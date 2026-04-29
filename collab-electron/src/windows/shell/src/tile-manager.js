@@ -3,6 +3,7 @@ import {
 	generateId, defaultSize, inferTileType, snapToGrid,
 	selectTile, deselectTile, toggleTileSelection,
 	clearSelection, isSelected, getSelectedTiles,
+	connections, getConnectionsForTile, removeConnection,
 } from "./canvas-state.js";
 import {
 	createTileDOM, positionTile, updateTileTitle, getTileLabel,
@@ -68,6 +69,14 @@ export function createTileManager({
 				zIndex: t.zIndex,
 				userTitle: t.userTitle,
 				autoTitle: t.autoTitle,
+			})),
+			connections: connections.map((conn) => ({
+				id: conn.id,
+				tileAId: conn.tileAId,
+				tileBId: conn.tileBId,
+				label: conn.label,
+				createdAt: conn.createdAt,
+				updatedAt: conn.updatedAt,
 			})),
 			viewport: {
 				panX: viewportState.panX,
@@ -590,6 +599,9 @@ export function createTileManager({
 					onTerminalTileClosed(tile.ptySessionId);
 				}
 			}
+		}
+		for (const conn of getConnectionsForTile(id)) {
+			removeConnection(conn.id);
 		}
 		removeTile(id);
 		onReposition?.();

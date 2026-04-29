@@ -121,6 +121,49 @@ export function registerCanvasRpc(win: BrowserWindow): void {
   );
 
   registerMethod(
+    "canvas.connectionList",
+    (params) => sendToShell("canvas.connectionList", params),
+    {
+      description: "List all canvas connections",
+      params: {},
+    },
+  );
+
+  registerMethod(
+    "canvas.connectionCreate",
+    (params) => sendToShell("canvas.connectionCreate", params),
+    {
+      description: "Create a connection between two tiles",
+      params: {
+        tileAId: "ID of the first tile",
+        tileBId: "ID of the second tile",
+        label: "(optional) Label for the connection",
+      },
+    },
+  );
+
+  registerMethod(
+    "canvas.connectionRemove",
+    (params) => sendToShell("canvas.connectionRemove", params),
+    {
+      description: "Remove a canvas connection",
+      params: { id: "ID of the connection to remove" },
+    },
+  );
+
+  registerMethod(
+    "canvas.connectionUpdateLabel",
+    (params) => sendToShell("canvas.connectionUpdateLabel", params),
+    {
+      description: "Update the label on a canvas connection",
+      params: {
+        id: "ID of the connection",
+        label: "New connection label",
+      },
+    },
+  );
+
+  registerMethod(
     "canvas.terminalWrite",
     (params) => sendToShell("canvas.terminalWrite", params),
     {

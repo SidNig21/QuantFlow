@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import {
   tiles,
+  connections,
   addTile,
   removeTile,
   getTile,
@@ -16,6 +17,11 @@ import {
   clearSelection,
   isSelected,
   getSelectedTiles,
+  addConnection,
+  removeConnection as removeConnectionState,
+  getConnectionsForTile,
+  getOtherTileId,
+  clearConnections,
 } from "./canvas-state.js";
 
 // Reset tiles array between tests by splicing out all entries.
@@ -23,6 +29,7 @@ import {
 beforeEach(() => {
   tiles.splice(0, tiles.length);
   clearSelection();
+  clearConnections();
 });
 
 // -- defaultSize --
@@ -125,6 +132,89 @@ describe("tile CRUD", () => {
     addTile({ id: "b", type: "note", x: 0, y: 0, width: 1, height: 1, zIndex: 2 });
     addTile({ id: "c", type: "code", x: 0, y: 0, width: 1, height: 1, zIndex: 3 });
     expect(tiles.map((t) => t.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("connection CRUD", () => {
+  test("addConnection adds to connections array", () => {
+    const conn = addConnection({
+      id: "conn-1",
+      tileAId: "tile-a",
+      tileBId: "tile-b",
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    expect(conn).toEqual(connections[0]);
+    expect(connections).toHaveLength(1);
+  });
+
+  test("removeConnection removes by id", () => {
+    addConnection({
+      id: "conn-1",
+      tileAId: "tile-a",
+      tileBId: "tile-b",
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    removeConnectionState("conn-1");
+    expect(connections).toHaveLength(0);
+  });
+
+  test("getConnectionsForTile returns connections for either endpoint", () => {
+    addConnection({
+      id: "conn-1",
+      tileAId: "tile-a",
+      tileBId: "tile-b",
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    addConnection({
+      id: "conn-2",
+      tileAId: "tile-c",
+      tileBId: "tile-a",
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    addConnection({
+      id: "conn-3",
+      tileAId: "tile-x",
+      tileBId: "tile-y",
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    expect(getConnectionsForTile("tile-a").map((conn) => conn.id)).toEqual([
+      "conn-1",
+      "conn-2",
+    ]);
+  });
+
+  test("getOtherTileId returns correct endpoint", () => {
+    const conn = addConnection({
+      id: "conn-1",
+      tileAId: "tile-a",
+      tileBId: "tile-b",
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    expect(getOtherTileId(conn, "tile-a")).toBe("tile-b");
+    expect(getOtherTileId(conn, "tile-b")).toBe("tile-a");
+  });
+
+  test("clearConnections empties array", () => {
+    addConnection({
+      id: "conn-1",
+      tileAId: "tile-a",
+      tileBId: "tile-b",
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    clearConnections();
+    expect(connections).toHaveLength(0);
   });
 });
 

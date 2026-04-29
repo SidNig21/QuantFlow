@@ -21,6 +21,9 @@
 /** @type {Tile[]} */
 export const tiles = [];
 
+/** @type {Array<{id: string, tileAId: string, tileBId: string, label?: string, createdAt: number, updatedAt: number}>} */
+export const connections = [];
+
 let nextZIndex = 1;
 
 const DEFAULT_TILE_SIZES = {
@@ -66,6 +69,44 @@ export function addTile(tile) {
 
 export function getTile(id) {
 	return tiles.find((t) => t.id === id) || null;
+}
+
+export function addConnection(conn) {
+	connections.push(conn);
+	return conn;
+}
+
+export function removeConnection(id) {
+	const idx = connections.findIndex((conn) => conn.id === id);
+	if (idx !== -1) connections.splice(idx, 1);
+}
+
+export function getConnection(id) {
+	return connections.find((conn) => conn.id === id) || null;
+}
+
+export function getConnectionsForTile(tileId) {
+	return connections.filter((conn) =>
+		conn.tileAId === tileId || conn.tileBId === tileId,
+	);
+}
+
+export function getOtherTileId(conn, tileId) {
+	if (conn.tileAId === tileId) return conn.tileBId;
+	if (conn.tileBId === tileId) return conn.tileAId;
+	return null;
+}
+
+export function updateConnectionLabel(id, label) {
+	const conn = getConnection(id);
+	if (!conn) return null;
+	conn.label = label;
+	conn.updatedAt = Date.now();
+	return conn;
+}
+
+export function clearConnections() {
+	connections.length = 0;
 }
 
 const IMAGE_EXTENSIONS = new Set([

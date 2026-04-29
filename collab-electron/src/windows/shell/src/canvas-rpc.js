@@ -1,6 +1,12 @@
 import {
-	tiles, getTile, defaultSize, snapToGrid,
+	tiles, connections, getTile, defaultSize, snapToGrid,
+	addConnection, removeConnection, updateConnectionLabel,
+	getConnection,
 } from "./canvas-state.js";
+
+function generateConnectionId() {
+	return "conn-" + Date.now() + "-" + Math.random().toString(36).slice(2, 9);
+}
 
 /**
  * Find a non-overlapping position on the canvas for a tile of the
@@ -174,6 +180,43 @@ export function createCanvasRpc({
 					tileManager.repositionAllTiles();
 					tileManager.saveCanvasImmediate();
 					result = {};
+					break;
+				}
+				case "connectionList": {
+					result = [...connections];
+					break;
+				}
+				case "connectionCreate": {
+					const tileA = requireTile(requestId, params.tileAId);
+					if (!tileA) return;
+					const tileB = requireTile(requestId, params.tileBId);
+					if (!tileB) return;
+					const now = Date.now();
+					result = addConnection({
+						id: generateConnectionId(),
+						tileAId: params.tileAId,
+						tileBId: params.tileBId,
+						label: params.label,
+						createdAt: now,
+						updatedAt: now,
+					});
+					tileManager.saveCanvasImmediate();
+					break;
+				}
+				case "connectionRemove": {
+					removeConnection(params.id);
+					tileManager.saveCanvasImmediate();
+					result = { ok: true };
+					break;
+				}
+				case "connectionUpdateLabel": {
+					const conn = updateConnectionLabel(params.id, params.label);
+					if (!conn) {
+						respondError(requestId, 3, "Connection not found");
+						return;
+					}
+					tileManager.saveCanvasImmediate();
+					result = getConnection(params.id);
 					break;
 				}
 				case "viewportGet": {

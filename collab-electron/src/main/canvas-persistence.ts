@@ -25,9 +25,19 @@ interface TileState {
   zIndex: number;
 }
 
+export interface ConnectionState {
+  id: string;
+  tileAId: string;
+  tileBId: string;
+  label?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 interface CanvasState {
   version: 1;
   tiles: TileState[];
+  connections: ConnectionState[];
   viewport: {
     centerX: number;
     centerY: number;
@@ -42,12 +52,17 @@ function sanitizeCoord(v: unknown): number {
 export async function loadState(): Promise<CanvasState | null> {
   try {
     const raw = await readFile(STATE_FILE, "utf-8");
-    const state = JSON.parse(raw) as CanvasState;
+    const state = JSON.parse(raw) as CanvasState & {
+      connections?: unknown;
+    };
     if (state.version !== 1) return null;
     for (const tile of state.tiles) {
       tile.x = sanitizeCoord(tile.x);
       tile.y = sanitizeCoord(tile.y);
     }
+    state.connections = Array.isArray(state.connections)
+      ? state.connections
+      : [];
     return state;
   } catch {
     return null;
