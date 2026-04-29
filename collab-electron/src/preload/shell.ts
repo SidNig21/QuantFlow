@@ -396,4 +396,8 @@ contextBridge.exposeInMainWorld("shellApi", {
   stringUnregisterTileSession: (
     tileId: string,
   ) => ipcRenderer.invoke("string:unregister-tile-session", tileId),
+
+  // ── Role service ──
+  rolesList: () => ipcRenderer.invoke("roles:list"),
+  rolesGet: (id: string) => ipcRenderer.invoke("roles:get", id),
 });

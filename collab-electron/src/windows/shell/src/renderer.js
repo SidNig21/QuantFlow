@@ -935,6 +935,7 @@ async function init() {
 		const selected = await window.shellApi.showContextMenu([
 			{ id: "new-terminal", label: "New terminal tile" },
 			{ id: "new-browser", label: "New browser tile" },
+			{ id: "spawn-role", label: "Spawn role tile…" },
 		]);
 
 		if (selected === "new-terminal") {
@@ -951,6 +952,31 @@ async function init() {
 				"browser", cx, cy,
 			);
 			tileManager.spawnBrowserWebview(tile, true);
+			tileManager.saveCanvasImmediate();
+			minimap.update();
+		} else if (selected === "spawn-role") {
+			const roles = await window.shellApi.rolesList?.() ?? [];
+			if (roles.length === 0) return;
+			const roleItems = roles.map((r) => ({
+				id: `role:${r.id}`,
+				label: `${r.name} — ${r.description}`,
+			}));
+			const roleSelected = await window.shellApi.showContextMenu(roleItems);
+			if (!roleSelected?.startsWith("role:")) return;
+			const roleId = roleSelected.slice(5);
+			const role = roles.find((r) => r.id === roleId);
+			if (!role) return;
+			const cwd = getTerminalCwd();
+			const size = getTerminalSize();
+			const tile = tileManager.createCanvasTile(
+				"term", cx, cy, {
+					cwd, ...size,
+					userTitle: role.name,
+					roleId: role.id,
+					roleColor: role.color,
+				},
+			);
+			tileManager.spawnTerminalWebview(tile, true);
 			tileManager.saveCanvasImmediate();
 			minimap.update();
 		}

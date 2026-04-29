@@ -39,6 +39,10 @@ export function createTileDOM(tile, callbacks) {
 
   const titleBar = document.createElement("div");
   titleBar.className = "tile-title-bar";
+  if (tile.roleColor) {
+    titleBar.style.setProperty("--role-color", tile.roleColor);
+    titleBar.classList.add("tile-title-bar--role");
+  }
 
   const titleText = document.createElement("span");
   titleText.className = "tile-title-text";

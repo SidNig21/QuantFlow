@@ -70,6 +70,8 @@ export function createTileManager({
 				zIndex: t.zIndex,
 				userTitle: t.userTitle,
 				autoTitle: t.autoTitle,
+				roleId: t.roleId,
+				roleColor: t.roleColor,
 			})),
 			connections: connections.map((conn) => ({
 				id: conn.id,
@@ -715,6 +717,8 @@ export function createTileManager({
 						ptySessionId: saved.ptySessionId,
 						userTitle: saved.userTitle,
 						autoTitle: saved.autoTitle,
+						roleId: saved.roleId,
+						roleColor: saved.roleColor,
 					},
 				);
 				spawnTerminalWebview(tile);

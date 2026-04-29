@@ -1431,6 +1431,16 @@ body.platform-win {
 	color: #c7d2fe;
 }
 
+/* Role-colored tile title bars */
+
+.tile-title-bar--role {
+	border-top: 2px solid var(--role-color, #6366f1);
+}
+
+.tile-title-bar--role .tile-title-name {
+	color: var(--role-color, #6366f1);
+}
+
 /* Cable draw mode: hold C key */
 
 .cable-draw-mode,
