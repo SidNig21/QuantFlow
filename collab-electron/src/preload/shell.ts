@@ -371,4 +371,29 @@ contextBridge.exposeInMainWorld("shellApi", {
     canGoBack: boolean; canGoForward: boolean;
   }> =>
     ipcRenderer.invoke("browser:info", { webContentsId }),
+
+  // ── String relay ──
+  stringRelay: (req: {
+    connectionId: string;
+    fromTileId: string;
+    fromLabel: string;
+    targetTileId: string;
+    targetSessionId: string | null;
+    text: string;
+  }) => ipcRenderer.invoke("string:relay", req),
+
+  stringGetLog: (
+    connectionId: string,
+    limit?: number,
+  ) => ipcRenderer.invoke("string:get-log", connectionId, limit),
+
+  stringRegisterTileSession: (
+    tileId: string,
+    sessionId: string,
+    label: string,
+  ) => ipcRenderer.invoke("string:register-tile-session", tileId, sessionId, label),
+
+  stringUnregisterTileSession: (
+    tileId: string,
+  ) => ipcRenderer.invoke("string:unregister-tile-session", tileId),
 });
