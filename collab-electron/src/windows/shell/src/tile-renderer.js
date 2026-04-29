@@ -192,11 +192,24 @@ export function createTileDOM(tile, callbacks) {
       const selected = await window.shellApi.showContextMenu([
         { id: "rename", label: "Rename" },
         { id: "duplicate", label: "Duplicate" },
+        { id: "inject-vault", label: "Inject vault file…" },
       ]);
       if (selected === "rename" && callbacks.onRename) {
         callbacks.onRename(tile.id);
       } else if (selected === "duplicate" && callbacks.onDuplicate) {
         callbacks.onDuplicate(tile.id);
+      } else if (selected === "inject-vault") {
+        try {
+          const filePath = await window.shellApi.vaultPickFile?.();
+          if (!filePath || !tile.ptySessionId) return;
+          const content = await window.shellApi.vaultReadFile?.(filePath);
+          if (!content) return;
+          const fileName = filePath.split(/[\\/]/).pop() ?? "file";
+          const header = `\n--- ${fileName} ---\n`;
+          window.shellApi.ptyWrite(tile.ptySessionId, header + content + "\n");
+        } catch (err) {
+          console.warn("[vault] inject failed:", err);
+        }
       }
     });
   }

@@ -19,6 +19,7 @@ import { registerCanvasHandlers } from "./ipc-canvas";
 import { registerMiscHandlers } from "./ipc-misc";
 import { registerStringRelayHandlers } from "./ipc-string-relay";
 import { registerRoleServiceHandlers } from "./ipc-role-service";
+import { registerVaultHandlers } from "./ipc-vault";
 
 const FS_CHANGE_DELETED = 3;
 
@@ -136,4 +137,5 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerMiscHandlers(miscCtx);
   registerStringRelayHandlers();
   registerRoleServiceHandlers();
+  registerVaultHandlers(() => mainWindow);
 }

@@ -400,4 +400,14 @@ contextBridge.exposeInMainWorld("shellApi", {
   // ── Role service ──
   rolesList: () => ipcRenderer.invoke("roles:list"),
   rolesGet: (id: string) => ipcRenderer.invoke("roles:get", id),
+
+  // ── Obsidian vault ──
+  vaultGetPath: (): Promise<string | null> =>
+    ipcRenderer.invoke("vault:get-path"),
+  vaultSetPath: (path: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke("vault:set-path", path),
+  vaultPickFile: (): Promise<string | null> =>
+    ipcRenderer.invoke("vault:pick-file"),
+  vaultReadFile: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke("vault:read-file", filePath),
 });
