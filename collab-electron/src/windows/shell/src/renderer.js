@@ -1,9 +1,9 @@
 import "./shell.css";
 import "./tooltip.js";
 import {
-	tiles, getTile, defaultSize, inferTileType, tileAtPoint,
+	tiles, connections, getTile, defaultSize, inferTileType, tileAtPoint,
 	selectTile, clearSelection, getSelectedTiles, getNearestTileInDirection,
-	removeConnection, updateConnectionLabel,
+	addConnection, removeConnection, updateConnectionLabel,
 } from "./canvas-state.js";
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
@@ -155,6 +155,7 @@ async function init() {
 	let lastNonModalSurface = "canvas";
 	let shiftHeld = false;
 	let spaceHeld = false;
+	let cableHeld = false;
 	let isPanning = false;
 	let suppressCanvasDblClickUntil = 0;
 
@@ -579,10 +580,57 @@ async function init() {
 	// -- Tile manager --
 
 	let minimapRef = null;
+	function onCableMousedown(tile, e) {
+		if (!cableHeld) return false;
+		e.preventDefault();
+		e.stopPropagation();
+		cableOverlay?.startPreview(tile);
+
+		function onMove(ev) {
+			cableOverlay?.updatePreview(ev.clientX, ev.clientY);
+		}
+
+		function onUp(ev) {
+			document.removeEventListener("mousemove", onMove);
+			document.removeEventListener("mouseup", onUp);
+
+			const rect = canvasEl.getBoundingClientRect();
+			const cx = (ev.clientX - rect.left - viewportState.panX) / viewportState.zoom;
+			const cy = (ev.clientY - rect.top - viewportState.panY) / viewportState.zoom;
+			const targetTile = tileAtPoint(cx, cy);
+
+			if (targetTile && targetTile.id !== tile.id) {
+				const duplicate = connections.some(
+					(c) =>
+						(c.tileAId === tile.id && c.tileBId === targetTile.id) ||
+						(c.tileAId === targetTile.id && c.tileBId === tile.id),
+				);
+				if (!duplicate) {
+					const now = Date.now();
+					addConnection({
+						id: `conn-${now}-${Math.random().toString(36).slice(2, 7)}`,
+						tileAId: tile.id,
+						tileBId: targetTile.id,
+						createdAt: now,
+						updatedAt: now,
+					});
+					tileManager.saveCanvasImmediate();
+					cableOverlay?.update();
+				}
+			}
+			cableOverlay?.cancelPreview();
+		}
+
+		document.addEventListener("mousemove", onMove);
+		document.addEventListener("mouseup", onUp);
+		return true;
+	}
+
 	const tileManager = createTileManager({
 		tileLayer, viewportState, configs,
 		getAllWebviews,
 		isSpaceHeld: () => spaceHeld,
+		onCableMousedown,
 		onReposition: () => { viewport.redrawGrid(); minimapRef?.update(); cableOverlay?.update(); },
 		onSaveDebounced(state) {
 			window.shellApi.canvasSaveState(
@@ -1029,6 +1077,35 @@ async function init() {
 		if (spaceHeld) {
 			spaceHeld = false;
 			canvasEl.classList.remove("space-held", "panning");
+		}
+	});
+
+	// -- C key: cable draw mode --
+
+	window.addEventListener("keydown", (e) => {
+		if (
+			e.code === "KeyC" && !e.repeat &&
+			!e.target.closest?.("webview") &&
+			!e.target.matches?.("input, textarea")
+		) {
+			cableHeld = true;
+			canvasEl.classList.add("cable-draw-mode");
+		}
+	});
+
+	window.addEventListener("keyup", (e) => {
+		if (e.code === "KeyC") {
+			cableHeld = false;
+			canvasEl.classList.remove("cable-draw-mode");
+			cableOverlay?.cancelPreview();
+		}
+	});
+
+	window.addEventListener("blur", () => {
+		if (cableHeld) {
+			cableHeld = false;
+			canvasEl.classList.remove("cable-draw-mode");
+			cableOverlay?.cancelPreview();
 		}
 	});
 

@@ -30,6 +30,7 @@ export function createTileManager({
 	onTileFocused,
 	onTileDblClick,
 	onReposition,
+	onCableMousedown,
 }) {
 	/** @type {Map<string, {container: HTMLElement, contentArea: HTMLElement, titleText: HTMLElement, webview?: HTMLElement}>} */
 	const tileDOMs = new Map();
@@ -569,6 +570,14 @@ export function createTileManager({
 				}
 			},
 		);
+
+		// Cable draw: intercept mousedown before drag fires
+		if (onCableMousedown) {
+			dom.container.addEventListener("mousedown", (e) => {
+				if (e.button !== 0) return;
+				onCableMousedown(tile, e);
+			}, { capture: true });
+		}
 
 		tileLayer.appendChild(dom.container);
 		tileDOMs.set(tile.id, dom);

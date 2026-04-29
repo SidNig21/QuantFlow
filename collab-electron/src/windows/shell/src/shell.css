@@ -1430,3 +1430,15 @@ body.platform-win {
 	background: rgba(99, 102, 241, 0.15);
 	color: #c7d2fe;
 }
+
+/* Cable draw mode: hold C key */
+
+.cable-draw-mode,
+.cable-draw-mode .canvas-tile,
+.cable-draw-mode .canvas-tile * {
+	cursor: crosshair !important;
+}
+
+.cable-draw-mode .canvas-tile:hover {
+	box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.45) !important;
+}
