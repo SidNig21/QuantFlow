@@ -241,6 +241,8 @@ export function createTileManager({
 				if (onTerminalSessionCreated) {
 					onTerminalSessionCreated(tile);
 				}
+				const label = tile.userTitle || tile.autoTitle || tile.id;
+				window.shellApi.stringRegisterTileSession?.(tile.id, tile.ptySessionId, label);
 			}
 			if (event.channel === "pty-cwd-changed") {
 				const cwd = event.args[1];
@@ -604,6 +606,7 @@ export function createTileManager({
 			);
 			if (tile.type === "term" && tile.ptySessionId) {
 				window.shellApi.ptyKillSession(tile.ptySessionId);
+				window.shellApi.stringUnregisterTileSession?.(tile.id);
 				if (onTerminalTileClosed) {
 					onTerminalTileClosed(tile.ptySessionId);
 				}
@@ -816,6 +819,10 @@ export function createTileManager({
 		const d = tileDOMs.get(id);
 		if (d) updateTileTitle(d, t);
 		saveCanvasImmediate();
+		if (t.type === "term" && t.ptySessionId) {
+			const label = t.userTitle || t.autoTitle || t.id;
+			window.shellApi.stringRegisterTileSession?.(t.id, t.ptySessionId, label);
+		}
 	}
 
 	return {
