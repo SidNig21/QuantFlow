@@ -37,8 +37,47 @@ const logRings = new Map<string, RelayLogEntry[]>();
 interface TileSession {
   sessionId: string;
   label: string;
+  lastLine?: string;
+  lastActivityTs?: number;
 }
 const tileRegistry = new Map<string, TileSession>();
+
+export interface TileSnapshot {
+  tileId: string;
+  label: string;
+  sessionId: string;
+  lastLine: string;
+  lastActivityTs: number;
+  status: "active" | "idle" | "quiet";
+}
+
+export function watchtowerSnapshot(): TileSnapshot[] {
+  const now = Date.now();
+  return [...tileRegistry.entries()].map(([tileId, entry]) => {
+    const age = entry.lastActivityTs != null ? now - entry.lastActivityTs : Infinity;
+    const status: TileSnapshot["status"] =
+      age < 5_000 ? "active" : age < 30_000 ? "idle" : "quiet";
+    return {
+      tileId,
+      label: entry.label,
+      sessionId: entry.sessionId,
+      lastLine: entry.lastLine ?? "",
+      lastActivityTs: entry.lastActivityTs ?? 0,
+      status,
+    };
+  });
+}
+
+export function getAllRelayLogs(
+  limit = 50,
+): RelayLogEntry[] {
+  const all: RelayLogEntry[] = [];
+  for (const ring of logRings.values()) {
+    all.push(...ring);
+  }
+  all.sort((a, b) => a.ts - b.ts);
+  return all.slice(-limit);
+}
 // Line buffers for agent-initiated relay (Phase 4)
 const lineBuffers = new Map<string, string>();
 
@@ -141,6 +180,16 @@ const RELAY_PREFIX_RE = /^>>@(.+?):\s*(.+)$/;
 export function onPtyData(sessionId: string, chunk: string): void {
   const fromTileId = tileIdForSession(sessionId);
   if (!fromTileId) return;
+
+  // Track last activity
+  const registryEntry = tileRegistry.get(fromTileId);
+  if (registryEntry) {
+    const lines = chunk.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length > 0) {
+      registryEntry.lastLine = lines[lines.length - 1]!;
+    }
+    registryEntry.lastActivityTs = Date.now();
+  }
 
   // Accumulate into line buffer
   let buf = (lineBuffers.get(fromTileId) ?? "") + chunk;

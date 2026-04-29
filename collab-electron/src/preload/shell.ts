@@ -397,6 +397,12 @@ contextBridge.exposeInMainWorld("shellApi", {
     tileId: string,
   ) => ipcRenderer.invoke("string:unregister-tile-session", tileId),
 
+  // ── Watchtower ──
+  watchtowerSnapshot: (): Promise<unknown[]> =>
+    ipcRenderer.invoke("watchtower:snapshot"),
+  watchtowerRelayLog: (limit?: number): Promise<unknown[]> =>
+    ipcRenderer.invoke("watchtower:relay-log", limit),
+
   // ── Role service ──
   rolesList: () => ipcRenderer.invoke("roles:list"),
   rolesGet: (id: string) => ipcRenderer.invoke("roles:get", id),

@@ -1106,6 +1106,99 @@ async function init() {
 		}
 	});
 
+	// -- W key: watchtower panel --
+
+	let watchtowerVisible = false;
+	let watchtowerTab = "agents";
+	let watchtowerTimer = null;
+	const watchtowerEl = document.createElement("div");
+	watchtowerEl.id = "watchtower-panel";
+	watchtowerEl.hidden = true;
+	watchtowerEl.innerHTML = `
+		<div class="wt-header">
+			<span class="wt-title">Watchtower</span>
+			<div class="wt-tabs">
+				<button class="wt-tab active" data-tab="agents">Agents</button>
+				<button class="wt-tab" data-tab="messages">Messages</button>
+			</div>
+			<button class="wt-close">✕</button>
+		</div>
+		<div class="wt-body"></div>
+	`;
+	document.body.appendChild(watchtowerEl);
+
+	watchtowerEl.querySelector(".wt-close").addEventListener("click", () => {
+		hideWatchtower();
+	});
+
+	for (const tab of watchtowerEl.querySelectorAll(".wt-tab")) {
+		tab.addEventListener("click", () => {
+			watchtowerTab = tab.dataset.tab;
+			for (const t of watchtowerEl.querySelectorAll(".wt-tab")) {
+				t.classList.toggle("active", t.dataset.tab === watchtowerTab);
+			}
+			refreshWatchtower();
+		});
+	}
+
+	function renderWatchtowerAgents(items) {
+		if (!items.length) return `<p class="wt-empty">No registered tile sessions.</p>`;
+		return items.map((item) => `
+			<div class="wt-agent-card wt-status-${item.status}">
+				<div class="wt-agent-label">${item.label}</div>
+				<div class="wt-agent-status">${item.status}</div>
+				${item.lastLine ? `<div class="wt-agent-line">${item.lastLine.slice(0, 120)}</div>` : ""}
+			</div>
+		`).join("");
+	}
+
+	function renderWatchtowerMessages(logs) {
+		if (!logs.length) return `<p class="wt-empty">No relay messages yet.</p>`;
+		return logs.slice(-20).reverse().map((entry) => `
+			<div class="wt-msg">
+				<span class="wt-msg-from">${entry.fromLabel}</span>
+				<span class="wt-msg-arrow">→</span>
+				<span class="wt-msg-text">${entry.formatted.slice(0, 200)}</span>
+			</div>
+		`).join("");
+	}
+
+	async function refreshWatchtower() {
+		const body = watchtowerEl.querySelector(".wt-body");
+		if (watchtowerTab === "agents") {
+			const items = await window.shellApi.watchtowerSnapshot?.() ?? [];
+			body.innerHTML = renderWatchtowerAgents(items);
+		} else {
+			const logs = await window.shellApi.watchtowerRelayLog?.(50) ?? [];
+			body.innerHTML = renderWatchtowerMessages(logs);
+		}
+	}
+
+	function showWatchtower() {
+		watchtowerVisible = true;
+		watchtowerEl.hidden = false;
+		refreshWatchtower();
+		watchtowerTimer = setInterval(refreshWatchtower, 2000);
+	}
+
+	function hideWatchtower() {
+		watchtowerVisible = false;
+		watchtowerEl.hidden = true;
+		clearInterval(watchtowerTimer);
+		watchtowerTimer = null;
+	}
+
+	window.addEventListener("keydown", (e) => {
+		if (
+			e.code === "KeyW" && !e.metaKey && !e.ctrlKey && !e.altKey &&
+			!e.target.closest?.("webview") &&
+			!e.target.matches?.("input, textarea")
+		) {
+			if (watchtowerVisible) hideWatchtower();
+			else showWatchtower();
+		}
+	});
+
 	// -- C key: cable draw mode --
 
 	window.addEventListener("keydown", (e) => {

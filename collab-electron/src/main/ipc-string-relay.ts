@@ -4,6 +4,8 @@ import {
   getStringLog,
   registerTileSession,
   unregisterTileSession,
+  watchtowerSnapshot,
+  getAllRelayLogs,
   type RelayRequest,
 } from "./string-relay";
 
@@ -34,4 +36,12 @@ export function registerStringRelayHandlers(): void {
       return { ok: true };
     },
   );
+
+  ipcMain.handle("watchtower:snapshot", () => {
+    return watchtowerSnapshot();
+  });
+
+  ipcMain.handle("watchtower:relay-log", (_event, limit?: number) => {
+    return getAllRelayLogs(limit);
+  });
 }
