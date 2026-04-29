@@ -193,6 +193,7 @@ export function createTileDOM(tile, callbacks) {
         { id: "rename", label: "Rename" },
         { id: "duplicate", label: "Duplicate" },
         { id: "inject-vault", label: "Inject vault file…" },
+        { id: "inject-context", label: "Inject shared context" },
       ]);
       if (selected === "rename" && callbacks.onRename) {
         callbacks.onRename(tile.id);
@@ -209,6 +210,13 @@ export function createTileDOM(tile, callbacks) {
           window.shellApi.ptyWrite(tile.ptySessionId, header + content + "\n");
         } catch (err) {
           console.warn("[vault] inject failed:", err);
+        }
+      } else if (selected === "inject-context") {
+        if (!tile.ptySessionId) return;
+        try {
+          await window.shellApi.contextInjectToTile?.(tile.ptySessionId);
+        } catch (err) {
+          console.warn("[context] inject failed:", err);
         }
       }
     });

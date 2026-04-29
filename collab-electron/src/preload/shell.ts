@@ -410,4 +410,16 @@ contextBridge.exposeInMainWorld("shellApi", {
     ipcRenderer.invoke("vault:pick-file"),
   vaultReadFile: (filePath: string): Promise<string> =>
     ipcRenderer.invoke("vault:read-file", filePath),
+
+  // ── Shared context ──
+  contextGet: (): Promise<unknown> =>
+    ipcRenderer.invoke("context:get"),
+  contextPinFile: (filePath: string): Promise<unknown> =>
+    ipcRenderer.invoke("context:pin-file", filePath),
+  contextUnpinFile: (filePath: string): Promise<unknown> =>
+    ipcRenderer.invoke("context:unpin-file", filePath),
+  contextAddDecision: (text: string): Promise<unknown> =>
+    ipcRenderer.invoke("context:add-decision", text),
+  contextInjectToTile: (sessionId: string): Promise<unknown> =>
+    ipcRenderer.invoke("context:inject-to-tile", sessionId),
 });
