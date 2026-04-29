@@ -3,6 +3,7 @@ import "./tooltip.js";
 import {
 	tiles, getTile, defaultSize, inferTileType, tileAtPoint,
 	selectTile, clearSelection, getSelectedTiles, getNearestTileInDirection,
+	removeConnection, updateConnectionLabel,
 } from "./canvas-state.js";
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
@@ -15,6 +16,7 @@ import { createWorkspaceManager } from "./workspace-manager.js";
 import { createCanvasRpc } from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
 import { updateTileTitle, getTileLabel } from "./tile-renderer.js";
+import { createCableOverlay } from "./cable-overlay.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
 const IS_WINDOWS = window.shellApi.getPlatform() === "win32";
@@ -581,7 +583,7 @@ async function init() {
 		tileLayer, viewportState, configs,
 		getAllWebviews,
 		isSpaceHeld: () => spaceHeld,
-		onReposition: () => { viewport.redrawGrid(); minimapRef?.update(); },
+		onReposition: () => { viewport.redrawGrid(); minimapRef?.update(); cableOverlay?.update(); },
 		onSaveDebounced(state) {
 			window.shellApi.canvasSaveState(
 				toCenterPointState(state),
@@ -625,6 +627,24 @@ async function init() {
 		},
 	});
 
+	// -- Cable overlay --
+
+	let cableOverlay = createCableOverlay({
+		containerEl: canvasEl,
+		viewportState,
+		onSendMessage: (req) => window.shellApi.stringRelay?.(req),
+		onRemoveConnection: (id) => {
+			removeConnection(id);
+			tileManager.saveCanvasImmediate();
+			cableOverlay.update();
+		},
+		onUpdateLabel: (id, label) => {
+			updateConnectionLabel(id, label);
+			tileManager.saveCanvasImmediate();
+			cableOverlay.update();
+		},
+	});
+
 	// -- Edge indicators --
 
 	const edgeIndicators = createEdgeIndicators({
@@ -661,11 +681,13 @@ async function init() {
 		tileManager.repositionAllTiles();
 		edgeIndicators.update();
 		minimap.update();
+		cableOverlay.update();
 		tileManager.saveCanvasDebounced();
 	});
 
 	edgeIndicators.update();
 	minimap.update();
+	cableOverlay.update();
 
 	// -- Agent panel init (after tileManager, since getAllWebviews references it) --
 

@@ -1269,3 +1269,164 @@ body.platform-win {
 .dark .tile-rename-input:focus {
 	border-color: rgba(255, 255, 255, 0.5);
 }
+
+/* ── Cable overlay ── */
+
+#cable-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 150;
+	overflow: visible;
+}
+
+.cable-path {
+	fill: none;
+	stroke: #6366f1;
+	stroke-width: 2px;
+	opacity: 0.6;
+	transition: opacity 0.15s, stroke 0.15s;
+}
+
+.cable-hit {
+	fill: none;
+	stroke: transparent;
+	stroke-width: 18px;
+	cursor: pointer;
+	pointer-events: all;
+}
+
+.cable-hit:hover ~ .cable-path {
+	opacity: 1;
+}
+
+@keyframes cablePulse {
+	0%   { stroke: #a5b4fc; stroke-width: 3px; opacity: 1; }
+	100% { stroke: #6366f1; stroke-width: 2px; opacity: 0.6; }
+}
+
+.cable-pulse {
+	animation: cablePulse 0.65s ease-out forwards;
+}
+
+.cable-preview {
+	fill: none;
+	stroke: #6366f1;
+	stroke-width: 2px;
+	stroke-dasharray: 7 5;
+	opacity: 0.45;
+	pointer-events: none;
+}
+
+.cable-label {
+	fill: rgba(148, 163, 184, 0.8);
+	font-size: 11px;
+	font-family: var(--font-sans);
+	text-anchor: middle;
+	pointer-events: none;
+	user-select: none;
+}
+
+/* Cable popover */
+
+.cable-popover {
+	position: absolute;
+	z-index: 9100;
+	background: #1e293b;
+	border: 1px solid rgba(99, 102, 241, 0.35);
+	border-radius: 7px;
+	padding: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 250px;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.dark .cable-popover {
+	background: #0f172a;
+	border-color: rgba(99, 102, 241, 0.4);
+}
+
+.cable-dir-btn {
+	background: rgba(99, 102, 241, 0.1);
+	border: 1px solid rgba(99, 102, 241, 0.25);
+	border-radius: 4px;
+	padding: 4px 8px;
+	font-size: 11px;
+	color: #94a3b8;
+	cursor: pointer;
+	text-align: left;
+	font-family: var(--font-mono);
+}
+
+.cable-dir-btn:hover {
+	background: rgba(99, 102, 241, 0.2);
+	color: #c7d2fe;
+}
+
+.cable-input {
+	background: rgba(15, 23, 42, 0.8);
+	border: 1px solid rgba(99, 102, 241, 0.25);
+	border-radius: 4px;
+	padding: 6px 8px;
+	font-size: 12px;
+	color: #e2e8f0;
+	outline: none;
+	width: 100%;
+	box-sizing: border-box;
+	font-family: var(--font-sans);
+}
+
+.cable-input:focus {
+	border-color: #6366f1;
+	box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.cable-send-btn {
+	background: #6366f1;
+	border: none;
+	border-radius: 4px;
+	padding: 6px 12px;
+	font-size: 12px;
+	color: #fff;
+	cursor: pointer;
+	font-family: var(--font-sans);
+}
+
+.cable-send-btn:hover {
+	background: #818cf8;
+}
+
+/* Cable context menu */
+
+.cable-context-menu {
+	position: fixed;
+	z-index: 9200;
+	background: #1e293b;
+	border: 1px solid #334155;
+	border-radius: 6px;
+	padding: 4px 0;
+	min-width: 170px;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.dark .cable-context-menu {
+	background: #0f172a;
+}
+
+.cable-menu-item {
+	padding: 7px 12px;
+	font-size: 12px;
+	color: #e2e8f0;
+	cursor: pointer;
+	font-family: var(--font-sans);
+}
+
+.cable-menu-item:hover {
+	background: rgba(99, 102, 241, 0.15);
+	color: #c7d2fe;
+}
