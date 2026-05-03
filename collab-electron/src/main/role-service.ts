@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFile, readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { COLLAB_DIR } from "./paths";
@@ -9,10 +10,69 @@ export interface Role {
   name: string;
   description: string;
   color: string;
+  icon?: string;
+  commandTemplate?: string;
+  commandAvailable?: boolean;
+  cwdPolicy?: "workspace" | "home" | "inherit";
+  defaultShell?: "auto" | "powershell" | "wsl" | "shell";
+  startupPrompt?: string;
   systemPrompt?: string;
 }
 
 const BUILT_IN_ROLES: Role[] = [
+  {
+    id: "shell",
+    name: "Shell",
+    description: "General-purpose terminal for project commands",
+    color: "#64748b",
+    icon: "terminal",
+    cwdPolicy: "workspace",
+    defaultShell: "auto",
+  },
+  {
+    id: "codex",
+    name: "Codex",
+    description: "Local Codex coding agent",
+    color: "#38bdf8",
+    icon: "bot",
+    commandTemplate: "codex",
+    cwdPolicy: "workspace",
+    defaultShell: "auto",
+    startupPrompt: "Review the current task context and wait for instructions.",
+  },
+  {
+    id: "claude-worker",
+    name: "Claude Worker",
+    description: "Claude Code implementation agent",
+    color: "#f97316",
+    icon: "hammer",
+    commandTemplate: "claude",
+    cwdPolicy: "workspace",
+    defaultShell: "auto",
+    startupPrompt: "Act as the implementation worker for this workspace.",
+  },
+  {
+    id: "claude-reviewer",
+    name: "Claude Reviewer",
+    description: "Claude Code review and risk-check agent",
+    color: "#22c55e",
+    icon: "search-check",
+    commandTemplate: "claude",
+    cwdPolicy: "workspace",
+    defaultShell: "auto",
+    startupPrompt: "Act as the reviewer. Focus on defects, risks, and missing tests.",
+  },
+  {
+    id: "opencode",
+    name: "OpenCode",
+    description: "OpenCode agent terminal",
+    color: "#a855f7",
+    icon: "blocks",
+    commandTemplate: "opencode",
+    cwdPolicy: "workspace",
+    defaultShell: "auto",
+    startupPrompt: "Open this workspace and wait for orchestration instructions.",
+  },
   {
     id: "coder",
     name: "Coder",
@@ -45,6 +105,40 @@ const BUILT_IN_ROLES: Role[] = [
   },
 ];
 
+export function getRoleCommandName(role: Pick<Role, "commandTemplate">): string | null {
+  const template = role.commandTemplate?.trim();
+  if (!template) return null;
+  const match = template.match(/^"([^"]+)"|^'([^']+)'|^(\S+)/);
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+}
+
+function commandExists(command: string): boolean {
+  try {
+    execFileSync(
+      process.platform === "win32" ? "where.exe" : "which",
+      [command],
+      {
+        encoding: "utf8",
+        stdio: "ignore",
+        timeout: 5000,
+        windowsHide: true,
+      },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function withRoleDiagnostics(role: Role): Role {
+  const command = getRoleCommandName(role);
+  if (!command) return role;
+  return {
+    ...role,
+    commandAvailable: commandExists(command),
+  };
+}
+
 export async function listRoles(): Promise<Role[]> {
   try {
     await mkdir(ROLES_DIR, { recursive: true });
@@ -62,9 +156,9 @@ export async function listRoles(): Promise<Role[]> {
         }
       } catch { /* skip invalid */ }
     }
-    return [...roleMap.values()];
+    return [...roleMap.values()].map(withRoleDiagnostics);
   } catch {
-    return [...BUILT_IN_ROLES];
+    return [...BUILT_IN_ROLES].map(withRoleDiagnostics);
   }
 }
 

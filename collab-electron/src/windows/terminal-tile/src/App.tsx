@@ -31,6 +31,7 @@ function App() {
     const existingSessionId = params.get("sessionId");
     const isRestored = params.get("restored") === "1";
     const cwd = params.get("cwd") || undefined;
+    const target = params.get("target") || undefined;
     const tileId = params.get("tileId") || undefined;
 
     const createFreshSession = (
@@ -107,7 +108,7 @@ function App() {
       return;
     }
 
-    createFreshSession();
+    createFreshSession(target);
   }, []);
 
   useEffect(() => {

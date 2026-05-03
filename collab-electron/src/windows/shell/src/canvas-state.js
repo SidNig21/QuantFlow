@@ -13,11 +13,17 @@
  * @property {string} [url] - URL for browser tiles
  * @property {string} [cwd] - Working directory for terminal tiles
  * @property {string} [ptySessionId] - PTY session ID for terminal tiles
+ * @property {string} [terminalTarget] - Requested terminal backend target
  * @property {string} [userTitle] - Manual title override set by user
  * @property {string} [autoTitle] - Auto-computed title from terminal session
  * @property {string} [routeHandle] - Stable relay handle without the @ prefix
  * @property {string} [roleId] - Role identifier for role-spawned tiles
+ * @property {string} [roleName] - Display name for role-spawned tiles
  * @property {string} [roleColor] - CSS color for role header
+ * @property {string} [roleShellKind] - Shell/CLI kind for role-spawned tiles
+ * @property {string} [roleCommandTemplate] - Startup command for role-spawned tiles
+ * @property {string} [roleStartupPrompt] - Initial role instruction text
+ * @property {string} [roleStartupSessionId] - Session that already received startup command
  * @property {number} zIndex - Stacking order
  */
 

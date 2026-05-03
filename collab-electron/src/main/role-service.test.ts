@@ -6,7 +6,7 @@ mock.module("node:fs/promises", () => ({
   readFile: async () => { throw new Error("no file"); },
 }));
 
-import { listRoles, getRole } from "./role-service";
+import { getRoleCommandName, listRoles, getRole } from "./role-service";
 
 describe("listRoles", () => {
   test("returns 5 built-in roles when no custom roles exist", async () => {
@@ -14,23 +14,27 @@ describe("listRoles", () => {
     expect(roles.length).toBeGreaterThanOrEqual(5);
   });
 
-  test("includes coder, reviewer, planner, researcher, writer", async () => {
+  test("includes practical orchestration roles", async () => {
     const roles = await listRoles();
     const ids = roles.map((r) => r.id);
-    expect(ids).toContain("coder");
-    expect(ids).toContain("reviewer");
-    expect(ids).toContain("planner");
-    expect(ids).toContain("researcher");
-    expect(ids).toContain("writer");
+    expect(ids).toContain("shell");
+    expect(ids).toContain("codex");
+    expect(ids).toContain("claude-worker");
+    expect(ids).toContain("claude-reviewer");
+    expect(ids).toContain("opencode");
   });
 
-  test("each role has id, name, description, color", async () => {
+  test("each role has identity and launch metadata", async () => {
     const roles = await listRoles();
     for (const role of roles) {
       expect(typeof role.id).toBe("string");
       expect(typeof role.name).toBe("string");
       expect(typeof role.description).toBe("string");
       expect(typeof role.color).toBe("string");
+      expect(role.cwdPolicy === undefined || typeof role.cwdPolicy === "string")
+        .toBe(true);
+      expect(role.defaultShell === undefined || typeof role.defaultShell === "string")
+        .toBe(true);
     }
   });
 });
@@ -45,5 +49,15 @@ describe("getRole", () => {
   test("returns null for unknown id", async () => {
     const role = await getRole("nonexistent");
     expect(role).toBeNull();
+  });
+});
+
+describe("getRoleCommandName", () => {
+  test("extracts the executable from a command template", () => {
+    expect(getRoleCommandName({ commandTemplate: "codex --dangerously" }))
+      .toBe("codex");
+    expect(getRoleCommandName({ commandTemplate: "\"claude code\"" }))
+      .toBe("claude code");
+    expect(getRoleCommandName({ commandTemplate: "   " })).toBeNull();
   });
 });

@@ -140,6 +140,32 @@ async function init() {
 		window.shellApi.setPref("lastTerminalSize", lastTerminalSize);
 	}
 
+	function getRoleCommandName(role) {
+		const template = String(role?.commandTemplate ?? "").trim();
+		if (!template) return null;
+		const match = template.match(/^"([^"]+)"|^'([^']+)'|^(\S+)/);
+		return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+	}
+
+	function isMissingRoleCommand(role) {
+		return Boolean(role?.commandTemplate && role.commandAvailable === false);
+	}
+
+	function formatRoleMenuLabel(role) {
+		const command = getRoleCommandName(role);
+		const suffix = isMissingRoleCommand(role)
+			? ` (missing: ${command})`
+			: command ? ` (${command})` : "";
+		return `${role.name} — ${role.description}${suffix}`;
+	}
+
+	function normalizeRoleTerminalTarget(defaultShell) {
+		if (defaultShell === "powershell" || defaultShell === "shell") {
+			return defaultShell;
+		}
+		return undefined;
+	}
+
 	function syncConnectionGraph() {
 		window.shellApi.stringSyncConnections?.(
 			connections.map((conn) => ({
@@ -1100,21 +1126,34 @@ async function init() {
 			if (roles.length === 0) return;
 			const roleItems = roles.map((r) => ({
 				id: `role:${r.id}`,
-				label: `${r.name} — ${r.description}`,
+				label: formatRoleMenuLabel(r),
+				enabled: !isMissingRoleCommand(r),
 			}));
 			const roleSelected = await window.shellApi.showContextMenu(roleItems);
 			if (!roleSelected?.startsWith("role:")) return;
 			const roleId = roleSelected.slice(5);
 			const role = roles.find((r) => r.id === roleId);
 			if (!role) return;
+			if (isMissingRoleCommand(role)) {
+				toasts.show({
+					message: `${role.name} is missing command: ${getRoleCommandName(role)}`,
+					tone: "error",
+				});
+				return;
+			}
 			const cwd = getTerminalCwd();
 			const size = getTerminalSize();
 			const tile = tileManager.createCanvasTile(
 				"term", cx, cy, {
 					cwd, ...size,
 					userTitle: role.name,
+					terminalTarget: normalizeRoleTerminalTarget(role.defaultShell),
 					roleId: role.id,
+					roleName: role.name,
 					roleColor: role.color,
+					roleShellKind: getRoleCommandName(role) || role.defaultShell || "shell",
+					roleCommandTemplate: role.commandTemplate,
+					roleStartupPrompt: role.startupPrompt,
 				},
 			);
 			tileManager.spawnTerminalWebview(tile, true);

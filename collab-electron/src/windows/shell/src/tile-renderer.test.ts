@@ -4,6 +4,7 @@ import {
   formatRelaySyntax,
   getTileLabel,
   getTileRoleBadge,
+  getTileShellBadge,
   getTileStatusBadge,
   splitFilepath,
   positionTile,
@@ -97,14 +98,40 @@ describe("getTileStatusBadge", () => {
 });
 
 describe("getTileRoleBadge", () => {
-  test("returns trimmed terminal role id", () => {
-    expect(getTileRoleBadge({ type: "term", roleId: " codex-reviewer " }))
-      .toBe("codex-reviewer");
+  test("returns terminal role name before role id", () => {
+    expect(getTileRoleBadge({
+      type: "term",
+      roleId: "codex-reviewer",
+      roleName: " Codex Reviewer ",
+    })).toBe("Codex Reviewer");
   });
 
   test("skips terminals without roles and non-terminal tiles", () => {
     expect(getTileRoleBadge({ type: "term", roleId: "   " })).toBeNull();
     expect(getTileRoleBadge({ type: "note", roleId: "planner" })).toBeNull();
+  });
+});
+
+describe("getTileShellBadge", () => {
+  test("returns explicit shell kind before command template", () => {
+    expect(getTileShellBadge({
+      type: "term",
+      roleShellKind: "wsl",
+      roleCommandTemplate: "codex",
+    })).toBe("wsl");
+  });
+
+  test("falls back to command executable", () => {
+    expect(getTileShellBadge({
+      type: "term",
+      roleCommandTemplate: "claude --dangerously-skip-permissions",
+    })).toBe("claude");
+  });
+
+  test("skips terminals without shell metadata and non-terminal tiles", () => {
+    expect(getTileShellBadge({ type: "term" })).toBeNull();
+    expect(getTileShellBadge({ type: "note", roleShellKind: "shell" }))
+      .toBeNull();
   });
 });
 

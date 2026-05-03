@@ -111,14 +111,21 @@ export function createTileManager({
 				filePath: t.filePath,
 				folderPath: t.folderPath,
 				workspacePath: t.workspacePath,
+				cwd: t.cwd,
 				ptySessionId: t.ptySessionId,
+				terminalTarget: t.terminalTarget,
 				url: t.url,
 				zIndex: t.zIndex,
 				userTitle: t.userTitle,
 				autoTitle: t.autoTitle,
 				routeHandle: t.routeHandle,
 				roleId: t.roleId,
+				roleName: t.roleName,
 				roleColor: t.roleColor,
+				roleShellKind: t.roleShellKind,
+				roleCommandTemplate: t.roleCommandTemplate,
+				roleStartupPrompt: t.roleStartupPrompt,
+				roleStartupSessionId: t.roleStartupSessionId,
 			})),
 			connections: connections.map((conn) => ({
 				id: conn.id,
@@ -266,6 +273,9 @@ export function createTileManager({
 		} else if (tile.cwd) {
 			params.set("cwd", tile.cwd);
 		}
+		if (tile.terminalTarget) {
+			params.set("target", tile.terminalTarget);
+		}
 		const qs = params.toString();
 		wv.setAttribute(
 			"src",
@@ -291,6 +301,7 @@ export function createTileManager({
 			if (event.channel === "pty-session-id") {
 				tile.ptySessionId = event.args[0];
 				ensureRouteHandle(tile);
+				maybeRunRoleStartup(tile);
 				updateTileTitle(tileDOMs.get(tile.id), tile);
 				saveCanvasDebounced();
 				if (onTerminalSessionCreated) {
@@ -313,6 +324,13 @@ export function createTileManager({
 				}
 			}
 		});
+	}
+
+	function maybeRunRoleStartup(tile) {
+		if (!tile.ptySessionId || !tile.roleCommandTemplate) return;
+		if (tile.roleStartupSessionId === tile.ptySessionId) return;
+		tile.roleStartupSessionId = tile.ptySessionId;
+		window.shellApi.ptyWrite?.(tile.ptySessionId, `${tile.roleCommandTemplate}\r`);
 	}
 
 	function spawnGraphWebview(tile) {
@@ -770,12 +788,19 @@ export function createTileManager({
 						width: saved.width,
 						height: saved.height,
 						zIndex: saved.zIndex,
+						cwd: saved.cwd,
 						ptySessionId: saved.ptySessionId,
+						terminalTarget: saved.terminalTarget,
 						userTitle: saved.userTitle,
 						autoTitle: saved.autoTitle,
 						routeHandle: saved.routeHandle,
 						roleId: saved.roleId,
+						roleName: saved.roleName,
 						roleColor: saved.roleColor,
+						roleShellKind: saved.roleShellKind,
+						roleCommandTemplate: saved.roleCommandTemplate,
+						roleStartupPrompt: saved.roleStartupPrompt,
+						roleStartupSessionId: saved.roleStartupSessionId,
 					},
 				);
 				spawnTerminalWebview(tile);

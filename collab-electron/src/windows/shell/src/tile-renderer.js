@@ -87,6 +87,8 @@ export function createTileDOM(tile, callbacks) {
   titleText.appendChild(nameSpan);
   const roleBadge = createTileRoleBadge(tile);
   if (roleBadge) titleText.appendChild(roleBadge);
+  const shellBadge = createTileShellBadge(tile);
+  if (shellBadge) titleText.appendChild(shellBadge);
   if (tile.type === "term" && tile.routeHandle) {
     const handleSpan = document.createElement("span");
     handleSpan.className = "tile-route-handle";
@@ -345,8 +347,19 @@ export function getTileStatusBadge(tile) {
 
 export function getTileRoleBadge(tile) {
   if (tile?.type !== "term") return null;
+  const roleName = String(tile.roleName ?? "").trim();
+  if (roleName) return roleName;
   const roleId = String(tile.roleId ?? "").trim();
   return roleId || null;
+}
+
+export function getTileShellBadge(tile) {
+  if (tile?.type !== "term") return null;
+  const shellKind = String(tile.roleShellKind ?? "").trim();
+  if (shellKind) return shellKind;
+  const command = String(tile.roleCommandTemplate ?? "").trim();
+  if (command) return command.split(/\s+/)[0];
+  return null;
 }
 
 function createTileRoleBadge(tile) {
@@ -356,6 +369,16 @@ function createTileRoleBadge(tile) {
   badge.className = "tile-role-badge";
   badge.textContent = roleId;
   badge.title = `Role: ${roleId}`;
+  return badge;
+}
+
+function createTileShellBadge(tile) {
+  const shellKind = getTileShellBadge(tile);
+  if (!shellKind) return null;
+  const badge = document.createElement("span");
+  badge.className = "tile-shell-badge";
+  badge.textContent = shellKind;
+  badge.title = `Shell: ${shellKind}`;
   return badge;
 }
 
@@ -383,6 +406,8 @@ export function updateTileTitle(dom, tile) {
   titleText.appendChild(nameSpan);
   const roleBadge = createTileRoleBadge(tile);
   if (roleBadge) titleText.appendChild(roleBadge);
+  const shellBadge = createTileShellBadge(tile);
+  if (shellBadge) titleText.appendChild(shellBadge);
   if (tile.type === "term" && tile.routeHandle) {
     const handleSpan = document.createElement("span");
     handleSpan.className = "tile-route-handle";
