@@ -752,6 +752,14 @@ async function init() {
 		containerEl: canvasEl,
 		viewportState,
 		onSendMessage: (req) => window.shellApi.stringRelay?.(req),
+		onGetLog: (connectionId, limit) =>
+			window.shellApi.stringGetLog?.(connectionId, limit),
+		onFocusTile: (id) => {
+			const tile = getTile(id);
+			if (!tile) return;
+			edgeIndicators.panToTile(tile, { targetZoom: 1 });
+			tileManager.focusCanvasTile(tile.id);
+		},
 		onRemoveConnection: (id) => {
 			removeConnection(id);
 			tileManager.saveCanvasImmediate();

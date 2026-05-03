@@ -1454,6 +1454,88 @@ body.platform-win {
 	cursor: wait;
 }
 
+.cable-actions {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 5px;
+}
+
+.cable-action-btn {
+	background: rgba(15, 23, 42, 0.7);
+	border: 1px solid rgba(99, 102, 241, 0.2);
+	border-radius: 4px;
+	color: #94a3b8;
+	cursor: pointer;
+	font-size: 11px;
+	overflow: hidden;
+	padding: 5px 7px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cable-action-btn:hover,
+.cable-action-btn:focus-visible {
+	background: rgba(99, 102, 241, 0.16);
+	border-color: rgba(129, 140, 248, 0.36);
+	color: #c7d2fe;
+}
+
+.cable-history {
+	border-top: 1px solid rgba(99, 102, 241, 0.16);
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	padding-top: 7px;
+}
+
+.cable-history-title {
+	color: #64748b;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.cable-history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 130px;
+	overflow-y: auto;
+}
+
+.cable-history-empty {
+	color: #64748b;
+	font-size: 11px;
+}
+
+.cable-history-item {
+	display: flex;
+	gap: 5px;
+	min-width: 0;
+}
+
+.cable-history-label {
+	color: #818cf8;
+	flex-shrink: 0;
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.cable-history-item.is-failed .cable-history-label {
+	color: #fca5a5;
+}
+
+.cable-history-text {
+	color: #94a3b8;
+	flex: 1;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* Cable context menu */
 
 .cable-context-menu {

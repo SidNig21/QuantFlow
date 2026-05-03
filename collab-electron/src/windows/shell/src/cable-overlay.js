@@ -87,10 +87,25 @@ export function shouldSubmitCableMessage(e) {
 	return e.key === "Enter" && (e.ctrlKey || e.metaKey);
 }
 
+export function formatCableLogEntry(entry) {
+	const ok = entry?.ok !== false;
+	const label = ok ? entry?.fromLabel || "sent" : entry?.errorCode || "failed";
+	const text = ok
+		? entry?.formatted || entry?.text || ""
+		: entry?.message || entry?.formatted || entry?.text || "";
+	return {
+		ok,
+		label: String(label),
+		text: String(text),
+	};
+}
+
 export function createCableOverlay({
 	containerEl,
 	viewportState,
 	onSendMessage,
+	onGetLog,
+	onFocusTile,
 	onRemoveConnection,
 	onUpdateLabel,
 }) {
@@ -158,6 +173,7 @@ export function createCableOverlay({
 		popoverEl.className = "cable-popover";
 		popoverEl.style.left = `${mx}px`;
 		popoverEl.style.top = `${my + 12}px`;
+		popoverEl.addEventListener("click", (e) => e.stopPropagation());
 
 		const dirBtn = document.createElement("button");
 		dirBtn.type = "button";
@@ -177,7 +193,7 @@ export function createCableOverlay({
 		});
 
 		const input = document.createElement("textarea");
-		input.placeholder = "Message... Ctrl+Enter sends";
+		input.placeholder = "Message...";
 		input.className = "cable-input";
 		input.rows = 3;
 		input.spellcheck = true;
@@ -191,10 +207,89 @@ export function createCableOverlay({
 		statusEl.className = "cable-status";
 		statusEl.hidden = true;
 
+		const actionsEl = document.createElement("div");
+		actionsEl.className = "cable-actions";
+
+		function addAction(label, onClick) {
+			const button = document.createElement("button");
+			button.type = "button";
+			button.className = "cable-action-btn";
+			button.textContent = label;
+			button.addEventListener("click", (e) => {
+				e.stopPropagation();
+				onClick();
+			});
+			actionsEl.appendChild(button);
+			return button;
+		}
+
+		addAction(`Focus ${tileLabel(tileA)}`, () => onFocusTile?.(tileA.id));
+		addAction(`Focus ${tileLabel(tileB)}`, () => onFocusTile?.(tileB.id));
+		addAction("Rename", () => {
+			const next = prompt("Cable label:", conn.label ?? "");
+			if (next !== null) {
+				onUpdateLabel?.(conn.id, next);
+				conn.label = next;
+			}
+		});
+		addAction("Remove", () => {
+			removePopover();
+			onRemoveConnection?.(conn.id);
+		});
+
+		const historyEl = document.createElement("div");
+		historyEl.className = "cable-history";
+		const historyTitle = document.createElement("div");
+		historyTitle.className = "cable-history-title";
+		historyTitle.textContent = "Recent messages";
+		const historyList = document.createElement("div");
+		historyList.className = "cable-history-list";
+		historyEl.appendChild(historyTitle);
+		historyEl.appendChild(historyList);
+
 		function setStatus(message, kind = "error") {
 			statusEl.textContent = message;
 			statusEl.hidden = !message;
 			statusEl.dataset.kind = kind;
+		}
+
+		function renderHistory(entries) {
+			historyList.replaceChildren();
+			if (!entries?.length) {
+				const empty = document.createElement("div");
+				empty.className = "cable-history-empty";
+				empty.textContent = "No relay history.";
+				historyList.appendChild(empty);
+				return;
+			}
+			for (const entry of entries.slice(-5).reverse()) {
+				const line = formatCableLogEntry(entry);
+				const item = document.createElement("div");
+				item.className = `cable-history-item ${line.ok ? "is-ok" : "is-failed"}`;
+				const label = document.createElement("span");
+				label.className = "cable-history-label";
+				label.textContent = line.label;
+				const text = document.createElement("span");
+				text.className = "cable-history-text";
+				text.textContent = line.text;
+				item.appendChild(label);
+				item.appendChild(text);
+				historyList.appendChild(item);
+			}
+		}
+
+		async function refreshHistory() {
+			if (!onGetLog) {
+				renderHistory([]);
+				return;
+			}
+			historyList.textContent = "Loading...";
+			try {
+				const entries = await onGetLog(conn.id, 5);
+				renderHistory(Array.isArray(entries) ? entries : []);
+			} catch {
+				historyList.textContent = "Could not load relay history.";
+			}
 		}
 
 		async function doSend() {
@@ -215,11 +310,13 @@ export function createCableOverlay({
 				});
 				if (result?.ok === false) {
 					setStatus(result.message || "Relay failed.", "error");
+					await refreshHistory();
 					input.focus();
 					return;
 				}
 				pulseCable(conn.id);
 				input.value = "";
+				await refreshHistory();
 				removePopover();
 			} catch (err) {
 				setStatus(err instanceof Error ? err.message : "Relay failed.", "error");
@@ -246,6 +343,8 @@ export function createCableOverlay({
 		popoverEl.appendChild(input);
 		popoverEl.appendChild(statusEl);
 		popoverEl.appendChild(sendBtn);
+		popoverEl.appendChild(actionsEl);
+		popoverEl.appendChild(historyEl);
 		containerEl.appendChild(popoverEl);
 
 		requestAnimationFrame(() => {
@@ -253,6 +352,7 @@ export function createCableOverlay({
 			placePopover(popoverEl, mx, my + 12);
 			input.focus();
 		});
+		refreshHistory();
 
 		setTimeout(() => {
 			document.addEventListener("click", removePopover, { once: true });
