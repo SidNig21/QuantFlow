@@ -1512,6 +1512,7 @@ body.platform-win {
 .cable-history-item {
 	display: flex;
 	gap: 5px;
+	align-items: center;
 	min-width: 0;
 }
 
@@ -1534,6 +1535,28 @@ body.platform-win {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.cable-history-retry {
+	background: rgba(30, 41, 59, 0.82);
+	border: 1px solid rgba(248, 113, 113, 0.28);
+	border-radius: 4px;
+	color: #fecaca;
+	cursor: pointer;
+	flex-shrink: 0;
+	font-size: 10px;
+	padding: 2px 5px;
+}
+
+.cable-history-retry:hover,
+.cable-history-retry:focus-visible {
+	background: rgba(127, 29, 29, 0.26);
+	border-color: rgba(248, 113, 113, 0.45);
+}
+
+.cable-history-retry:disabled {
+	cursor: wait;
+	opacity: 0.55;
 }
 
 /* Cable context menu */

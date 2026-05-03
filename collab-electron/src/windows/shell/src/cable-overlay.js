@@ -106,6 +106,32 @@ export function getDirectedCableTiles(direction, tileA, tileB) {
 		: { fromTile: tileA, toTile: tileB };
 }
 
+export function getRetryCableRelayRequest(entry, conn, tileA, tileB, getLabel) {
+	if (entry?.ok !== false) return null;
+	const text = String(entry?.text ?? "").trim();
+	if (!text) return null;
+	const fromTileId = String(entry?.fromTileId ?? "");
+	const targetTileId = String(entry?.targetTileId ?? "");
+	if (!fromTileId || !targetTileId || fromTileId === targetTileId) return null;
+
+	const endpoints = new Map([
+		[tileA.id, tileA],
+		[tileB.id, tileB],
+	]);
+	const fromTile = endpoints.get(fromTileId);
+	const targetTile = endpoints.get(targetTileId);
+	if (!fromTile || !targetTile) return null;
+	const labelFor = typeof getLabel === "function" ? getLabel : (tile) => tile.id;
+	return {
+		connectionId: conn.id,
+		fromTileId: fromTile.id,
+		fromLabel: labelFor(fromTile),
+		targetTileId: targetTile.id,
+		targetSessionId: targetTile.ptySessionId ?? null,
+		text,
+	};
+}
+
 export function formatCableContextRelay(preview) {
 	const text = String(preview?.text ?? "").trim();
 	if (!text) return "";
@@ -302,6 +328,34 @@ export function createCableOverlay({
 			statusEl.dataset.kind = kind;
 		}
 
+		async function sendRelayRequest(request, {
+			clearInputOnSuccess = false,
+			focusInputOnFailure = false,
+		} = {}) {
+			setStatus("Sending…", "pending");
+			try {
+				const result = await onSendMessage?.(request);
+				if (result?.ok === false) {
+					setStatus(result.message || "Relay failed.", "error");
+					onNotify?.(result.message || "Relay failed.", "error");
+					await refreshHistory();
+					if (focusInputOnFailure) input.focus();
+					return false;
+				}
+				pulseCable(conn.id);
+				if (clearInputOnSuccess) input.value = "";
+				await refreshHistory();
+				removePopover();
+				return true;
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Relay failed.";
+				setStatus(message, "error");
+				onNotify?.(message, "error");
+				if (focusInputOnFailure) input.focus();
+				return false;
+			}
+		}
+
 		function renderHistory(entries) {
 			historyList.replaceChildren();
 			if (!entries?.length) {
@@ -323,6 +377,29 @@ export function createCableOverlay({
 				text.textContent = line.text;
 				item.appendChild(label);
 				item.appendChild(text);
+				const retryRequest = getRetryCableRelayRequest(
+					entry,
+					conn,
+					tileA,
+					tileB,
+					tileLabel,
+				);
+				if (retryRequest) {
+					const retryBtn = document.createElement("button");
+					retryBtn.type = "button";
+					retryBtn.className = "cable-history-retry";
+					retryBtn.textContent = "Retry";
+					retryBtn.addEventListener("click", async (e) => {
+						e.stopPropagation();
+						retryBtn.disabled = true;
+						try {
+							await sendRelayRequest(retryRequest);
+						} finally {
+							if (popoverEl) retryBtn.disabled = false;
+						}
+					});
+					item.appendChild(retryBtn);
+				}
 				historyList.appendChild(item);
 			}
 		}
@@ -346,32 +423,18 @@ export function createCableOverlay({
 			if (!text) return;
 			const { fromTile, toTile } = getDirectedCableTiles(direction, tileA, tileB);
 			sendBtn.disabled = true;
-			setStatus("Sending…", "pending");
 			try {
-				const result = await onSendMessage?.({
+				await sendRelayRequest({
 					connectionId: conn.id,
 					fromTileId: fromTile.id,
 					fromLabel: tileLabel(fromTile),
 					targetTileId: toTile.id,
 					targetSessionId: toTile.ptySessionId ?? null,
 					text,
+				}, {
+					clearInputOnSuccess: true,
+					focusInputOnFailure: true,
 				});
-				if (result?.ok === false) {
-					setStatus(result.message || "Relay failed.", "error");
-					onNotify?.(result.message || "Relay failed.", "error");
-					await refreshHistory();
-					input.focus();
-					return;
-				}
-				pulseCable(conn.id);
-				input.value = "";
-				await refreshHistory();
-				removePopover();
-			} catch (err) {
-				const message = err instanceof Error ? err.message : "Relay failed.";
-				setStatus(message, "error");
-				onNotify?.(message, "error");
-				input.focus();
 			} finally {
 				if (popoverEl) sendBtn.disabled = false;
 			}

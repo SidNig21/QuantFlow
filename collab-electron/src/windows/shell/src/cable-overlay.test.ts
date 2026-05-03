@@ -5,6 +5,7 @@ import {
 	formatCableLogEntry,
 	getDirectedCableTiles,
 	getConnectionPresentation,
+	getRetryCableRelayRequest,
 	shouldSubmitCableMessage,
 } from "./cable-overlay.js";
 
@@ -137,6 +138,50 @@ describe("getDirectedCableTiles", () => {
 			fromTile: tileB,
 			toTile: tileA,
 		});
+	});
+});
+
+describe("getRetryCableRelayRequest", () => {
+	const conn = { id: "conn-ab", tileAId: "tile-a", tileBId: "tile-b" };
+	const tileA = { id: "tile-a", userTitle: "Worker", ptySessionId: "session-a" };
+	const tileB = { id: "tile-b", userTitle: "Reviewer", ptySessionId: "session-b" };
+	const labelFor = (tile) => tile.userTitle || tile.id;
+
+	test("builds a cable-bounded retry request from a failed entry", () => {
+		expect(getRetryCableRelayRequest({
+			ok: false,
+			fromTileId: "tile-a",
+			targetTileId: "tile-b",
+			text: "please retry",
+		}, conn, tileA, tileB, labelFor)).toEqual({
+			connectionId: "conn-ab",
+			fromTileId: "tile-a",
+			fromLabel: "Worker",
+			targetTileId: "tile-b",
+			targetSessionId: "session-b",
+			text: "please retry",
+		});
+	});
+
+	test("rejects entries that cannot be retried on this cable", () => {
+		expect(getRetryCableRelayRequest({
+			ok: true,
+			fromTileId: "tile-a",
+			targetTileId: "tile-b",
+			text: "sent",
+		}, conn, tileA, tileB, labelFor)).toBeNull();
+		expect(getRetryCableRelayRequest({
+			ok: false,
+			fromTileId: "tile-a",
+			targetTileId: null,
+			text: "missing target",
+		}, conn, tileA, tileB, labelFor)).toBeNull();
+		expect(getRetryCableRelayRequest({
+			ok: false,
+			fromTileId: "tile-a",
+			targetTileId: "tile-c",
+			text: "off cable",
+		}, conn, tileA, tileB, labelFor)).toBeNull();
 	});
 });
 
