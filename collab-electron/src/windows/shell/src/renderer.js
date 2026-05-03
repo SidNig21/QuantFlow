@@ -22,6 +22,7 @@ import {
 	WATCHTOWER_MESSAGE_FILTERS,
 	createConnectionCounts,
 	renderWatchtowerAgents,
+	renderWatchtowerAttention,
 	renderWatchtowerMessages,
 } from "./watchtower-view.js";
 
@@ -1308,15 +1309,16 @@ async function init() {
 	async function refreshWatchtower() {
 		renderWatchtowerFilters();
 		const body = watchtowerEl.querySelector(".wt-body");
+		const relayLogs = await window.shellApi.watchtowerRelayLog?.(50) ?? [];
+		const attentionHtml = renderWatchtowerAttention(relayLogs);
 		if (watchtowerTab === "agents") {
 			const items = await window.shellApi.watchtowerSnapshot?.() ?? [];
-			body.innerHTML = renderWatchtowerAgents(items, {
+			body.innerHTML = attentionHtml + renderWatchtowerAgents(items, {
 				filter: watchtowerAgentFilter,
 				connectionCounts: createConnectionCounts(connections),
 			});
 		} else {
-			const logs = await window.shellApi.watchtowerRelayLog?.(50) ?? [];
-			body.innerHTML = renderWatchtowerMessages(logs, {
+			body.innerHTML = attentionHtml + renderWatchtowerMessages(relayLogs, {
 				filter: watchtowerMessageFilter,
 			});
 		}

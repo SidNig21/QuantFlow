@@ -5,7 +5,9 @@ import {
 	filterWatchtowerAgents,
 	filterWatchtowerMessages,
 	formatWatchtowerAge,
+	getWatchtowerAttentionItems,
 	renderWatchtowerAgents,
+	renderWatchtowerAttention,
 	renderWatchtowerMessages,
 } from "./watchtower-view.js";
 
@@ -77,6 +79,22 @@ describe("formatWatchtowerAge", () => {
 	});
 });
 
+describe("getWatchtowerAttentionItems", () => {
+	test("returns recent failed relay events newest first", () => {
+		const logs = [
+			{ ok: false, eventId: "old" },
+			{ ok: true, eventId: "sent" },
+			{ ok: false, eventId: "middle" },
+			{ ok: false, eventId: "new" },
+		];
+
+		expect(getWatchtowerAttentionItems(logs, 2)).toEqual([
+			{ ok: false, eventId: "new" },
+			{ ok: false, eventId: "middle" },
+		]);
+	});
+});
+
 describe("renderWatchtowerAgents", () => {
 	test("escapes agent fields and includes connection count", () => {
 		const html = renderWatchtowerAgents([
@@ -120,5 +138,32 @@ describe("renderWatchtowerMessages", () => {
 		expect(html).toContain("no_route");
 		expect(html).toContain("&lt;missing&gt;");
 		expect(html).not.toContain("<missing>");
+	});
+});
+
+describe("renderWatchtowerAttention", () => {
+	test("returns an empty string when no failed relay needs attention", () => {
+		expect(renderWatchtowerAttention([{ ok: true }])).toBe("");
+	});
+
+	test("renders escaped clickable failed relay cards", () => {
+		const html = renderWatchtowerAttention([
+			{
+				ok: false,
+				errorCode: "missing_pty",
+				connectionId: `conn"<x>`,
+				fromTileId: `from"<x>`,
+				targetTileId: null,
+				message: "<target exited>",
+			},
+		]);
+
+		expect(html).toContain("Needs attention");
+		expect(html).toContain("data-watchtower-kind=\"message\"");
+		expect(html).toContain("data-conn-id=\"conn&quot;&lt;x&gt;\"");
+		expect(html).toContain("data-from-tile-id=\"from&quot;&lt;x&gt;\"");
+		expect(html).toContain("missing_pty");
+		expect(html).toContain("&lt;target exited&gt;");
+		expect(html).not.toContain("<target exited>");
 	});
 });

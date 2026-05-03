@@ -34,6 +34,13 @@ export function filterWatchtowerMessages(logs, filter = "all") {
 	return logs;
 }
 
+export function getWatchtowerAttentionItems(logs, limit = 5) {
+	return logs
+		.filter((entry) => entry.ok === false)
+		.slice(-limit)
+		.reverse();
+}
+
 export function formatWatchtowerAge(ts, now = Date.now()) {
 	if (!Number.isFinite(ts) || ts <= 0) return "no activity";
 	const ageMs = Math.max(0, now - ts);
@@ -81,6 +88,35 @@ export function renderWatchtowerAgents(
 			</div>
 		`;
 	}).join("");
+}
+
+export function renderWatchtowerAttention(logs, { limit = 5 } = {}) {
+	const items = getWatchtowerAttentionItems(logs, limit);
+	if (!items.length) return "";
+
+	return `
+		<section class="wt-attention" aria-label="Needs attention">
+			<div class="wt-section-title">Needs attention</div>
+			${items.map((entry) => {
+				const code = entry.errorCode || "relay failed";
+				const text = entry.message || entry.formatted || entry.text || "";
+				return `
+					<div
+						class="wt-attention-card"
+						data-watchtower-kind="message"
+						data-conn-id="${escapeHtml(entry.connectionId)}"
+						data-from-tile-id="${escapeHtml(entry.fromTileId)}"
+						data-target-tile-id="${escapeHtml(entry.targetTileId ?? "")}"
+						role="button"
+						tabindex="0"
+					>
+						<div class="wt-attention-code">${escapeHtml(code)}</div>
+						<div class="wt-attention-text">${escapeHtml(String(text).slice(0, 160))}</div>
+					</div>
+				`;
+			}).join("")}
+		</section>
+	`;
 }
 
 export function renderWatchtowerMessages(
