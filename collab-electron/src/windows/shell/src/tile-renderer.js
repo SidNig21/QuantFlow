@@ -85,6 +85,8 @@ export function createTileDOM(tile, callbacks) {
   nameSpan.textContent = label.name;
   titleText.appendChild(parentSpan);
   titleText.appendChild(nameSpan);
+  const roleBadge = createTileRoleBadge(tile);
+  if (roleBadge) titleText.appendChild(roleBadge);
   if (tile.type === "term" && tile.routeHandle) {
     const handleSpan = document.createElement("span");
     handleSpan.className = "tile-route-handle";
@@ -341,6 +343,22 @@ export function getTileStatusBadge(tile) {
   return "idle";
 }
 
+export function getTileRoleBadge(tile) {
+  if (tile?.type !== "term") return null;
+  const roleId = String(tile.roleId ?? "").trim();
+  return roleId || null;
+}
+
+function createTileRoleBadge(tile) {
+  const roleId = getTileRoleBadge(tile);
+  if (!roleId) return null;
+  const badge = document.createElement("span");
+  badge.className = "tile-role-badge";
+  badge.textContent = roleId;
+  badge.title = `Role: ${roleId}`;
+  return badge;
+}
+
 function createTileStatusBadge(tile) {
   const status = getTileStatusBadge(tile);
   if (!status) return null;
@@ -363,6 +381,8 @@ export function updateTileTitle(dom, tile) {
   nameSpan.textContent = label.name;
   titleText.appendChild(parentSpan);
   titleText.appendChild(nameSpan);
+  const roleBadge = createTileRoleBadge(tile);
+  if (roleBadge) titleText.appendChild(roleBadge);
   if (tile.type === "term" && tile.routeHandle) {
     const handleSpan = document.createElement("span");
     handleSpan.className = "tile-route-handle";

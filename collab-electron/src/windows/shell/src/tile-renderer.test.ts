@@ -3,6 +3,7 @@ import {
   formatContextPreviewDetail,
   formatRelaySyntax,
   getTileLabel,
+  getTileRoleBadge,
   getTileStatusBadge,
   splitFilepath,
   positionTile,
@@ -92,6 +93,18 @@ describe("getTileStatusBadge", () => {
 
   test("skips non-terminal tiles", () => {
     expect(getTileStatusBadge({ type: "note" })).toBeNull();
+  });
+});
+
+describe("getTileRoleBadge", () => {
+  test("returns trimmed terminal role id", () => {
+    expect(getTileRoleBadge({ type: "term", roleId: " codex-reviewer " }))
+      .toBe("codex-reviewer");
+  });
+
+  test("skips terminals without roles and non-terminal tiles", () => {
+    expect(getTileRoleBadge({ type: "term", roleId: "   " })).toBeNull();
+    expect(getTileRoleBadge({ type: "note", roleId: "planner" })).toBeNull();
   });
 });
 

@@ -932,6 +932,22 @@ body.platform-win {
 	flex-shrink: 1;
 }
 
+.tile-role-badge {
+	border: 1px solid rgba(125, 211, 252, 0.26);
+	border-radius: 4px;
+	color: #bae6fd;
+	flex-shrink: 0;
+	font-family: var(--font-mono);
+	font-size: 9px;
+	line-height: 1;
+	margin-left: 7px;
+	max-width: 120px;
+	overflow: hidden;
+	padding: 2px 4px;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+}
+
 .tile-status-badge {
 	border: 1px solid rgba(148, 163, 184, 0.24);
 	border-radius: 4px;
