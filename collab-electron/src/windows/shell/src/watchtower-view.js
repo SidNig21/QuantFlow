@@ -1,4 +1,4 @@
-export const WATCHTOWER_AGENT_FILTERS = ["all", "active", "idle", "quiet"];
+export const WATCHTOWER_AGENT_FILTERS = ["all", "active", "idle", "quiet", "exited"];
 export const WATCHTOWER_MESSAGE_FILTERS = ["all", "failed", "no_route"];
 
 export function escapeHtml(value) {

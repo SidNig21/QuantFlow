@@ -1829,6 +1829,7 @@ body.platform-win {
 .wt-status-active { border-left-color: #10b981; }
 .wt-status-idle   { border-left-color: #f59e0b; }
 .wt-status-quiet  { border-left-color: #475569; }
+.wt-status-exited { border-left-color: #ef4444; }
 
 .wt-agent-label {
 	font-weight: 600;

@@ -23,6 +23,7 @@ import {
   relayStringMessage,
   resetStringRelayForTests,
   syncConnectionGraph,
+  watchtowerSnapshot,
 } from "./string-relay";
 
 beforeEach(() => {
@@ -105,6 +106,24 @@ describe("relayStringMessage", () => {
       expect(result.errorCode).toBe("unconnected_target");
     }
     expect(writtenSessions).toHaveLength(0);
+  });
+});
+
+describe("watchtowerSnapshot", () => {
+  test("marks registered tiles with missing PTY sessions as exited", () => {
+    registerTileSession("tile-a", "session-a", "Worker", "worker");
+
+    expect(watchtowerSnapshot()).toEqual([
+      {
+        tileId: "tile-a",
+        label: "Worker",
+        routeHandle: "worker",
+        sessionId: "session-a",
+        lastLine: "",
+        lastActivityTs: 0,
+        status: "exited",
+      },
+    ]);
   });
 });
 

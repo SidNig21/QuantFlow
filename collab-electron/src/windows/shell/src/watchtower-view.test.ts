@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	WATCHTOWER_AGENT_FILTERS,
 	createConnectionCounts,
 	escapeHtml,
 	filterWatchtowerAgents,
@@ -38,15 +39,23 @@ describe("filterWatchtowerAgents", () => {
 		{ tileId: "a", status: "active" },
 		{ tileId: "b", status: "idle" },
 		{ tileId: "c", status: "quiet" },
+		{ tileId: "d", status: "exited" },
 	];
 
 	test("keeps all agents by default", () => {
-		expect(filterWatchtowerAgents(agents)).toHaveLength(3);
+		expect(filterWatchtowerAgents(agents)).toHaveLength(4);
 	});
 
 	test("filters by status", () => {
 		expect(filterWatchtowerAgents(agents, "idle")).toEqual([
 			{ tileId: "b", status: "idle" },
+		]);
+	});
+
+	test("includes exited as a first-class filter", () => {
+		expect(WATCHTOWER_AGENT_FILTERS).toContain("exited");
+		expect(filterWatchtowerAgents(agents, "exited")).toEqual([
+			{ tileId: "d", status: "exited" },
 		]);
 	});
 });

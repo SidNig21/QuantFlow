@@ -81,7 +81,7 @@ export interface TileSnapshot {
   sessionId: string;
   lastLine: string;
   lastActivityTs: number;
-  status: "active" | "idle" | "quiet";
+  status: "active" | "idle" | "quiet" | "exited";
 }
 
 const logRings = new Map<string, RelayLogEntry[]>();
@@ -92,12 +92,15 @@ const connectionGraph = new Map<string, ConnectionGraphEntry>();
 
 export function watchtowerSnapshot(): TileSnapshot[] {
   const now = Date.now();
+  const activeSessionIds = new Set(listSessions());
   return [...tileRegistry.entries()].map(([tileId, entry]) => {
     const age = entry.lastActivityTs != null
       ? now - entry.lastActivityTs
       : Infinity;
     const status: TileSnapshot["status"] =
-      age < 5_000 ? "active" : age < 30_000 ? "idle" : "quiet";
+      !activeSessionIds.has(entry.sessionId)
+        ? "exited"
+        : age < 5_000 ? "active" : age < 30_000 ? "idle" : "quiet";
     return {
       tileId,
       label: entry.label,
