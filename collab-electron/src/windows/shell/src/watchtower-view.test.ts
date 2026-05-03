@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
 	WATCHTOWER_AGENT_FILTERS,
+	WATCHTOWER_MESSAGE_FILTERS,
 	createConnectionCounts,
 	escapeHtml,
 	filterWatchtowerAgents,
 	filterWatchtowerMessages,
+	formatWatchtowerFilterLabel,
 	formatRelayRoute,
 	formatWatchtowerAge,
 	getWatchtowerAttentionItems,
@@ -65,16 +67,38 @@ describe("filterWatchtowerMessages", () => {
 		{ ok: true, errorCode: undefined },
 		{ ok: false, errorCode: "missing_pty" },
 		{ ok: false, errorCode: "no_route" },
+		{ ok: false, errorCode: "ambiguous_route" },
+		{ ok: false, errorCode: "unconnected_target" },
+		{ ok: false, errorCode: "write_failed" },
 	];
 
 	test("filters failed relay events", () => {
-		expect(filterWatchtowerMessages(logs, "failed")).toHaveLength(2);
+		expect(filterWatchtowerMessages(logs, "failed")).toHaveLength(5);
 	});
 
-	test("filters no-route relay events", () => {
-		expect(filterWatchtowerMessages(logs, "no_route")).toEqual([
-			{ ok: false, errorCode: "no_route" },
+	test("includes relay failure codes as first-class filters", () => {
+		expect(WATCHTOWER_MESSAGE_FILTERS).toEqual([
+			"all",
+			"failed",
+			"no_route",
+			"missing_pty",
+			"ambiguous_route",
+			"unconnected_target",
+			"write_failed",
 		]);
+		for (const code of WATCHTOWER_MESSAGE_FILTERS.slice(2)) {
+			expect(filterWatchtowerMessages(logs, code)).toEqual([
+				{ ok: false, errorCode: code },
+			]);
+		}
+	});
+});
+
+describe("formatWatchtowerFilterLabel", () => {
+	test("formats underscore filters for readable controls", () => {
+		expect(formatWatchtowerFilterLabel("no_route")).toBe("No Route");
+		expect(formatWatchtowerFilterLabel("missing_pty")).toBe("Missing PTY");
+		expect(formatWatchtowerFilterLabel("failed")).toBe("Failed");
 	});
 });
 

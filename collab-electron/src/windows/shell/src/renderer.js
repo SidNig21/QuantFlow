@@ -26,6 +26,7 @@ import {
 	WATCHTOWER_AGENT_FILTERS,
 	WATCHTOWER_MESSAGE_FILTERS,
 	createConnectionCounts,
+	formatWatchtowerFilterLabel,
 	renderWatchtowerAgents,
 	renderWatchtowerAttention,
 	renderWatchtowerMessages,
@@ -1272,8 +1273,7 @@ async function init() {
 	}
 
 	function watchtowerFilterLabel(filter) {
-		if (filter === "no_route") return "No route";
-		return filter[0].toUpperCase() + filter.slice(1);
+		return formatWatchtowerFilterLabel(filter);
 	}
 
 	function renderWatchtowerFilters() {

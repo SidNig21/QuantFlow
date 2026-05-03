@@ -1,5 +1,16 @@
 export const WATCHTOWER_AGENT_FILTERS = ["all", "active", "idle", "quiet", "exited"];
-export const WATCHTOWER_MESSAGE_FILTERS = ["all", "failed", "no_route"];
+export const WATCHTOWER_RELAY_ERROR_FILTERS = [
+	"no_route",
+	"missing_pty",
+	"ambiguous_route",
+	"unconnected_target",
+	"write_failed",
+];
+export const WATCHTOWER_MESSAGE_FILTERS = [
+	"all",
+	"failed",
+	...WATCHTOWER_RELAY_ERROR_FILTERS,
+];
 
 export function escapeHtml(value) {
 	return String(value ?? "")
@@ -28,10 +39,20 @@ export function filterWatchtowerMessages(logs, filter = "all") {
 	if (filter === "failed") {
 		return logs.filter((entry) => entry.ok === false);
 	}
-	if (filter === "no_route") {
-		return logs.filter((entry) => entry.errorCode === "no_route");
+	if (WATCHTOWER_RELAY_ERROR_FILTERS.includes(filter)) {
+		return logs.filter((entry) => entry.errorCode === filter);
 	}
 	return logs;
+}
+
+export function formatWatchtowerFilterLabel(filter) {
+	if (!filter) return "";
+	return String(filter)
+		.split("_")
+		.filter(Boolean)
+		.map((part) => part[0].toUpperCase() + part.slice(1))
+		.map((part) => part === "Pty" ? "PTY" : part)
+		.join(" ");
 }
 
 export function getWatchtowerAttentionItems(logs, limit = 5) {
