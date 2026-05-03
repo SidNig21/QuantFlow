@@ -93,11 +93,25 @@ export function formatCableLogEntry(entry) {
 	const text = ok
 		? entry?.formatted || entry?.text || ""
 		: entry?.message || entry?.formatted || entry?.text || "";
+	const detail = formatCableLogDetail(entry, ok);
 	return {
 		ok,
 		label: String(label),
 		text: String(text),
+		detail,
 	};
+}
+
+export function formatCableLogDetail(entry, ok = entry?.ok !== false) {
+	const method = entry?.routeMethod === "agent" ? "agent" : "manual";
+	const source = String(entry?.fromLabel || entry?.fromTileId || "unknown").trim();
+	const rawTargetLabel = String(entry?.targetLabel || "").trim().replace(/^@/, "");
+	const target = rawTargetLabel
+		? `@${rawTargetLabel}`
+		: String(entry?.targetTileId || "unresolved").trim();
+	const route = `${method} / ${source || "unknown"} -> ${target || "unresolved"}`;
+	const error = !ok && entry?.errorCode ? ` / ${entry.errorCode}` : "";
+	return `${route}${error}`;
 }
 
 export function getDirectedCableTiles(direction, tileA, tileB) {
@@ -375,8 +389,15 @@ export function createCableOverlay({
 				const text = document.createElement("span");
 				text.className = "cable-history-text";
 				text.textContent = line.text;
+				const body = document.createElement("div");
+				body.className = "cable-history-body";
+				const detail = document.createElement("span");
+				detail.className = "cable-history-detail";
+				detail.textContent = line.detail;
 				item.appendChild(label);
-				item.appendChild(text);
+				body.appendChild(text);
+				body.appendChild(detail);
+				item.appendChild(body);
 				const retryRequest = getRetryCableRelayRequest(
 					entry,
 					conn,

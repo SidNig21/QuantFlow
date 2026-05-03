@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	clampFloatingPosition,
 	formatCableContextRelay,
+	formatCableLogDetail,
 	formatCableLogEntry,
 	getDirectedCableTiles,
 	getConnectionPresentation,
@@ -101,11 +102,14 @@ describe("formatCableLogEntry", () => {
 		expect(formatCableLogEntry({
 			ok: true,
 			fromLabel: "Worker",
+			targetTileId: "tile-b",
+			routeMethod: "manual",
 			formatted: "[Worker]: done",
 		})).toEqual({
 			ok: true,
 			label: "Worker",
 			text: "[Worker]: done",
+			detail: "manual / Worker -> tile-b",
 		});
 	});
 
@@ -113,12 +117,25 @@ describe("formatCableLogEntry", () => {
 		expect(formatCableLogEntry({
 			ok: false,
 			errorCode: "missing_pty",
+			fromLabel: "Worker",
+			targetLabel: "Reviewer",
+			routeMethod: "agent",
 			message: "Target exited",
 		})).toEqual({
 			ok: false,
 			label: "missing_pty",
 			text: "Target exited",
+			detail: "agent / Worker -> @Reviewer / missing_pty",
 		});
+	});
+});
+
+describe("formatCableLogDetail", () => {
+	test("falls back when route fields are missing", () => {
+		expect(formatCableLogDetail({
+			ok: false,
+			errorCode: "no_route",
+		})).toBe("manual / unknown -> unresolved / no_route");
 	});
 });
 
