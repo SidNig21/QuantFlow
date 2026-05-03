@@ -93,6 +93,45 @@ export function formatWatchtowerAge(ts, now = Date.now()) {
 	return `${days}d ago`;
 }
 
+export function getWatchtowerRetryRequest(
+	entry,
+	connection,
+	fromTile,
+	targetTile,
+	getLabel,
+) {
+	if (entry?.ok !== false) return null;
+	const text = String(entry?.text ?? "").trim();
+	if (!text) return null;
+	if (!connection || !fromTile || !targetTile) return null;
+	const fromTileId = String(entry?.fromTileId ?? "");
+	const targetTileId = String(entry?.targetTileId ?? "");
+	if (!fromTileId || !targetTileId || fromTileId === targetTileId) return null;
+	const direct = connection.tileAId === fromTileId && connection.tileBId === targetTileId;
+	const reverse = connection.tileAId === targetTileId && connection.tileBId === fromTileId;
+	if (!direct && !reverse) return null;
+	if (fromTile.id !== fromTileId || targetTile.id !== targetTileId) return null;
+	const labelFor = typeof getLabel === "function" ? getLabel : (tile) => tile.id;
+	return {
+		connectionId: connection.id,
+		fromTileId,
+		fromLabel: labelFor(fromTile),
+		targetTileId,
+		targetSessionId: targetTile.ptySessionId ?? null,
+		text,
+	};
+}
+
+export function shouldRenderWatchtowerRetry(entry) {
+	if (entry?.ok !== false) return false;
+	if (!String(entry?.eventId ?? "").trim()) return false;
+	if (!String(entry?.connectionId ?? "").trim()) return false;
+	if (!String(entry?.fromTileId ?? "").trim()) return false;
+	if (!String(entry?.targetTileId ?? "").trim()) return false;
+	if (!String(entry?.text ?? "").trim()) return false;
+	return true;
+}
+
 export function renderWatchtowerAgents(
 	items,
 	{
@@ -177,10 +216,12 @@ export function renderWatchtowerMessages(
 		const label = ok ? entry.fromLabel : entry.errorCode || "relay failed";
 		const text = ok ? entry.formatted : entry.message || entry.formatted;
 		const route = formatRelayRoute(entry);
+		const canRetry = shouldRenderWatchtowerRetry(entry);
 		return `
 			<div
 				class="wt-msg ${ok ? "wt-msg-ok" : "wt-msg-failed"}"
 				data-watchtower-kind="message"
+				data-event-id="${escapeHtml(entry.eventId ?? "")}"
 				data-conn-id="${escapeHtml(entry.connectionId)}"
 				data-from-tile-id="${escapeHtml(entry.fromTileId)}"
 				data-target-tile-id="${escapeHtml(entry.targetTileId ?? "")}"
@@ -192,7 +233,10 @@ export function renderWatchtowerMessages(
 					<span class="wt-msg-arrow">${ok ? "&rarr;" : "!"}</span>
 					<span class="wt-msg-text">${escapeHtml(String(text ?? "").slice(0, 200))}</span>
 				</div>
-				<div class="wt-msg-meta">${escapeHtml(route)}</div>
+				<div class="wt-msg-meta">
+					<span class="wt-msg-route">${escapeHtml(route)}</span>
+					${canRetry ? `<button class="wt-msg-retry" data-event-id="${escapeHtml(entry.eventId)}" type="button">Retry</button>` : ""}
+				</div>
 			</div>
 		`;
 	}).join("");

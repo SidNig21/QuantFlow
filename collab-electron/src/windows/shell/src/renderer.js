@@ -27,6 +27,7 @@ import {
 	WATCHTOWER_MESSAGE_FILTERS,
 	createConnectionCounts,
 	formatWatchtowerFilterLabel,
+	getWatchtowerRetryRequest,
 	renderWatchtowerAgents,
 	renderWatchtowerAttention,
 	renderWatchtowerMessages,
@@ -1236,6 +1237,7 @@ async function init() {
 	let watchtowerAgentFilter = "all";
 	let watchtowerMessageFilter = "all";
 	let watchtowerTimer = null;
+	let watchtowerRelayLogCache = [];
 	const watchtowerEl = document.createElement("div");
 	watchtowerEl.id = "watchtower-panel";
 	watchtowerEl.hidden = true;
@@ -1333,6 +1335,48 @@ async function init() {
 		return false;
 	}
 
+	async function retryWatchtowerRelay(button) {
+		const row = button.closest?.("[data-watchtower-kind='message']");
+		if (!row) return;
+		const entry = watchtowerRelayLogCache.find((item) =>
+			String(item?.eventId ?? "") === row.dataset.eventId,
+		);
+		const connection = connections.find((conn) => conn.id === entry?.connectionId);
+		const fromTile = entry?.fromTileId ? getTile(entry.fromTileId) : null;
+		const targetTile = entry?.targetTileId ? getTile(entry.targetTileId) : null;
+		const request = getWatchtowerRetryRequest(
+			entry,
+			connection,
+			fromTile,
+			targetTile,
+			getTileLabel,
+		);
+		if (!request) {
+			toasts.show({
+				message: "Relay cannot be retried from this Watchtower row.",
+				tone: "warn",
+			});
+			return;
+		}
+		button.disabled = true;
+		try {
+			const result = await window.shellApi.stringRelay?.(request);
+			if (result?.ok === false) {
+				toasts.show({ message: result.message || "Relay retry failed.", tone: "error" });
+			} else {
+				toasts.show({ message: "Relay retried.", tone: "info" });
+			}
+			await refreshWatchtower();
+		} catch (err) {
+			toasts.show({
+				message: err instanceof Error ? err.message : "Relay retry failed.",
+				tone: "error",
+			});
+		} finally {
+			if (watchtowerEl.contains(button)) button.disabled = false;
+		}
+	}
+
 	function activateWatchtowerRow(target) {
 		const row = target.closest?.("[data-watchtower-kind]");
 		if (!row || !watchtowerEl.contains(row)) return;
@@ -1346,6 +1390,13 @@ async function init() {
 	}
 
 	watchtowerEl.addEventListener("click", (e) => {
+		const retryButton = e.target.closest?.(".wt-msg-retry");
+		if (retryButton && watchtowerEl.contains(retryButton)) {
+			e.preventDefault();
+			e.stopPropagation();
+			retryWatchtowerRelay(retryButton);
+			return;
+		}
 		activateWatchtowerRow(e.target);
 	});
 
@@ -1361,7 +1412,8 @@ async function init() {
 		renderWatchtowerFilters();
 		const body = watchtowerEl.querySelector(".wt-body");
 		const relayLogs = await window.shellApi.watchtowerRelayLog?.(50) ?? [];
-		const attentionHtml = renderWatchtowerAttention(relayLogs);
+		watchtowerRelayLogCache = Array.isArray(relayLogs) ? relayLogs : [];
+		const attentionHtml = renderWatchtowerAttention(watchtowerRelayLogCache);
 		if (watchtowerTab === "agents") {
 			const items = await window.shellApi.watchtowerSnapshot?.() ?? [];
 			body.innerHTML = attentionHtml + renderWatchtowerAgents(items, {
@@ -1369,7 +1421,7 @@ async function init() {
 				connectionCounts: createConnectionCounts(connections),
 			});
 		} else {
-			body.innerHTML = attentionHtml + renderWatchtowerMessages(relayLogs, {
+			body.innerHTML = attentionHtml + renderWatchtowerMessages(watchtowerRelayLogCache, {
 				filter: watchtowerMessageFilter,
 			});
 		}
