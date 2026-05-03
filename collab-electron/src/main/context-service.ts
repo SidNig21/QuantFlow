@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { homedir } from "node:os";
 
 const MAX_DECISIONS = 50;
@@ -47,6 +47,24 @@ export interface ContextPreview {
   text: string;
 }
 
+export function toVaultRelativePath(filePath: string, vaultPath: string): string {
+  const vaultAbs = resolve(vaultPath);
+  const fileAbs = resolve(filePath);
+  const rel = normalize(relative(vaultAbs, fileAbs));
+  if (!rel || rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)) {
+    throw new Error("Path is outside vault directory");
+  }
+  return rel;
+}
+
+export function resolveVaultPinnedPath(pinnedPath: string, vaultPath: string): string {
+  const absolute = isAbsolute(pinnedPath)
+    ? resolve(pinnedPath)
+    : resolve(vaultPath, pinnedPath);
+  const rel = toVaultRelativePath(absolute, vaultPath);
+  return resolve(vaultPath, rel);
+}
+
 async function load(): Promise<SharedContext> {
   try {
     const raw = await readFile(getCtxPath(), "utf-8");
@@ -77,6 +95,13 @@ export async function pinFile(filePath: string): Promise<SharedContext> {
     await save(ctx);
   }
   return ctx;
+}
+
+export async function pinVaultFile(
+  filePath: string,
+  vaultPath: string,
+): Promise<SharedContext> {
+  return pinFile(toVaultRelativePath(filePath, vaultPath));
 }
 
 export async function unpinFile(filePath: string): Promise<SharedContext> {
@@ -187,6 +212,15 @@ export async function previewForTile(
   return buildPreview(vaultReadFile, maxChars);
 }
 
+export async function previewForVaultTile(
+  vaultPath: string,
+  vaultReadFile: (p: string) => Promise<string>,
+  maxChars = DEFAULT_CONTEXT_MAX_CHARS,
+): Promise<ContextPreview> {
+  return buildPreview((p) =>
+    vaultReadFile(resolveVaultPinnedPath(p, vaultPath)), maxChars);
+}
+
 export async function composeForTile(
   vaultReadFile?: (p: string) => Promise<string>,
   maxChars = DEFAULT_CONTEXT_MAX_CHARS,
@@ -195,11 +229,34 @@ export async function composeForTile(
   return preview.text;
 }
 
+export async function composeForVaultTile(
+  vaultPath: string,
+  vaultReadFile: (p: string) => Promise<string>,
+  maxChars = DEFAULT_CONTEXT_MAX_CHARS,
+): Promise<string> {
+  const preview = await previewForVaultTile(vaultPath, vaultReadFile, maxChars);
+  return preview.text;
+}
+
 export async function injectToTile(
   sessionId: string,
   vaultReadFile?: (p: string) => Promise<string>,
 ): Promise<void> {
   const text = await composeForTile(vaultReadFile);
+  if (!text.trim()) return;
+  const { writeToSession } = await import("./pty");
+  writeToSession(
+    sessionId,
+    `\n--- Shared Context ---\n${text}\n--- End Context ---\n`,
+  );
+}
+
+export async function injectVaultContextToTile(
+  sessionId: string,
+  vaultPath: string,
+  vaultReadFile: (p: string) => Promise<string>,
+): Promise<void> {
+  const text = await composeForVaultTile(vaultPath, vaultReadFile);
   if (!text.trim()) return;
   const { writeToSession } = await import("./pty");
   writeToSession(

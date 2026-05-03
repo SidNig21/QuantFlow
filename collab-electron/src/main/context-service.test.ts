@@ -10,7 +10,12 @@ import {
   unpinFile,
   addDecision,
   composeForTile,
+  composeForVaultTile,
+  pinVaultFile,
   previewForTile,
+  previewForVaultTile,
+  resolveVaultPinnedPath,
+  toVaultRelativePath,
 } from "./context-service";
 
 const TEST_DIR = join(tmpdir(), `ctx-test-${Date.now()}`);
@@ -44,6 +49,35 @@ describe("pinFile / unpinFile", () => {
     await pinFile("/vault/a.md");
     const ctx = await getContext();
     expect(ctx.pinnedFiles.filter((p) => p === "/vault/a.md").length).toBe(1);
+  });
+});
+
+describe("vault-relative context pins", () => {
+  test("normalizes vault files to relative paths", async () => {
+    expect(toVaultRelativePath("/vault/specs/a.md", "/vault")).toBe("specs/a.md");
+  });
+
+  test("rejects files outside the vault", () => {
+    expect(() => toVaultRelativePath("/other/a.md", "/vault")).toThrow(
+      "Path is outside vault directory",
+    );
+  });
+
+  test("pins vault files as relative paths", async () => {
+    await pinVaultFile("/vault/specs/a.md", "/vault");
+
+    const ctx = await getContext();
+    expect(ctx.pinnedFiles).toEqual(["specs/a.md"]);
+  });
+
+  test("resolves relative pins under the vault", () => {
+    expect(resolveVaultPinnedPath("specs/a.md", "/vault")).toBe("/vault/specs/a.md");
+  });
+
+  test("rejects relative traversal pins during preview resolution", () => {
+    expect(() => resolveVaultPinnedPath("../outside.md", "/vault")).toThrow(
+      "Path is outside vault directory",
+    );
   });
 });
 
@@ -126,5 +160,26 @@ describe("previewForTile", () => {
     expect(preview.files[0]?.ok).toBe(false);
     expect(preview.files[0]?.error).toBe("could not read file");
     expect(preview.text).toContain("could not read file");
+  });
+});
+
+describe("vault-relative preview and compose", () => {
+  test("resolves pinned relative files under the vault root", async () => {
+    await pinFile("specs/a.md");
+    const reads: string[] = [];
+
+    const preview = await previewForVaultTile("/vault", async (p) => {
+      reads.push(p);
+      return "vault file";
+    }, 300);
+
+    expect(reads).toEqual(["/vault/specs/a.md"]);
+    expect(preview.text).toContain("vault file");
+
+    const text = await composeForVaultTile("/vault", async (p) => {
+      reads.push(p);
+      return "again";
+    }, 300);
+    expect(text).toContain("again");
   });
 });

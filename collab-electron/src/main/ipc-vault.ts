@@ -9,7 +9,7 @@ interface VaultConfig {
   vaultPath?: string;
 }
 
-async function readConfig(): Promise<VaultConfig> {
+export async function readVaultConfig(): Promise<VaultConfig> {
   try {
     const raw = await readFile(CONFIG_PATH, "utf-8");
     return JSON.parse(raw) as VaultConfig;
@@ -27,19 +27,19 @@ export function registerVaultHandlers(
   mainWindow: () => BrowserWindow | null,
 ): void {
   ipcMain.handle("vault:get-path", async () => {
-    const cfg = await readConfig();
+    const cfg = await readVaultConfig();
     return cfg.vaultPath ?? null;
   });
 
   ipcMain.handle("vault:set-path", async (_event, path: string) => {
-    await writeConfig({ ...(await readConfig()), vaultPath: path });
+    await writeConfig({ ...(await readVaultConfig()), vaultPath: path });
     return { ok: true };
   });
 
   ipcMain.handle("vault:pick-file", async () => {
     const win = mainWindow();
     if (!win) return null;
-    const cfg = await readConfig();
+    const cfg = await readVaultConfig();
     const result = await dialog.showOpenDialog(win, {
       title: "Select vault file",
       defaultPath: cfg.vaultPath,
@@ -51,7 +51,7 @@ export function registerVaultHandlers(
   });
 
   ipcMain.handle("vault:read-file", async (_event, filePath: string) => {
-    const cfg = await readConfig();
+    const cfg = await readVaultConfig();
     if (!cfg.vaultPath) {
       throw new Error("No vault path configured");
     }
