@@ -7,6 +7,7 @@ import {
 	filterWatchtowerAgents,
 	filterWatchtowerMessages,
 	formatWatchtowerFilterLabel,
+	formatWatchtowerDiagnostics,
 	formatRelayRoute,
 	formatWatchtowerAge,
 	getWatchtowerRetryRequest,
@@ -129,6 +130,46 @@ describe("formatWatchtowerAge", () => {
 
 	test("handles missing activity", () => {
 		expect(formatWatchtowerAge(0, 4_500)).toBe("no activity");
+	});
+});
+
+describe("formatWatchtowerDiagnostics", () => {
+	test("formats copyable agent, cable, and relay diagnostics", () => {
+		const text = formatWatchtowerDiagnostics({
+			now: 4_000,
+			agents: [
+				{
+					tileId: "tile-a",
+					label: "Planner",
+					routeHandle: "planner",
+					sessionId: "session-a",
+					status: "waiting",
+					lastActivityTs: 1_000,
+					lastLine: "Approval required: continue?",
+				},
+			],
+			connections: [
+				{ id: "conn-ab", tileAId: "tile-a", tileBId: "tile-b", label: "review" },
+			],
+			relayLogs: [
+				{
+					ok: false,
+					errorCode: "missing_pty",
+					routeMethod: "agent",
+					fromLabel: "Planner",
+					targetLabel: "Reviewer",
+					message: "Target session is not active.",
+				},
+			],
+		});
+
+		expect(text).toContain("QuantFlow Watchtower diagnostics");
+		expect(text).toContain("Agents (1)");
+		expect(text).toContain("Planner @planner [waiting]");
+		expect(text).toContain("Cables (1)");
+		expect(text).toContain("conn-ab: tile-a <-> tile-b");
+		expect(text).toContain("Relay events (1)");
+		expect(text).toContain("failed/missing_pty agent / Planner -> @Reviewer");
 	});
 });
 

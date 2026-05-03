@@ -140,6 +140,55 @@ export function shouldRenderWatchtowerRetry(entry) {
 	return true;
 }
 
+export function formatWatchtowerDiagnostics({
+	agents = [],
+	connections = [],
+	relayLogs = [],
+	now = Date.now(),
+} = {}) {
+	const lines = [
+		"QuantFlow Watchtower diagnostics",
+		`Generated: ${new Date(now).toISOString()}`,
+		"",
+		`Agents (${agents.length})`,
+	];
+	if (agents.length) {
+		for (const item of agents) {
+			const label = String(item?.label || item?.tileId || "unknown");
+			const handle = item?.routeHandle ? ` @${item.routeHandle}` : "";
+			const last = item?.lastLine ? ` last="${String(item.lastLine).slice(0, 160)}"` : "";
+			lines.push(
+				`- ${label}${handle} [${item?.status || "unknown"}] tile=${item?.tileId || ""} session=${item?.sessionId || ""} ${formatWatchtowerAge(item?.lastActivityTs, now)}${last}`,
+			);
+		}
+	} else {
+		lines.push("- none");
+	}
+
+	lines.push("", `Cables (${connections.length})`);
+	if (connections.length) {
+		for (const conn of connections) {
+			const label = conn?.label ? ` label="${conn.label}"` : "";
+			lines.push(`- ${conn?.id || ""}: ${conn?.tileAId || ""} <-> ${conn?.tileBId || ""}${label}`);
+		}
+	} else {
+		lines.push("- none");
+	}
+
+	lines.push("", `Relay events (${relayLogs.length})`);
+	if (relayLogs.length) {
+		for (const entry of relayLogs.slice(-20).reverse()) {
+			const status = entry?.ok === false ? `failed/${entry?.errorCode || "unknown"}` : "sent";
+			const text = String(entry?.message || entry?.formatted || entry?.text || "").slice(0, 180);
+			lines.push(`- ${status} ${formatRelayRoute(entry)} :: ${text}`);
+		}
+	} else {
+		lines.push("- none");
+	}
+
+	return lines.join("\n");
+}
+
 export function renderWatchtowerAgents(
 	items,
 	{

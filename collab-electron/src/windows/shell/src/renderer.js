@@ -26,6 +26,7 @@ import {
 	WATCHTOWER_AGENT_FILTERS,
 	WATCHTOWER_MESSAGE_FILTERS,
 	createConnectionCounts,
+	formatWatchtowerDiagnostics,
 	formatWatchtowerFilterLabel,
 	getWatchtowerRetryRequest,
 	renderWatchtowerAgents,
@@ -1248,6 +1249,7 @@ async function init() {
 				<button class="wt-tab active" data-tab="agents">Agents</button>
 				<button class="wt-tab" data-tab="messages">Messages</button>
 			</div>
+			<button class="wt-copy" title="Copy diagnostics">Copy</button>
 			<button class="wt-refresh" title="Refresh">Refresh</button>
 			<button class="wt-close">✕</button>
 		</div>
@@ -1258,6 +1260,27 @@ async function init() {
 
 	watchtowerEl.querySelector(".wt-refresh").addEventListener("click", () => {
 		refreshWatchtower();
+	});
+
+	watchtowerEl.querySelector(".wt-copy").addEventListener("click", async () => {
+		try {
+			const [items, relayLogs] = await Promise.all([
+				window.shellApi.watchtowerSnapshot?.() ?? [],
+				window.shellApi.watchtowerRelayLog?.(50) ?? [],
+			]);
+			const text = formatWatchtowerDiagnostics({
+				agents: Array.isArray(items) ? items : [],
+				connections,
+				relayLogs: Array.isArray(relayLogs) ? relayLogs : [],
+			});
+			await navigator.clipboard.writeText(text);
+			toasts.show({ message: "Watchtower diagnostics copied.", tone: "info" });
+		} catch (err) {
+			toasts.show({
+				message: err instanceof Error ? err.message : "Could not copy diagnostics.",
+				tone: "error",
+			});
+		}
 	});
 
 	watchtowerEl.querySelector(".wt-close").addEventListener("click", () => {

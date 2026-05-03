@@ -1721,6 +1721,7 @@ body.platform-win {
 
 .wt-close:hover { color: #94a3b8; }
 
+.wt-copy,
 .wt-refresh {
 	background: rgba(15, 23, 42, 0.65);
 	border: 1px solid #334155;
@@ -1731,6 +1732,8 @@ body.platform-win {
 	padding: 3px 7px;
 }
 
+.wt-copy:hover,
+.wt-copy:focus-visible,
 .wt-refresh:hover,
 .wt-refresh:focus-visible {
 	border-color: #475569;
