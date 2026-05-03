@@ -106,22 +106,46 @@ export function createCableOverlay({
 		sendBtn.textContent = "Send";
 		sendBtn.className = "cable-send-btn";
 
-		function doSend() {
+		const statusEl = document.createElement("div");
+		statusEl.className = "cable-status";
+		statusEl.hidden = true;
+
+		function setStatus(message, kind = "error") {
+			statusEl.textContent = message;
+			statusEl.hidden = !message;
+			statusEl.dataset.kind = kind;
+		}
+
+		async function doSend() {
 			const text = input.value.trim();
 			if (!text) return;
 			const fromTile = direction === "AtoB" ? tileA : tileB;
 			const toTile = direction === "AtoB" ? tileB : tileA;
-			onSendMessage?.({
-				connectionId: conn.id,
-				fromTileId: fromTile.id,
-				fromLabel: tileLabel(fromTile),
-				targetTileId: toTile.id,
-				targetSessionId: toTile.ptySessionId ?? null,
-				text,
-			});
-			pulseCable(conn.id);
-			input.value = "";
-			removePopover();
+			sendBtn.disabled = true;
+			setStatus("Sending…", "pending");
+			try {
+				const result = await onSendMessage?.({
+					connectionId: conn.id,
+					fromTileId: fromTile.id,
+					fromLabel: tileLabel(fromTile),
+					targetTileId: toTile.id,
+					targetSessionId: toTile.ptySessionId ?? null,
+					text,
+				});
+				if (result?.ok === false) {
+					setStatus(result.message || "Relay failed.", "error");
+					input.focus();
+					return;
+				}
+				pulseCable(conn.id);
+				input.value = "";
+				removePopover();
+			} catch (err) {
+				setStatus(err instanceof Error ? err.message : "Relay failed.", "error");
+				input.focus();
+			} finally {
+				if (popoverEl) sendBtn.disabled = false;
+			}
 		}
 
 		sendBtn.addEventListener("click", (e) => { e.stopPropagation(); doSend(); });
@@ -133,6 +157,7 @@ export function createCableOverlay({
 
 		popoverEl.appendChild(dirBtn);
 		popoverEl.appendChild(input);
+		popoverEl.appendChild(statusEl);
 		popoverEl.appendChild(sendBtn);
 		containerEl.appendChild(popoverEl);
 

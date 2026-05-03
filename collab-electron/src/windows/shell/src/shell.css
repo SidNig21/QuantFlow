@@ -1386,6 +1386,16 @@ body.platform-win {
 	box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
+.cable-status {
+	font-size: 11px;
+	line-height: 1.35;
+	color: #fca5a5;
+}
+
+.cable-status[data-kind="pending"] {
+	color: #93c5fd;
+}
+
 .cable-send-btn {
 	background: #6366f1;
 	border: none;
@@ -1399,6 +1409,11 @@ body.platform-win {
 
 .cable-send-btn:hover {
 	background: #818cf8;
+}
+
+.cable-send-btn:disabled {
+	opacity: 0.55;
+	cursor: wait;
 }
 
 /* Cable context menu */
@@ -1573,15 +1588,31 @@ body.platform-win {
 	border-bottom: 1px solid #1e293b;
 }
 
+.wt-msg-failed {
+	background: rgba(239, 68, 68, 0.08);
+	border-bottom-color: rgba(239, 68, 68, 0.18);
+	margin: 0 -4px;
+	padding: 5px 4px;
+	border-radius: 4px;
+}
+
 .wt-msg-from {
 	font-weight: 600;
 	color: #818cf8;
 	flex-shrink: 0;
 }
 
+.wt-msg-failed .wt-msg-from {
+	color: #fca5a5;
+}
+
 .wt-msg-arrow {
 	color: #475569;
 	flex-shrink: 0;
+}
+
+.wt-msg-failed .wt-msg-arrow {
+	color: #f87171;
 }
 
 .wt-msg-text {
