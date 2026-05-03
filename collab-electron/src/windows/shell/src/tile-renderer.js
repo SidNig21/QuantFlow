@@ -44,6 +44,11 @@ export function formatContextPreviewDetail(preview) {
   return lines.join("\n");
 }
 
+export function formatRelaySyntax(routeHandle) {
+  const handle = String(routeHandle ?? "").trim().replace(/^@+/, "");
+  return handle ? `>>@${handle}: ` : "";
+}
+
 /**
  * Creates the DOM structure for a tile.
  * @param {import('./canvas-state.js').Tile} tile
@@ -240,6 +245,11 @@ export function createTileDOM(tile, callbacks) {
       const selected = await window.shellApi.showContextMenu([
         { id: "rename", label: "Rename" },
         { id: "duplicate", label: "Duplicate" },
+        {
+          id: "copy-relay-syntax",
+          label: "Copy relay syntax",
+          enabled: Boolean(tile.routeHandle),
+        },
         { id: "inject-vault", label: "Inject vault file…" },
         { id: "inject-context", label: "Inject shared context" },
       ]);
@@ -247,6 +257,9 @@ export function createTileDOM(tile, callbacks) {
         callbacks.onRename(tile.id);
       } else if (selected === "duplicate" && callbacks.onDuplicate) {
         callbacks.onDuplicate(tile.id);
+      } else if (selected === "copy-relay-syntax") {
+        const syntax = formatRelaySyntax(tile.routeHandle);
+        if (syntax) await navigator.clipboard.writeText(syntax);
       } else if (selected === "inject-vault") {
         try {
           const filePath = await window.shellApi.vaultPickFile?.();

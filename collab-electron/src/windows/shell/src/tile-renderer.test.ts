@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   formatContextPreviewDetail,
+  formatRelaySyntax,
   getTileLabel,
   splitFilepath,
   positionTile,
@@ -62,6 +63,20 @@ describe("formatContextPreviewDetail", () => {
     expect(detail).toContain("included: /vault/a.md");
     expect(detail).toContain("omitted: /vault/b.md");
     expect(detail).toContain("unreadable: /vault/c.md");
+  });
+});
+
+describe("formatRelaySyntax", () => {
+  test("formats a stable route handle for agent relay", () => {
+    expect(formatRelaySyntax("codex-reviewer")).toBe(">>@codex-reviewer: ");
+  });
+
+  test("normalizes a handle that already includes @", () => {
+    expect(formatRelaySyntax("@claude-worker")).toBe(">>@claude-worker: ");
+  });
+
+  test("returns empty string without a handle", () => {
+    expect(formatRelaySyntax("   ")).toBe("");
   });
 });
 
