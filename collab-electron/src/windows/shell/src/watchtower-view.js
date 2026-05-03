@@ -1,4 +1,12 @@
-export const WATCHTOWER_AGENT_FILTERS = ["all", "active", "idle", "quiet", "exited"];
+export const WATCHTOWER_AGENT_FILTERS = [
+	"all",
+	"active",
+	"idle",
+	"quiet",
+	"waiting",
+	"blocked",
+	"exited",
+];
 export const WATCHTOWER_RELAY_ERROR_FILTERS = [
 	"no_route",
 	"missing_pty",

@@ -81,8 +81,16 @@ export interface TileSnapshot {
   sessionId: string;
   lastLine: string;
   lastActivityTs: number;
-  status: "active" | "idle" | "quiet" | "exited";
+  status: TileSnapshotStatus;
 }
+
+export type TileSnapshotStatus =
+  | "active"
+  | "idle"
+  | "quiet"
+  | "waiting"
+  | "blocked"
+  | "exited";
 
 const logRings = new Map<string, RelayLogEntry[]>();
 const eventRing: RelayLogEntry[] = [];
@@ -97,10 +105,11 @@ export function watchtowerSnapshot(): TileSnapshot[] {
     const age = entry.lastActivityTs != null
       ? now - entry.lastActivityTs
       : Infinity;
-    const status: TileSnapshot["status"] =
-      !activeSessionIds.has(entry.sessionId)
-        ? "exited"
-        : age < 5_000 ? "active" : age < 30_000 ? "idle" : "quiet";
+    const status = inferTileSnapshotStatus({
+      hasActiveSession: activeSessionIds.has(entry.sessionId),
+      lastLine: entry.lastLine ?? "",
+      ageMs: age,
+    });
     return {
       tileId,
       label: entry.label,
@@ -111,6 +120,29 @@ export function watchtowerSnapshot(): TileSnapshot[] {
       status,
     };
   });
+}
+
+export function inferTileSnapshotStatus({
+  hasActiveSession,
+  lastLine,
+  ageMs,
+}: {
+  hasActiveSession: boolean;
+  lastLine?: string;
+  ageMs: number;
+}): TileSnapshotStatus {
+  if (!hasActiveSession) return "exited";
+  const normalized = String(lastLine ?? "").trim().toLowerCase();
+  if (normalized) {
+    if (/\b(blocked|fatal|traceback|exception|panic)\b/.test(normalized) ||
+      /\b(error|failed|failure):/.test(normalized)) {
+      return "blocked";
+    }
+    if (/\b(waiting for|approval required|input required|press enter|press return|confirm)\b|continue\?|\byes\/no\b|\(y\/n\)|\[y\/n\]/.test(normalized)) {
+      return "waiting";
+    }
+  }
+  return ageMs < 5_000 ? "active" : ageMs < 30_000 ? "idle" : "quiet";
 }
 
 export function getAllRelayLogs(limit = 50): RelayLogEntry[] {

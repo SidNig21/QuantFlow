@@ -18,6 +18,7 @@ mock.module("node:fs/promises", () => ({
 import {
   getAllRelayLogs,
   getStringLog,
+  inferTileSnapshotStatus,
   onPtyData,
   registerTileSession,
   relayStringMessage,
@@ -124,6 +125,44 @@ describe("watchtowerSnapshot", () => {
         status: "exited",
       },
     ]);
+  });
+});
+
+describe("inferTileSnapshotStatus", () => {
+  test("preserves exited and age-based statuses", () => {
+    expect(inferTileSnapshotStatus({
+      hasActiveSession: false,
+      lastLine: "",
+      ageMs: 0,
+    })).toBe("exited");
+    expect(inferTileSnapshotStatus({
+      hasActiveSession: true,
+      lastLine: "working",
+      ageMs: 4_000,
+    })).toBe("active");
+    expect(inferTileSnapshotStatus({
+      hasActiveSession: true,
+      lastLine: "working",
+      ageMs: 12_000,
+    })).toBe("idle");
+    expect(inferTileSnapshotStatus({
+      hasActiveSession: true,
+      lastLine: "working",
+      ageMs: 45_000,
+    })).toBe("quiet");
+  });
+
+  test("detects waiting and blocked terminal lines", () => {
+    expect(inferTileSnapshotStatus({
+      hasActiveSession: true,
+      lastLine: "Approval required: continue?",
+      ageMs: 45_000,
+    })).toBe("waiting");
+    expect(inferTileSnapshotStatus({
+      hasActiveSession: true,
+      lastLine: "ERROR: command failed",
+      ageMs: 4_000,
+    })).toBe("blocked");
   });
 });
 

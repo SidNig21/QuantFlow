@@ -43,11 +43,13 @@ describe("filterWatchtowerAgents", () => {
 		{ tileId: "a", status: "active" },
 		{ tileId: "b", status: "idle" },
 		{ tileId: "c", status: "quiet" },
-		{ tileId: "d", status: "exited" },
+		{ tileId: "d", status: "waiting" },
+		{ tileId: "e", status: "blocked" },
+		{ tileId: "f", status: "exited" },
 	];
 
 	test("keeps all agents by default", () => {
-		expect(filterWatchtowerAgents(agents)).toHaveLength(4);
+		expect(filterWatchtowerAgents(agents)).toHaveLength(6);
 	});
 
 	test("filters by status", () => {
@@ -56,10 +58,25 @@ describe("filterWatchtowerAgents", () => {
 		]);
 	});
 
-	test("includes exited as a first-class filter", () => {
+	test("includes attention statuses as first-class filters", () => {
+		expect(WATCHTOWER_AGENT_FILTERS).toEqual([
+			"all",
+			"active",
+			"idle",
+			"quiet",
+			"waiting",
+			"blocked",
+			"exited",
+		]);
+		expect(filterWatchtowerAgents(agents, "waiting")).toEqual([
+			{ tileId: "d", status: "waiting" },
+		]);
+		expect(filterWatchtowerAgents(agents, "blocked")).toEqual([
+			{ tileId: "e", status: "blocked" },
+		]);
 		expect(WATCHTOWER_AGENT_FILTERS).toContain("exited");
 		expect(filterWatchtowerAgents(agents, "exited")).toEqual([
-			{ tileId: "d", status: "exited" },
+			{ tileId: "f", status: "exited" },
 		]);
 	});
 });
