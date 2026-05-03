@@ -591,10 +591,11 @@ async function init() {
 	// -- Tile manager --
 
 	let minimapRef = null;
-	function onCableMousedown(tile, e) {
-		if (!cableHeld) return false;
+	function onCableMousedown(tile, e, opts = {}) {
+		if (!cableHeld && !opts.force) return false;
 		e.preventDefault();
 		e.stopPropagation();
+		canvasEl.classList.add("cable-draw-mode");
 		cableOverlay?.startPreview(tile);
 
 		function onMove(ev) {
@@ -630,6 +631,9 @@ async function init() {
 				}
 			}
 			cableOverlay?.cancelPreview();
+			if (!cableHeld) {
+				canvasEl.classList.remove("cable-draw-mode");
+			}
 		}
 
 		document.addEventListener("mousemove", onMove);
@@ -683,6 +687,10 @@ async function init() {
 		},
 		onTileDblClick(tile) {
 			edgeIndicators.panToTile(tile);
+		},
+		onCablePortMouseDown(id, e) {
+			const tile = getTile(id);
+			if (tile) onCableMousedown(tile, e, { force: true });
 		},
 		onConnectionsChanged: syncConnectionGraph,
 	});

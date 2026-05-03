@@ -31,6 +31,7 @@ export function createTileManager({
 	onTileDblClick,
 	onReposition,
 	onCableMousedown,
+	onCablePortMouseDown,
 	onConnectionsChanged,
 }) {
 	/** @type {Map<string, {container: HTMLElement, contentArea: HTMLElement, titleText: HTMLElement, webview?: HTMLElement}>} */
@@ -573,6 +574,7 @@ export function createTileManager({
 					saveCanvasImmediate();
 				});
 			},
+			onCablePortMouseDown,
 		});
 
 		// Double-click title bar → center tile in viewport

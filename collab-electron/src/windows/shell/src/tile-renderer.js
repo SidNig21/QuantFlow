@@ -30,6 +30,7 @@ function resolveInput(raw) {
  * @param {((id: string, url: string) => void)|null} [callbacks.onNavigate]
  * @param {((id: string) => void)|null} [callbacks.onRename]
  * @param {((id: string) => void)|null} [callbacks.onDuplicate]
+ * @param {((id: string, e: MouseEvent) => void)|null} [callbacks.onCablePortMouseDown]
  */
 export function createTileDOM(tile, callbacks) {
   const container = document.createElement("div");
@@ -147,6 +148,22 @@ export function createTileDOM(tile, callbacks) {
   const btnGroup = document.createElement("div");
   btnGroup.className = "tile-btn-group";
 
+  let cablePort;
+  if (tile.type === "term") {
+    cablePort = document.createElement("button");
+    cablePort.type = "button";
+    cablePort.className = "tile-action-btn tile-cable-port";
+    cablePort.title = "Drag to connect cable";
+    cablePort.setAttribute("aria-label", "Drag to connect cable");
+    cablePort.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="3.5" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="1" fill="currentColor"/></svg>`;
+    cablePort.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      callbacks.onCablePortMouseDown?.(tile.id, e);
+    });
+    btnGroup.appendChild(cablePort);
+  }
+
   const copyablePath = tile.filePath || tile.folderPath;
   if (copyablePath) {
     const copySvg = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M5 11H3.5A1.5 1.5 0 0 1 2 9.5V3.5A1.5 1.5 0 0 1 3.5 2h6A1.5 1.5 0 0 1 11 3.5V5"/></svg>`;
@@ -241,7 +258,7 @@ export function createTileDOM(tile, callbacks) {
   container.appendChild(contentArea);
   contentArea.appendChild(contentOverlay);
 
-  return { container, titleBar, titleText, contentArea, contentOverlay, closeBtn, urlInput, navBack, navForward, navReload };
+  return { container, titleBar, titleText, contentArea, contentOverlay, closeBtn, urlInput, navBack, navForward, navReload, cablePort };
 }
 
 export function getTileLabel(tile) {

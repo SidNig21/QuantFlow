@@ -956,6 +956,22 @@ body.platform-win {
 	opacity: 0.8;
 }
 
+.tile-cable-port {
+	color: #818cf8;
+	opacity: 0.75;
+	padding: 1px 3px;
+}
+
+.tile-cable-port:hover {
+	opacity: 1;
+	background: rgba(99, 102, 241, 0.16);
+}
+
+.tile-cable-port:active {
+	cursor: crosshair;
+	background: rgba(99, 102, 241, 0.24);
+}
+
 .tile-close-btn {
 	font-size: 18px;
 }
