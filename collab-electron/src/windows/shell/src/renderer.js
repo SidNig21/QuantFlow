@@ -17,6 +17,13 @@ import { createCanvasRpc } from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
 import { updateTileTitle, getTileLabel } from "./tile-renderer.js";
 import { createCableOverlay } from "./cable-overlay.js";
+import {
+	WATCHTOWER_AGENT_FILTERS,
+	WATCHTOWER_MESSAGE_FILTERS,
+	createConnectionCounts,
+	renderWatchtowerAgents,
+	renderWatchtowerMessages,
+} from "./watchtower-view.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
 const IS_WINDOWS = window.shellApi.getPlatform() === "win32";
@@ -1171,17 +1178,10 @@ async function init() {
 
 	// -- W key: watchtower panel --
 
-	function escapeHtml(value) {
-		return String(value ?? "")
-			.replace(/&/g, "&amp;")
-			.replace(/</g, "&lt;")
-			.replace(/>/g, "&gt;")
-			.replace(/"/g, "&quot;")
-			.replace(/'/g, "&#39;");
-	}
-
 	let watchtowerVisible = false;
 	let watchtowerTab = "agents";
+	let watchtowerAgentFilter = "all";
+	let watchtowerMessageFilter = "all";
 	let watchtowerTimer = null;
 	const watchtowerEl = document.createElement("div");
 	watchtowerEl.id = "watchtower-panel";
@@ -1193,11 +1193,17 @@ async function init() {
 				<button class="wt-tab active" data-tab="agents">Agents</button>
 				<button class="wt-tab" data-tab="messages">Messages</button>
 			</div>
+			<button class="wt-refresh" title="Refresh">Refresh</button>
 			<button class="wt-close">✕</button>
 		</div>
+		<div class="wt-filter-bar"></div>
 		<div class="wt-body"></div>
 	`;
 	document.body.appendChild(watchtowerEl);
+
+	watchtowerEl.querySelector(".wt-refresh").addEventListener("click", () => {
+		refreshWatchtower();
+	});
 
 	watchtowerEl.querySelector(".wt-close").addEventListener("click", () => {
 		hideWatchtower();
@@ -1212,6 +1218,39 @@ async function init() {
 			refreshWatchtower();
 		});
 	}
+
+	function watchtowerFilterLabel(filter) {
+		if (filter === "no_route") return "No route";
+		return filter[0].toUpperCase() + filter.slice(1);
+	}
+
+	function renderWatchtowerFilters() {
+		const filters = watchtowerTab === "agents"
+			? WATCHTOWER_AGENT_FILTERS
+			: WATCHTOWER_MESSAGE_FILTERS;
+		const activeFilter = watchtowerTab === "agents"
+			? watchtowerAgentFilter
+			: watchtowerMessageFilter;
+		const filterBar = watchtowerEl.querySelector(".wt-filter-bar");
+		filterBar.innerHTML = filters.map((filter) => `
+			<button
+				class="wt-filter ${filter === activeFilter ? "active" : ""}"
+				data-filter="${filter}"
+				type="button"
+			>${watchtowerFilterLabel(filter)}</button>
+		`).join("");
+	}
+
+	watchtowerEl.querySelector(".wt-filter-bar").addEventListener("click", (e) => {
+		const button = e.target.closest?.(".wt-filter");
+		if (!button) return;
+		if (watchtowerTab === "agents") {
+			watchtowerAgentFilter = button.dataset.filter;
+		} else {
+			watchtowerMessageFilter = button.dataset.filter;
+		}
+		refreshWatchtower();
+	});
 
 	function focusWatchtowerTile(tileId) {
 		const tile = getTile(tileId);
@@ -1266,55 +1305,20 @@ async function init() {
 		activateWatchtowerRow(row);
 	});
 
-	function renderWatchtowerAgents(items) {
-		if (!items.length) return `<p class="wt-empty">No registered tile sessions.</p>`;
-		return items.map((item) => `
-			<div
-				class="wt-agent-card wt-status-${item.status}"
-				data-watchtower-kind="agent"
-				data-tile-id="${escapeHtml(item.tileId)}"
-				role="button"
-				tabindex="0"
-			>
-				<div class="wt-agent-label">${escapeHtml(item.label)}</div>
-				<div class="wt-agent-status">${escapeHtml(item.status)}</div>
-				${item.lastLine ? `<div class="wt-agent-line">${escapeHtml(item.lastLine.slice(0, 120))}</div>` : ""}
-			</div>
-		`).join("");
-	}
-
-	function renderWatchtowerMessages(logs) {
-		if (!logs.length) return `<p class="wt-empty">No relay messages yet.</p>`;
-		return logs.slice(-20).reverse().map((entry) => {
-			const ok = entry.ok !== false;
-			const label = ok ? entry.fromLabel : entry.errorCode || "relay failed";
-			const text = ok ? entry.formatted : entry.message || entry.formatted;
-			return `
-			<div
-				class="wt-msg ${ok ? "wt-msg-ok" : "wt-msg-failed"}"
-				data-watchtower-kind="message"
-				data-conn-id="${escapeHtml(entry.connectionId)}"
-				data-from-tile-id="${escapeHtml(entry.fromTileId)}"
-				data-target-tile-id="${escapeHtml(entry.targetTileId ?? "")}"
-				role="button"
-				tabindex="0"
-			>
-				<span class="wt-msg-from">${escapeHtml(label)}</span>
-				<span class="wt-msg-arrow">${ok ? "→" : "!"}</span>
-				<span class="wt-msg-text">${escapeHtml(String(text ?? "").slice(0, 200))}</span>
-			</div>
-		`;
-		}).join("");
-	}
-
 	async function refreshWatchtower() {
+		renderWatchtowerFilters();
 		const body = watchtowerEl.querySelector(".wt-body");
 		if (watchtowerTab === "agents") {
 			const items = await window.shellApi.watchtowerSnapshot?.() ?? [];
-			body.innerHTML = renderWatchtowerAgents(items);
+			body.innerHTML = renderWatchtowerAgents(items, {
+				filter: watchtowerAgentFilter,
+				connectionCounts: createConnectionCounts(connections),
+			});
 		} else {
 			const logs = await window.shellApi.watchtowerRelayLog?.(50) ?? [];
-			body.innerHTML = renderWatchtowerMessages(logs);
+			body.innerHTML = renderWatchtowerMessages(logs, {
+				filter: watchtowerMessageFilter,
+			});
 		}
 	}
 
@@ -1322,7 +1326,9 @@ async function init() {
 		watchtowerVisible = true;
 		watchtowerEl.hidden = false;
 		refreshWatchtower();
-		watchtowerTimer = setInterval(refreshWatchtower, 2000);
+		if (!watchtowerTimer) {
+			watchtowerTimer = setInterval(refreshWatchtower, 2000);
+		}
 	}
 
 	function hideWatchtower() {
