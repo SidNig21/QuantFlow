@@ -1669,3 +1669,31 @@ body.platform-win {
 .cable-draw-mode .canvas-tile:hover {
 	box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.45) !important;
 }
+
+.cable-mode-hud {
+	position: fixed;
+	left: 50%;
+	bottom: 28px;
+	transform: translateX(-50%);
+	z-index: 9600;
+	background: rgba(15, 23, 42, 0.92);
+	border: 1px solid rgba(129, 140, 248, 0.36);
+	border-radius: 6px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+	color: #dbeafe;
+	font-family: var(--font-sans);
+	font-size: 12px;
+	line-height: 1.35;
+	max-width: min(520px, calc(100vw - 32px));
+	padding: 8px 12px;
+	pointer-events: none;
+}
+
+.cable-mode-hud[data-tone="warn"] {
+	border-color: rgba(245, 158, 11, 0.45);
+	color: #fde68a;
+}
+
+.cable-mode-hud[hidden] {
+	display: none;
+}

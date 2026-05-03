@@ -591,11 +591,43 @@ async function init() {
 	// -- Tile manager --
 
 	let minimapRef = null;
+	let cableHudTimer = null;
+	const cableHudEl = document.createElement("div");
+	cableHudEl.className = "cable-mode-hud";
+	cableHudEl.hidden = true;
+	document.body.appendChild(cableHudEl);
+
+	function showCableHud(message, tone = "info", timeout = 0) {
+		clearTimeout(cableHudTimer);
+		cableHudEl.textContent = message;
+		cableHudEl.dataset.tone = tone;
+		cableHudEl.hidden = false;
+		if (timeout > 0) {
+			cableHudTimer = setTimeout(() => {
+				cableHudEl.hidden = true;
+				cableHudTimer = null;
+			}, timeout);
+		}
+	}
+
+	function hideCableHud() {
+		clearTimeout(cableHudTimer);
+		cableHudTimer = null;
+		cableHudEl.hidden = true;
+	}
+
+	function showCableModeHud() {
+		showCableHud(
+			"Cable mode: drag from one terminal to another. Esc cancels.",
+		);
+	}
+
 	function onCableMousedown(tile, e, opts = {}) {
 		if (!cableHeld && !opts.force) return false;
 		e.preventDefault();
 		e.stopPropagation();
 		canvasEl.classList.add("cable-draw-mode");
+		showCableModeHud();
 		cableOverlay?.startPreview(tile);
 
 		function onMove(ev) {
@@ -610,6 +642,7 @@ async function init() {
 			const cx = (ev.clientX - rect.left - viewportState.panX) / viewportState.zoom;
 			const cy = (ev.clientY - rect.top - viewportState.panY) / viewportState.zoom;
 			const targetTile = tileAtPoint(cx, cy);
+			let feedbackShown = false;
 
 			if (targetTile && targetTile.id !== tile.id) {
 				const duplicate = connections.some(
@@ -628,11 +661,21 @@ async function init() {
 					});
 					tileManager.saveCanvasImmediate();
 					cableOverlay?.update();
+				} else {
+					showCableHud("Connection already exists.", "warn", 1800);
+					feedbackShown = true;
 				}
+			} else if (targetTile?.id === tile.id) {
+				showCableHud("Drop on a different terminal.", "warn", 1800);
+				feedbackShown = true;
+			} else {
+				showCableHud("Drop on a terminal to connect.", "warn", 1800);
+				feedbackShown = true;
 			}
 			cableOverlay?.cancelPreview();
 			if (!cableHeld) {
 				canvasEl.classList.remove("cable-draw-mode");
+				if (!feedbackShown) hideCableHud();
 			}
 		}
 
@@ -1236,6 +1279,13 @@ async function init() {
 	// -- C key: cable draw mode --
 
 	window.addEventListener("keydown", (e) => {
+		if (e.key === "Escape" && cableHeld) {
+			cableHeld = false;
+			canvasEl.classList.remove("cable-draw-mode");
+			cableOverlay?.cancelPreview();
+			hideCableHud();
+			return;
+		}
 		if (
 			e.code === "KeyC" && !e.repeat &&
 			!e.target.closest?.("webview") &&
@@ -1243,6 +1293,7 @@ async function init() {
 		) {
 			cableHeld = true;
 			canvasEl.classList.add("cable-draw-mode");
+			showCableModeHud();
 		}
 	});
 
@@ -1251,6 +1302,7 @@ async function init() {
 			cableHeld = false;
 			canvasEl.classList.remove("cable-draw-mode");
 			cableOverlay?.cancelPreview();
+			hideCableHud();
 		}
 	});
 
@@ -1259,6 +1311,7 @@ async function init() {
 			cableHeld = false;
 			canvasEl.classList.remove("cable-draw-mode");
 			cableOverlay?.cancelPreview();
+			hideCableHud();
 		}
 	});
 
