@@ -1408,11 +1408,15 @@ body.platform-win {
 	border-radius: 4px;
 	padding: 6px 8px;
 	font-size: 12px;
+	line-height: 1.35;
 	color: #e2e8f0;
 	outline: none;
 	width: 100%;
+	min-height: 72px;
+	max-height: 150px;
 	box-sizing: border-box;
 	font-family: var(--font-sans);
+	resize: vertical;
 }
 
 .cable-input:focus {

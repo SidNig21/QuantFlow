@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	clampFloatingPosition,
 	getConnectionPresentation,
+	shouldSubmitCableMessage,
 } from "./cable-overlay.js";
 
 describe("clampFloatingPosition", () => {
@@ -63,5 +64,30 @@ describe("getConnectionPresentation", () => {
 			tiles.slice(0, 1),
 			viewport,
 		)).toBeNull();
+	});
+});
+
+describe("shouldSubmitCableMessage", () => {
+	test("submits only deliberate modified Enter", () => {
+		expect(shouldSubmitCableMessage({
+			key: "Enter",
+			ctrlKey: true,
+			metaKey: false,
+		})).toBe(true);
+		expect(shouldSubmitCableMessage({
+			key: "Enter",
+			ctrlKey: false,
+			metaKey: true,
+		})).toBe(true);
+		expect(shouldSubmitCableMessage({
+			key: "Enter",
+			ctrlKey: false,
+			metaKey: false,
+		})).toBe(false);
+		expect(shouldSubmitCableMessage({
+			key: "a",
+			ctrlKey: true,
+			metaKey: false,
+		})).toBe(false);
 	});
 });

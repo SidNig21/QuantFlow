@@ -83,6 +83,10 @@ export function clampFloatingPosition(
 	};
 }
 
+export function shouldSubmitCableMessage(e) {
+	return e.key === "Enter" && (e.ctrlKey || e.metaKey);
+}
+
 export function createCableOverlay({
 	containerEl,
 	viewportState,
@@ -172,10 +176,11 @@ export function createCableOverlay({
 			refreshDirLabel();
 		});
 
-		const input = document.createElement("input");
-		input.type = "text";
-		input.placeholder = "Message…";
+		const input = document.createElement("textarea");
+		input.placeholder = "Message... Ctrl+Enter sends";
 		input.className = "cable-input";
+		input.rows = 3;
+		input.spellcheck = true;
 
 		const sendBtn = document.createElement("button");
 		sendBtn.type = "button";
@@ -226,8 +231,14 @@ export function createCableOverlay({
 
 		sendBtn.addEventListener("click", (e) => { e.stopPropagation(); doSend(); });
 		input.addEventListener("keydown", (e) => {
-			if (e.key === "Enter") doSend();
-			if (e.key === "Escape") removePopover();
+			if (shouldSubmitCableMessage(e)) {
+				e.preventDefault();
+				doSend();
+			}
+			if (e.key === "Escape") {
+				e.preventDefault();
+				removePopover();
+			}
 			e.stopPropagation();
 		});
 
