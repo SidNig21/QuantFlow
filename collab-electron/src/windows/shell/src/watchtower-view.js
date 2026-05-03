@@ -41,6 +41,24 @@ export function getWatchtowerAttentionItems(logs, limit = 5) {
 		.reverse();
 }
 
+export function formatRelayRoute(entry) {
+	const method = entry?.routeMethod === "agent" ? "agent" : "manual";
+	const source = firstNonBlank(entry?.fromLabel, entry?.fromTileId) || "unknown";
+	const targetLabel = String(entry?.targetLabel || "").trim().replace(/^@/, "");
+	const target = targetLabel
+		? `@${targetLabel}`
+		: firstNonBlank(entry?.targetTileId) || "unresolved";
+	return `${method} / ${source} -> ${target}`;
+}
+
+function firstNonBlank(...values) {
+	for (const value of values) {
+		const text = String(value ?? "").trim();
+		if (text) return text;
+	}
+	return "";
+}
+
 export function formatWatchtowerAge(ts, now = Date.now()) {
 	if (!Number.isFinite(ts) || ts <= 0) return "no activity";
 	const ageMs = Math.max(0, now - ts);
@@ -100,6 +118,7 @@ export function renderWatchtowerAttention(logs, { limit = 5 } = {}) {
 			${items.map((entry) => {
 				const code = entry.errorCode || "relay failed";
 				const text = entry.message || entry.formatted || entry.text || "";
+				const route = formatRelayRoute(entry);
 				return `
 					<div
 						class="wt-attention-card"
@@ -111,6 +130,7 @@ export function renderWatchtowerAttention(logs, { limit = 5 } = {}) {
 						tabindex="0"
 					>
 						<div class="wt-attention-code">${escapeHtml(code)}</div>
+						<div class="wt-attention-route">${escapeHtml(route)}</div>
 						<div class="wt-attention-text">${escapeHtml(String(text).slice(0, 160))}</div>
 					</div>
 				`;
@@ -135,6 +155,7 @@ export function renderWatchtowerMessages(
 		const ok = entry.ok !== false;
 		const label = ok ? entry.fromLabel : entry.errorCode || "relay failed";
 		const text = ok ? entry.formatted : entry.message || entry.formatted;
+		const route = formatRelayRoute(entry);
 		return `
 			<div
 				class="wt-msg ${ok ? "wt-msg-ok" : "wt-msg-failed"}"
@@ -145,9 +166,12 @@ export function renderWatchtowerMessages(
 				role="button"
 				tabindex="0"
 			>
-				<span class="wt-msg-from">${escapeHtml(label)}</span>
-				<span class="wt-msg-arrow">${ok ? "&rarr;" : "!"}</span>
-				<span class="wt-msg-text">${escapeHtml(String(text ?? "").slice(0, 200))}</span>
+				<div class="wt-msg-line">
+					<span class="wt-msg-from">${escapeHtml(label)}</span>
+					<span class="wt-msg-arrow">${ok ? "&rarr;" : "!"}</span>
+					<span class="wt-msg-text">${escapeHtml(String(text ?? "").slice(0, 200))}</span>
+				</div>
+				<div class="wt-msg-meta">${escapeHtml(route)}</div>
 			</div>
 		`;
 	}).join("");

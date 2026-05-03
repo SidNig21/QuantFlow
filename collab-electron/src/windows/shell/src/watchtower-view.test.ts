@@ -4,6 +4,7 @@ import {
 	escapeHtml,
 	filterWatchtowerAgents,
 	filterWatchtowerMessages,
+	formatRelayRoute,
 	formatWatchtowerAge,
 	getWatchtowerAttentionItems,
 	renderWatchtowerAgents,
@@ -95,6 +96,34 @@ describe("getWatchtowerAttentionItems", () => {
 	});
 });
 
+describe("formatRelayRoute", () => {
+	test("describes manual relay route with tile fallback", () => {
+		expect(formatRelayRoute({
+			routeMethod: "manual",
+			fromLabel: "Planner",
+			targetTileId: "tile-reviewer",
+		})).toBe("manual / Planner -> tile-reviewer");
+	});
+
+	test("describes agent relay route with requested target handle", () => {
+		expect(formatRelayRoute({
+			routeMethod: "agent",
+			fromLabel: "Planner",
+			targetLabel: "@Reviewer",
+			targetTileId: "tile-reviewer",
+		})).toBe("agent / Planner -> @Reviewer");
+	});
+
+	test("falls back when relay labels are blank", () => {
+		expect(formatRelayRoute({
+			routeMethod: "manual",
+			fromLabel: " ",
+			fromTileId: "tile-planner",
+			targetTileId: " ",
+		})).toBe("manual / tile-planner -> unresolved");
+	});
+});
+
 describe("renderWatchtowerAgents", () => {
 	test("escapes agent fields and includes connection count", () => {
 		const html = renderWatchtowerAgents([
@@ -127,6 +156,9 @@ describe("renderWatchtowerMessages", () => {
 				connectionId: `conn"<x>`,
 				fromTileId: "from",
 				targetTileId: null,
+				routeMethod: "agent",
+				fromLabel: "<sender>",
+				targetLabel: "<target>",
 				message: "<missing>",
 			},
 		], {
@@ -137,6 +169,7 @@ describe("renderWatchtowerMessages", () => {
 		expect(html).toContain("data-conn-id=\"conn&quot;&lt;x&gt;\"");
 		expect(html).toContain("no_route");
 		expect(html).toContain("&lt;missing&gt;");
+		expect(html).toContain("agent / &lt;sender&gt; -&gt; @&lt;target&gt;");
 		expect(html).not.toContain("<missing>");
 	});
 });
@@ -154,6 +187,9 @@ describe("renderWatchtowerAttention", () => {
 				connectionId: `conn"<x>`,
 				fromTileId: `from"<x>`,
 				targetTileId: null,
+				routeMethod: "agent",
+				fromLabel: "Planner",
+				targetLabel: "Reviewer",
 				message: "<target exited>",
 			},
 		]);
@@ -163,6 +199,7 @@ describe("renderWatchtowerAttention", () => {
 		expect(html).toContain("data-conn-id=\"conn&quot;&lt;x&gt;\"");
 		expect(html).toContain("data-from-tile-id=\"from&quot;&lt;x&gt;\"");
 		expect(html).toContain("missing_pty");
+		expect(html).toContain("agent / Planner -&gt; @Reviewer");
 		expect(html).toContain("&lt;target exited&gt;");
 		expect(html).not.toContain("<target exited>");
 	});

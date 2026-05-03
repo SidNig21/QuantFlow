@@ -1786,6 +1786,16 @@ body.platform-win {
 	text-transform: uppercase;
 }
 
+.wt-attention-route {
+	color: #fca5a5;
+	font-family: var(--font-mono);
+	font-size: 10px;
+	margin-top: 2px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .wt-attention-text {
 	color: #fca5a5;
 	font-family: var(--font-mono);
@@ -1845,12 +1855,20 @@ body.platform-win {
 
 .wt-msg {
 	display: flex;
+	flex-direction: column;
 	gap: 4px;
-	align-items: baseline;
+	align-items: stretch;
 	padding: 4px 0;
 	border-bottom: 1px solid #1e293b;
 	cursor: pointer;
 	outline: none;
+}
+
+.wt-msg-line {
+	display: flex;
+	gap: 4px;
+	align-items: baseline;
+	min-width: 0;
 }
 
 .wt-msg:hover,
@@ -1896,6 +1914,15 @@ body.platform-win {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	flex: 1;
+}
+
+.wt-msg-meta {
+	color: #64748b;
+	font-family: var(--font-mono);
+	font-size: 10px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* Cable draw mode: hold C key */
