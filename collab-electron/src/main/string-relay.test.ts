@@ -1,34 +1,44 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-// Mock pty module before importing string-relay
 const writtenSessions: Array<{ sessionId: string; data: string }> = [];
+const activeSessions = new Set<string>();
+
 mock.module("./pty", () => ({
+  listSessions: () => [...activeSessions],
   writeToSession: (sessionId: string, data: string) => {
     writtenSessions.push({ sessionId, data });
   },
 }));
 
-// Mock fs/promises to avoid actual file writes in tests
 mock.module("node:fs/promises", () => ({
   appendFile: async () => {},
   mkdir: async () => {},
 }));
 
 import {
-  relayStringMessage,
+  getAllRelayLogs,
   getStringLog,
-  registerTileSession,
-  unregisterTileSession,
   onPtyData,
+  registerTileSession,
+  relayStringMessage,
+  resetStringRelayForTests,
+  syncConnectionGraph,
 } from "./string-relay";
 
 beforeEach(() => {
   writtenSessions.length = 0;
+  activeSessions.clear();
+  resetStringRelayForTests();
 });
 
 describe("relayStringMessage", () => {
-  test("formats and writes message to target session", () => {
-    relayStringMessage({
+  test("returns structured success and logs relay.sent", () => {
+    activeSessions.add("session-b");
+    syncConnectionGraph([
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
+
+    const result = relayStringMessage({
       connectionId: "conn-1",
       fromTileId: "tile-a",
       fromLabel: "Claude Worker",
@@ -37,182 +47,158 @@ describe("relayStringMessage", () => {
       text: "hello from A",
     });
 
-    expect(writtenSessions).toHaveLength(1);
-    expect(writtenSessions[0]!.sessionId).toBe("session-b");
-    expect(writtenSessions[0]!.data).toBe("[Claude Worker]: hello from A\n");
+    expect(result.ok).toBe(true);
+    expect(result.message).toBe("Relay sent");
+    if (result.ok) {
+      expect(result.formatted).toBe("[Claude Worker]: hello from A");
+    }
+    expect(writtenSessions).toEqual([
+      { sessionId: "session-b", data: "[Claude Worker]: hello from A\n" },
+    ]);
+
+    const [event] = getStringLog("conn-1");
+    expect(event?.type).toBe("relay.sent");
+    expect(event?.ok).toBe(true);
+    expect(event?.routeMethod).toBe("manual");
   });
 
-  test("trims whitespace from message text", () => {
-    relayStringMessage({
-      connectionId: "conn-1",
-      fromTileId: "tile-a",
-      fromLabel: "A",
-      targetTileId: "tile-b",
-      targetSessionId: "session-b",
-      text: "  trimmed message  ",
-    });
-    expect(writtenSessions[0]!.data).toBe("[A]: trimmed message\n");
-  });
+  test("returns missing_pty when target session is gone", () => {
+    syncConnectionGraph([
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
 
-  test("rejects empty messages", () => {
-    expect(() =>
-      relayStringMessage({
-        connectionId: "conn-1",
-        fromTileId: "tile-a",
-        fromLabel: "A",
-        targetTileId: "tile-b",
-        targetSessionId: "session-b",
-        text: "   ",
-      }),
-    ).toThrow("must not be empty");
-  });
-
-  test("rejects null targetSessionId", () => {
-    expect(() =>
-      relayStringMessage({
-        connectionId: "conn-1",
-        fromTileId: "tile-a",
-        fromLabel: "A",
-        targetTileId: "tile-b",
-        targetSessionId: null,
-        text: "hello",
-      }),
-    ).toThrow("no active PTY session");
-  });
-
-  test("returns formatted text in result", () => {
     const result = relayStringMessage({
       connectionId: "conn-1",
       fromTileId: "tile-a",
-      fromLabel: "Worker",
+      fromLabel: "A",
       targetTileId: "tile-b",
       targetSessionId: "session-b",
-      text: "do the thing",
+      text: "still there?",
     });
-    expect(result.ok).toBe(true);
-    expect(result.formatted).toBe("[Worker]: do the thing");
-  });
-});
 
-describe("getStringLog", () => {
-  test("returns entries for a connection", () => {
-    relayStringMessage({
-      connectionId: "conn-log",
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorCode).toBe("missing_pty");
+      expect(result.message).toContain("not active");
+    }
+    expect(writtenSessions).toHaveLength(0);
+    expect(getAllRelayLogs()[0]?.errorCode).toBe("missing_pty");
+  });
+
+  test("returns unconnected_target when manual request is not on that cable", () => {
+    activeSessions.add("session-b");
+    syncConnectionGraph([
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-c" },
+    ]);
+
+    const result = relayStringMessage({
+      connectionId: "conn-1",
       fromTileId: "tile-a",
       fromLabel: "A",
       targetTileId: "tile-b",
       targetSessionId: "session-b",
-      text: "msg1",
-    });
-    relayStringMessage({
-      connectionId: "conn-log",
-      fromTileId: "tile-b",
-      fromLabel: "B",
-      targetTileId: "tile-a",
-      targetSessionId: "session-a",
-      text: "msg2",
+      text: "wrong route",
     });
 
-    const log = getStringLog("conn-log");
-    expect(log).toHaveLength(2);
-    expect(log[0]!.text).toBe("msg1");
-    expect(log[1]!.text).toBe("msg2");
-  });
-
-  test("returns empty array for unknown connection", () => {
-    expect(getStringLog("no-such-conn")).toEqual([]);
-  });
-
-  test("respects limit parameter", () => {
-    for (let i = 0; i < 10; i++) {
-      relayStringMessage({
-        connectionId: "conn-limit",
-        fromTileId: "tile-a",
-        fromLabel: "A",
-        targetTileId: "tile-b",
-        targetSessionId: "session-b",
-        text: `msg ${i}`,
-      });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorCode).toBe("unconnected_target");
     }
-    const log = getStringLog("conn-limit", 3);
-    expect(log).toHaveLength(3);
-    expect(log[2]!.text).toBe("msg 9");
-  });
-
-  test("caps ring buffer at 100 entries", () => {
-    for (let i = 0; i < 110; i++) {
-      relayStringMessage({
-        connectionId: "conn-cap",
-        fromTileId: "tile-a",
-        fromLabel: "A",
-        targetTileId: "tile-b",
-        targetSessionId: "session-b",
-        text: `msg ${i}`,
-      });
-    }
-    const log = getStringLog("conn-cap", 200);
-    expect(log).toHaveLength(100);
-    expect(log[0]!.text).toBe("msg 10");
-    expect(log[99]!.text).toBe("msg 109");
+    expect(writtenSessions).toHaveLength(0);
   });
 });
 
-describe("agent-initiated relay (onPtyData)", () => {
-  beforeEach(() => {
-    unregisterTileSession("tile-a");
-    unregisterTileSession("tile-b");
-    unregisterTileSession("tile-c");
-    writtenSessions.length = 0;
-  });
-
-  test("routes >>@Label: message to registered target", () => {
+describe("agent-initiated relay", () => {
+  test("routes only across an existing cable", () => {
+    activeSessions.add("session-b");
     registerTileSession("tile-a", "session-a", "Claude Worker");
     registerTileSession("tile-b", "session-b", "Codex Reviewer");
+    syncConnectionGraph([
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
 
     onPtyData("session-a", ">>@Codex Reviewer: please review auth changes\n");
 
-    expect(writtenSessions).toHaveLength(1);
-    expect(writtenSessions[0]!.sessionId).toBe("session-b");
-    expect(writtenSessions[0]!.data).toContain("please review auth changes");
+    expect(writtenSessions).toEqual([
+      {
+        sessionId: "session-b",
+        data: "[Claude Worker]: please review auth changes\n",
+      },
+    ]);
+    const [event] = getStringLog("conn-1");
+    expect(event?.type).toBe("relay.sent");
+    expect(event?.routeMethod).toBe("agent");
   });
 
-  test("ignores lines without the >>@ prefix", () => {
-    registerTileSession("tile-a", "session-a", "A");
-    registerTileSession("tile-b", "session-b", "B");
+  test("logs no_route when no connected endpoint matches", () => {
+    registerTileSession("tile-a", "session-a", "Worker");
+    syncConnectionGraph([]);
+
+    onPtyData("session-a", ">>@Reviewer: hello\n");
+
+    expect(writtenSessions).toHaveLength(0);
+    const [event] = getAllRelayLogs();
+    expect(event?.type).toBe("relay.failed");
+    expect(event?.errorCode).toBe("no_route");
+  });
+
+  test("logs unconnected_target when the label exists off-cable", () => {
+    registerTileSession("tile-a", "session-a", "Worker");
+    registerTileSession("tile-b", "session-b", "Reviewer");
+    syncConnectionGraph([]);
+
+    onPtyData("session-a", ">>@Reviewer: hello\n");
+
+    expect(writtenSessions).toHaveLength(0);
+    const [event] = getAllRelayLogs();
+    expect(event?.type).toBe("relay.failed");
+    expect(event?.errorCode).toBe("unconnected_target");
+    expect(event?.targetTileId).toBe("tile-b");
+  });
+
+  test("logs ambiguous_route when multiple connected endpoints match", () => {
+    registerTileSession("tile-a", "session-a", "Worker");
+    registerTileSession("tile-b", "session-b", "Reviewer");
+    registerTileSession("tile-c", "session-c", "Reviewer");
+    syncConnectionGraph([
+      { id: "conn-ab", tileAId: "tile-a", tileBId: "tile-b" },
+      { id: "conn-ac", tileAId: "tile-a", tileBId: "tile-c" },
+    ]);
+
+    onPtyData("session-a", ">>@Reviewer: ambiguous\n");
+
+    expect(writtenSessions).toHaveLength(0);
+    const [event] = getAllRelayLogs();
+    expect(event?.type).toBe("relay.failed");
+    expect(event?.errorCode).toBe("ambiguous_route");
+  });
+
+  test("logs missing_pty when connected target session is gone", () => {
+    registerTileSession("tile-a", "session-a", "Worker");
+    registerTileSession("tile-b", "session-b", "Reviewer");
+    syncConnectionGraph([
+      { id: "conn-ab", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
+
+    onPtyData("session-a", ">>@Reviewer: are you alive?\n");
+
+    expect(writtenSessions).toHaveLength(0);
+    const [event] = getAllRelayLogs();
+    expect(event?.type).toBe("relay.failed");
+    expect(event?.connectionId).toBe("conn-ab");
+    expect(event?.errorCode).toBe("missing_pty");
+  });
+
+  test("ignores ordinary terminal output", () => {
+    registerTileSession("tile-a", "session-a", "Worker");
+    registerTileSession("tile-b", "session-b", "Reviewer");
+    syncConnectionGraph([
+      { id: "conn-ab", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
 
     onPtyData("session-a", "normal terminal output\n");
 
     expect(writtenSessions).toHaveLength(0);
-  });
-
-  test("logs warning and skips on missing target", () => {
-    registerTileSession("tile-a", "session-a", "A");
-
-    // No tile-b registered — should not throw
-    expect(() => {
-      onPtyData("session-a", ">>@NonExistent: hello\n");
-    }).not.toThrow();
-
-    expect(writtenSessions).toHaveLength(0);
-  });
-
-  test("logs warning and skips on ambiguous target label", () => {
-    registerTileSession("tile-a", "session-a", "Worker");
-    registerTileSession("tile-b", "session-b", "Reviewer");
-    registerTileSession("tile-c", "session-c", "Reviewer"); // duplicate label
-
-    expect(() => {
-      onPtyData("session-a", ">>@Reviewer: ambiguous\n");
-    }).not.toThrow();
-
-    expect(writtenSessions).toHaveLength(0);
-  });
-
-  test("does not route to self", () => {
-    registerTileSession("tile-a", "session-a", "Worker");
-
-    onPtyData("session-a", ">>@Worker: self message\n");
-
-    expect(writtenSessions).toHaveLength(0);
+    expect(getAllRelayLogs()).toHaveLength(0);
   });
 });

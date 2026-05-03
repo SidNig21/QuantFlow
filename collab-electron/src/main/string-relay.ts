@@ -1,10 +1,11 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { COLLAB_DIR } from "./paths";
-import { writeToSession } from "./pty";
+import { listSessions, writeToSession } from "./pty";
 
 const RELAY_LOG_PATH = join(COLLAB_DIR, "string-relay-log.ndjson");
 const LOG_RING_CAP = 100;
+const EVENT_RING_CAP = 250;
 
 export interface RelayRequest {
   connectionId: string;
@@ -15,32 +16,62 @@ export interface RelayRequest {
   text: string;
 }
 
-export interface RelayResult {
-  ok: true;
-  formatted: string;
-}
+export type RelayRouteMethod = "manual" | "agent";
 
-export interface RelayLogEntry {
+export type RelayErrorCode =
+  | "empty_message"
+  | "missing_pty"
+  | "no_route"
+  | "ambiguous_route"
+  | "unconnected_target"
+  | "write_failed";
+
+export type RelayResult =
+  | {
+    ok: true;
+    formatted: string;
+    eventId: string;
+    message: string;
+  }
+  | {
+    ok: false;
+    eventId: string;
+    errorCode: RelayErrorCode;
+    message: string;
+  };
+
+export interface RelayEvent {
+  eventId: string;
+  type: "relay.sent" | "relay.failed";
+  ok: boolean;
   connectionId: string;
   fromTileId: string;
-  targetTileId: string;
+  targetTileId: string | null;
   fromLabel: string;
+  targetLabel?: string;
+  routeMethod: RelayRouteMethod;
   text: string;
   formatted: string;
   ts: number;
+  errorCode?: RelayErrorCode;
+  message: string;
 }
 
-// Per-connection in-memory ring buffers
-const logRings = new Map<string, RelayLogEntry[]>();
+export interface RelayLogEntry extends RelayEvent {}
 
-// tile-session registry for agent-initiated relay (Phase 4)
+export interface ConnectionGraphEntry {
+  id: string;
+  tileAId: string;
+  tileBId: string;
+  label?: string;
+}
+
 interface TileSession {
   sessionId: string;
   label: string;
   lastLine?: string;
   lastActivityTs?: number;
 }
-const tileRegistry = new Map<string, TileSession>();
 
 export interface TileSnapshot {
   tileId: string;
@@ -51,10 +82,18 @@ export interface TileSnapshot {
   status: "active" | "idle" | "quiet";
 }
 
+const logRings = new Map<string, RelayLogEntry[]>();
+const eventRing: RelayLogEntry[] = [];
+const tileRegistry = new Map<string, TileSession>();
+const lineBuffers = new Map<string, string>();
+const connectionGraph = new Map<string, ConnectionGraphEntry>();
+
 export function watchtowerSnapshot(): TileSnapshot[] {
   const now = Date.now();
   return [...tileRegistry.entries()].map(([tileId, entry]) => {
-    const age = entry.lastActivityTs != null ? now - entry.lastActivityTs : Infinity;
+    const age = entry.lastActivityTs != null
+      ? now - entry.lastActivityTs
+      : Infinity;
     const status: TileSnapshot["status"] =
       age < 5_000 ? "active" : age < 30_000 ? "idle" : "quiet";
     return {
@@ -68,57 +107,101 @@ export function watchtowerSnapshot(): TileSnapshot[] {
   });
 }
 
-export function getAllRelayLogs(
-  limit = 50,
-): RelayLogEntry[] {
-  const all: RelayLogEntry[] = [];
-  for (const ring of logRings.values()) {
-    all.push(...ring);
-  }
-  all.sort((a, b) => a.ts - b.ts);
-  return all.slice(-limit);
+export function getAllRelayLogs(limit = 50): RelayLogEntry[] {
+  return eventRing.slice(-Math.max(1, limit));
 }
-// Line buffers for agent-initiated relay (Phase 4)
-const lineBuffers = new Map<string, string>();
 
-export function relayStringMessage(req: RelayRequest): RelayResult {
-  const { connectionId, fromTileId, targetTileId, fromLabel, targetSessionId, text } = req;
-
-  const trimmed = text.trim();
-  if (!trimmed) {
-    throw new Error("relay message must not be empty");
-  }
-
-  if (!targetSessionId) {
-    throw new Error(`target tile ${targetTileId} has no active PTY session`);
-  }
-
-  const formatted = `[${fromLabel}]: ${trimmed}`;
-  writeToSession(targetSessionId, formatted + "\n");
-
-  const entry: RelayLogEntry = {
+export function relayStringMessage(
+  req: RelayRequest,
+  routeMethod: RelayRouteMethod = "manual",
+): RelayResult {
+  const {
     connectionId,
     fromTileId,
     targetTileId,
     fromLabel,
+    targetSessionId,
+    text,
+  } = req;
+
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return relayFailed({
+      connectionId,
+      fromTileId,
+      targetTileId,
+      fromLabel,
+      routeMethod,
+      text,
+      errorCode: "empty_message",
+      message: "Relay message must not be empty.",
+    });
+  }
+
+  if (!findConnection(connectionId, fromTileId, targetTileId)) {
+    return relayFailed({
+      connectionId,
+      fromTileId,
+      targetTileId,
+      fromLabel,
+      routeMethod,
+      text: trimmed,
+      errorCode: "unconnected_target",
+      message: "Relay blocked because the tiles are not connected by this cable.",
+    });
+  }
+
+  if (!targetSessionId) {
+    return relayFailed({
+      connectionId,
+      fromTileId,
+      targetTileId,
+      fromLabel,
+      routeMethod,
+      text: trimmed,
+      errorCode: "missing_pty",
+      message: `Target tile ${targetTileId} has no active PTY session.`,
+    });
+  }
+
+  if (!listSessions().includes(targetSessionId)) {
+    return relayFailed({
+      connectionId,
+      fromTileId,
+      targetTileId,
+      fromLabel,
+      routeMethod,
+      text: trimmed,
+      errorCode: "missing_pty",
+      message: `Target PTY session ${targetSessionId} is not active.`,
+    });
+  }
+
+  const formatted = `[${fromLabel}]: ${trimmed}`;
+  try {
+    writeToSession(targetSessionId, formatted + "\n");
+  } catch (err) {
+    return relayFailed({
+      connectionId,
+      fromTileId,
+      targetTileId,
+      fromLabel,
+      routeMethod,
+      text: trimmed,
+      errorCode: "write_failed",
+      message: err instanceof Error ? err.message : "Relay write failed.",
+    });
+  }
+
+  return relaySent({
+    connectionId,
+    fromTileId,
+    targetTileId,
+    fromLabel,
+    routeMethod,
     text: trimmed,
     formatted,
-    ts: Date.now(),
-  };
-
-  // Update ring buffer
-  let ring = logRings.get(connectionId);
-  if (!ring) {
-    ring = [];
-    logRings.set(connectionId, ring);
-  }
-  ring.push(entry);
-  if (ring.length > LOG_RING_CAP) ring.shift();
-
-  // Append to NDJSON log (fire-and-forget)
-  appendRelayLog(entry);
-
-  return { ok: true, formatted };
+  });
 }
 
 export function getStringLog(
@@ -129,16 +212,19 @@ export function getStringLog(
   return ring.slice(-Math.max(1, limit));
 }
 
-async function appendRelayLog(entry: RelayLogEntry): Promise<void> {
-  try {
-    await mkdir(COLLAB_DIR, { recursive: true });
-    await appendFile(RELAY_LOG_PATH, JSON.stringify(entry) + "\n", "utf-8");
-  } catch {
-    // Non-fatal: log write failures should not break relay
+export function syncConnectionGraph(connections: ConnectionGraphEntry[]): void {
+  connectionGraph.clear();
+  for (const conn of connections) {
+    if (!conn.id || !conn.tileAId || !conn.tileBId) continue;
+    const entry: ConnectionGraphEntry = {
+      id: conn.id,
+      tileAId: conn.tileAId,
+      tileBId: conn.tileBId,
+    };
+    if (conn.label != null) entry.label = conn.label;
+    connectionGraph.set(conn.id, entry);
   }
 }
-
-// ── Agent-initiated relay support (Phase 4) ──────────────────────────
 
 export function registerTileSession(
   tileId: string,
@@ -153,35 +239,10 @@ export function unregisterTileSession(tileId: string): void {
   lineBuffers.delete(tileId);
 }
 
-// Returns the tileId for a given sessionId, or null
-function tileIdForSession(sessionId: string): string | null {
-  for (const [tileId, entry] of tileRegistry) {
-    if (entry.sessionId === sessionId) return tileId;
-  }
-  return null;
-}
-
-// Returns connections for a tile (imported lazily to avoid circular deps)
-// Resolved at call time so canvas state is always current
-function getConnectionsForTileId(tileId: string): Array<{ tileAId: string; tileBId: string; id: string }> {
-  try {
-    // canvas-persistence is the source of truth for connections in main
-    // but connections live in renderer state. We rely on the registry
-    // for routing: tileId -> sessionId -> relay target by label.
-    // Actual connection lookup is done by label matching against registry.
-    return [];
-  } catch {
-    return [];
-  }
-}
-
-const RELAY_PREFIX_RE = /^>>@(.+?):\s*(.+)$/;
-
 export function onPtyData(sessionId: string, chunk: string): void {
   const fromTileId = tileIdForSession(sessionId);
   if (!fromTileId) return;
 
-  // Track last activity
   const registryEntry = tileRegistry.get(fromTileId);
   if (registryEntry) {
     const lines = chunk.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -191,10 +252,8 @@ export function onPtyData(sessionId: string, chunk: string): void {
     registryEntry.lastActivityTs = Date.now();
   }
 
-  // Accumulate into line buffer
-  let buf = (lineBuffers.get(fromTileId) ?? "") + chunk;
+  const buf = (lineBuffers.get(fromTileId) ?? "") + chunk;
   const lines = buf.split("\n");
-  // Keep incomplete last line in buffer
   lineBuffers.set(fromTileId, lines[lines.length - 1] ?? "");
 
   for (let i = 0; i < lines.length - 1; i++) {
@@ -204,51 +263,218 @@ export function onPtyData(sessionId: string, chunk: string): void {
 
     const targetLabel = match[1]!.trim();
     const message = match[2]!.trim();
+    routeAgentRelay(fromTileId, targetLabel, message);
+  }
+}
 
-    // Find a registered tile whose label matches
-    let targetTileId: string | null = null;
-    let targetSessionId: string | null = null;
-    let ambiguous = false;
+export function resetStringRelayForTests(): void {
+  logRings.clear();
+  eventRing.length = 0;
+  tileRegistry.clear();
+  lineBuffers.clear();
+  connectionGraph.clear();
+}
 
-    for (const [tid, entry] of tileRegistry) {
-      if (tid === fromTileId) continue;
-      if (entry.label.toLowerCase() === targetLabel.toLowerCase()) {
-        if (targetTileId !== null) {
-          ambiguous = true;
-          break;
-        }
-        targetTileId = tid;
-        targetSessionId = entry.sessionId;
-      }
-    }
+const RELAY_PREFIX_RE = /^>>@(.+?):\s*(.+)$/;
 
-    if (ambiguous) {
-      console.warn(`[string-relay] ambiguous target label "${targetLabel}" — skipping`);
-      continue;
-    }
+function routeAgentRelay(
+  fromTileId: string,
+  targetLabel: string,
+  message: string,
+): void {
+  const normalizedTarget = normalizeLabel(targetLabel);
+  const fromEntry = tileRegistry.get(fromTileId);
+  const fromLabel = fromEntry?.label ?? fromTileId;
+  const globalMatches = [...tileRegistry.entries()]
+    .filter(([tid, entry]) =>
+      tid !== fromTileId && normalizeLabel(entry.label) === normalizedTarget,
+    );
+  const connectedMatches = connectedEdges(fromTileId)
+    .map(({ connection, otherTileId }) => ({
+      connection,
+      otherTileId,
+      entry: tileRegistry.get(otherTileId),
+    }))
+    .filter((candidate) =>
+      candidate.entry != null &&
+      normalizeLabel(candidate.entry.label) === normalizedTarget,
+    );
 
-    if (!targetTileId || !targetSessionId) {
-      console.warn(`[string-relay] no registered tile with label "${targetLabel}" — skipping`);
-      continue;
-    }
+  if (connectedMatches.length > 1) {
+    relayFailed({
+      connectionId: `agent:${fromTileId}:${normalizedTarget}`,
+      fromTileId,
+      targetTileId: null,
+      fromLabel,
+      targetLabel,
+      routeMethod: "agent",
+      text: message,
+      errorCode: "ambiguous_route",
+      message: `Ambiguous relay target "${targetLabel}" across connected tiles.`,
+    });
+    return;
+  }
 
-    const fromEntry = tileRegistry.get(fromTileId);
-    const fromLabel = fromEntry?.label ?? fromTileId;
+  if (connectedMatches.length === 0) {
+    relayFailed({
+      connectionId: `agent:${fromTileId}:${normalizedTarget}`,
+      fromTileId,
+      targetTileId: globalMatches.length === 1 ? globalMatches[0]![0] : null,
+      fromLabel,
+      targetLabel,
+      routeMethod: "agent",
+      text: message,
+      errorCode: globalMatches.length > 0 ? "unconnected_target" : "no_route",
+      message: globalMatches.length > 0
+        ? `Relay target "${targetLabel}" exists but is not connected to this tile.`
+        : `No connected relay target matches "${targetLabel}".`,
+    });
+    return;
+  }
 
-    // We don't have connectionId here; use a synthetic one for logging
-    const connectionId = `agent:${fromTileId}:${targetTileId}`;
+  const connectedMatch = connectedMatches[0]!;
+  relayStringMessage({
+    connectionId: connectedMatch.connection.id,
+    fromTileId,
+    fromLabel,
+    targetTileId: connectedMatch.otherTileId,
+    targetSessionId: connectedMatch.entry!.sessionId,
+    text: message,
+  }, "agent");
+}
 
-    try {
-      relayStringMessage({
-        connectionId,
-        fromTileId,
-        fromLabel,
-        targetTileId,
-        targetSessionId,
-        text: message,
-      });
-    } catch (err) {
-      console.warn("[string-relay] agent-relay failed:", err);
+function relayFailed(params: {
+  connectionId: string;
+  fromTileId: string;
+  targetTileId: string | null;
+  fromLabel: string;
+  targetLabel?: string;
+  routeMethod: RelayRouteMethod;
+  text: string;
+  errorCode: RelayErrorCode;
+  message: string;
+}): RelayResult {
+  const eventId = makeEventId();
+  const entry: RelayLogEntry = {
+    eventId,
+    type: "relay.failed",
+    ok: false,
+    connectionId: params.connectionId,
+    fromTileId: params.fromTileId,
+    targetTileId: params.targetTileId,
+    fromLabel: params.fromLabel,
+    routeMethod: params.routeMethod,
+    text: params.text,
+    formatted: params.message,
+    ts: Date.now(),
+    errorCode: params.errorCode,
+    message: params.message,
+  };
+  if (params.targetLabel != null) entry.targetLabel = params.targetLabel;
+  pushRelayEvent(entry);
+  return {
+    ok: false,
+    eventId,
+    errorCode: params.errorCode,
+    message: params.message,
+  };
+}
+
+function relaySent(params: {
+  connectionId: string;
+  fromTileId: string;
+  targetTileId: string;
+  fromLabel: string;
+  routeMethod: RelayRouteMethod;
+  text: string;
+  formatted: string;
+}): RelayResult {
+  const eventId = makeEventId();
+  const entry: RelayLogEntry = {
+    eventId,
+    type: "relay.sent",
+    ok: true,
+    connectionId: params.connectionId,
+    fromTileId: params.fromTileId,
+    targetTileId: params.targetTileId,
+    fromLabel: params.fromLabel,
+    routeMethod: params.routeMethod,
+    text: params.text,
+    formatted: params.formatted,
+    ts: Date.now(),
+    message: "Relay sent",
+  };
+  pushRelayEvent(entry);
+  return {
+    ok: true,
+    formatted: params.formatted,
+    eventId,
+    message: "Relay sent",
+  };
+}
+
+function pushRelayEvent(entry: RelayLogEntry): void {
+  let ring = logRings.get(entry.connectionId);
+  if (!ring) {
+    ring = [];
+    logRings.set(entry.connectionId, ring);
+  }
+  ring.push(entry);
+  if (ring.length > LOG_RING_CAP) ring.shift();
+
+  eventRing.push(entry);
+  if (eventRing.length > EVENT_RING_CAP) eventRing.shift();
+
+  appendRelayLog(entry);
+}
+
+async function appendRelayLog(entry: RelayLogEntry): Promise<void> {
+  try {
+    await mkdir(COLLAB_DIR, { recursive: true });
+    await appendFile(RELAY_LOG_PATH, JSON.stringify(entry) + "\n", "utf-8");
+  } catch {
+    // Non-fatal: log write failures should not break relay
+  }
+}
+
+function makeEventId(): string {
+  return `relay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function findConnection(
+  connectionId: string,
+  fromTileId: string,
+  targetTileId: string,
+): ConnectionGraphEntry | null {
+  const conn = connectionGraph.get(connectionId);
+  if (!conn) return null;
+  const direct = conn.tileAId === fromTileId && conn.tileBId === targetTileId;
+  const reverse = conn.tileAId === targetTileId && conn.tileBId === fromTileId;
+  return direct || reverse ? conn : null;
+}
+
+function tileIdForSession(sessionId: string): string | null {
+  for (const [tileId, entry] of tileRegistry) {
+    if (entry.sessionId === sessionId) return tileId;
+  }
+  return null;
+}
+
+function normalizeLabel(label: string): string {
+  return label.trim().replace(/^@/, "").toLowerCase();
+}
+
+function connectedEdges(tileId: string): Array<{
+  connection: ConnectionGraphEntry;
+  otherTileId: string;
+}> {
+  const edges: Array<{ connection: ConnectionGraphEntry; otherTileId: string }> = [];
+  for (const conn of connectionGraph.values()) {
+    if (conn.tileAId === tileId) {
+      edges.push({ connection: conn, otherTileId: conn.tileBId });
+    } else if (conn.tileBId === tileId) {
+      edges.push({ connection: conn, otherTileId: conn.tileAId });
     }
   }
+  return edges;
 }

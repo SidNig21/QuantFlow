@@ -397,6 +397,15 @@ contextBridge.exposeInMainWorld("shellApi", {
     tileId: string,
   ) => ipcRenderer.invoke("string:unregister-tile-session", tileId),
 
+  stringSyncConnections: (
+    connections: Array<{
+      id: string;
+      tileAId: string;
+      tileBId: string;
+      label?: string;
+    }>,
+  ) => ipcRenderer.invoke("string:sync-connections", connections),
+
   // ── Watchtower ──
   watchtowerSnapshot: (): Promise<unknown[]> =>
     ipcRenderer.invoke("watchtower:snapshot"),

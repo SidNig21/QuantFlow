@@ -31,6 +31,7 @@ export function createTileManager({
 	onTileDblClick,
 	onReposition,
 	onCableMousedown,
+	onConnectionsChanged,
 }) {
 	/** @type {Map<string, {container: HTMLElement, contentArea: HTMLElement, titleText: HTMLElement, webview?: HTMLElement}>} */
 	const tileDOMs = new Map();
@@ -92,13 +93,17 @@ export function createTileManager({
 	function saveCanvasDebounced() {
 		clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => {
-			onSaveDebounced(getCanvasStateForSave());
+			const state = getCanvasStateForSave();
+			onConnectionsChanged?.(state.connections);
+			onSaveDebounced(state);
 		}, 500);
 	}
 
 	function saveCanvasImmediate() {
 		clearTimeout(saveTimer);
-		onSaveImmediate(getCanvasStateForSave());
+		const state = getCanvasStateForSave();
+		onConnectionsChanged?.(state.connections);
+		onSaveImmediate(state);
 	}
 
 	// -- Tile positioning --

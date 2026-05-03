@@ -3,7 +3,7 @@ import "./tooltip.js";
 import {
 	tiles, connections, getTile, defaultSize, inferTileType, tileAtPoint,
 	selectTile, clearSelection, getSelectedTiles, getNearestTileInDirection,
-	addConnection, removeConnection, updateConnectionLabel,
+	addConnection, removeConnection, updateConnectionLabel, clearConnections,
 } from "./canvas-state.js";
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
@@ -121,6 +121,17 @@ async function init() {
 	function setLastTerminalSize(width, height) {
 		lastTerminalSize = { width, height };
 		window.shellApi.setPref("lastTerminalSize", lastTerminalSize);
+	}
+
+	function syncConnectionGraph() {
+		window.shellApi.stringSyncConnections?.(
+			connections.map((conn) => ({
+				id: conn.id,
+				tileAId: conn.tileAId,
+				tileBId: conn.tileBId,
+				label: conn.label,
+			})),
+		);
 	}
 
 	// DOM elements
@@ -673,6 +684,7 @@ async function init() {
 		onTileDblClick(tile) {
 			edgeIndicators.panToTile(tile);
 		},
+		onConnectionsChanged: syncConnectionGraph,
 	});
 
 	// -- Cable overlay --
@@ -1871,8 +1883,15 @@ async function init() {
 			: 0;
 		viewport.updateCanvas();
 		tileManager.restoreCanvasState(savedState.tiles);
+		clearConnections();
+		for (const conn of savedState.connections ?? []) {
+			if (!conn.id || !conn.tileAId || !conn.tileBId) continue;
+			addConnection(conn);
+		}
+		syncConnectionGraph();
 		viewport.redrawGrid();
 		minimap.update();
+		cableOverlay.update();
 
 		// Batch-sync metadata for restored terminal tiles
 		const restoredTermTiles = tiles.filter(

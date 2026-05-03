@@ -4,9 +4,11 @@ import {
   getStringLog,
   registerTileSession,
   unregisterTileSession,
+  syncConnectionGraph,
   watchtowerSnapshot,
   getAllRelayLogs,
   type RelayRequest,
+  type ConnectionGraphEntry,
 } from "./string-relay";
 
 export function registerStringRelayHandlers(): void {
@@ -33,6 +35,14 @@ export function registerStringRelayHandlers(): void {
     "string:unregister-tile-session",
     (_event, tileId: string) => {
       unregisterTileSession(tileId);
+      return { ok: true };
+    },
+  );
+
+  ipcMain.handle(
+    "string:sync-connections",
+    (_event, connections: ConnectionGraphEntry[]) => {
+      syncConnectionGraph(Array.isArray(connections) ? connections : []);
       return { ok: true };
     },
   );
