@@ -1,5 +1,10 @@
 import { describe, test, expect } from "bun:test";
-import { getTileLabel, splitFilepath, positionTile } from "./tile-renderer.js";
+import {
+  formatContextPreviewDetail,
+  getTileLabel,
+  splitFilepath,
+  positionTile,
+} from "./tile-renderer.js";
 
 // -- splitFilepath --
 
@@ -35,6 +40,28 @@ describe("splitFilepath", () => {
   test("handles root path", () => {
     const result = splitFilepath("/");
     expect(result.name).toBe("/");
+  });
+});
+
+describe("formatContextPreviewDetail", () => {
+  test("summarizes included and omitted preview files", () => {
+    const detail = formatContextPreviewDetail({
+      maxChars: 20_000,
+      injectedChars: 1_200,
+      decisionsCount: 2,
+      files: [
+        { path: "/vault/a.md", ok: true, omitted: false },
+        { path: "/vault/b.md", ok: true, omitted: true },
+        { path: "/vault/c.md", ok: false, omitted: false },
+      ],
+    });
+
+    expect(detail).toContain("3 pinned files, 2 decisions");
+    expect(detail).toContain("1200 chars injected of 20000 max");
+    expect(detail).toContain("2 files omitted or unreadable");
+    expect(detail).toContain("included: /vault/a.md");
+    expect(detail).toContain("omitted: /vault/b.md");
+    expect(detail).toContain("unreadable: /vault/c.md");
   });
 });
 

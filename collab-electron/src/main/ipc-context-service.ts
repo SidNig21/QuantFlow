@@ -4,10 +4,10 @@ import {
   pinFile,
   unpinFile,
   addDecision,
+  previewForTile,
   injectToTile,
 } from "./context-service";
-import { readFile } from "node:fs/promises";
-import { resolve, normalize } from "node:path";
+import { resolve } from "node:path";
 import { readFile as readVaultFile } from "node:fs/promises";
 
 export function registerContextServiceHandlers(): void {
@@ -25,6 +25,10 @@ export function registerContextServiceHandlers(): void {
 
   ipcMain.handle("context:add-decision", async (_event, text: string) => {
     return addDecision(text);
+  });
+
+  ipcMain.handle("context:preview-for-tile", async () => {
+    return previewForTile((p) => readVaultFile(resolve(p), "utf-8"));
   });
 
   ipcMain.handle(

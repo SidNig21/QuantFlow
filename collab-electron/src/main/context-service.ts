@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 
 const MAX_DECISIONS = 50;
+const DEFAULT_CONTEXT_MAX_CHARS = 20_000;
 
 let ctxDir: string | null = null;
 
@@ -25,6 +26,25 @@ export interface ContextDecision {
 export interface SharedContext {
   pinnedFiles: string[];
   decisions: ContextDecision[];
+}
+
+export interface ContextPreviewFile {
+  path: string;
+  ok: boolean;
+  charCount: number;
+  includedCharCount: number;
+  omitted: boolean;
+  error?: string;
+}
+
+export interface ContextPreview {
+  maxChars: number;
+  sourceChars: number;
+  injectedChars: number;
+  files: ContextPreviewFile[];
+  decisionsCount: number;
+  omittedDecisionCount: number;
+  text: string;
 }
 
 async function load(): Promise<SharedContext> {
@@ -76,35 +96,103 @@ export async function addDecision(text: string): Promise<SharedContext> {
   return ctx;
 }
 
-export async function composeForTile(
+async function buildPreview(
   vaultReadFile?: (p: string) => Promise<string>,
-): Promise<string> {
+  maxChars = DEFAULT_CONTEXT_MAX_CHARS,
+): Promise<ContextPreview> {
   const ctx = await load();
   const parts: string[] = [];
+  const files: ContextPreviewFile[] = [];
+  let sourceChars = 0;
+  let remaining = Math.max(0, maxChars);
+  let omittedDecisionCount = 0;
+
+  function append(part: string): boolean {
+    if (part.length > remaining) return false;
+    parts.push(part);
+    remaining -= part.length;
+    return true;
+  }
 
   if (ctx.pinnedFiles.length > 0) {
-    parts.push("## Pinned Files");
+    append("## Pinned Files");
     for (const filePath of ctx.pinnedFiles) {
-      parts.push(`\n### ${filePath}`);
+      const entry: ContextPreviewFile = {
+        path: filePath,
+        ok: true,
+        charCount: 0,
+        includedCharCount: 0,
+        omitted: false,
+      };
+      files.push(entry);
+
+      let content = "";
       if (vaultReadFile) {
         try {
-          const content = await vaultReadFile(filePath);
-          parts.push(content);
+          content = await vaultReadFile(filePath);
+          entry.charCount = content.length;
+          sourceChars += content.length;
         } catch {
-          parts.push("(could not read file)");
+          entry.ok = false;
+          entry.error = "could not read file";
         }
       }
+
+      const header = `\n### ${filePath}\n`;
+      if (!entry.ok) {
+        append(`${header}(could not read file)`);
+        continue;
+      }
+      if (!vaultReadFile) {
+        append(header.trimEnd());
+        continue;
+      }
+      if (header.length + content.length <= remaining) {
+        append(header + content);
+        entry.includedCharCount = content.length;
+        continue;
+      }
+      entry.omitted = true;
+      append(`${header}(omitted: ${content.length} chars exceeds context limit)`);
     }
   }
 
   if (ctx.decisions.length > 0) {
-    parts.push("\n## Decisions");
+    append("\n## Decisions");
     for (const d of ctx.decisions) {
-      parts.push(`- ${d.text}`);
+      const line = `\n- ${d.text}`;
+      sourceChars += d.text.length;
+      if (!append(line)) {
+        omittedDecisionCount++;
+      }
     }
   }
 
-  return parts.join("\n");
+  const text = parts.join("\n");
+  return {
+    maxChars,
+    sourceChars,
+    injectedChars: text.length,
+    files,
+    decisionsCount: ctx.decisions.length,
+    omittedDecisionCount,
+    text,
+  };
+}
+
+export async function previewForTile(
+  vaultReadFile?: (p: string) => Promise<string>,
+  maxChars = DEFAULT_CONTEXT_MAX_CHARS,
+): Promise<ContextPreview> {
+  return buildPreview(vaultReadFile, maxChars);
+}
+
+export async function composeForTile(
+  vaultReadFile?: (p: string) => Promise<string>,
+  maxChars = DEFAULT_CONTEXT_MAX_CHARS,
+): Promise<string> {
+  const preview = await buildPreview(vaultReadFile, maxChars);
+  return preview.text;
 }
 
 export async function injectToTile(

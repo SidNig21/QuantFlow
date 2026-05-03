@@ -20,6 +20,30 @@ function resolveInput(raw) {
   return `https://www.google.com/search?q=${encodeURIComponent(s)}`;
 }
 
+export function formatContextPreviewDetail(preview) {
+  const files = Array.isArray(preview?.files) ? preview.files : [];
+  const fileLines = files.slice(0, 5).map((file) => {
+    const status = file.ok === false
+      ? "unreadable"
+      : file.omitted ? "omitted" : "included";
+    return `${status}: ${file.path}`;
+  });
+  const hiddenCount = Math.max(0, files.length - fileLines.length);
+  const omittedFiles = files.filter((file) => file.omitted || file.ok === false).length;
+  const lines = [
+    `${files.length} pinned files, ${preview?.decisionsCount ?? 0} decisions`,
+    `${preview?.injectedChars ?? 0} chars injected of ${preview?.maxChars ?? 0} max`,
+  ];
+  if (omittedFiles > 0) {
+    lines.push(`${omittedFiles} files omitted or unreadable`);
+  }
+  lines.push(...fileLines);
+  if (hiddenCount > 0) {
+    lines.push(`${hiddenCount} more files`);
+  }
+  return lines.join("\n");
+}
+
 /**
  * Creates the DOM structure for a tile.
  * @param {import('./canvas-state.js').Tile} tile
@@ -238,6 +262,14 @@ export function createTileDOM(tile, callbacks) {
       } else if (selected === "inject-context") {
         if (!tile.ptySessionId) return;
         try {
+          const preview = await window.shellApi.contextPreviewForTile?.();
+          if (!preview || !preview.injectedChars) return;
+          const response = await window.shellApi.showConfirmDialog({
+            message: "Inject shared context?",
+            detail: formatContextPreviewDetail(preview),
+            buttons: ["Cancel", "Inject"],
+          });
+          if (response !== 1) return;
           await window.shellApi.contextInjectToTile?.(tile.ptySessionId);
         } catch (err) {
           console.warn("[context] inject failed:", err);

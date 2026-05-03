@@ -442,6 +442,8 @@ contextBridge.exposeInMainWorld("shellApi", {
     ipcRenderer.invoke("context:unpin-file", filePath),
   contextAddDecision: (text: string): Promise<unknown> =>
     ipcRenderer.invoke("context:add-decision", text),
+  contextPreviewForTile: (): Promise<unknown> =>
+    ipcRenderer.invoke("context:preview-for-tile"),
   contextInjectToTile: (sessionId: string): Promise<unknown> =>
     ipcRenderer.invoke("context:inject-to-tile", sessionId),
 });

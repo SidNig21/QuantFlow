@@ -10,6 +10,7 @@ import {
   unpinFile,
   addDecision,
   composeForTile,
+  previewForTile,
 } from "./context-service";
 
 const TEST_DIR = join(tmpdir(), `ctx-test-${Date.now()}`);
@@ -80,5 +81,50 @@ describe("composeForTile", () => {
   test("returns empty string when context is empty", async () => {
     const text = await composeForTile();
     expect(text.trim()).toBe("");
+  });
+});
+
+describe("previewForTile", () => {
+  test("shows included files and injected size before injection", async () => {
+    await pinFile("/vault/spec.md");
+    await addDecision("Use bounded context");
+
+    const preview = await previewForTile(async () => "hello world", 200);
+
+    expect(preview.files).toEqual([{
+      path: "/vault/spec.md",
+      ok: true,
+      charCount: 11,
+      includedCharCount: 11,
+      omitted: false,
+    }]);
+    expect(preview.decisionsCount).toBe(1);
+    expect(preview.injectedChars).toBeGreaterThan(0);
+    expect(preview.text).toContain("hello world");
+    expect(preview.text).toContain("Use bounded context");
+  });
+
+  test("marks oversized files as omitted", async () => {
+    await pinFile("/vault/huge.md");
+
+    const preview = await previewForTile(async () => "x".repeat(500), 120);
+
+    expect(preview.files[0]?.omitted).toBe(true);
+    expect(preview.files[0]?.includedCharCount).toBe(0);
+    expect(preview.injectedChars).toBeLessThanOrEqual(120);
+    expect(preview.text).toContain("omitted");
+    expect(preview.text).not.toContain("x".repeat(500));
+  });
+
+  test("surfaces unreadable files before injection", async () => {
+    await pinFile("/vault/missing.md");
+
+    const preview = await previewForTile(async () => {
+      throw new Error("missing");
+    }, 200);
+
+    expect(preview.files[0]?.ok).toBe(false);
+    expect(preview.files[0]?.error).toBe("could not read file");
+    expect(preview.text).toContain("could not read file");
   });
 });
