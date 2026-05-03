@@ -1391,6 +1391,25 @@ body.platform-win {
 	stroke-width: 3px;
 }
 
+.cable-path.cable-sending {
+	opacity: 1;
+	stroke: #60a5fa;
+	stroke-dasharray: 8 6;
+	stroke-width: 3px;
+}
+
+.cable-path.cable-sent {
+	opacity: 1;
+	stroke: #34d399;
+	stroke-width: 3px;
+}
+
+.cable-path.cable-failed {
+	opacity: 1;
+	stroke: #f87171;
+	stroke-width: 3px;
+}
+
 .cable-hit {
 	fill: none;
 	stroke: transparent;

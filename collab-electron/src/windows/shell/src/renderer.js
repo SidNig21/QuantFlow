@@ -858,6 +858,7 @@ async function init() {
 			tileManager.saveCanvasImmediate();
 			cableOverlay.update();
 		},
+		onGetFocusedTileId: () => tileManager.getFocusedTileId(),
 	});
 
 	// -- Edge indicators --

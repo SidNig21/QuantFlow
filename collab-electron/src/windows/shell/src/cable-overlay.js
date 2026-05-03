@@ -120,6 +120,41 @@ export function getDirectedCableTiles(direction, tileA, tileB) {
 		: { fromTile: tileA, toTile: tileB };
 }
 
+function tileScreenCenter(tile, viewport) {
+	return {
+		x: tile.x * viewport.zoom + viewport.panX + (tile.width * viewport.zoom) / 2,
+		y: tile.y * viewport.zoom + viewport.panY + (tile.height * viewport.zoom) / 2,
+	};
+}
+
+function squaredDistance(a, b) {
+	const dx = a.x - b.x;
+	const dy = a.y - b.y;
+	return dx * dx + dy * dy;
+}
+
+export function getCableDefaultDirection({
+	tileA,
+	tileB,
+	viewport,
+	focusedTileId,
+	pointerX,
+	pointerY,
+} = {}) {
+	if (!tileA || !tileB) return "AtoB";
+	if (focusedTileId === tileA.id) return "AtoB";
+	if (focusedTileId === tileB.id) return "BtoA";
+	if (!viewport || !Number.isFinite(pointerX) || !Number.isFinite(pointerY)) {
+		return "AtoB";
+	}
+	const pointer = { x: pointerX, y: pointerY };
+	const a = tileScreenCenter(tileA, viewport);
+	const b = tileScreenCenter(tileB, viewport);
+	return squaredDistance(pointer, b) < squaredDistance(pointer, a)
+		? "BtoA"
+		: "AtoB";
+}
+
 export function getRetryCableRelayRequest(entry, conn, tileA, tileB, getLabel) {
 	if (entry?.ok !== false) return null;
 	const text = String(entry?.text ?? "").trim();
@@ -162,6 +197,7 @@ export function createCableOverlay({
 	onFocusTile,
 	onRemoveConnection,
 	onUpdateLabel,
+	onGetFocusedTileId,
 }) {
 	const svg = document.createElementNS(SVG_NS, "svg");
 	svg.id = "cable-overlay";
@@ -184,6 +220,7 @@ export function createCableOverlay({
 	let popoverEl = null;
 	let contextMenuEl = null;
 	let selectedConnectionId = null;
+	const relayStateByConnection = new Map();
 
 	const previewState = { active: false, startTile: null, mouseX: 0, mouseY: 0 };
 
@@ -215,13 +252,37 @@ export function createCableOverlay({
 		el.style.top = `${pos.y}px`;
 	}
 
-	function showPopover(conn, mx, my, tileA, tileB) {
+	function setCableRelayState(connectionId, state) {
+		if (!state) {
+			relayStateByConnection.delete(connectionId);
+		} else {
+			relayStateByConnection.set(connectionId, state);
+		}
+		updateCableClasses();
+	}
+
+	function getLocalPoint(event) {
+		const rect = containerEl.getBoundingClientRect();
+		return {
+			x: event.clientX - rect.left,
+			y: event.clientY - rect.top,
+		};
+	}
+
+	function showPopover(conn, mx, my, tileA, tileB, pointer = null) {
 		removePopover();
 		removeContextMenu();
 		selectedConnectionId = conn.id;
 		updateCableClasses();
 
-		let direction = "AtoB";
+		let direction = getCableDefaultDirection({
+			tileA,
+			tileB,
+			viewport: viewportState,
+			focusedTileId: onGetFocusedTileId?.() ?? null,
+			pointerX: pointer?.x,
+			pointerY: pointer?.y,
+		});
 
 		popoverEl = document.createElement("div");
 		popoverEl.className = "cable-popover";
@@ -347,22 +408,27 @@ export function createCableOverlay({
 			focusInputOnFailure = false,
 		} = {}) {
 			setStatus("Sending…", "pending");
+			setCableRelayState(conn.id, "sending");
 			try {
 				const result = await onSendMessage?.(request);
 				if (result?.ok === false) {
+					setCableRelayState(conn.id, "failed");
 					setStatus(result.message || "Relay failed.", "error");
 					onNotify?.(result.message || "Relay failed.", "error");
 					await refreshHistory();
 					if (focusInputOnFailure) input.focus();
 					return false;
 				}
+				setCableRelayState(conn.id, "sent");
 				pulseCable(conn.id);
 				if (clearInputOnSuccess) input.value = "";
 				await refreshHistory();
 				removePopover();
+				setTimeout(() => setCableRelayState(conn.id, null), 1500);
 				return true;
 			} catch (err) {
 				const message = err instanceof Error ? err.message : "Relay failed.";
+				setCableRelayState(conn.id, "failed");
 				setStatus(message, "error");
 				onNotify?.(message, "error");
 				if (focusInputOnFailure) input.focus();
@@ -555,6 +621,10 @@ export function createCableOverlay({
 				"cable-selected",
 				el.dataset.connId === selectedConnectionId,
 			);
+			const state = relayStateByConnection.get(el.dataset.connId) ?? "";
+			el.classList.toggle("cable-sending", state === "sending");
+			el.classList.toggle("cable-sent", state === "sent");
+			el.classList.toggle("cable-failed", state === "failed");
 		}
 	}
 
@@ -590,7 +660,7 @@ export function createCableOverlay({
 			hit.addEventListener("mouseleave", () => setCableHovered(conn.id, false));
 			hit.addEventListener("click", (e) => {
 				e.stopPropagation();
-				showPopover(conn, mid.x, mid.y, tileA, tileB);
+				showPopover(conn, mid.x, mid.y, tileA, tileB, getLocalPoint(e));
 			});
 			hit.addEventListener("contextmenu", (e) => {
 				e.preventDefault();

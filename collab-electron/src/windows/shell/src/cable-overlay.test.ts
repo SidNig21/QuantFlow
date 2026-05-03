@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	clampFloatingPosition,
 	formatCableContextRelay,
+	getCableDefaultDirection,
 	formatCableLogDetail,
 	formatCableLogEntry,
 	getDirectedCableTiles,
@@ -155,6 +156,56 @@ describe("getDirectedCableTiles", () => {
 			fromTile: tileB,
 			toTile: tileA,
 		});
+	});
+});
+
+describe("getCableDefaultDirection", () => {
+	const viewport = { panX: 0, panY: 0, zoom: 1 };
+	const tileA = { id: "tile-a", x: 0, y: 0, width: 100, height: 100 };
+	const tileB = { id: "tile-b", x: 300, y: 0, width: 100, height: 100 };
+
+	test("uses the focused endpoint as the source", () => {
+		expect(getCableDefaultDirection({
+			tileA,
+			tileB,
+			viewport,
+			focusedTileId: "tile-b",
+			pointerX: 80,
+			pointerY: 50,
+		})).toBe("BtoA");
+
+		expect(getCableDefaultDirection({
+			tileA,
+			tileB,
+			viewport,
+			focusedTileId: "tile-a",
+			pointerX: 350,
+			pointerY: 50,
+		})).toBe("AtoB");
+	});
+
+	test("falls back to the endpoint nearest the click", () => {
+		expect(getCableDefaultDirection({
+			tileA,
+			tileB,
+			viewport,
+			pointerX: 340,
+			pointerY: 50,
+		})).toBe("BtoA");
+
+		expect(getCableDefaultDirection({
+			tileA,
+			tileB,
+			viewport,
+			pointerX: 60,
+			pointerY: 50,
+		})).toBe("AtoB");
+	});
+
+	test("defaults to A to B without usable focus or pointer data", () => {
+		expect(getCableDefaultDirection({ tileA, tileB }))
+			.toBe("AtoB");
+		expect(getCableDefaultDirection()).toBe("AtoB");
 	});
 });
 
