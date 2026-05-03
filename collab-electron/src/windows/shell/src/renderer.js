@@ -15,6 +15,7 @@ import { createPanel } from "./panel-manager.js";
 import { createWorkspaceManager } from "./workspace-manager.js";
 import { createCanvasRpc } from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
+import { createToastController } from "./toast-controller.js";
 import {
 	formatContextPreviewDetail,
 	updateTileTitle,
@@ -38,6 +39,7 @@ const viewportState = { panX: 0, panY: 0, zoom: 1 };
 const canvasEl = document.getElementById("panel-viewer");
 const gridCanvas = document.getElementById("grid-canvas");
 canvasEl.tabIndex = -1;
+const toasts = createToastController({ document });
 
 document.documentElement.classList.toggle("platform-win", IS_WINDOWS);
 document.body.classList.toggle("platform-win", IS_WINDOWS);
@@ -675,13 +677,16 @@ async function init() {
 					cableOverlay?.update();
 				} else {
 					showCableHud("Connection already exists.", "warn", 1800);
+					toasts.show({ message: "Connection already exists.", tone: "warn" });
 					feedbackShown = true;
 				}
 			} else if (targetTile?.id === tile.id) {
 				showCableHud("Drop on a different terminal.", "warn", 1800);
+				toasts.show({ message: "Drop on a different terminal.", tone: "warn" });
 				feedbackShown = true;
 			} else {
 				showCableHud("Drop on a terminal to connect.", "warn", 1800);
+				toasts.show({ message: "Drop on a terminal to connect.", tone: "warn" });
 				feedbackShown = true;
 			}
 			cableOverlay?.cancelPreview();
@@ -758,10 +763,12 @@ async function init() {
 		onSendMessage: (req) => window.shellApi.stringRelay?.(req),
 		onGetLog: (connectionId, limit) =>
 			window.shellApi.stringGetLog?.(connectionId, limit),
+		onNotify: (message, tone = "info") => toasts.show({ message, tone }),
 		onInjectContext: async (req) => {
 			const preview = await window.shellApi.contextPreviewForTile?.();
 			const text = formatCableContextRelay(preview);
 			if (!text) {
+				toasts.show({ message: "No shared context to inject.", tone: "warn" });
 				return { ok: false, message: "No shared context to inject." };
 			}
 			const detail = [
@@ -777,7 +784,7 @@ async function init() {
 			if (response !== 1) {
 				return { canceled: true };
 			}
-			return window.shellApi.stringRelay?.({
+			const result = await window.shellApi.stringRelay?.({
 				connectionId: req.connectionId,
 				fromTileId: req.fromTileId,
 				fromLabel: req.fromLabel,
@@ -785,6 +792,10 @@ async function init() {
 				targetSessionId: req.targetSessionId,
 				text,
 			});
+			if (result?.ok === false) {
+				toasts.show({ message: result.message || "Context relay failed.", tone: "error" });
+			}
+			return result;
 		},
 		onFocusTile: (id) => {
 			const tile = getTile(id);

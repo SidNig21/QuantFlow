@@ -1598,6 +1598,40 @@ body.platform-win {
 
 #watchtower-panel[hidden] { display: none; }
 
+.toast-host {
+	position: fixed;
+	right: 18px;
+	bottom: 18px;
+	z-index: 9900;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	pointer-events: none;
+	max-width: min(360px, calc(100vw - 36px));
+}
+
+.app-toast {
+	background: rgba(15, 23, 42, 0.96);
+	border: 1px solid rgba(148, 163, 184, 0.28);
+	border-left: 3px solid #60a5fa;
+	border-radius: 6px;
+	box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+	color: #e2e8f0;
+	font-size: 12px;
+	line-height: 1.4;
+	padding: 9px 11px;
+	pointer-events: auto;
+	white-space: normal;
+}
+
+.app-toast[data-tone="warn"] {
+	border-left-color: #f59e0b;
+}
+
+.app-toast[data-tone="error"] {
+	border-left-color: #ef4444;
+}
+
 .wt-header {
 	display: flex;
 	align-items: center;

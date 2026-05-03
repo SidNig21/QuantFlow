@@ -117,6 +117,7 @@ export function createCableOverlay({
 	viewportState,
 	onSendMessage,
 	onGetLog,
+	onNotify,
 	onInjectContext,
 	onFocusTile,
 	onRemoveConnection,
@@ -258,6 +259,7 @@ export function createCableOverlay({
 				}
 				if (result?.ok === false) {
 					setStatus(result.message || "Context relay failed.", "error");
+					onNotify?.(result.message || "Context relay failed.", "error");
 					await refreshHistory();
 					return;
 				}
@@ -265,7 +267,9 @@ export function createCableOverlay({
 				await refreshHistory();
 				removePopover();
 			} catch (err) {
-				setStatus(err instanceof Error ? err.message : "Context relay failed.", "error");
+				const message = err instanceof Error ? err.message : "Context relay failed.";
+				setStatus(message, "error");
+				onNotify?.(message, "error");
 			} finally {
 				if (popoverEl) contextBtn.disabled = false;
 			}
@@ -354,6 +358,7 @@ export function createCableOverlay({
 				});
 				if (result?.ok === false) {
 					setStatus(result.message || "Relay failed.", "error");
+					onNotify?.(result.message || "Relay failed.", "error");
 					await refreshHistory();
 					input.focus();
 					return;
@@ -363,7 +368,9 @@ export function createCableOverlay({
 				await refreshHistory();
 				removePopover();
 			} catch (err) {
-				setStatus(err instanceof Error ? err.message : "Relay failed.", "error");
+				const message = err instanceof Error ? err.message : "Relay failed.";
+				setStatus(message, "error");
+				onNotify?.(message, "error");
 				input.focus();
 			} finally {
 				if (popoverEl) sendBtn.disabled = false;
