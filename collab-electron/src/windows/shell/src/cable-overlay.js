@@ -37,6 +37,33 @@ function makePath(ax, ay, bx, by) {
 	return { d, mid };
 }
 
+export function clampFloatingPosition(
+	x,
+	y,
+	width,
+	height,
+	viewportWidth,
+	viewportHeight,
+	margin = 12,
+) {
+	const safeWidth = Number.isFinite(width) && width > 0 ? width : 1;
+	const safeHeight = Number.isFinite(height) && height > 0 ? height : 1;
+	const safeViewportWidth = Number.isFinite(viewportWidth) && viewportWidth > 0
+		? viewportWidth
+		: safeWidth + margin * 2;
+	const safeViewportHeight = Number.isFinite(viewportHeight) && viewportHeight > 0
+		? viewportHeight
+		: safeHeight + margin * 2;
+	const minX = margin;
+	const minY = margin;
+	const maxX = Math.max(minX, safeViewportWidth - safeWidth - margin);
+	const maxY = Math.max(minY, safeViewportHeight - safeHeight - margin);
+	return {
+		x: Math.min(Math.max(x, minX), maxX),
+		y: Math.min(Math.max(y, minY), maxY),
+	};
+}
+
 export function createCableOverlay({
 	containerEl,
 	viewportState,
@@ -49,8 +76,22 @@ export function createCableOverlay({
 	svg.setAttribute("aria-hidden", "true");
 	containerEl.appendChild(svg);
 
+	const pathLayer = document.createElementNS(SVG_NS, "g");
+	pathLayer.setAttribute("class", "cable-path-layer");
+	const labelLayer = document.createElementNS(SVG_NS, "g");
+	labelLayer.setAttribute("class", "cable-label-layer");
+	const hitLayer = document.createElementNS(SVG_NS, "g");
+	hitLayer.setAttribute("class", "cable-hit-layer");
+	const previewLayer = document.createElementNS(SVG_NS, "g");
+	previewLayer.setAttribute("class", "cable-preview-layer");
+	svg.appendChild(pathLayer);
+	svg.appendChild(labelLayer);
+	svg.appendChild(hitLayer);
+	svg.appendChild(previewLayer);
+
 	let popoverEl = null;
 	let contextMenuEl = null;
+	let selectedConnectionId = null;
 
 	const previewState = { active: false, startTile: null, mouseX: 0, mouseY: 0 };
 
@@ -68,9 +109,25 @@ export function createCableOverlay({
 		return tile.userTitle || tile.autoTitle || tile.id;
 	}
 
+	function placePopover(el, x, y) {
+		const rect = el.getBoundingClientRect();
+		const pos = clampFloatingPosition(
+			x,
+			y,
+			rect.width || el.offsetWidth || 250,
+			rect.height || el.offsetHeight || 120,
+			containerEl.clientWidth,
+			containerEl.clientHeight,
+		);
+		el.style.left = `${pos.x}px`;
+		el.style.top = `${pos.y}px`;
+	}
+
 	function showPopover(conn, mx, my, tileA, tileB) {
 		removePopover();
 		removeContextMenu();
+		selectedConnectionId = conn.id;
+		updateCableClasses();
 
 		let direction = "AtoB";
 
@@ -161,7 +218,11 @@ export function createCableOverlay({
 		popoverEl.appendChild(sendBtn);
 		containerEl.appendChild(popoverEl);
 
-		requestAnimationFrame(() => input.focus());
+		requestAnimationFrame(() => {
+			if (!popoverEl) return;
+			placePopover(popoverEl, mx, my + 12);
+			input.focus();
+		});
 
 		setTimeout(() => {
 			document.addEventListener("click", removePopover, { once: true });
@@ -217,12 +278,25 @@ export function createCableOverlay({
 		}
 	}
 
+	function setCableHovered(connectionId, hovered) {
+		for (const el of svg.querySelectorAll(`[data-conn-id="${connectionId}"]`)) {
+			el.classList.toggle("cable-hovered", hovered);
+		}
+	}
+
+	function updateCableClasses() {
+		for (const el of svg.querySelectorAll("[data-conn-id]")) {
+			el.classList.toggle(
+				"cable-selected",
+				el.dataset.connId === selectedConnectionId,
+			);
+		}
+	}
+
 	function drawConnections() {
-		// Remove old connection paths (keep preview)
-		const old = svg.querySelectorAll("[data-conn-id]");
-		for (const el of old) el.remove();
-		const oldLabels = svg.querySelectorAll(".cable-label");
-		for (const el of oldLabels) el.remove();
+		pathLayer.replaceChildren();
+		labelLayer.replaceChildren();
+		hitLayer.replaceChildren();
 
 		const vp = viewportState;
 
@@ -240,7 +314,7 @@ export function createCableOverlay({
 			path.setAttribute("d", d);
 			path.setAttribute("class", "cable-path");
 			path.setAttribute("data-conn-id", conn.id);
-			svg.appendChild(path);
+			pathLayer.appendChild(path);
 
 			// Hit path (wide, transparent, receives pointer events)
 			const hit = document.createElementNS(SVG_NS, "path");
@@ -248,6 +322,8 @@ export function createCableOverlay({
 			hit.setAttribute("class", "cable-hit");
 			hit.setAttribute("data-conn-id", conn.id);
 
+			hit.addEventListener("mouseenter", () => setCableHovered(conn.id, true));
+			hit.addEventListener("mouseleave", () => setCableHovered(conn.id, false));
 			hit.addEventListener("click", (e) => {
 				e.stopPropagation();
 				showPopover(conn, mid.x, mid.y, tileA, tileB);
@@ -257,7 +333,7 @@ export function createCableOverlay({
 				e.stopPropagation();
 				showContextMenu(conn, e.clientX, e.clientY);
 			});
-			svg.appendChild(hit);
+			hitLayer.appendChild(hit);
 
 			// Label
 			if (conn.label) {
@@ -266,14 +342,14 @@ export function createCableOverlay({
 				txt.setAttribute("y", mid.y - 8);
 				txt.setAttribute("class", "cable-label");
 				txt.textContent = conn.label;
-				svg.appendChild(txt);
+				labelLayer.appendChild(txt);
 			}
 		}
+		updateCableClasses();
 	}
 
 	function drawPreview() {
-		const prev = svg.querySelector(".cable-preview");
-		if (prev) prev.remove();
+		previewLayer.replaceChildren();
 
 		if (!previewState.active || !previewState.startTile) return;
 
@@ -288,7 +364,7 @@ export function createCableOverlay({
 		const path = document.createElementNS(SVG_NS, "path");
 		path.setAttribute("d", d);
 		path.setAttribute("class", "cable-preview");
-		svg.appendChild(path);
+		previewLayer.appendChild(path);
 	}
 
 	function update() {
@@ -310,8 +386,7 @@ export function createCableOverlay({
 	function cancelPreview() {
 		previewState.active = false;
 		previewState.startTile = null;
-		const prev = svg.querySelector(".cable-preview");
-		if (prev) prev.remove();
+		previewLayer.replaceChildren();
 	}
 
 	function destroy() {

@@ -1298,7 +1298,15 @@ body.platform-win {
 	stroke: #6366f1;
 	stroke-width: 2px;
 	opacity: 0.6;
-	transition: opacity 0.15s, stroke 0.15s;
+	transition: opacity 0.15s, stroke 0.15s, stroke-width 0.15s;
+	pointer-events: none;
+}
+
+.cable-path.cable-hovered,
+.cable-path.cable-selected {
+	opacity: 1;
+	stroke: #818cf8;
+	stroke-width: 3px;
 }
 
 .cable-hit {
@@ -1309,8 +1317,8 @@ body.platform-win {
 	pointer-events: all;
 }
 
-.cable-hit:hover ~ .cable-path {
-	opacity: 1;
+.cable-hit.cable-selected {
+	stroke-width: 22px;
 }
 
 @keyframes cablePulse {
