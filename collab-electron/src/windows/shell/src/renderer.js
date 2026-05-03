@@ -15,8 +15,12 @@ import { createPanel } from "./panel-manager.js";
 import { createWorkspaceManager } from "./workspace-manager.js";
 import { createCanvasRpc } from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
-import { updateTileTitle, getTileLabel } from "./tile-renderer.js";
-import { createCableOverlay } from "./cable-overlay.js";
+import {
+	formatContextPreviewDetail,
+	updateTileTitle,
+	getTileLabel,
+} from "./tile-renderer.js";
+import { createCableOverlay, formatCableContextRelay } from "./cable-overlay.js";
 import {
 	WATCHTOWER_AGENT_FILTERS,
 	WATCHTOWER_MESSAGE_FILTERS,
@@ -754,6 +758,34 @@ async function init() {
 		onSendMessage: (req) => window.shellApi.stringRelay?.(req),
 		onGetLog: (connectionId, limit) =>
 			window.shellApi.stringGetLog?.(connectionId, limit),
+		onInjectContext: async (req) => {
+			const preview = await window.shellApi.contextPreviewForTile?.();
+			const text = formatCableContextRelay(preview);
+			if (!text) {
+				return { ok: false, message: "No shared context to inject." };
+			}
+			const detail = [
+				`${req.fromLabel} -> ${req.targetLabel}`,
+				"Destination format: relayed cable message",
+				formatContextPreviewDetail(preview),
+			].join("\n");
+			const response = await window.shellApi.showConfirmDialog({
+				message: "Inject shared context over cable?",
+				detail,
+				buttons: ["Cancel", "Inject"],
+			});
+			if (response !== 1) {
+				return { canceled: true };
+			}
+			return window.shellApi.stringRelay?.({
+				connectionId: req.connectionId,
+				fromTileId: req.fromTileId,
+				fromLabel: req.fromLabel,
+				targetTileId: req.targetTileId,
+				targetSessionId: req.targetSessionId,
+				text,
+			});
+		},
 		onFocusTile: (id) => {
 			const tile = getTile(id);
 			if (!tile) return;

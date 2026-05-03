@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
 	clampFloatingPosition,
+	formatCableContextRelay,
 	formatCableLogEntry,
+	getDirectedCableTiles,
 	getConnectionPresentation,
 	shouldSubmitCableMessage,
 } from "./cable-overlay.js";
@@ -116,5 +118,36 @@ describe("formatCableLogEntry", () => {
 			label: "missing_pty",
 			text: "Target exited",
 		});
+	});
+});
+
+describe("getDirectedCableTiles", () => {
+	const tileA = { id: "tile-a" };
+	const tileB = { id: "tile-b" };
+
+	test("returns A to B by default", () => {
+		expect(getDirectedCableTiles("AtoB", tileA, tileB)).toEqual({
+			fromTile: tileA,
+			toTile: tileB,
+		});
+	});
+
+	test("returns B to A when direction is reversed", () => {
+		expect(getDirectedCableTiles("BtoA", tileA, tileB)).toEqual({
+			fromTile: tileB,
+			toTile: tileA,
+		});
+	});
+});
+
+describe("formatCableContextRelay", () => {
+	test("wraps preview text for cable relay", () => {
+		expect(formatCableContextRelay({ text: "## Context" })).toBe(
+			"--- Shared Context ---\n## Context\n--- End Context ---",
+		);
+	});
+
+	test("returns empty string for empty preview text", () => {
+		expect(formatCableContextRelay({ text: "   " })).toBe("");
 	});
 });

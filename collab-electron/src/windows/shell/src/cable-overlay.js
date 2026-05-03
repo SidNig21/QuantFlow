@@ -100,11 +100,24 @@ export function formatCableLogEntry(entry) {
 	};
 }
 
+export function getDirectedCableTiles(direction, tileA, tileB) {
+	return direction === "BtoA"
+		? { fromTile: tileB, toTile: tileA }
+		: { fromTile: tileA, toTile: tileB };
+}
+
+export function formatCableContextRelay(preview) {
+	const text = String(preview?.text ?? "").trim();
+	if (!text) return "";
+	return `--- Shared Context ---\n${text}\n--- End Context ---`;
+}
+
 export function createCableOverlay({
 	containerEl,
 	viewportState,
 	onSendMessage,
 	onGetLog,
+	onInjectContext,
 	onFocusTile,
 	onRemoveConnection,
 	onUpdateLabel,
@@ -225,6 +238,38 @@ export function createCableOverlay({
 
 		addAction(`Focus ${tileLabel(tileA)}`, () => onFocusTile?.(tileA.id));
 		addAction(`Focus ${tileLabel(tileB)}`, () => onFocusTile?.(tileB.id));
+		const contextBtn = addAction("Context", async () => {
+			if (!onInjectContext) return;
+			const { fromTile, toTile } = getDirectedCableTiles(direction, tileA, tileB);
+			contextBtn.disabled = true;
+			setStatus("Preparing context...", "pending");
+			try {
+				const result = await onInjectContext({
+					connectionId: conn.id,
+					fromTileId: fromTile.id,
+					fromLabel: tileLabel(fromTile),
+					targetTileId: toTile.id,
+					targetLabel: tileLabel(toTile),
+					targetSessionId: toTile.ptySessionId ?? null,
+				});
+				if (result?.canceled) {
+					setStatus("");
+					return;
+				}
+				if (result?.ok === false) {
+					setStatus(result.message || "Context relay failed.", "error");
+					await refreshHistory();
+					return;
+				}
+				pulseCable(conn.id);
+				await refreshHistory();
+				removePopover();
+			} catch (err) {
+				setStatus(err instanceof Error ? err.message : "Context relay failed.", "error");
+			} finally {
+				if (popoverEl) contextBtn.disabled = false;
+			}
+		});
 		addAction("Rename", () => {
 			const next = prompt("Cable label:", conn.label ?? "");
 			if (next !== null) {
@@ -295,8 +340,7 @@ export function createCableOverlay({
 		async function doSend() {
 			const text = input.value.trim();
 			if (!text) return;
-			const fromTile = direction === "AtoB" ? tileA : tileB;
-			const toTile = direction === "AtoB" ? tileB : tileA;
+			const { fromTile, toTile } = getDirectedCableTiles(direction, tileA, tileB);
 			sendBtn.disabled = true;
 			setStatus("Sending…", "pending");
 			try {
