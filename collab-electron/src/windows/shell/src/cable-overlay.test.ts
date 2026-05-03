@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { clampFloatingPosition } from "./cable-overlay.js";
+import {
+	clampFloatingPosition,
+	getConnectionPresentation,
+} from "./cable-overlay.js";
 
 describe("clampFloatingPosition", () => {
 	test("keeps an in-bounds position unchanged", () => {
@@ -21,5 +24,44 @@ describe("clampFloatingPosition", () => {
 			x: 12,
 			y: 12,
 		});
+	});
+});
+
+describe("getConnectionPresentation", () => {
+	const viewport = { panX: 0, panY: 0, zoom: 1 };
+	const tiles = [
+		{ id: "tile-a", x: 0, y: 0, width: 100, height: 100 },
+		{ id: "tile-b", x: 300, y: 0, width: 100, height: 100 },
+	];
+	const connections = [
+		{ id: "conn-ab", tileAId: "tile-a", tileBId: "tile-b" },
+	];
+
+	test("returns endpoint tiles and cable midpoint for a connection", () => {
+		const result = getConnectionPresentation(
+			"conn-ab",
+			connections,
+			tiles,
+			viewport,
+		);
+
+		expect(result?.tileA.id).toBe("tile-a");
+		expect(result?.tileB.id).toBe("tile-b");
+		expect(result?.mid).toEqual({ x: 200, y: 50 });
+		expect(result?.d).toBe("M 100 50 C 180 50, 220 50, 300 50");
+	});
+
+	test("returns null when the connection is missing", () => {
+		expect(getConnectionPresentation("missing", connections, tiles, viewport))
+			.toBeNull();
+	});
+
+	test("returns null when an endpoint tile is missing", () => {
+		expect(getConnectionPresentation(
+			"conn-ab",
+			connections,
+			tiles.slice(0, 1),
+			viewport,
+		)).toBeNull();
 	});
 });

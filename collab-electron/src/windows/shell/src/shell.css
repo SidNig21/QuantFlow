@@ -1585,6 +1585,18 @@ body.platform-win {
 	border-radius: 6px;
 	padding: 8px 10px;
 	border-left: 3px solid #334155;
+	cursor: pointer;
+	outline: none;
+}
+
+.wt-agent-card:hover,
+.wt-agent-card:focus-visible {
+	background: rgba(148, 163, 184, 0.08);
+	border-color: #475569;
+}
+
+.wt-agent-card:focus-visible {
+	box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
 }
 
 .wt-status-active { border-left-color: #10b981; }
@@ -1620,6 +1632,17 @@ body.platform-win {
 	align-items: baseline;
 	padding: 4px 0;
 	border-bottom: 1px solid #1e293b;
+	cursor: pointer;
+	outline: none;
+}
+
+.wt-msg:hover,
+.wt-msg:focus-visible {
+	background: rgba(148, 163, 184, 0.08);
+}
+
+.wt-msg:focus-visible {
+	box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
 }
 
 .wt-msg-failed {

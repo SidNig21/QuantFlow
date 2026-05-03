@@ -37,6 +37,25 @@ function makePath(ax, ay, bx, by) {
 	return { d, mid };
 }
 
+export function getConnectionPresentation(
+	connectionId,
+	connectionList,
+	tileList,
+	viewport,
+) {
+	const conn = connectionList.find((item) => item.id === connectionId);
+	if (!conn) return null;
+
+	const tileA = tileList.find((tile) => tile.id === conn.tileAId);
+	const tileB = tileList.find((tile) => tile.id === conn.tileBId);
+	if (!tileA || !tileB) return null;
+
+	const a = getAnchor(tileA, tileB, viewport);
+	const b = getAnchor(tileB, tileA, viewport);
+	const { d, mid } = makePath(a.x, a.y, b.x, b.y);
+	return { conn, tileA, tileB, a, b, d, mid };
+}
+
 export function clampFloatingPosition(
 	x,
 	y,
@@ -298,16 +317,15 @@ export function createCableOverlay({
 		labelLayer.replaceChildren();
 		hitLayer.replaceChildren();
 
-		const vp = viewportState;
-
 		for (const conn of connections) {
-			const tileA = tiles.find((t) => t.id === conn.tileAId);
-			const tileB = tiles.find((t) => t.id === conn.tileBId);
-			if (!tileA || !tileB) continue;
-
-			const a = getAnchor(tileA, tileB, vp);
-			const b = getAnchor(tileB, tileA, vp);
-			const { d, mid } = makePath(a.x, a.y, b.x, b.y);
+			const presentation = getConnectionPresentation(
+				conn.id,
+				connections,
+				tiles,
+				viewportState,
+			);
+			if (!presentation) continue;
+			const { tileA, tileB, d, mid } = presentation;
 
 			// Visible cable path
 			const path = document.createElementNS(SVG_NS, "path");
@@ -389,11 +407,39 @@ export function createCableOverlay({
 		previewLayer.replaceChildren();
 	}
 
+	function selectConnection(connectionId, { openPopover = true } = {}) {
+		const presentation = getConnectionPresentation(
+			connectionId,
+			connections,
+			tiles,
+			viewportState,
+		);
+		if (!presentation) return null;
+
+		const { conn, tileA, tileB, mid } = presentation;
+		selectedConnectionId = conn.id;
+		updateCableClasses();
+
+		if (openPopover) {
+			showPopover(conn, mid.x, mid.y, tileA, tileB);
+		}
+
+		return { connection: conn, tileA, tileB, mid };
+	}
+
 	function destroy() {
 		svg.remove();
 		removePopover();
 		removeContextMenu();
 	}
 
-	return { update, startPreview, updatePreview, cancelPreview, pulseCable, destroy };
+	return {
+		update,
+		startPreview,
+		updatePreview,
+		cancelPreview,
+		selectConnection,
+		pulseCable,
+		destroy,
+	};
 }

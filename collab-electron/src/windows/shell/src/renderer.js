@@ -1213,10 +1213,69 @@ async function init() {
 		});
 	}
 
+	function focusWatchtowerTile(tileId) {
+		const tile = getTile(tileId);
+		if (!tile) return false;
+		edgeIndicators.panToTile(tile, { targetZoom: 1 });
+		tileManager.focusCanvasTile(tile.id);
+		return true;
+	}
+
+	function focusWatchtowerRelay(row) {
+		const selected = row.dataset.connId
+			? cableOverlay?.selectConnection(row.dataset.connId)
+			: null;
+		if (selected?.tileA && selected?.tileB) {
+			edgeIndicators.panToTiles([selected.tileA, selected.tileB]);
+			const targetTileId = row.dataset.targetTileId;
+			const targetTile = targetTileId ? getTile(targetTileId) : null;
+			tileManager.focusCanvasTile(targetTile?.id ?? selected.tileB.id);
+			return true;
+		}
+
+		if (row.dataset.targetTileId && focusWatchtowerTile(row.dataset.targetTileId)) {
+			return true;
+		}
+		if (row.dataset.fromTileId && focusWatchtowerTile(row.dataset.fromTileId)) {
+			return true;
+		}
+		return false;
+	}
+
+	function activateWatchtowerRow(target) {
+		const row = target.closest?.("[data-watchtower-kind]");
+		if (!row || !watchtowerEl.contains(row)) return;
+		if (row.dataset.watchtowerKind === "agent") {
+			focusWatchtowerTile(row.dataset.tileId);
+			return;
+		}
+		if (row.dataset.watchtowerKind === "message") {
+			focusWatchtowerRelay(row);
+		}
+	}
+
+	watchtowerEl.addEventListener("click", (e) => {
+		activateWatchtowerRow(e.target);
+	});
+
+	watchtowerEl.addEventListener("keydown", (e) => {
+		if (e.key !== "Enter" && e.key !== " ") return;
+		const row = e.target.closest?.("[data-watchtower-kind]");
+		if (!row) return;
+		e.preventDefault();
+		activateWatchtowerRow(row);
+	});
+
 	function renderWatchtowerAgents(items) {
 		if (!items.length) return `<p class="wt-empty">No registered tile sessions.</p>`;
 		return items.map((item) => `
-			<div class="wt-agent-card wt-status-${item.status}">
+			<div
+				class="wt-agent-card wt-status-${item.status}"
+				data-watchtower-kind="agent"
+				data-tile-id="${escapeHtml(item.tileId)}"
+				role="button"
+				tabindex="0"
+			>
 				<div class="wt-agent-label">${escapeHtml(item.label)}</div>
 				<div class="wt-agent-status">${escapeHtml(item.status)}</div>
 				${item.lastLine ? `<div class="wt-agent-line">${escapeHtml(item.lastLine.slice(0, 120))}</div>` : ""}
@@ -1231,7 +1290,15 @@ async function init() {
 			const label = ok ? entry.fromLabel : entry.errorCode || "relay failed";
 			const text = ok ? entry.formatted : entry.message || entry.formatted;
 			return `
-			<div class="wt-msg ${ok ? "wt-msg-ok" : "wt-msg-failed"}">
+			<div
+				class="wt-msg ${ok ? "wt-msg-ok" : "wt-msg-failed"}"
+				data-watchtower-kind="message"
+				data-conn-id="${escapeHtml(entry.connectionId)}"
+				data-from-tile-id="${escapeHtml(entry.fromTileId)}"
+				data-target-tile-id="${escapeHtml(entry.targetTileId ?? "")}"
+				role="button"
+				tabindex="0"
+			>
 				<span class="wt-msg-from">${escapeHtml(label)}</span>
 				<span class="wt-msg-arrow">${ok ? "→" : "!"}</span>
 				<span class="wt-msg-text">${escapeHtml(String(text ?? "").slice(0, 200))}</span>
