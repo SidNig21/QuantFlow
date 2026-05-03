@@ -16,6 +16,7 @@ import { createWorkspaceManager } from "./workspace-manager.js";
 import { createCanvasRpc } from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
 import { createToastController } from "./toast-controller.js";
+import { createOperationalEventLog } from "./operational-event-log.js";
 import {
 	formatContextPreviewDetail,
 	updateTileTitle,
@@ -43,6 +44,7 @@ const canvasEl = document.getElementById("panel-viewer");
 const gridCanvas = document.getElementById("grid-canvas");
 canvasEl.tabIndex = -1;
 const toasts = createToastController({ document });
+const operationalEvents = createOperationalEventLog({ limit: 120 });
 
 document.documentElement.classList.toggle("platform-win", IS_WINDOWS);
 document.body.classList.toggle("platform-win", IS_WINDOWS);
@@ -164,6 +166,12 @@ async function init() {
 			return defaultShell;
 		}
 		return undefined;
+	}
+
+	function tileEventLabel(tile) {
+		if (!tile) return "unknown";
+		const label = getTileLabel(tile);
+		return label.name || tile.userTitle || tile.autoTitle || tile.id;
 	}
 
 	function syncConnectionGraph() {
@@ -711,12 +719,23 @@ async function init() {
 				);
 				if (!duplicate) {
 					const now = Date.now();
-					addConnection({
+					const conn = {
 						id: `conn-${now}-${Math.random().toString(36).slice(2, 7)}`,
 						tileAId: tile.id,
 						tileBId: targetTile.id,
 						createdAt: now,
 						updatedAt: now,
+					};
+					addConnection(conn);
+					operationalEvents.record({
+						type: "connection.created",
+						severity: "info",
+						summary: `${tileEventLabel(tile)} connected to ${tileEventLabel(targetTile)}`,
+						meta: {
+							connectionId: conn.id,
+							tileAId: tile.id,
+							tileBId: targetTile.id,
+						},
 					});
 					tileManager.saveCanvasImmediate();
 					cableOverlay?.update();
@@ -813,6 +832,12 @@ async function init() {
 			const preview = await window.shellApi.contextPreviewForTile?.();
 			const text = formatCableContextRelay(preview);
 			if (!text) {
+				operationalEvents.record({
+					type: "context.failed",
+					severity: "warn",
+					summary: "No shared context to inject.",
+					meta: { connectionId: req.connectionId },
+				});
 				toasts.show({ message: "No shared context to inject.", tone: "warn" });
 				return { ok: false, message: "No shared context to inject." };
 			}
@@ -838,7 +863,21 @@ async function init() {
 				text,
 			});
 			if (result?.ok === false) {
+				operationalEvents.record({
+					type: "context.failed",
+					severity: "error",
+					summary: result.message || "Context relay failed.",
+					detail: `${req.fromLabel} -> ${req.targetLabel}`,
+					meta: { connectionId: req.connectionId, eventId: result.eventId },
+				});
 				toasts.show({ message: result.message || "Context relay failed.", tone: "error" });
+			} else {
+				operationalEvents.record({
+					type: "context.injected",
+					severity: "info",
+					summary: `Shared context injected over cable: ${req.fromLabel} -> ${req.targetLabel}`,
+					meta: { connectionId: req.connectionId, eventId: result?.eventId },
+				});
 			}
 			return result;
 		},
@@ -849,7 +888,16 @@ async function init() {
 			tileManager.focusCanvasTile(tile.id);
 		},
 		onRemoveConnection: (id) => {
+			const conn = connections.find((item) => item.id === id);
+			const tileA = getTile(conn?.tileAId);
+			const tileB = getTile(conn?.tileBId);
 			removeConnection(id);
+			operationalEvents.record({
+				type: "connection.removed",
+				severity: "info",
+				summary: `${tileEventLabel(tileA)} disconnected from ${tileEventLabel(tileB)}`,
+				meta: { connectionId: id, tileAId: conn?.tileAId, tileBId: conn?.tileBId },
+			});
 			tileManager.saveCanvasImmediate();
 			cableOverlay.update();
 		},
@@ -1136,6 +1184,12 @@ async function init() {
 			const role = roles.find((r) => r.id === roleId);
 			if (!role) return;
 			if (isMissingRoleCommand(role)) {
+				operationalEvents.record({
+					type: "role.failed",
+					severity: "error",
+					summary: `${role.name} is missing command: ${getRoleCommandName(role)}`,
+					meta: { roleId: role.id, command: getRoleCommandName(role) },
+				});
 				toasts.show({
 					message: `${role.name} is missing command: ${getRoleCommandName(role)}`,
 					tone: "error",
@@ -1157,6 +1211,17 @@ async function init() {
 					roleStartupPrompt: role.startupPrompt,
 				},
 			);
+			operationalEvents.record({
+				type: "role.spawned",
+				severity: "info",
+				summary: `${role.name} role tile spawned`,
+				detail: role.commandTemplate || "shell",
+				meta: {
+					roleId: role.id,
+					tileId: tile.id,
+					command: role.commandTemplate,
+				},
+			});
 			tileManager.spawnTerminalWebview(tile, true);
 			tileManager.saveCanvasImmediate();
 			minimap.update();
@@ -1328,6 +1393,7 @@ async function init() {
 				agents: Array.isArray(items) ? items : [],
 				connections,
 				relayLogs: Array.isArray(relayLogs) ? relayLogs : [],
+				operationalEvents: operationalEvents.list(),
 			});
 			await navigator.clipboard.writeText(text);
 			toasts.show({ message: "Watchtower diagnostics copied.", tone: "info" });

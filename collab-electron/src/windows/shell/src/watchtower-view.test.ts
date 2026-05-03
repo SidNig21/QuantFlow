@@ -161,6 +161,14 @@ describe("formatWatchtowerDiagnostics", () => {
 					message: "Target session is not active.",
 				},
 			],
+			operationalEvents: [
+				{
+					type: "connection.created",
+					severity: "info",
+					timestamp: 2_000,
+					summary: "Planner connected to Reviewer",
+				},
+			],
 		});
 
 		expect(text).toContain("QuantFlow Watchtower diagnostics");
@@ -170,6 +178,8 @@ describe("formatWatchtowerDiagnostics", () => {
 		expect(text).toContain("conn-ab: tile-a <-> tile-b");
 		expect(text).toContain("Relay events (1)");
 		expect(text).toContain("failed/missing_pty agent / Planner -> @Reviewer");
+		expect(text).toContain("Operational events (1)");
+		expect(text).toContain("connection.created 2s ago :: Planner connected to Reviewer");
 	});
 });
 

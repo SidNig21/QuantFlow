@@ -144,6 +144,7 @@ export function formatWatchtowerDiagnostics({
 	agents = [],
 	connections = [],
 	relayLogs = [],
+	operationalEvents = [],
 	now = Date.now(),
 } = {}) {
 	const lines = [
@@ -170,6 +171,18 @@ export function formatWatchtowerDiagnostics({
 		for (const conn of connections) {
 			const label = conn?.label ? ` label="${conn.label}"` : "";
 			lines.push(`- ${conn?.id || ""}: ${conn?.tileAId || ""} <-> ${conn?.tileBId || ""}${label}`);
+		}
+	} else {
+		lines.push("- none");
+	}
+
+	lines.push("", `Operational events (${operationalEvents.length})`);
+	if (operationalEvents.length) {
+		for (const event of operationalEvents.slice(-30).reverse()) {
+			const age = formatWatchtowerAge(event?.timestamp, now);
+			const summary = String(event?.summary || event?.type || "event").slice(0, 180);
+			const detail = event?.detail ? ` :: ${String(event.detail).slice(0, 180)}` : "";
+			lines.push(`- ${event?.severity || "info"} ${event?.type || "event"} ${age} :: ${summary}${detail}`);
 		}
 	} else {
 		lines.push("- none");
