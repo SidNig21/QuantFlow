@@ -922,6 +922,16 @@ body.platform-win {
 	flex-shrink: 0;
 }
 
+.tile-route-handle {
+	color: var(--muted);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	margin-left: 7px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	flex-shrink: 1;
+}
+
 .tile-btn-group {
 	display: flex;
 	align-items: center;

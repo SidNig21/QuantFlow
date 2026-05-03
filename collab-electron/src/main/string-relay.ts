@@ -69,6 +69,7 @@ export interface ConnectionGraphEntry {
 interface TileSession {
   sessionId: string;
   label: string;
+  routeHandle?: string;
   lastLine?: string;
   lastActivityTs?: number;
 }
@@ -76,6 +77,7 @@ interface TileSession {
 export interface TileSnapshot {
   tileId: string;
   label: string;
+  routeHandle: string;
   sessionId: string;
   lastLine: string;
   lastActivityTs: number;
@@ -99,6 +101,7 @@ export function watchtowerSnapshot(): TileSnapshot[] {
     return {
       tileId,
       label: entry.label,
+      routeHandle: entry.routeHandle ?? "",
       sessionId: entry.sessionId,
       lastLine: entry.lastLine ?? "",
       lastActivityTs: entry.lastActivityTs ?? 0,
@@ -230,8 +233,11 @@ export function registerTileSession(
   tileId: string,
   sessionId: string,
   label: string,
+  routeHandle?: string,
 ): void {
-  tileRegistry.set(tileId, { sessionId, label });
+  const entry: TileSession = { sessionId, label };
+  if (routeHandle) entry.routeHandle = routeHandle;
+  tileRegistry.set(tileId, entry);
 }
 
 export function unregisterTileSession(tileId: string): void {
@@ -287,17 +293,21 @@ function routeAgentRelay(
   const fromLabel = fromEntry?.label ?? fromTileId;
   const globalMatches = [...tileRegistry.entries()]
     .filter(([tid, entry]) =>
-      tid !== fromTileId && normalizeLabel(entry.label) === normalizedTarget,
+      tid !== fromTileId && matchesTarget(entry, normalizedTarget),
     );
-  const connectedMatches = connectedEdges(fromTileId)
+  const connectedCandidates = connectedEdges(fromTileId)
     .map(({ connection, otherTileId }) => ({
       connection,
       otherTileId,
       entry: tileRegistry.get(otherTileId),
     }))
-    .filter((candidate) =>
-      candidate.entry != null &&
-      normalizeLabel(candidate.entry.label) === normalizedTarget,
+    .filter((candidate) => candidate.entry != null);
+  const connectedHandleMatches = connectedCandidates
+    .filter((candidate) => normalizeHandle(candidate.entry!.routeHandle) === normalizedTarget);
+  const connectedMatches = connectedHandleMatches.length > 0
+    ? connectedHandleMatches
+    : connectedCandidates.filter((candidate) =>
+      normalizeLabel(candidate.entry!.label) === normalizedTarget,
     );
 
   if (connectedMatches.length > 1) {
@@ -462,6 +472,15 @@ function tileIdForSession(sessionId: string): string | null {
 
 function normalizeLabel(label: string): string {
   return label.trim().replace(/^@/, "").toLowerCase();
+}
+
+function normalizeHandle(handle: string | undefined): string {
+  return (handle ?? "").trim().replace(/^@/, "").toLowerCase();
+}
+
+function matchesTarget(entry: TileSession, normalizedTarget: string): boolean {
+  return normalizeHandle(entry.routeHandle) === normalizedTarget ||
+    normalizeLabel(entry.label) === normalizedTarget;
 }
 
 function connectedEdges(tileId: string): Array<{

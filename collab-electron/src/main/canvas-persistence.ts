@@ -22,6 +22,7 @@ interface TileState {
   ptySessionId?: string;
   userTitle?: string;
   autoTitle?: string;
+  routeHandle?: string;
   zIndex: number;
 }
 

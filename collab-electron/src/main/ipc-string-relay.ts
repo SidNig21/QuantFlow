@@ -25,8 +25,14 @@ export function registerStringRelayHandlers(): void {
 
   ipcMain.handle(
     "string:register-tile-session",
-    (_event, tileId: string, sessionId: string, label: string) => {
-      registerTileSession(tileId, sessionId, label);
+    (
+      _event,
+      tileId: string,
+      sessionId: string,
+      label: string,
+      routeHandle?: string,
+    ) => {
+      registerTileSession(tileId, sessionId, label, routeHandle);
       return { ok: true };
     },
   );

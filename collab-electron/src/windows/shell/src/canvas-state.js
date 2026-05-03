@@ -15,6 +15,7 @@
  * @property {string} [ptySessionId] - PTY session ID for terminal tiles
  * @property {string} [userTitle] - Manual title override set by user
  * @property {string} [autoTitle] - Auto-computed title from terminal session
+ * @property {string} [routeHandle] - Stable relay handle without the @ prefix
  * @property {string} [roleId] - Role identifier for role-spawned tiles
  * @property {string} [roleColor] - CSS color for role header
  * @property {number} zIndex - Stacking order

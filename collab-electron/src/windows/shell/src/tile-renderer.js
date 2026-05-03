@@ -55,8 +55,15 @@ export function createTileDOM(tile, callbacks) {
   nameSpan.textContent = label.name;
   titleText.appendChild(parentSpan);
   titleText.appendChild(nameSpan);
+  if (tile.type === "term" && tile.routeHandle) {
+    const handleSpan = document.createElement("span");
+    handleSpan.className = "tile-route-handle";
+    handleSpan.textContent = `@${tile.routeHandle}`;
+    titleText.appendChild(handleSpan);
+  }
   if (tile.filePath) titleText.title = tile.filePath;
   if (tile.folderPath) titleText.title = tile.folderPath;
+  if (tile.routeHandle) titleText.title = `@${tile.routeHandle}`;
   titleBar.appendChild(titleText);
 
   // For browser tiles, add nav controls and a URL input to the title bar
@@ -275,7 +282,15 @@ export function updateTileTitle(dom, tile) {
   nameSpan.textContent = label.name;
   titleText.appendChild(parentSpan);
   titleText.appendChild(nameSpan);
-  titleText.title = tile.filePath || tile.folderPath || tile.cwd || "";
+  if (tile.type === "term" && tile.routeHandle) {
+    const handleSpan = document.createElement("span");
+    handleSpan.className = "tile-route-handle";
+    handleSpan.textContent = `@${tile.routeHandle}`;
+    titleText.appendChild(handleSpan);
+  }
+  titleText.title = tile.routeHandle
+    ? `@${tile.routeHandle}`
+    : tile.filePath || tile.folderPath || tile.cwd || "";
 }
 
 export function startInlineRename(dom, tile, onCommit) {

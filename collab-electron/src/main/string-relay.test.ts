@@ -130,6 +130,54 @@ describe("agent-initiated relay", () => {
     expect(event?.routeMethod).toBe("agent");
   });
 
+  test("routes by stable handle after display label changes", () => {
+    activeSessions.add("session-b");
+    registerTileSession("tile-a", "session-a", "Claude Worker", "worker");
+    registerTileSession(
+      "tile-b",
+      "session-b",
+      "Renamed Reviewer",
+      "codex-reviewer",
+    );
+    syncConnectionGraph([
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
+
+    onPtyData("session-a", ">>@codex-reviewer: handle still works\n");
+
+    expect(writtenSessions).toEqual([
+      {
+        sessionId: "session-b",
+        data: "[Claude Worker]: handle still works\n",
+      },
+    ]);
+    const [event] = getStringLog("conn-1");
+    expect(event?.type).toBe("relay.sent");
+    expect(event?.targetTileId).toBe("tile-b");
+  });
+
+  test("prefers unique connected handle over ambiguous connected labels", () => {
+    activeSessions.add("session-b");
+    registerTileSession("tile-a", "session-a", "Worker", "worker");
+    registerTileSession("tile-b", "session-b", "Reviewer", "codex-reviewer");
+    registerTileSession("tile-c", "session-c", "Reviewer", "claude-reviewer");
+    syncConnectionGraph([
+      { id: "conn-ab", tileAId: "tile-a", tileBId: "tile-b" },
+      { id: "conn-ac", tileAId: "tile-a", tileBId: "tile-c" },
+    ]);
+
+    onPtyData("session-a", ">>@codex-reviewer: handle disambiguates\n");
+
+    expect(writtenSessions).toEqual([
+      {
+        sessionId: "session-b",
+        data: "[Worker]: handle disambiguates\n",
+      },
+    ]);
+    const [event] = getStringLog("conn-ab");
+    expect(event?.type).toBe("relay.sent");
+  });
+
   test("logs no_route when no connected endpoint matches", () => {
     registerTileSession("tile-a", "session-a", "Worker");
     syncConnectionGraph([]);

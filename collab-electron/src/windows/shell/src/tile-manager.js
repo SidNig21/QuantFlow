@@ -51,6 +51,50 @@ export function createTileManager({
 		return Number.isFinite(v) ? v : 0;
 	}
 
+	function slugifyHandle(value) {
+		const base = String(value || "terminal")
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "");
+		return base || "terminal";
+	}
+
+	function tileIdSuffix(tile) {
+		const compact = String(tile.id || "").replace(/[^a-z0-9]/gi, "");
+		return compact.slice(-5).toLowerCase() || "local";
+	}
+
+	function ensureRouteHandle(tile) {
+		if (tile.type !== "term") return;
+		if (tile.routeHandle) return;
+		const seed = tile.userTitle || tile.roleId || tile.autoTitle || tile.cwd || "terminal";
+		const base = slugifyHandle(seed);
+		let handle = `${base}-${tileIdSuffix(tile)}`;
+		let n = 2;
+		while (
+			tiles.some((t) =>
+				t.id !== tile.id &&
+				t.routeHandle?.toLowerCase() === handle.toLowerCase(),
+			)
+		) {
+			handle = `${base}-${tileIdSuffix(tile)}-${n}`;
+			n++;
+		}
+		tile.routeHandle = handle;
+	}
+
+	function registerTerminalTileSession(tile) {
+		if (tile.type !== "term" || !tile.ptySessionId) return;
+		ensureRouteHandle(tile);
+		const label = tile.userTitle || tile.autoTitle || tile.id;
+		window.shellApi.stringRegisterTileSession?.(
+			tile.id,
+			tile.ptySessionId,
+			label,
+			tile.routeHandle,
+		);
+	}
+
 	// -- Canvas persistence --
 
 	function getCanvasStateForSave() {
@@ -71,6 +115,7 @@ export function createTileManager({
 				zIndex: t.zIndex,
 				userTitle: t.userTitle,
 				autoTitle: t.autoTitle,
+				routeHandle: t.routeHandle,
 				roleId: t.roleId,
 				roleColor: t.roleColor,
 			})),
@@ -244,20 +289,23 @@ export function createTileManager({
 		wv.addEventListener("ipc-message", (event) => {
 			if (event.channel === "pty-session-id") {
 				tile.ptySessionId = event.args[0];
+				ensureRouteHandle(tile);
+				updateTileTitle(tileDOMs.get(tile.id), tile);
 				saveCanvasDebounced();
 				if (onTerminalSessionCreated) {
 					onTerminalSessionCreated(tile);
 				}
-				const label = tile.userTitle || tile.autoTitle || tile.id;
-				window.shellApi.stringRegisterTileSession?.(tile.id, tile.ptySessionId, label);
+				registerTerminalTileSession(tile);
 			}
 			if (event.channel === "pty-cwd-changed") {
 				const cwd = event.args[1];
 				if (cwd && cwd !== tile.autoTitle) {
 					tile.cwd = cwd;
 					tile.autoTitle = cwd;
+					ensureRouteHandle(tile);
 					updateTileTitle(tileDOMs.get(tile.id), tile);
 					saveCanvasDebounced();
+					registerTerminalTileSession(tile);
 					if (onTerminalCwdChanged) {
 						onTerminalCwdChanged(cwd);
 					}
@@ -462,6 +510,7 @@ export function createTileManager({
 			height: extra.height || size.height,
 			...extra,
 		});
+		ensureRouteHandle(tile);
 		snapToGrid(tile);
 		window.shellApi.trackEvent("tile_created", { type });
 
@@ -722,6 +771,7 @@ export function createTileManager({
 						ptySessionId: saved.ptySessionId,
 						userTitle: saved.userTitle,
 						autoTitle: saved.autoTitle,
+						routeHandle: saved.routeHandle,
 						roleId: saved.roleId,
 						roleColor: saved.roleColor,
 					},
@@ -828,10 +878,7 @@ export function createTileManager({
 		const d = tileDOMs.get(id);
 		if (d) updateTileTitle(d, t);
 		saveCanvasImmediate();
-		if (t.type === "term" && t.ptySessionId) {
-			const label = t.userTitle || t.autoTitle || t.id;
-			window.shellApi.stringRegisterTileSession?.(t.id, t.ptySessionId, label);
-		}
+		registerTerminalTileSession(t);
 	}
 
 	return {
