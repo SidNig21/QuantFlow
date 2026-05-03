@@ -91,6 +91,8 @@ export function createTileDOM(tile, callbacks) {
     handleSpan.textContent = `@${tile.routeHandle}`;
     titleText.appendChild(handleSpan);
   }
+  const statusBadge = createTileStatusBadge(tile);
+  if (statusBadge) titleText.appendChild(statusBadge);
   if (tile.filePath) titleText.title = tile.filePath;
   if (tile.folderPath) titleText.title = tile.folderPath;
   if (tile.routeHandle) titleText.title = `@${tile.routeHandle}`;
@@ -332,6 +334,23 @@ export function splitFilepath(path) {
   return splitDisplayPath(path);
 }
 
+export function getTileStatusBadge(tile) {
+  if (tile?.type !== "term") return null;
+  if (tile.ptyStatus) return String(tile.ptyStatus);
+  if (tile.ptySessionId) return "running";
+  return "idle";
+}
+
+function createTileStatusBadge(tile) {
+  const status = getTileStatusBadge(tile);
+  if (!status) return null;
+  const badge = document.createElement("span");
+  badge.className = "tile-status-badge";
+  badge.dataset.status = status;
+  badge.textContent = status;
+  return badge;
+}
+
 export function updateTileTitle(dom, tile) {
   const label = getTileLabel(tile);
   const titleText = dom.titleText;
@@ -350,6 +369,8 @@ export function updateTileTitle(dom, tile) {
     handleSpan.textContent = `@${tile.routeHandle}`;
     titleText.appendChild(handleSpan);
   }
+  const statusBadge = createTileStatusBadge(tile);
+  if (statusBadge) titleText.appendChild(statusBadge);
   titleText.title = tile.routeHandle
     ? `@${tile.routeHandle}`
     : tile.filePath || tile.folderPath || tile.cwd || "";

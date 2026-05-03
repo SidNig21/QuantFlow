@@ -452,6 +452,22 @@ async function init() {
 		}
 	}
 
+	function syncTerminalTileStatuses(items) {
+		if (!Array.isArray(items)) return;
+		let changed = false;
+		for (const item of items) {
+			const tile = item?.tileId ? getTile(item.tileId) : null;
+			if (!tile || tile.type !== "term") continue;
+			const next = item.status || "";
+			if (tile.ptyStatus === next) continue;
+			tile.ptyStatus = next;
+			const dom = tileManager.getTileDOMs().get(tile.id);
+			if (dom) updateTileTitle(dom, tile);
+			changed = true;
+		}
+		if (changed) syncTileList();
+	}
+
 	function buildTileListEntry(tile) {
 		let title = tile.id;
 		let description = "";
@@ -463,7 +479,7 @@ async function init() {
 				? label.parent + label.name
 				: label.name;
 			description = tile.cwd || "~";
-			status = tile.ptySessionId ? "running" : "idle";
+			status = tile.ptyStatus || (tile.ptySessionId ? "running" : "idle");
 		} else if (tile.type === "browser") {
 			title = tile.url || "Browser";
 			description = "Browser";
@@ -1434,12 +1450,16 @@ async function init() {
 	async function refreshWatchtower() {
 		renderWatchtowerFilters();
 		const body = watchtowerEl.querySelector(".wt-body");
-		const relayLogs = await window.shellApi.watchtowerRelayLog?.(50) ?? [];
+		const [items, relayLogs] = await Promise.all([
+			window.shellApi.watchtowerSnapshot?.() ?? [],
+			window.shellApi.watchtowerRelayLog?.(50) ?? [],
+		]);
 		watchtowerRelayLogCache = Array.isArray(relayLogs) ? relayLogs : [];
+		const agentItems = Array.isArray(items) ? items : [];
+		syncTerminalTileStatuses(agentItems);
 		const attentionHtml = renderWatchtowerAttention(watchtowerRelayLogCache);
 		if (watchtowerTab === "agents") {
-			const items = await window.shellApi.watchtowerSnapshot?.() ?? [];
-			body.innerHTML = attentionHtml + renderWatchtowerAgents(items, {
+			body.innerHTML = attentionHtml + renderWatchtowerAgents(agentItems, {
 				filter: watchtowerAgentFilter,
 				connectionCounts: createConnectionCounts(connections),
 			});

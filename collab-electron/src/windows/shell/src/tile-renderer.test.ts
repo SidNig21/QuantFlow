@@ -3,6 +3,7 @@ import {
   formatContextPreviewDetail,
   formatRelaySyntax,
   getTileLabel,
+  getTileStatusBadge,
   splitFilepath,
   positionTile,
 } from "./tile-renderer.js";
@@ -77,6 +78,20 @@ describe("formatRelaySyntax", () => {
 
   test("returns empty string without a handle", () => {
     expect(formatRelaySyntax("   ")).toBe("");
+  });
+});
+
+describe("getTileStatusBadge", () => {
+  test("returns terminal status badge text", () => {
+    expect(getTileStatusBadge({ type: "term", ptyStatus: "blocked" }))
+      .toBe("blocked");
+    expect(getTileStatusBadge({ type: "term", ptySessionId: "session-a" }))
+      .toBe("running");
+    expect(getTileStatusBadge({ type: "term" })).toBe("idle");
+  });
+
+  test("skips non-terminal tiles", () => {
+    expect(getTileStatusBadge({ type: "note" })).toBeNull();
   });
 });
 
