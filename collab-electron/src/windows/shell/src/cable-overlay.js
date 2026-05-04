@@ -207,6 +207,19 @@ export function formatCableRelayFailure(result, targetTile) {
 	return `${base} Target status: ${status.message}`;
 }
 
+function defaultCableEndpointLabel(tile) {
+	return tile?.userTitle || tile?.autoTitle || tile?.id || "Target";
+}
+
+export function getCableSendBlockMessage(targetTile, getLabel = defaultCableEndpointLabel) {
+	const status = getCableEndpointStatus(targetTile);
+	if (status.sendable) return null;
+	const label = typeof getLabel === "function"
+		? getLabel(targetTile)
+		: targetTile?.id || "Target";
+	return `${label} cannot receive yet. ${status.message || "No active PTY session."}`;
+}
+
 export function getDirectedCableTiles(direction, tileA, tileB) {
 	return direction === "BtoA"
 		? { fromTile: tileB, toTile: tileA }
@@ -635,12 +648,12 @@ export function createCableOverlay({
 			const text = input.value.trim();
 			if (!text) return;
 			const { fromTile, toTile } = getDirectedCableTiles(direction, tileA, tileB);
-			const targetStatus = getCableEndpointStatus(toTile);
-			if (!targetStatus.sendable) {
-				setStatus(
-					`${tileLabel(toTile)} cannot receive yet. ${targetStatus.message || "No active PTY session."}`,
-					"error",
-				);
+			const blockMessage = getCableSendBlockMessage(toTile, tileLabel);
+			if (blockMessage) {
+				setStatus(blockMessage, "error");
+				onNotify?.(blockMessage, "error");
+				input.focus();
+				return;
 			}
 			sendBtn.disabled = true;
 			try {

@@ -8,6 +8,7 @@ import {
 	formatCableLogEntry,
 	formatCableEndpointSummary,
 	formatCableRelayFailure,
+	getCableSendBlockMessage,
 	getDirectedCableTiles,
 	getCableEndpointStatus,
 	getCableLabelLayout,
@@ -248,6 +249,30 @@ describe("formatCableRelayFailure", () => {
 			{ ok: false, message: "No route." },
 			{ id: "tile-b", ptySessionId: "session-b" },
 		)).toBe("No route.");
+	});
+});
+
+describe("getCableSendBlockMessage", () => {
+	test("returns null for sendable terminal endpoints", () => {
+		expect(getCableSendBlockMessage({
+			id: "tile-b",
+			userTitle: "Reviewer",
+			ptySessionId: "session-b",
+		}, (tile) => tile.userTitle)).toBeNull();
+	});
+
+	test("explains why the inspector should block sends to unhealthy endpoints", () => {
+		expect(getCableSendBlockMessage({
+			id: "tile-b",
+			userTitle: "Reviewer",
+			ptyStatus: "exited",
+		}, (tile) => tile.userTitle)).toBe(
+			"Reviewer cannot receive yet. Terminal session has exited.",
+		);
+
+		expect(getCableSendBlockMessage(null)).toBe(
+			"Target cannot receive yet. No active PTY session.",
+		);
 	});
 });
 
