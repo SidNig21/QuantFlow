@@ -13,7 +13,10 @@ import { createEdgeIndicators } from "./edge-indicators.js";
 import { createMinimap } from "./canvas-minimap.js";
 import { createPanel } from "./panel-manager.js";
 import { createWorkspaceManager } from "./workspace-manager.js";
-import { createCanvasRpc } from "./canvas-rpc.js";
+import {
+	createCanvasRpc,
+	createConnectionMutationEvent,
+} from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
 import { createToastController } from "./toast-controller.js";
 import { createOperationalEventLog } from "./operational-event-log.js";
@@ -1069,6 +1072,18 @@ async function init() {
 
 	const handleCanvasRpc = createCanvasRpc({
 		tileManager, viewportState, viewport, edgeIndicators,
+		onConnectionCreated(conn, tileA, tileB) {
+			operationalEvents.record(createConnectionMutationEvent(
+				"created", conn, tileA, tileB, tileEventLabel,
+			));
+			cableOverlay?.update();
+		},
+		onConnectionRemoved(conn, tileA, tileB) {
+			operationalEvents.record(createConnectionMutationEvent(
+				"removed", conn, tileA, tileB, tileEventLabel,
+			));
+			cableOverlay?.update();
+		},
 	});
 
 	Promise.resolve(window.shellApi.runtimeDiagnostics?.() ?? [])

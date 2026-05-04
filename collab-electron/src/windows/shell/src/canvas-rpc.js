@@ -8,6 +8,35 @@ function generateConnectionId() {
 	return "conn-" + Date.now() + "-" + Math.random().toString(36).slice(2, 9);
 }
 
+function defaultTileLabel(tile) {
+	return tile?.userTitle || tile?.autoTitle || tile?.id || "unknown";
+}
+
+export function createConnectionMutationEvent(
+	action,
+	conn,
+	tileA,
+	tileB,
+	labelForTile = defaultTileLabel,
+) {
+	const created = action === "created";
+	const tileALabel = labelForTile(tileA);
+	const tileBLabel = labelForTile(tileB);
+	return {
+		type: created ? "connection.created" : "connection.removed",
+		severity: "info",
+		summary: created
+			? `${tileALabel} connected to ${tileBLabel}`
+			: `${tileALabel} disconnected from ${tileBLabel}`,
+		meta: {
+			connectionId: conn?.id,
+			tileAId: conn?.tileAId,
+			tileBId: conn?.tileBId,
+			source: "canvas-rpc",
+		},
+	};
+}
+
 /**
  * Find a non-overlapping position on the canvas for a tile of the
  * given size. Scans on a 20 px grid within a 4000x3000 region.
@@ -46,6 +75,8 @@ export function findAutoPlacement(existingTiles, width, height) {
  */
 export function createCanvasRpc({
 	tileManager, viewportState, viewport, edgeIndicators,
+	onConnectionCreated,
+	onConnectionRemoved,
 }) {
 	function respond(requestId, result) {
 		window.shellApi.canvasRpcResponse({ requestId, result });
@@ -200,11 +231,18 @@ export function createCanvasRpc({
 						createdAt: now,
 						updatedAt: now,
 					});
+					onConnectionCreated?.(result, tileA, tileB);
 					tileManager.saveCanvasImmediate();
 					break;
 				}
 				case "connectionRemove": {
+					const conn = getConnection(params.id);
+					const tileA = getTile(conn?.tileAId);
+					const tileB = getTile(conn?.tileBId);
 					removeConnection(params.id);
+					if (conn) {
+						onConnectionRemoved?.(conn, tileA, tileB);
+					}
 					tileManager.saveCanvasImmediate();
 					result = { ok: true };
 					break;

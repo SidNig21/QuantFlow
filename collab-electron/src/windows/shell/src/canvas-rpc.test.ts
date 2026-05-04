@@ -1,5 +1,8 @@
 import { describe, test, expect } from "bun:test";
-import { findAutoPlacement } from "./canvas-rpc.js";
+import {
+	createConnectionMutationEvent,
+	findAutoPlacement,
+} from "./canvas-rpc.js";
 
 interface Tile {
   x: number;
@@ -86,5 +89,46 @@ describe("findAutoPlacement", () => {
     const pos = findAutoPlacement(existing, 100, 100);
     // Giant tile covers canvas, so fallback: last.x+40, last.y+40
     expect(pos).toEqual({ x: 40, y: 40 });
+  });
+});
+
+describe("createConnectionMutationEvent", () => {
+  test("formats RPC-created connection events for Watchtower", () => {
+    const event = createConnectionMutationEvent(
+      "created",
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+      { id: "tile-a", userTitle: "Worker" },
+      { id: "tile-b", userTitle: "Reviewer" },
+    );
+
+    expect(event).toEqual({
+      type: "connection.created",
+      severity: "info",
+      summary: "Worker connected to Reviewer",
+      meta: {
+        connectionId: "conn-1",
+        tileAId: "tile-a",
+        tileBId: "tile-b",
+        source: "canvas-rpc",
+      },
+    });
+  });
+
+  test("formats RPC-removed connection events with fallback labels", () => {
+    const event = createConnectionMutationEvent(
+      "removed",
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+      { id: "tile-a" },
+      null,
+    );
+
+    expect(event).toMatchObject({
+      type: "connection.removed",
+      summary: "tile-a disconnected from unknown",
+      meta: {
+        connectionId: "conn-1",
+        source: "canvas-rpc",
+      },
+    });
   });
 });
