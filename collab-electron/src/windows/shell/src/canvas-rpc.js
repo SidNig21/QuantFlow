@@ -38,6 +38,30 @@ export function createConnectionMutationEvent(
 	};
 }
 
+export function createConnectionLabelEvent(
+	conn,
+	tileA,
+	tileB,
+	labelForTile = defaultTileLabel,
+) {
+	const tileALabel = labelForTile(tileA);
+	const tileBLabel = labelForTile(tileB);
+	const label = String(conn?.label ?? "").trim();
+	return {
+		type: "connection.updated",
+		severity: "info",
+		summary: label
+			? `${tileALabel} -> ${tileBLabel} cable renamed: ${label}`
+			: `${tileALabel} -> ${tileBLabel} cable label cleared`,
+		meta: {
+			connectionId: conn?.id,
+			tileAId: conn?.tileAId,
+			tileBId: conn?.tileBId,
+			source: "canvas-rpc",
+		},
+	};
+}
+
 export function createConnectionFailureEvent(
 	message,
 	params = {},
@@ -53,8 +77,9 @@ export function createConnectionFailureEvent(
 		summary: `Connection failed: ${message}`,
 		detail: `${tileALabel} -> ${tileBLabel}`,
 		meta: {
-			tileAId: params.tileAId,
-			tileBId: params.tileBId,
+			...(params.connectionId ? { connectionId: params.connectionId } : {}),
+			...(params.tileAId ? { tileAId: params.tileAId } : {}),
+			...(params.tileBId ? { tileBId: params.tileBId } : {}),
 			source: "canvas-rpc",
 		},
 	};
@@ -117,6 +142,7 @@ export function createCanvasRpc({
 	tileManager, viewportState, viewport, edgeIndicators,
 	onConnectionCreated,
 	onConnectionRemoved,
+	onConnectionUpdated,
 	onConnectionFailed,
 }) {
 	function respond(requestId, result) {
@@ -297,12 +323,20 @@ export function createCanvasRpc({
 				}
 				case "connectionRemove": {
 					const conn = getConnection(params.id);
+					if (!conn) {
+						onConnectionFailed?.(
+							createConnectionFailureEvent(
+								"Connection not found.",
+								{ connectionId: params.id },
+							),
+						);
+						respondError(requestId, 3, "Connection not found");
+						return;
+					}
 					const tileA = getTile(conn?.tileAId);
 					const tileB = getTile(conn?.tileBId);
 					removeConnection(params.id);
-					if (conn) {
-						onConnectionRemoved?.(conn, tileA, tileB);
-					}
+					onConnectionRemoved?.(conn, tileA, tileB);
 					tileManager.saveCanvasImmediate();
 					result = { ok: true };
 					break;
@@ -310,9 +344,20 @@ export function createCanvasRpc({
 				case "connectionUpdateLabel": {
 					const conn = updateConnectionLabel(params.id, params.label);
 					if (!conn) {
+						onConnectionFailed?.(
+							createConnectionFailureEvent(
+								"Connection not found.",
+								{ connectionId: params.id },
+							),
+						);
 						respondError(requestId, 3, "Connection not found");
 						return;
 					}
+					onConnectionUpdated?.(
+						conn,
+						getTile(conn.tileAId),
+						getTile(conn.tileBId),
+					);
 					tileManager.saveCanvasImmediate();
 					result = getConnection(params.id);
 					break;

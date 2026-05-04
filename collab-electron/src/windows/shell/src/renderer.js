@@ -15,6 +15,7 @@ import { createPanel } from "./panel-manager.js";
 import { createWorkspaceManager } from "./workspace-manager.js";
 import {
 	createCanvasRpc,
+	createConnectionLabelEvent,
 	createConnectionMutationEvent,
 } from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
@@ -1081,6 +1082,12 @@ async function init() {
 		onConnectionRemoved(conn, tileA, tileB) {
 			operationalEvents.record(createConnectionMutationEvent(
 				"removed", conn, tileA, tileB, tileEventLabel,
+			));
+			cableOverlay?.update();
+		},
+		onConnectionUpdated(conn, tileA, tileB) {
+			operationalEvents.record(createConnectionLabelEvent(
+				conn, tileA, tileB, tileEventLabel,
 			));
 			cableOverlay?.update();
 		},

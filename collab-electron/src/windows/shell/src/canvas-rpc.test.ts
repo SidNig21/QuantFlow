@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
 	createConnectionFailureEvent,
+	createConnectionLabelEvent,
 	createConnectionMutationEvent,
 	findAutoPlacement,
 	validateRpcConnectionCreate,
@@ -154,6 +155,53 @@ describe("createConnectionFailureEvent", () => {
         tileBId: "tile-b",
         source: "canvas-rpc",
       },
+    });
+  });
+
+  test("formats missing connection failures without fake tile endpoints", () => {
+    expect(createConnectionFailureEvent(
+      "Connection not found.",
+      { connectionId: "conn-missing" },
+    )).toEqual({
+      type: "connection.failed",
+      severity: "warn",
+      summary: "Connection failed: Connection not found.",
+      detail: "unknown -> unknown",
+      meta: {
+        connectionId: "conn-missing",
+        source: "canvas-rpc",
+      },
+    });
+  });
+});
+
+describe("createConnectionLabelEvent", () => {
+  test("formats RPC label update events for Watchtower", () => {
+    expect(createConnectionLabelEvent(
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b", label: "handoff" },
+      { id: "tile-a", userTitle: "Worker" },
+      { id: "tile-b", userTitle: "Reviewer" },
+    )).toEqual({
+      type: "connection.updated",
+      severity: "info",
+      summary: "Worker -> Reviewer cable renamed: handoff",
+      meta: {
+        connectionId: "conn-1",
+        tileAId: "tile-a",
+        tileBId: "tile-b",
+        source: "canvas-rpc",
+      },
+    });
+  });
+
+  test("formats RPC label clear events", () => {
+    expect(createConnectionLabelEvent(
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b", label: "" },
+      { id: "tile-a", userTitle: "Worker" },
+      { id: "tile-b", userTitle: "Reviewer" },
+    )).toMatchObject({
+      type: "connection.updated",
+      summary: "Worker -> Reviewer cable label cleared",
     });
   });
 });
