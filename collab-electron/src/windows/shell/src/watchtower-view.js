@@ -19,6 +19,12 @@ export const WATCHTOWER_MESSAGE_FILTERS = [
 	"failed",
 	...WATCHTOWER_RELAY_ERROR_FILTERS,
 ];
+export const WATCHTOWER_EVENT_FILTERS = [
+	"all",
+	"error",
+	"warn",
+	"info",
+];
 
 export function escapeHtml(value) {
 	return String(value ?? "")
@@ -51,6 +57,11 @@ export function filterWatchtowerMessages(logs, filter = "all") {
 		return logs.filter((entry) => entry.errorCode === filter);
 	}
 	return logs;
+}
+
+export function filterWatchtowerEvents(events, filter = "all") {
+	if (filter === "all") return events;
+	return events.filter((event) => event.severity === filter);
 }
 
 export function formatWatchtowerFilterLabel(filter) {
@@ -307,6 +318,43 @@ export function renderWatchtowerMessages(
 					<span class="wt-msg-route">${escapeHtml(route)}</span>
 					${canRetry ? `<button class="wt-msg-retry" data-event-id="${escapeHtml(entry.eventId)}" type="button">Retry</button>` : ""}
 				</div>
+			</div>
+		`;
+	}).join("");
+}
+
+export function renderWatchtowerEvents(
+	events,
+	{
+		filter = "all",
+		limit = 30,
+		now = Date.now(),
+	} = {},
+) {
+	const filtered = filterWatchtowerEvents(events, filter);
+	if (!filtered.length) {
+		const label = filter === "all" ? "" : `${filter} `;
+		return `<p class="wt-empty">No ${escapeHtml(label)}operational events.</p>`;
+	}
+	return filtered.slice(-limit).reverse().map((event) => {
+		const meta = event?.meta && typeof event.meta === "object" ? event.meta : {};
+		return `
+			<div
+				class="wt-event wt-event-${escapeHtml(event.severity || "info")}"
+				data-watchtower-kind="event"
+				data-conn-id="${escapeHtml(meta.connectionId ?? "")}"
+				data-tile-id="${escapeHtml(meta.tileId ?? "")}"
+				data-from-tile-id="${escapeHtml(meta.fromTileId ?? meta.tileAId ?? "")}"
+				data-target-tile-id="${escapeHtml(meta.targetTileId ?? meta.tileBId ?? "")}"
+				role="button"
+				tabindex="0"
+			>
+				<div class="wt-event-line">
+					<span class="wt-event-type">${escapeHtml(event.type || "event")}</span>
+					<span class="wt-event-age">${escapeHtml(formatWatchtowerAge(event.timestamp, now))}</span>
+				</div>
+				<div class="wt-event-summary">${escapeHtml(String(event.summary || "").slice(0, 180))}</div>
+				${event.detail ? `<div class="wt-event-detail">${escapeHtml(String(event.detail).slice(0, 200))}</div>` : ""}
 			</div>
 		`;
 	}).join("");

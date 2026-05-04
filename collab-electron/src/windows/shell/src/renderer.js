@@ -25,6 +25,7 @@ import {
 import { createCableOverlay, formatCableContextRelay } from "./cable-overlay.js";
 import {
 	WATCHTOWER_AGENT_FILTERS,
+	WATCHTOWER_EVENT_FILTERS,
 	WATCHTOWER_MESSAGE_FILTERS,
 	createConnectionCounts,
 	formatWatchtowerDiagnostics,
@@ -32,6 +33,7 @@ import {
 	getWatchtowerRetryRequest,
 	renderWatchtowerAgents,
 	renderWatchtowerAttention,
+	renderWatchtowerEvents,
 	renderWatchtowerMessages,
 } from "./watchtower-view.js";
 
@@ -172,6 +174,27 @@ async function init() {
 		if (!tile) return "unknown";
 		const label = getTileLabel(tile);
 		return label.name || tile.userTitle || tile.autoTitle || tile.id;
+	}
+
+	function recordRelayOperationalEvent(result, request, fallbackError = null) {
+		const ok = result?.ok === true && !fallbackError;
+		const fromLabel = request?.fromLabel || request?.fromTileId || "unknown";
+		const targetLabel = request?.targetLabel || request?.targetTileId || "unresolved";
+		operationalEvents.record({
+			type: ok ? "relay.sent" : "relay.failed",
+			severity: ok ? "info" : "error",
+			summary: ok
+				? `Relay sent: ${fromLabel} -> ${targetLabel}`
+				: `Relay failed: ${result?.message || fallbackError || "Unknown relay failure"}`,
+			detail: `${fromLabel} -> ${targetLabel}`,
+			meta: {
+				connectionId: request?.connectionId,
+				eventId: result?.eventId,
+				fromTileId: request?.fromTileId,
+				targetTileId: request?.targetTileId,
+				errorCode: result?.errorCode,
+			},
+		});
 	}
 
 	function syncConnectionGraph() {
@@ -824,7 +847,17 @@ async function init() {
 	let cableOverlay = createCableOverlay({
 		containerEl: canvasEl,
 		viewportState,
-		onSendMessage: (req) => window.shellApi.stringRelay?.(req),
+		onSendMessage: async (req) => {
+			try {
+				const result = await window.shellApi.stringRelay?.(req);
+				recordRelayOperationalEvent(result, req);
+				return result;
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Relay failed.";
+				recordRelayOperationalEvent({ ok: false, message }, req, message);
+				throw err;
+			}
+		},
 		onGetLog: (connectionId, limit) =>
 			window.shellApi.stringGetLog?.(connectionId, limit),
 		onNotify: (message, tone = "info") => toasts.show({ message, tone }),
@@ -1358,6 +1391,7 @@ async function init() {
 	let watchtowerTab = "agents";
 	let watchtowerAgentFilter = "all";
 	let watchtowerMessageFilter = "all";
+	let watchtowerEventFilter = "all";
 	let watchtowerTimer = null;
 	let watchtowerRelayLogCache = [];
 	const watchtowerEl = document.createElement("div");
@@ -1369,6 +1403,7 @@ async function init() {
 			<div class="wt-tabs">
 				<button class="wt-tab active" data-tab="agents">Agents</button>
 				<button class="wt-tab" data-tab="messages">Messages</button>
+				<button class="wt-tab" data-tab="events">Events</button>
 			</div>
 			<button class="wt-copy" title="Copy diagnostics">Copy</button>
 			<button class="wt-refresh" title="Refresh">Refresh</button>
@@ -1426,10 +1461,14 @@ async function init() {
 	function renderWatchtowerFilters() {
 		const filters = watchtowerTab === "agents"
 			? WATCHTOWER_AGENT_FILTERS
-			: WATCHTOWER_MESSAGE_FILTERS;
+			: watchtowerTab === "events"
+				? WATCHTOWER_EVENT_FILTERS
+				: WATCHTOWER_MESSAGE_FILTERS;
 		const activeFilter = watchtowerTab === "agents"
 			? watchtowerAgentFilter
-			: watchtowerMessageFilter;
+			: watchtowerTab === "events"
+				? watchtowerEventFilter
+				: watchtowerMessageFilter;
 		const filterBar = watchtowerEl.querySelector(".wt-filter-bar");
 		filterBar.innerHTML = filters.map((filter) => `
 			<button
@@ -1445,6 +1484,8 @@ async function init() {
 		if (!button) return;
 		if (watchtowerTab === "agents") {
 			watchtowerAgentFilter = button.dataset.filter;
+		} else if (watchtowerTab === "events") {
+			watchtowerEventFilter = button.dataset.filter;
 		} else {
 			watchtowerMessageFilter = button.dataset.filter;
 		}
@@ -1506,6 +1547,7 @@ async function init() {
 		button.disabled = true;
 		try {
 			const result = await window.shellApi.stringRelay?.(request);
+			recordRelayOperationalEvent(result, request);
 			if (result?.ok === false) {
 				toasts.show({ message: result.message || "Relay retry failed.", tone: "error" });
 			} else {
@@ -1513,8 +1555,10 @@ async function init() {
 			}
 			await refreshWatchtower();
 		} catch (err) {
+			const message = err instanceof Error ? err.message : "Relay retry failed.";
+			recordRelayOperationalEvent({ ok: false, message }, request, message);
 			toasts.show({
-				message: err instanceof Error ? err.message : "Relay retry failed.",
+				message,
 				tone: "error",
 			});
 		} finally {
@@ -1531,6 +1575,13 @@ async function init() {
 		}
 		if (row.dataset.watchtowerKind === "message") {
 			focusWatchtowerRelay(row);
+			return;
+		}
+		if (row.dataset.watchtowerKind === "event") {
+			if (row.dataset.connId && focusWatchtowerRelay(row)) return;
+			if (row.dataset.tileId && focusWatchtowerTile(row.dataset.tileId)) return;
+			if (row.dataset.targetTileId && focusWatchtowerTile(row.dataset.targetTileId)) return;
+			if (row.dataset.fromTileId) focusWatchtowerTile(row.dataset.fromTileId);
 		}
 	}
 
@@ -1568,6 +1619,10 @@ async function init() {
 			body.innerHTML = attentionHtml + renderWatchtowerAgents(agentItems, {
 				filter: watchtowerAgentFilter,
 				connectionCounts: createConnectionCounts(connections),
+			});
+		} else if (watchtowerTab === "events") {
+			body.innerHTML = attentionHtml + renderWatchtowerEvents(operationalEvents.list(), {
+				filter: watchtowerEventFilter,
 			});
 		} else {
 			body.innerHTML = attentionHtml + renderWatchtowerMessages(watchtowerRelayLogCache, {

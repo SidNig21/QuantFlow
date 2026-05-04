@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
 	WATCHTOWER_AGENT_FILTERS,
+	WATCHTOWER_EVENT_FILTERS,
 	WATCHTOWER_MESSAGE_FILTERS,
 	createConnectionCounts,
 	escapeHtml,
 	filterWatchtowerAgents,
+	filterWatchtowerEvents,
 	filterWatchtowerMessages,
 	formatWatchtowerFilterLabel,
 	formatWatchtowerDiagnostics,
@@ -14,6 +16,7 @@ import {
 	getWatchtowerAttentionItems,
 	renderWatchtowerAgents,
 	renderWatchtowerAttention,
+	renderWatchtowerEvents,
 	renderWatchtowerMessages,
 	shouldRenderWatchtowerRetry,
 } from "./watchtower-view.js";
@@ -111,6 +114,27 @@ describe("filterWatchtowerMessages", () => {
 				{ ok: false, errorCode: code },
 			]);
 		}
+	});
+});
+
+describe("filterWatchtowerEvents", () => {
+	const events = [
+		{ severity: "info", summary: "connected" },
+		{ severity: "warn", summary: "missing context" },
+		{ severity: "error", summary: "role failed" },
+	];
+
+	test("filters operational events by severity", () => {
+		expect(WATCHTOWER_EVENT_FILTERS).toEqual([
+			"all",
+			"error",
+			"warn",
+			"info",
+		]);
+		expect(filterWatchtowerEvents(events, "error")).toEqual([
+			{ severity: "error", summary: "role failed" },
+		]);
+		expect(filterWatchtowerEvents(events)).toHaveLength(3);
 	});
 });
 
@@ -385,6 +409,37 @@ describe("renderWatchtowerMessages", () => {
 		]);
 
 		expect(html).not.toContain("wt-msg-retry");
+	});
+});
+
+describe("renderWatchtowerEvents", () => {
+	test("renders escaped operational event rows with route metadata", () => {
+		const html = renderWatchtowerEvents([
+			{
+				type: "connection.created",
+				severity: "info",
+				timestamp: 2_000,
+				summary: "Planner <-> Reviewer",
+				detail: "Created from cable port",
+				meta: {
+					connectionId: "conn-ab",
+					tileAId: "tile-a",
+					tileBId: "tile-b",
+				},
+			},
+		], { now: 5_000 });
+
+		expect(html).toContain("data-watchtower-kind=\"event\"");
+		expect(html).toContain("data-conn-id=\"conn-ab\"");
+		expect(html).toContain("data-from-tile-id=\"tile-a\"");
+		expect(html).toContain("data-target-tile-id=\"tile-b\"");
+		expect(html).toContain("Planner &lt;-&gt; Reviewer");
+		expect(html).toContain("3s ago");
+	});
+
+	test("renders filtered empty state", () => {
+		expect(renderWatchtowerEvents([], { filter: "error" }))
+			.toContain("No error operational events.");
 	});
 });
 

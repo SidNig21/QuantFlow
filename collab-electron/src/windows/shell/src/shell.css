@@ -2085,6 +2085,74 @@ body.platform-win {
 	opacity: 0.55;
 }
 
+.wt-event {
+	background: rgba(255, 255, 255, 0.03);
+	border: 1px solid #263244;
+	border-left: 3px solid #475569;
+	border-radius: 6px;
+	cursor: pointer;
+	outline: none;
+	padding: 7px 9px;
+}
+
+.wt-event:hover,
+.wt-event:focus-visible {
+	background: rgba(148, 163, 184, 0.08);
+	border-color: #475569;
+}
+
+.wt-event:focus-visible {
+	box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
+}
+
+.wt-event-info { border-left-color: #38bdf8; }
+.wt-event-warn { border-left-color: #f59e0b; }
+.wt-event-error { border-left-color: #ef4444; }
+
+.wt-event-line {
+	align-items: center;
+	display: flex;
+	gap: 8px;
+	justify-content: space-between;
+	min-width: 0;
+}
+
+.wt-event-type {
+	color: #cbd5e1;
+	font-family: var(--font-mono);
+	font-size: 10px;
+	font-weight: 700;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.wt-event-age {
+	color: #64748b;
+	flex-shrink: 0;
+	font-size: 10px;
+}
+
+.wt-event-summary {
+	color: #e2e8f0;
+	font-size: 12px;
+	margin-top: 4px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wt-event-detail {
+	color: #94a3b8;
+	font-family: var(--font-mono);
+	font-size: 10px;
+	margin-top: 3px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* Cable draw mode: hold C key */
 
 .cable-draw-mode,
