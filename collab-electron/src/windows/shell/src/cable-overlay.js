@@ -114,6 +114,63 @@ export function formatCableLogDetail(entry, ok = entry?.ok !== false) {
 	return `${route}${error}`;
 }
 
+export function getCableEndpointStatus(tile) {
+	if (!tile) {
+		return { label: "missing", tone: "error", sendable: false };
+	}
+	if (tile.ptyStatus === "error" || tile.ptyError) {
+		return {
+			label: "error",
+			tone: "error",
+			sendable: false,
+			message: tile.ptyError || "Terminal is in an error state.",
+		};
+	}
+	if (tile.ptyStatus === "exited") {
+		return {
+			label: "exited",
+			tone: "error",
+			sendable: false,
+			message: "Terminal session has exited.",
+		};
+	}
+	if (!tile.ptySessionId) {
+		return {
+			label: "no PTY",
+			tone: "error",
+			sendable: false,
+			message: "No active PTY session is attached.",
+		};
+	}
+	const label = tile.ptyStatus
+		? String(tile.ptyStatus)
+		: "ready";
+	return {
+		label,
+		tone: label === "running" || label === "ready" ? "ok" : "warn",
+		sendable: true,
+	};
+}
+
+export function formatCableEndpointSummary(tile, label) {
+	const status = getCableEndpointStatus(tile);
+	const route = tile?.routeHandle ? ` @${tile.routeHandle}` : "";
+	return {
+		label: `${label}${route}`,
+		status: status.label,
+		tone: status.tone,
+		message: status.message || "",
+		sendable: status.sendable,
+	};
+}
+
+export function formatCableRelayFailure(result, targetTile) {
+	const base = String(result?.message || "Relay failed.").trim();
+	const status = getCableEndpointStatus(targetTile);
+	if (status.sendable || !status.message) return base;
+	return `${base} Target status: ${status.message}`;
+}
+
 export function getDirectedCableTiles(direction, tileA, tileB) {
 	return direction === "BtoA"
 		? { fromTile: tileB, toTile: tileA }
@@ -298,8 +355,8 @@ export function createCableOverlay({
 			const la = tileLabel(tileA);
 			const lb = tileLabel(tileB);
 			dirBtn.textContent = direction === "AtoB" ? `${la} → ${lb}` : `${lb} → ${la}`;
+			renderEndpointHealth();
 		}
-		refreshDirLabel();
 
 		dirBtn.addEventListener("click", (e) => {
 			e.stopPropagation();
@@ -321,6 +378,9 @@ export function createCableOverlay({
 		const statusEl = document.createElement("div");
 		statusEl.className = "cable-status";
 		statusEl.hidden = true;
+
+		const endpointHealthEl = document.createElement("div");
+		endpointHealthEl.className = "cable-endpoint-health";
 
 		const actionsEl = document.createElement("div");
 		actionsEl.className = "cable-actions";
@@ -403,18 +463,48 @@ export function createCableOverlay({
 			statusEl.dataset.kind = kind;
 		}
 
+		function renderEndpointHealth() {
+			if (!endpointHealthEl) return;
+			const { fromTile, toTile } = getDirectedCableTiles(direction, tileA, tileB);
+			const rows = [
+				formatCableEndpointSummary(fromTile, "From"),
+				formatCableEndpointSummary(toTile, "To"),
+			];
+			endpointHealthEl.replaceChildren();
+			for (const row of rows) {
+				const item = document.createElement("div");
+				item.className = "cable-endpoint-row";
+				item.dataset.tone = row.tone;
+				item.title = row.message || row.status;
+				const name = document.createElement("span");
+				name.className = "cable-endpoint-name";
+				name.textContent = row.label;
+				const status = document.createElement("span");
+				status.className = "cable-endpoint-status";
+				status.textContent = row.status;
+				item.appendChild(name);
+				item.appendChild(status);
+				endpointHealthEl.appendChild(item);
+			}
+		}
+
 		async function sendRelayRequest(request, {
 			clearInputOnSuccess = false,
 			focusInputOnFailure = false,
+			targetTile = null,
 		} = {}) {
+			const resolvedTargetTile = targetTile
+				|| (request?.targetTileId === tileA.id ? tileA : null)
+				|| (request?.targetTileId === tileB.id ? tileB : null);
 			setStatus("Sending…", "pending");
 			setCableRelayState(conn.id, "sending");
 			try {
 				const result = await onSendMessage?.(request);
 				if (result?.ok === false) {
 					setCableRelayState(conn.id, "failed");
-					setStatus(result.message || "Relay failed.", "error");
-					onNotify?.(result.message || "Relay failed.", "error");
+					const message = formatCableRelayFailure(result, resolvedTargetTile);
+					setStatus(message, "error");
+					onNotify?.(message, "error");
 					await refreshHistory();
 					if (focusInputOnFailure) input.focus();
 					return false;
@@ -509,6 +599,13 @@ export function createCableOverlay({
 			const text = input.value.trim();
 			if (!text) return;
 			const { fromTile, toTile } = getDirectedCableTiles(direction, tileA, tileB);
+			const targetStatus = getCableEndpointStatus(toTile);
+			if (!targetStatus.sendable) {
+				setStatus(
+					`${tileLabel(toTile)} cannot receive yet. ${targetStatus.message || "No active PTY session."}`,
+					"error",
+				);
+			}
 			sendBtn.disabled = true;
 			try {
 				await sendRelayRequest({
@@ -521,6 +618,7 @@ export function createCableOverlay({
 				}, {
 					clearInputOnSuccess: true,
 					focusInputOnFailure: true,
+					targetTile: toTile,
 				});
 			} finally {
 				if (popoverEl) sendBtn.disabled = false;
@@ -540,7 +638,9 @@ export function createCableOverlay({
 			e.stopPropagation();
 		});
 
+		refreshDirLabel();
 		popoverEl.appendChild(dirBtn);
+		popoverEl.appendChild(endpointHealthEl);
 		popoverEl.appendChild(input);
 		popoverEl.appendChild(statusEl);
 		popoverEl.appendChild(sendBtn);

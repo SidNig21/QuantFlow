@@ -5,7 +5,10 @@ import {
 	getCableDefaultDirection,
 	formatCableLogDetail,
 	formatCableLogEntry,
+	formatCableEndpointSummary,
+	formatCableRelayFailure,
 	getDirectedCableTiles,
+	getCableEndpointStatus,
 	getConnectionPresentation,
 	getRetryCableRelayRequest,
 	shouldSubmitCableMessage,
@@ -137,6 +140,75 @@ describe("formatCableLogDetail", () => {
 			ok: false,
 			errorCode: "no_route",
 		})).toBe("manual / unknown -> unresolved / no_route");
+	});
+});
+
+describe("getCableEndpointStatus", () => {
+	test("marks attached terminal endpoints as sendable", () => {
+		expect(getCableEndpointStatus({
+			id: "tile-a",
+			ptySessionId: "session-a",
+		})).toEqual({
+			label: "ready",
+			tone: "ok",
+			sendable: true,
+		});
+	});
+
+	test("surfaces missing and errored PTYs", () => {
+		expect(getCableEndpointStatus({ id: "tile-a" })).toEqual({
+			label: "no PTY",
+			tone: "error",
+			sendable: false,
+			message: "No active PTY session is attached.",
+		});
+
+		expect(getCableEndpointStatus({
+			id: "tile-b",
+			ptySessionId: "session-b",
+			ptyStatus: "error",
+			ptyError: "spawn ENOENT",
+		})).toEqual({
+			label: "error",
+			tone: "error",
+			sendable: false,
+			message: "spawn ENOENT",
+		});
+	});
+});
+
+describe("formatCableEndpointSummary", () => {
+	test("includes route handles and status for inspector rows", () => {
+		expect(formatCableEndpointSummary({
+			id: "tile-a",
+			routeHandle: "worker-a",
+			ptySessionId: "session-a",
+			ptyStatus: "running",
+		}, "From")).toEqual({
+			label: "From @worker-a",
+			status: "running",
+			tone: "ok",
+			message: "",
+			sendable: true,
+		});
+	});
+});
+
+describe("formatCableRelayFailure", () => {
+	test("adds target health to failed relay messages", () => {
+		expect(formatCableRelayFailure(
+			{ ok: false, message: "Target session is not active." },
+			{ id: "tile-b" },
+		)).toBe(
+			"Target session is not active. Target status: No active PTY session is attached.",
+		);
+	});
+
+	test("keeps the structured relay message when target is healthy", () => {
+		expect(formatCableRelayFailure(
+			{ ok: false, message: "No route." },
+			{ id: "tile-b", ptySessionId: "session-b" },
+		)).toBe("No route.");
 	});
 });
 
