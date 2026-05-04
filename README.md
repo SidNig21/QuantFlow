@@ -1,6 +1,6 @@
-# Collaborator
+# QuantFlow
 
-Collaborator is a place to build with agents.
+QuantFlow is a canvas-first cockpit for coordinating local coding agents and CLI tools.
 
 ![Collaborator](screenshot.png)
 
@@ -10,12 +10,12 @@ The app is early-stage and in active development, with native desktop targets fo
 
 ## Install
 
-**[Download the latest release](https://github.com/collaborator-ai/collab-public/releases/latest)** for macOS, Windows, or Linux.
+**[Download the latest release](https://github.com/SidNig21/QuantFlow/releases/latest)** for macOS, Windows, or Linux.
 
 macOS and Linux also support command-line install:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/collaborator-ai/collab-public/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/SidNig21/QuantFlow/refs/heads/codex/xynth-cable-foundation/install.sh | bash
 ```
 
 Windows: use the `.exe` installer from the releases page.
@@ -255,7 +255,7 @@ Platform notes:
 
 * macOS: Homebrew is the simplest way to install Node.js and Bun.
 
-* Windows: PowerShell 7 is recommended; WSL2 support requires at least one installed distro.
+* Windows: PowerShell 7 is recommended; WSL2 support requires at least one installed distro. See [QuantFlow Windows Dev Setup](WINDOWS_DEV_SETUP.md).
 
 * Linux: install Node.js and Bun from your distro packages or upstream installers.
 
@@ -264,8 +264,8 @@ Platform notes:
 Once the prerequisites are installed, clone the repo and install dependencies:
 
 ```sh
-git clone https://github.com/collaborator-ai/collab-public.git
-cd collab-public/collab-electron
+git clone https://github.com/SidNig21/QuantFlow.git
+cd QuantFlow/collab-electron
 bun install
 ```
 
