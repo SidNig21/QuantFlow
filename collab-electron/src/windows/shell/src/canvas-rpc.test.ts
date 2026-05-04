@@ -3,8 +3,10 @@ import {
 	createConnectionFailureEvent,
 	createConnectionLabelEvent,
 	createConnectionMutationEvent,
+	createTerminalWriteFailureEvent,
 	findAutoPlacement,
 	validateRpcConnectionCreate,
+	validateRpcTerminalWrite,
 } from "./canvas-rpc.js";
 
 interface Tile {
@@ -260,5 +262,71 @@ describe("validateRpcConnectionCreate", () => {
         ok: false,
         reason: "same_tile",
       });
+  });
+});
+
+describe("validateRpcTerminalWrite", () => {
+  test("accepts non-empty string input for terminal sessions", () => {
+    expect(validateRpcTerminalWrite(
+      { id: "tile-a", type: "term", ptySessionId: "session-a" },
+      "\n",
+    )).toEqual({
+      ok: true,
+      sessionId: "session-a",
+      input: "\n",
+    });
+  });
+
+  test("rejects non-terminal, missing session, and empty input writes", () => {
+    expect(validateRpcTerminalWrite(
+      { id: "tile-a", type: "note" },
+      "hello",
+    )).toMatchObject({
+      ok: false,
+      reason: "not_terminal",
+      message: "Tile is not a terminal",
+    });
+    expect(validateRpcTerminalWrite(
+      { id: "tile-a", type: "term" },
+      "hello",
+    )).toMatchObject({
+      ok: false,
+      reason: "missing_session",
+      message: "Terminal has no session",
+    });
+    expect(validateRpcTerminalWrite(
+      { id: "tile-a", type: "term", ptySessionId: "session-a" },
+      "",
+    )).toMatchObject({
+      ok: false,
+      reason: "empty_input",
+      message: "Terminal input must be a non-empty string",
+    });
+  });
+});
+
+describe("createTerminalWriteFailureEvent", () => {
+  test("formats RPC terminal write failures for Watchtower", () => {
+    expect(createTerminalWriteFailureEvent(
+      {
+        id: "tile-a",
+        type: "term",
+        ptySessionId: "session-a",
+        userTitle: "Worker",
+      },
+      "Terminal input must be a non-empty string",
+      "empty_input",
+    )).toEqual({
+      type: "terminal.write_failed",
+      severity: "warn",
+      summary: "Terminal write failed: Terminal input must be a non-empty string",
+      detail: "Worker",
+      meta: {
+        tileId: "tile-a",
+        sessionId: "session-a",
+        reason: "empty_input",
+        source: "canvas-rpc",
+      },
+    });
   });
 });

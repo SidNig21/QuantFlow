@@ -103,6 +103,43 @@ export function validateRpcConnectionCreate(tileA, tileB, existingConnections) {
 	return dropResult;
 }
 
+export function validateRpcTerminalWrite(tile, input) {
+	if (tile?.type !== "term") {
+		return { ok: false, code: 4, reason: "not_terminal", message: "Tile is not a terminal" };
+	}
+	if (!tile.ptySessionId) {
+		return { ok: false, code: 4, reason: "missing_session", message: "Terminal has no session" };
+	}
+	if (typeof input !== "string" || input.length === 0) {
+		return { ok: false, code: 4, reason: "empty_input", message: "Terminal input must be a non-empty string" };
+	}
+	return {
+		ok: true,
+		sessionId: tile.ptySessionId,
+		input,
+	};
+}
+
+export function createTerminalWriteFailureEvent(
+	tile,
+	message,
+	reason,
+	labelForTile = defaultTileLabel,
+) {
+	return {
+		type: "terminal.write_failed",
+		severity: "warn",
+		summary: `Terminal write failed: ${message}`,
+		detail: labelForTile(tile),
+		meta: {
+			tileId: tile?.id,
+			sessionId: tile?.ptySessionId,
+			reason,
+			source: "canvas-rpc",
+		},
+	};
+}
+
 /**
  * Find a non-overlapping position on the canvas for a tile of the
  * given size. Scans on a 20 px grid within a 4000x3000 region.
@@ -145,6 +182,7 @@ export function createCanvasRpc({
 	onConnectionRemoved,
 	onConnectionUpdated,
 	onConnectionFailed,
+	onTerminalWriteFailed,
 }) {
 	function respond(requestId, result) {
 		window.shellApi.canvasRpcResponse({ requestId, result });
@@ -389,17 +427,33 @@ export function createCanvasRpc({
 				case "terminalWrite": {
 					const tile = requireTile(requestId, params.tileId);
 					if (!tile) return;
-					if (tile.type !== "term") {
-						respondError(requestId, 4, "Tile is not a terminal");
+					const validation = validateRpcTerminalWrite(tile, params.input);
+					if (!validation.ok) {
+						onTerminalWriteFailed?.(tile, validation);
+						respondError(
+							requestId,
+							validation.code,
+							validation.message,
+						);
 						return;
 					}
-					if (!tile.ptySessionId) {
-						respondError(requestId, 4, "Terminal has no session");
+					try {
+						window.shellApi.ptyWrite(
+							validation.sessionId,
+							validation.input,
+						);
+					} catch (err) {
+						const message = err instanceof Error
+							? err.message
+							: "Terminal write failed";
+						onTerminalWriteFailed?.(tile, {
+							code: 4,
+							reason: "write_failed",
+							message,
+						});
+						respondError(requestId, 4, message);
 						return;
 					}
-					window.shellApi.ptyWrite(
-						tile.ptySessionId, params.input,
-					);
 					result = {};
 					break;
 				}
