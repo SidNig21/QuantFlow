@@ -24,6 +24,7 @@ describe("collab-canvas CLI", () => {
     expect(result.stdout).toContain("connection list");
     expect(result.stdout).toContain("connection create <a> <b> [opts]");
     expect(result.stdout).toContain("connection label <id> <label>");
+    expect(result.stdout).toContain("connection send <id> --from <tile> <message>");
     expect(result.stdout).toContain("viewport set [--pan x,y] [--zoom z]");
   });
 
@@ -42,6 +43,15 @@ describe("collab-canvas CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
       "viewport set requires --pan x,y or --zoom n",
+    );
+  });
+
+  test("validates connection send direction before opening the RPC socket", () => {
+    const result = runCli(["connection", "send", "conn-1", "hello"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "connection send requires --from <tileId>",
     );
   });
 });

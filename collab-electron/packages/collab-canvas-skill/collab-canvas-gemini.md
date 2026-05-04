@@ -51,6 +51,9 @@ collab-canvas connection create <tileA> <tileB> [--label <text>]
 collab-canvas connection rm <id>
 collab-canvas connection label <id> <label>
 
+# Send a cable-bounded message
+collab-canvas connection send <id> --from <tileId> <message>
+
 # Get viewport state
 collab-canvas viewport
 
@@ -70,6 +73,7 @@ collab-canvas tile create graph --file ./research.graph.json --pos 0,0 --size 30
 collab-canvas tile create note --file ./notes.md --pos 31,0
 collab-canvas tile create term --pos 0,26
 collab-canvas connection create <worker-id> <reviewer-id> --label review
+collab-canvas connection send <connection-id> --from <worker-id> "Please review the pinned notes."
 
 # Frame the viewport after arranging
 collab-canvas viewport set --pan 0,0 --zoom 0.8

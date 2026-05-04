@@ -143,6 +143,21 @@ Rename a cable label.
 collab-canvas connection label <id> <label>
 ```
 
+### collab-canvas connection send
+
+Send a plain-English message across an existing cable from one endpoint tile to the other. The `--from` tile must be one endpoint of the cable.
+
+```bash
+collab-canvas connection send <id> --from <tileId> <message>
+```
+
+Returns the structured relay result, including `ok`, `eventId`, and any relay error code.
+
+**Examples:**
+```bash
+collab-canvas connection send conn-abc123 --from tile-worker "Please review the current diff."
+```
+
 ### collab-canvas viewport
 
 Read or set the canvas viewport.
@@ -202,6 +217,7 @@ collab-canvas tile create graph --file ./research.graph.json --pos 0,0 --size 30
 collab-canvas tile create note --file ./notes.md --pos 31,0
 collab-canvas tile create term --pos 0,26
 collab-canvas connection create <worker-id> <reviewer-id> --label review
+collab-canvas connection send <connection-id> --from <worker-id> "Please review the pinned notes."
 ```
 
 ### Dashboard layout

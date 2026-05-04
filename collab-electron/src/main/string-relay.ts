@@ -16,6 +16,12 @@ export interface RelayRequest {
   text: string;
 }
 
+export interface RelayConnectionRequest {
+  connectionId: string;
+  fromTileId: string;
+  text: string;
+}
+
 export type RelayRouteMethod = "manual" | "agent";
 
 export type RelayErrorCode =
@@ -170,6 +176,61 @@ function matchesStatusHints(normalizedLine: string, hints?: string[]): boolean {
 
 export function getAllRelayLogs(limit = 50): RelayLogEntry[] {
   return eventRing.slice(-Math.max(1, limit));
+}
+
+export function relayConnectionMessage(
+  req: RelayConnectionRequest,
+): RelayResult {
+  const input = req ?? ({} as RelayConnectionRequest);
+  const connectionId = String(input.connectionId ?? "").trim();
+  const fromTileId = String(input.fromTileId ?? "").trim();
+  const text = String(input.text ?? "");
+  const connection = connectionGraph.get(connectionId);
+  const fromEntry = tileRegistry.get(fromTileId);
+  const fromLabel = fromEntry?.label ?? fromTileId;
+
+  if (!connection) {
+    return relayFailed({
+      connectionId: connectionId || "missing-connection",
+      fromTileId: fromTileId || "missing-source",
+      targetTileId: null,
+      fromLabel: fromLabel || "Unknown",
+      routeMethod: "manual",
+      text,
+      errorCode: "no_route",
+      message: `Connection ${connectionId || "(missing)"} was not found.`,
+    });
+  }
+
+  const targetTileId = connection.tileAId === fromTileId
+    ? connection.tileBId
+    : connection.tileBId === fromTileId
+      ? connection.tileAId
+      : null;
+
+  if (!targetTileId) {
+    return relayFailed({
+      connectionId,
+      fromTileId,
+      targetTileId: null,
+      fromLabel,
+      routeMethod: "manual",
+      text,
+      errorCode: "unconnected_target",
+      message:
+        `Source tile ${fromTileId || "(missing)"} is not an endpoint of ${connectionId}.`,
+    });
+  }
+
+  const targetEntry = tileRegistry.get(targetTileId);
+  return relayStringMessage({
+    connectionId,
+    fromTileId,
+    fromLabel,
+    targetTileId,
+    targetSessionId: targetEntry?.sessionId ?? null,
+    text,
+  }, "manual");
 }
 
 export function relayStringMessage(

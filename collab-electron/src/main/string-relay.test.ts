@@ -21,6 +21,7 @@ import {
   inferTileSnapshotStatus,
   onPtyData,
   registerTileSession,
+  relayConnectionMessage,
   relayStringMessage,
   resetStringRelayForTests,
   syncConnectionGraph,
@@ -100,6 +101,48 @@ describe("relayStringMessage", () => {
       targetTileId: "tile-b",
       targetSessionId: "session-b",
       text: "wrong route",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorCode).toBe("unconnected_target");
+    }
+    expect(writtenSessions).toHaveLength(0);
+  });
+});
+
+describe("relayConnectionMessage", () => {
+  test("sends from one cable endpoint to the other with registered labels", () => {
+    activeSessions.add("session-b");
+    registerTileSession("tile-a", "session-a", "Worker", "worker");
+    registerTileSession("tile-b", "session-b", "Reviewer", "reviewer");
+    syncConnectionGraph([
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
+
+    const result = relayConnectionMessage({
+      connectionId: "conn-1",
+      fromTileId: "tile-a",
+      text: "please review",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(writtenSessions).toEqual([
+      { sessionId: "session-b", data: "[Worker]: please review\n" },
+    ]);
+    expect(getStringLog("conn-1")[0]?.routeMethod).toBe("manual");
+  });
+
+  test("rejects a send when the source tile is not a cable endpoint", () => {
+    registerTileSession("tile-c", "session-c", "Observer", "observer");
+    syncConnectionGraph([
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
+
+    const result = relayConnectionMessage({
+      connectionId: "conn-1",
+      fromTileId: "tile-c",
+      text: "wrong cable",
     });
 
     expect(result.ok).toBe(false);

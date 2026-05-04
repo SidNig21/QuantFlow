@@ -1,6 +1,8 @@
 import { ipcMain } from "electron";
+import { registerMethod } from "./json-rpc-server";
 import {
   relayStringMessage,
+  relayConnectionMessage,
   getStringLog,
   registerTileSession,
   unregisterTileSession,
@@ -15,6 +17,22 @@ export function registerStringRelayHandlers(): void {
   ipcMain.handle("string:relay", (_event, req: RelayRequest) => {
     return relayStringMessage(req);
   });
+
+  registerMethod(
+    "relay.connectionSend",
+    (req) =>
+      relayConnectionMessage(
+        req as Parameters<typeof relayConnectionMessage>[0],
+      ),
+    {
+      description: "Send a cable-bounded message across an existing connection",
+      params: {
+        connectionId: "ID of the cable/connection",
+        fromTileId: "Endpoint tile ID to send from",
+        text: "Plain-English message to relay",
+      },
+    },
+  );
 
   ipcMain.handle(
     "string:get-log",

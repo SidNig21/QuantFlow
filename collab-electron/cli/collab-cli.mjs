@@ -300,6 +300,34 @@ async function cmdConnectionLabel(args) {
   console.log(pretty(result));
 }
 
+async function cmdConnectionSend(args) {
+  if (args.length === 0) die("connection send requires a connection id");
+  const connectionId = args.shift();
+  let fromTileId = null;
+  const messageParts = [];
+
+  while (args.length > 0) {
+    const arg = args.shift();
+    if (arg === "--from") {
+      if (args.length === 0) die("--from requires a tile id");
+      fromTileId = args.shift();
+    } else {
+      messageParts.push(arg);
+    }
+  }
+
+  if (!fromTileId) die("connection send requires --from <tileId>");
+  const text = messageParts.join(" ").trim();
+  if (!text) die("connection send requires a message");
+
+  const result = await rpcCall("relay.connectionSend", {
+    connectionId,
+    fromTileId,
+    text,
+  });
+  console.log(pretty(result));
+}
+
 async function cmdViewport(args) {
   if (args.length === 0) {
     const result = await rpcCall("canvas.viewportGet");
@@ -470,6 +498,7 @@ COMMANDS
   connection create <a> <b> [opts]   Connect two tiles with a cable
   connection rm <id>                 Remove a cable
   connection label <id> <label>      Rename a cable label
+  connection send <id> --from <tile> <message>
   viewport                           Get viewport pan and zoom
   viewport set [--pan x,y] [--zoom z]
   terminal write <id> <input>        Send input to a terminal tile
@@ -503,6 +532,9 @@ TERMINAL READ OPTIONS
 
 CONNECTION CREATE OPTIONS
   --label <text>  Optional visible cable label
+
+CONNECTION SEND OPTIONS
+  --from <id>     Source endpoint tile ID for cable-bounded send
 
 VIEWPORT SET OPTIONS
   --pan x,y       Canvas pan in pixels
@@ -574,7 +606,7 @@ try {
     }
     case "connection": {
       if (argv.length < 2) {
-        die("connection requires a subcommand (list, create, rm, label)");
+        die("connection requires a subcommand (list, create, rm, label, send)");
       }
       const sub = argv[1];
       const rest = argv.slice(2);
@@ -583,6 +615,7 @@ try {
         case "create": await cmdConnectionCreate(rest); break;
         case "rm":     await cmdConnectionRm(rest); break;
         case "label":  await cmdConnectionLabel(rest); break;
+        case "send":   await cmdConnectionSend(rest); break;
         default: die(`unknown connection subcommand: ${sub}`);
       }
       break;
