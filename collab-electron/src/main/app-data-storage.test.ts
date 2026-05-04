@@ -10,6 +10,7 @@ const APP_DATA_DIR = join(TEST_ROOT, ".quantflow");
 const { _setCanvasStateDir, saveState } = await import("./canvas-persistence");
 const { _setRolesDir, listRoles } = await import("./role-service");
 const { _setCtxDir, pinFile } = await import("./context-service");
+const { _setSessionDir, writeSessionMeta } = await import("./tmux");
 
 beforeEach(() => {
   rmSync(TEST_ROOT, { recursive: true, force: true });
@@ -17,6 +18,7 @@ beforeEach(() => {
   _setCanvasStateDir(APP_DATA_DIR);
   _setRolesDir(join(APP_DATA_DIR, "roles"));
   _setCtxDir(APP_DATA_DIR);
+  _setSessionDir(join(APP_DATA_DIR, "terminal-sessions"));
 });
 
 afterEach(() => {
@@ -50,5 +52,21 @@ describe("QuantFlow app-data storage", () => {
     expect(saved.pinnedFiles).toEqual([
       { path: "/vault/spec.md", mode: "full" },
     ]);
+  });
+
+  test("writes terminal session metadata under QuantFlow app data", () => {
+    writeSessionMeta("session-a", {
+      shell: "powershell.exe",
+      cwd: "C:\\Users\\rybow\\QuantFlow",
+      createdAt: "2026-05-03T00:00:00.000Z",
+      target: "powershell",
+      backend: "sidecar",
+    });
+
+    expect(existsSync(join(
+      APP_DATA_DIR,
+      "terminal-sessions",
+      "session-a.json",
+    ))).toBe(true);
   });
 });
