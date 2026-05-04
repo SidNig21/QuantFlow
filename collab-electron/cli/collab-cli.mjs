@@ -129,6 +129,19 @@ function parseLimitValue(value) {
   return limit;
 }
 
+function parseMaxCharsValue(value) {
+  const maxChars = Number(value);
+  if (!Number.isInteger(maxChars) || maxChars <= 0) {
+    die("--max-chars must be a positive integer");
+  }
+  return maxChars;
+}
+
+function parseContextMode(value) {
+  if (["full", "summary-header", "excerpt"].includes(value)) return value;
+  die("mode must be full, summary-header, or excerpt");
+}
+
 function getRoleCommandName(role) {
   const template = String(role?.commandTemplate ?? "").trim();
   if (!template) return null;
@@ -401,6 +414,186 @@ async function cmdWatchtower(args) {
   console.log(pretty(result));
 }
 
+async function cmdContextPreview(args) {
+  const params = {};
+  let textOnly = false;
+
+  while (args.length > 0) {
+    const flag = args.shift();
+    if (flag === "--max-chars") {
+      if (args.length === 0) die("--max-chars requires a number");
+      params.maxChars = parseMaxCharsValue(args.shift());
+    } else if (flag === "--text") {
+      textOnly = true;
+    } else {
+      die(`unknown option: ${flag}`);
+    }
+  }
+
+  const result = await rpcCall("context.preview", params);
+  console.log(textOnly ? String(result.text ?? "") : pretty(result));
+}
+
+async function cmdContextPin(args) {
+  if (args.length === 0) die("context pin requires a file path");
+  const filePath = resolve(args.shift());
+  let mode = "full";
+  let excerpt;
+
+  while (args.length > 0) {
+    const flag = args.shift();
+    if (flag === "--mode") {
+      if (args.length === 0) die("--mode requires a value");
+      mode = parseContextMode(args.shift());
+    } else if (flag === "--excerpt") {
+      if (args.length === 0) die("--excerpt requires text");
+      excerpt = args.shift();
+    } else {
+      die(`unknown option: ${flag}`);
+    }
+  }
+
+  let result = await rpcCall("context.pinFile", { filePath });
+  if (mode !== "full" || excerpt) {
+    result = await rpcCall("context.setFileMode", {
+      filePath,
+      mode,
+      ...(excerpt ? { excerpt } : {}),
+    });
+  }
+  console.log(pretty(result));
+}
+
+async function cmdContextMode(args) {
+  if (args.length < 2) die("context mode requires <file> <mode>");
+  const filePath = args.shift();
+  const mode = parseContextMode(args.shift());
+  let excerpt;
+
+  while (args.length > 0) {
+    const flag = args.shift();
+    if (flag === "--excerpt") {
+      if (args.length === 0) die("--excerpt requires text");
+      excerpt = args.shift();
+    } else {
+      die(`unknown option: ${flag}`);
+    }
+  }
+
+  const result = await rpcCall("context.setFileMode", {
+    filePath,
+    mode,
+    ...(excerpt ? { excerpt } : {}),
+  });
+  console.log(pretty(result));
+}
+
+async function cmdContextDecision(args) {
+  const metadata = {};
+  const textParts = [];
+
+  while (args.length > 0) {
+    const arg = args.shift();
+    if (arg === "--author") {
+      if (args.length === 0) die("--author requires a value");
+      metadata.author = args.shift();
+    } else if (arg === "--source") {
+      if (args.length === 0) die("--source requires a value");
+      metadata.source = args.shift();
+    } else if (arg === "--file") {
+      if (args.length === 0) die("--file requires a path");
+      metadata.linkedFile = args.shift();
+    } else if (arg === "--cable") {
+      if (args.length === 0) die("--cable requires a connection id");
+      metadata.cableId = args.shift();
+    } else {
+      textParts.push(arg);
+    }
+  }
+
+  const text = textParts.join(" ").trim();
+  if (!text) die("context decision requires text");
+
+  const result = await rpcCall("context.addDecision", {
+    ...metadata,
+    text,
+  });
+  console.log(pretty(result));
+}
+
+async function cmdContextInject(args) {
+  if (args.length === 0) die("context inject requires a tile id");
+  const tileId = args.shift();
+  const params = {};
+
+  while (args.length > 0) {
+    const flag = args.shift();
+    if (flag === "--max-chars") {
+      if (args.length === 0) die("--max-chars requires a number");
+      params.maxChars = parseMaxCharsValue(args.shift());
+    } else {
+      die(`unknown option: ${flag}`);
+    }
+  }
+
+  const preview = await rpcCall("context.preview", params);
+  const text = String(preview.text ?? "").trim();
+  if (!text) die("no shared context to inject");
+  await rpcCall("canvas.terminalWrite", {
+    tileId,
+    input: `\n--- Shared Context ---\n${text}\n--- End Context ---\n`,
+  });
+  console.log(pretty({
+    ok: true,
+    tileId,
+    injectedChars: preview.injectedChars,
+    truncated: preview.truncated,
+    files: preview.files,
+    decisionsCount: preview.decisionsCount,
+  }));
+}
+
+async function cmdContext(args) {
+  if (args.length === 0) {
+    die("context requires a subcommand (get, preview, pin, unpin, mode, decision, inject)");
+  }
+
+  const sub = args.shift();
+  switch (sub) {
+    case "get": {
+      if (args.length > 0) die(`unknown option: ${args[0]}`);
+      const result = await rpcCall("context.get");
+      console.log(pretty(result));
+      break;
+    }
+    case "preview":
+      await cmdContextPreview(args);
+      break;
+    case "pin":
+      await cmdContextPin(args);
+      break;
+    case "unpin": {
+      if (args.length === 0) die("context unpin requires a file path");
+      const filePath = args[0];
+      if (args.length > 1) die(`unknown option: ${args[1]}`);
+      const result = await rpcCall("context.unpinFile", { filePath });
+      console.log(pretty(result));
+      break;
+    }
+    case "mode":
+      await cmdContextMode(args);
+      break;
+    case "decision":
+      await cmdContextDecision(args);
+      break;
+    case "inject":
+      await cmdContextInject(args);
+      break;
+    default:
+      die(`unknown context subcommand: ${sub}`);
+  }
+}
+
 async function cmdRole(args) {
   if (args.length === 0) die("role requires a subcommand (list, spawn)");
   const sub = args.shift();
@@ -632,6 +825,13 @@ COMMANDS
   connection log <id> [--limit N]    Show relay history for a cable
   relay log [--limit N]              Show recent relay success/failure events
   watchtower snapshot                Show agent status snapshots
+  context get                        Show shared context pins and decisions
+  context preview [options]          Preview composed shared context
+  context pin <file> [options]       Pin a vault file into shared context
+  context unpin <file>               Remove a shared context file pin
+  context mode <file> <mode> [opts]  Set a pinned file include mode
+  context decision [opts] <text>     Append a shared context decision
+  context inject <tile> [options]    Inject shared context into a terminal
   role list                          List configured terminal roles
   role spawn <id> [options]          Spawn a terminal tile from a role
   viewport                           Get viewport pan and zoom
@@ -673,6 +873,16 @@ CONNECTION SEND OPTIONS
 
 LOG OPTIONS
   --limit N       Maximum number of events to return (default 50)
+
+CONTEXT OPTIONS
+  --max-chars N    Preview/injection character limit
+  --text           Print only preview text
+  --mode <mode>    Include mode: full, summary-header, excerpt
+  --excerpt <text> Explicit excerpt text
+  --author <name>  Decision author
+  --source <name>  Decision source
+  --file <path>    Decision linked file
+  --cable <id>     Decision related cable ID
 
 ROLE SPAWN OPTIONS
   --cwd <path>     Working directory (default: current directory)
@@ -769,6 +979,9 @@ try {
       break;
     case "watchtower":
       await cmdWatchtower(argv.slice(1));
+      break;
+    case "context":
+      await cmdContext(argv.slice(1));
       break;
     case "role":
       await cmdRole(argv.slice(1));

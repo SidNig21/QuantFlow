@@ -132,6 +132,31 @@ collab-canvas role list
 collab-canvas role spawn codex --cwd . --pos 0,0
 ```
 
+### collab-canvas context
+
+Inspect, prepare, and inject shared context from the configured Obsidian vault. Context pins stay vault-relative inside QuantFlow; the vault remains the durable memory source.
+
+```bash
+collab-canvas context get
+collab-canvas context preview [--max-chars N] [--text]
+collab-canvas context pin <file> [--mode full|summary-header|excerpt] [--excerpt <text>]
+collab-canvas context unpin <file>
+collab-canvas context mode <file> <mode> [--excerpt <text>]
+collab-canvas context decision [--author <name>] [--source <name>] [--file <path>] [--cable <id>] <text>
+collab-canvas context inject <tileId> [--max-chars N]
+```
+
+**Examples:**
+```bash
+# Pin the active hardening spec and preview what will be sent
+collab-canvas context pin "/mnt/c/Users/rybow/Obsidian/Cursor Collab/Specs/QuantFlow-phase-9-hardening-spec.md" --mode summary-header
+collab-canvas context preview --max-chars 12000
+
+# Record an inspectable decision and inject the current pack to a terminal tile
+collab-canvas context decision --author codex --source cli "Use cable-bounded routing for agent handoffs."
+collab-canvas context inject tile-worker --max-chars 12000
+```
+
 ### collab-canvas connection list
 
 List all visible cables on the canvas.
@@ -273,6 +298,8 @@ collab-canvas tile create note --file ./notes.md --pos 31,0
 collab-canvas role spawn codex --cwd . --pos 0,26
 collab-canvas role spawn claude-reviewer --cwd . --pos 21,26
 collab-canvas connection create <worker-id> <reviewer-id> --label review
+collab-canvas context preview --max-chars 12000
+collab-canvas context inject <worker-id> --max-chars 12000
 collab-canvas connection send <connection-id> --from <worker-id> "Please review the pinned notes."
 collab-canvas connection log <connection-id> --limit 10
 ```

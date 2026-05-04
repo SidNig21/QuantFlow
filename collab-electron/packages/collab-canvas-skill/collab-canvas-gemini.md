@@ -46,6 +46,15 @@ collab-canvas tile focus <id> [<id>...]
 collab-canvas role list
 collab-canvas role spawn <role-id> [--cwd <path>] [--pos x,y] [--size w,h]
 
+# Inspect and inject shared Obsidian-vault context
+collab-canvas context get
+collab-canvas context preview [--max-chars N] [--text]
+collab-canvas context pin <file> [--mode full|summary-header|excerpt] [--excerpt <text>]
+collab-canvas context unpin <file>
+collab-canvas context mode <file> <mode> [--excerpt <text>]
+collab-canvas context decision [--author <name>] [--source <name>] [--file <path>] [--cable <id>] <text>
+collab-canvas context inject <tileId> [--max-chars N]
+
 # List cables
 collab-canvas connection list
 
@@ -84,6 +93,8 @@ collab-canvas tile create note --file ./notes.md --pos 31,0
 collab-canvas role spawn codex --cwd . --pos 0,26
 collab-canvas role spawn claude-reviewer --cwd . --pos 21,26
 collab-canvas connection create <worker-id> <reviewer-id> --label review
+collab-canvas context preview --max-chars 12000
+collab-canvas context inject <worker-id> --max-chars 12000
 collab-canvas connection send <connection-id> --from <worker-id> "Please review the pinned notes."
 collab-canvas connection log <connection-id> --limit 10
 
@@ -95,13 +106,14 @@ collab-canvas viewport set --pan 0,0 --zoom 0.8
 
 1. Always `collab-canvas tile list` first to see existing tiles before creating new ones.
 2. Use `collab-canvas role list` and `collab-canvas role spawn` for agent terminals when possible so role/status metadata stays visible.
-3. Create visible connections with `collab-canvas connection create` before coordinating agents across tiles.
-4. Inspect `connection log`, `relay log`, or `watchtower snapshot` before assuming a relay arrived.
-5. Use `collab-canvas viewport set` or `collab-canvas tile focus` to frame the view after arranging tiles.
-6. Remove tiles and connections when no longer needed.
-7. Leave 1 grid unit gap between adjacent tiles.
-8. File tiles auto-refresh when you write to the underlying file.
-9. Graph tiles support incremental updates — append nodes to `.graph.json` and the graph updates smoothly.
+3. Use `collab-canvas context preview` before injecting shared context so missing files and truncation are visible.
+4. Create visible connections with `collab-canvas connection create` before coordinating agents across tiles.
+5. Inspect `connection log`, `relay log`, or `watchtower snapshot` before assuming a relay arrived.
+6. Use `collab-canvas viewport set` or `collab-canvas tile focus` to frame the view after arranging tiles.
+7. Remove tiles and connections when no longer needed.
+8. Leave 1 grid unit gap between adjacent tiles.
+9. File tiles auto-refresh when you write to the underlying file.
+10. Graph tiles support incremental updates — append nodes to `.graph.json` and the graph updates smoothly.
 
 ## Exit Codes
 

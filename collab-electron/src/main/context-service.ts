@@ -64,9 +64,16 @@ export interface ContextPreview {
   text: string;
 }
 
+function normalizeHostPath(pathValue: string): string {
+  if (process.platform !== "win32") return pathValue;
+  const match = pathValue.match(/^\/mnt\/([a-zA-Z])\/(.*)$/);
+  if (!match) return pathValue;
+  return `${match[1]!.toUpperCase()}:\\${match[2]!.replace(/\//g, "\\")}`;
+}
+
 export function toVaultRelativePath(filePath: string, vaultPath: string): string {
-  const vaultAbs = resolve(vaultPath);
-  const fileAbs = resolve(filePath);
+  const vaultAbs = resolve(normalizeHostPath(vaultPath));
+  const fileAbs = resolve(normalizeHostPath(filePath));
   const rel = normalize(relative(vaultAbs, fileAbs));
   if (!rel || rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)) {
     throw new Error("Path is outside vault directory");
@@ -75,11 +82,13 @@ export function toVaultRelativePath(filePath: string, vaultPath: string): string
 }
 
 export function resolveVaultPinnedPath(pinnedPath: string, vaultPath: string): string {
-  const absolute = isAbsolute(pinnedPath)
-    ? resolve(pinnedPath)
-    : resolve(vaultPath, pinnedPath);
+  const normalizedPinnedPath = normalizeHostPath(pinnedPath);
+  const normalizedVaultPath = normalizeHostPath(vaultPath);
+  const absolute = isAbsolute(normalizedPinnedPath)
+    ? resolve(normalizedPinnedPath)
+    : resolve(normalizedVaultPath, normalizedPinnedPath);
   const rel = toVaultRelativePath(absolute, vaultPath);
-  return resolve(vaultPath, rel);
+  return resolve(normalizedVaultPath, rel);
 }
 
 async function load(): Promise<SharedContext> {

@@ -28,6 +28,8 @@ describe("collab-canvas CLI", () => {
     expect(result.stdout).toContain("connection log <id> [--limit N]");
     expect(result.stdout).toContain("relay log [--limit N]");
     expect(result.stdout).toContain("watchtower snapshot");
+    expect(result.stdout).toContain("context preview [options]");
+    expect(result.stdout).toContain("context inject <tile> [options]");
     expect(result.stdout).toContain("role list");
     expect(result.stdout).toContain("role spawn <id> [options]");
     expect(result.stdout).toContain("viewport set [--pan x,y] [--zoom z]");
@@ -103,5 +105,39 @@ describe("collab-canvas CLI", () => {
     const invalidSize = runCli(["role", "spawn", "codex", "--size", "20,no"]);
     expect(invalidSize.exitCode).toBe(1);
     expect(invalidSize.stderr).toContain("invalid size: 20,no");
+  });
+
+  test("validates context subcommands before opening the RPC socket", () => {
+    const missingSubcommand = runCli(["context"]);
+    expect(missingSubcommand.exitCode).toBe(1);
+    expect(missingSubcommand.stderr).toContain(
+      "context requires a subcommand (get, preview, pin, unpin, mode, decision, inject)",
+    );
+
+    const missingPin = runCli(["context", "pin"]);
+    expect(missingPin.exitCode).toBe(1);
+    expect(missingPin.stderr).toContain("context pin requires a file path");
+
+    const missingInject = runCli(["context", "inject"]);
+    expect(missingInject.exitCode).toBe(1);
+    expect(missingInject.stderr).toContain("context inject requires a tile id");
+  });
+
+  test("validates context options before opening the RPC socket", () => {
+    const badPreviewLimit = runCli(["context", "preview", "--max-chars", "0"]);
+    expect(badPreviewLimit.exitCode).toBe(1);
+    expect(badPreviewLimit.stderr).toContain(
+      "--max-chars must be a positive integer",
+    );
+
+    const badMode = runCli(["context", "mode", "Specs/a.md", "summary"]);
+    expect(badMode.exitCode).toBe(1);
+    expect(badMode.stderr).toContain(
+      "mode must be full, summary-header, or excerpt",
+    );
+
+    const missingDecision = runCli(["context", "decision", "--author", "codex"]);
+    expect(missingDecision.exitCode).toBe(1);
+    expect(missingDecision.stderr).toContain("context decision requires text");
   });
 });
