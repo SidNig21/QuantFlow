@@ -14,6 +14,8 @@
  * @property {string} [cwd] - Working directory for terminal tiles
  * @property {string} [ptySessionId] - PTY session ID for terminal tiles
  * @property {string} [terminalTarget] - Requested terminal backend target
+ * @property {string} [ptyStatus] - Runtime status for terminal tiles
+ * @property {string} [ptyError] - Last PTY startup/runtime error
  * @property {string} [userTitle] - Manual title override set by user
  * @property {string} [autoTitle] - Auto-computed title from terminal session
  * @property {string} [routeHandle] - Stable relay handle without the @ prefix

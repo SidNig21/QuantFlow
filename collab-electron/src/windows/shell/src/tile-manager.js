@@ -25,6 +25,7 @@ export function createTileManager({
 	onNoteSurfaceFocus, onFocusSurface,
 	onTerminalSessionCreated,
 	onTerminalCwdChanged,
+	onTerminalStartFailed,
 	onTerminalTileClosed,
 	onTerminalTileResized,
 	onTileFocused,
@@ -114,6 +115,8 @@ export function createTileManager({
 				cwd: t.cwd,
 				ptySessionId: t.ptySessionId,
 				terminalTarget: t.terminalTarget,
+				ptyStatus: t.ptyStatus,
+				ptyError: t.ptyError,
 				url: t.url,
 				zIndex: t.zIndex,
 				userTitle: t.userTitle,
@@ -308,6 +311,16 @@ export function createTileManager({
 					onTerminalSessionCreated(tile);
 				}
 				registerTerminalTileSession(tile);
+			}
+			if (event.channel === "pty-start-failed") {
+				const payload = event.args[0] || {};
+				tile.ptyStatus = "error";
+				tile.ptyError = String(payload.message || "PTY start failed.");
+				updateTileTitle(tileDOMs.get(tile.id), tile);
+				saveCanvasDebounced();
+				if (onTerminalStartFailed) {
+					onTerminalStartFailed(tile, payload);
+				}
 			}
 			if (event.channel === "pty-cwd-changed") {
 				const cwd = event.args[1];
@@ -791,6 +804,8 @@ export function createTileManager({
 						cwd: saved.cwd,
 						ptySessionId: saved.ptySessionId,
 						terminalTarget: saved.terminalTarget,
+						ptyStatus: saved.ptyStatus,
+						ptyError: saved.ptyError,
 						userTitle: saved.userTitle,
 						autoTitle: saved.autoTitle,
 						routeHandle: saved.routeHandle,

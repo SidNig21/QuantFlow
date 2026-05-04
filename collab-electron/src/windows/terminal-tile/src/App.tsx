@@ -23,6 +23,7 @@ function App() {
     useState<string | null>(null);
   const [sessionMode, setSessionMode] =
     useState<"tmux" | "sidecar" | undefined>(undefined);
+  const [startError, setStartError] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(
@@ -47,7 +48,17 @@ function App() {
             result.sessionId,
           );
         })
-        .catch(() => {
+        .catch((err) => {
+          const message = err instanceof Error
+            ? err.message
+            : "Terminal PTY failed to start.";
+          setStartError(message);
+          window.api.notifyPtyStartFailed?.({
+            message,
+            tileId,
+            cwd: nextCwd ?? cwd,
+            target,
+          });
           setExited(true);
         });
     };
@@ -127,8 +138,11 @@ function App() {
 
   if (exited) {
     return (
-      <div className="terminal-tile-exited">
-        Session ended
+      <div className="terminal-tile-exited" data-error={startError ? "true" : "false"}>
+        <span>{startError ? "PTY start failed" : "Session ended"}</span>
+        {startError ? (
+          <small>{startError}</small>
+        ) : null}
       </div>
     );
   }

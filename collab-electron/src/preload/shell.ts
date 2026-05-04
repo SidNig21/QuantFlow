@@ -228,6 +228,9 @@ contextBridge.exposeInMainWorld("shellApi", {
 
   getHomePath: (): string => ipcRenderer.sendSync("get-home-path"),
 
+  runtimeDiagnostics: (): Promise<unknown[]> =>
+    ipcRenderer.invoke("runtime:diagnostics"),
+
   ptyKillSession: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke("pty:kill", { sessionId }),
 

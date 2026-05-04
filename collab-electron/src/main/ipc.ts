@@ -21,6 +21,7 @@ import { registerStringRelayHandlers } from "./ipc-string-relay";
 import { registerRoleServiceHandlers } from "./ipc-role-service";
 import { registerVaultHandlers } from "./ipc-vault";
 import { registerContextServiceHandlers } from "./ipc-context-service";
+import { registerRuntimeDiagnosticsHandlers } from "./ipc-runtime-diagnostics";
 
 const FS_CHANGE_DELETED = 3;
 
@@ -140,4 +141,5 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerRoleServiceHandlers();
   registerVaultHandlers(() => mainWindow);
   registerContextServiceHandlers();
+  registerRuntimeDiagnosticsHandlers();
 }

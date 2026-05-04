@@ -14,6 +14,8 @@ body,
 .terminal-tile-exited,
 .terminal-tile-loading {
 	display: flex;
+	flex-direction: column;
+	gap: 6px;
 	align-items: center;
 	justify-content: center;
 	width: 100%;
@@ -21,4 +23,19 @@ body,
 	color: rgba(128, 128, 128, 0.7);
 	font-family: -apple-system, BlinkMacSystemFont, sans-serif;
 	font-size: 12px;
+	padding: 18px;
+	text-align: center;
+}
+
+.terminal-tile-exited[data-error="true"] {
+	color: rgba(248, 113, 113, 0.9);
+}
+
+.terminal-tile-exited small {
+	max-width: 90%;
+	color: rgba(148, 163, 184, 0.88);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 11px;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
 }

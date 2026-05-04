@@ -309,6 +309,12 @@ contextBridge.exposeInMainWorld("api", {
   },
   notifyPtySessionId: (sessionId: string) =>
     ipcRenderer.sendToHost("pty-session-id", sessionId),
+  notifyPtyStartFailed: (payload: {
+    message: string;
+    tileId?: string;
+    cwd?: string;
+    target?: string;
+  }) => ipcRenderer.sendToHost("pty-start-failed", payload),
   notifyCwdChanged: (sessionId: string, cwd: string) =>
     ipcRenderer.sendToHost("pty-cwd-changed", sessionId, cwd),
   onCdTo: (cb: CdToCallback) => {
