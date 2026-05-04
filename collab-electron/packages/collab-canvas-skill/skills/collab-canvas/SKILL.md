@@ -29,7 +29,7 @@ Type is inferred from the file when `--file` is used:
 
 ### collab-canvas tile list
 
-List all tiles on the canvas. Returns JSON array with id, type, position, size, and file path for each tile.
+List all tiles on the canvas. Returns JSON with id, type, position, size, route handle, relay syntax, role/status identity, and connected cable IDs for each tile.
 
 ```bash
 collab-canvas tile list

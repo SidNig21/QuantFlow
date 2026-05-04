@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import {
+	buildRpcTileSummary,
 	createConnectionFailureEvent,
 	createConnectionLabelEvent,
 	createConnectionMutationEvent,
@@ -98,6 +99,55 @@ describe("findAutoPlacement", () => {
     const pos = findAutoPlacement(existing, 100, 100);
     // Giant tile covers canvas, so fallback: last.x+40, last.y+40
     expect(pos).toEqual({ x: 40, y: 40 });
+  });
+});
+
+describe("buildRpcTileSummary", () => {
+  test("exposes terminal routing identity and connected cable ids", () => {
+    const summary = buildRpcTileSummary(
+      {
+        id: "tile-a",
+        type: "term",
+        x: 20,
+        y: 40,
+        width: 400,
+        height: 500,
+        cwd: "/repo",
+        ptySessionId: "session-a",
+        terminalTarget: "wsl:Ubuntu",
+        ptyStatus: "ready",
+        routeHandle: "codex-reviewer",
+        roleId: "codex-reviewer",
+        roleName: "Codex Reviewer",
+        roleShellKind: "codex",
+        roleCommandTemplate: "codex",
+        zIndex: 7,
+      },
+      [
+        { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+        { id: "conn-2", tileAId: "tile-c", tileBId: "tile-a" },
+        { id: "conn-other", tileAId: "tile-x", tileBId: "tile-y" },
+      ],
+    );
+
+    expect(summary).toMatchObject({
+      id: "tile-a",
+      type: "term",
+      cwd: "/repo",
+      ptySessionId: "session-a",
+      terminalTarget: "wsl:Ubuntu",
+      ptyStatus: "ready",
+      routeHandle: "codex-reviewer",
+      relaySyntax: ">>@codex-reviewer: <message>",
+      roleId: "codex-reviewer",
+      roleName: "Codex Reviewer",
+      roleShellKind: "codex",
+      roleCommandTemplate: "codex",
+      connectionIds: ["conn-1", "conn-2"],
+      position: { x: 20, y: 40 },
+      size: { width: 400, height: 500 },
+      zIndex: 7,
+    });
   });
 });
 

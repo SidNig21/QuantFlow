@@ -218,6 +218,41 @@ export function createTerminalReadFailureEvent(
 	};
 }
 
+export function buildRpcTileSummary(tile, existingConnections = []) {
+	const connectionIds = existingConnections
+		.filter((conn) =>
+			conn.tileAId === tile.id || conn.tileBId === tile.id,
+		)
+		.map((conn) => conn.id);
+	const summary = {
+		id: tile.id,
+		type: tile.type,
+		filePath: tile.filePath,
+		folderPath: tile.folderPath,
+		url: tile.url,
+		cwd: tile.cwd,
+		ptySessionId: tile.ptySessionId,
+		terminalTarget: tile.terminalTarget,
+		ptyStatus: tile.ptyStatus,
+		ptyError: tile.ptyError,
+		userTitle: tile.userTitle,
+		autoTitle: tile.autoTitle,
+		routeHandle: tile.routeHandle,
+		roleId: tile.roleId,
+		roleName: tile.roleName,
+		roleShellKind: tile.roleShellKind,
+		roleCommandTemplate: tile.roleCommandTemplate,
+		connectionIds,
+		position: { x: tile.x, y: tile.y },
+		size: { width: tile.width, height: tile.height },
+		zIndex: tile.zIndex,
+	};
+	if (tile.routeHandle) {
+		summary.relaySyntax = `>>@${tile.routeHandle}: <message>`;
+	}
+	return summary;
+}
+
 /**
  * Find a non-overlapping position on the canvas for a tile of the
  * given size. Scans on a 20 px grid within a 4000x3000 region.
@@ -305,20 +340,9 @@ export function createCanvasRpc({
 			switch (method) {
 				case "tileList": {
 					result = {
-						tiles: tiles.map((t) => ({
-							id: t.id,
-							type: t.type,
-							filePath: t.filePath,
-							folderPath: t.folderPath,
-							url: t.url,
-							cwd: t.cwd,
-							ptySessionId: t.ptySessionId,
-							userTitle: t.userTitle,
-							autoTitle: t.autoTitle,
-							position: { x: t.x, y: t.y },
-							size: { width: t.width, height: t.height },
-							zIndex: t.zIndex,
-						})),
+						tiles: tiles.map((t) =>
+							buildRpcTileSummary(t, connections),
+						),
 					};
 					break;
 				}

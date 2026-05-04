@@ -25,6 +25,7 @@ Type is inferred from file extension when `--file` is used.
 ```bash
 # List all tiles
 collab-canvas tile list
+# Includes routeHandle, relaySyntax, role/status identity, and connectionIds.
 
 # Add a tile (returns tile ID)
 collab-canvas tile create <type> [--file <path>] [--pos x,y] [--size w,h]
