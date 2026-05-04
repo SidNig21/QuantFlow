@@ -499,7 +499,12 @@ describe("renderWatchtowerAgents", () => {
 			now: 4_000,
 		});
 
+		expect(html).toContain("data-watchtower-kind=\"agent\"");
 		expect(html).toContain("data-tile-id=\"tile&quot;&lt;a&gt;\"");
+		expect(getWatchtowerFocusPlan({
+			watchtowerKind: "agent",
+			tileId: `tile"<a>`,
+		})).toEqual([{ type: "tile", tileId: `tile"<a>` }]);
 		expect(html).toContain("&lt;Reviewer&gt;");
 		expect(html).toContain("active / 2 cables / 3s ago");
 		expect(html).toContain("&lt;ready&gt;");
@@ -529,10 +534,51 @@ describe("renderWatchtowerMessages", () => {
 		expect(html).toContain("wt-msg-failed");
 		expect(html).toContain("data-event-id=\"relay-1\"");
 		expect(html).toContain("data-conn-id=\"conn&quot;&lt;x&gt;\"");
+		expect(html).toContain("data-from-tile-id=\"from\"");
+		expect(html).toContain("data-target-tile-id=\"\"");
+		expect(getWatchtowerFocusPlan({
+			watchtowerKind: "message",
+			connId: `conn"<x>`,
+			fromTileId: "from",
+			targetTileId: "",
+		})).toEqual([
+			{ type: "relay", connId: `conn"<x>` },
+			{ type: "tile", tileId: "from" },
+		]);
 		expect(html).toContain("no_route");
 		expect(html).toContain("&lt;missing&gt;");
 		expect(html).toContain("agent / &lt;sender&gt; -&gt; @&lt;target&gt;");
 		expect(html).not.toContain("<missing>");
+	});
+
+	test("renders successful relay rows with cable, source, and target focus data", () => {
+		const html = renderWatchtowerMessages([
+			{
+				ok: true,
+				eventId: "relay-2",
+				connectionId: "conn-ab",
+				fromTileId: "tile-a",
+				targetTileId: "tile-b",
+				routeMethod: "manual",
+				fromLabel: "Planner",
+				formatted: "[Planner]: ready",
+			},
+		]);
+
+		expect(html).toContain("data-watchtower-kind=\"message\"");
+		expect(html).toContain("data-conn-id=\"conn-ab\"");
+		expect(html).toContain("data-from-tile-id=\"tile-a\"");
+		expect(html).toContain("data-target-tile-id=\"tile-b\"");
+		expect(getWatchtowerFocusPlan({
+			watchtowerKind: "message",
+			connId: "conn-ab",
+			targetTileId: "tile-b",
+			fromTileId: "tile-a",
+		})).toEqual([
+			{ type: "relay", connId: "conn-ab" },
+			{ type: "tile", tileId: "tile-b" },
+			{ type: "tile", tileId: "tile-a" },
+		]);
 	});
 
 	test("renders retry for failed relay rows with concrete route text", () => {
@@ -626,6 +672,16 @@ describe("renderWatchtowerAttention", () => {
 		expect(html).toContain("data-watchtower-kind=\"message\"");
 		expect(html).toContain("data-conn-id=\"conn&quot;&lt;x&gt;\"");
 		expect(html).toContain("data-from-tile-id=\"from&quot;&lt;x&gt;\"");
+		expect(html).toContain("data-target-tile-id=\"\"");
+		expect(getWatchtowerFocusPlan({
+			watchtowerKind: "message",
+			connId: `conn"<x>`,
+			fromTileId: `from"<x>`,
+			targetTileId: "",
+		})).toEqual([
+			{ type: "relay", connId: `conn"<x>` },
+			{ type: "tile", tileId: `from"<x>` },
+		]);
 		expect(html).toContain("missing_pty");
 		expect(html).toContain("agent / Planner -&gt; @Reviewer");
 		expect(html).toContain("&lt;target exited&gt;");
