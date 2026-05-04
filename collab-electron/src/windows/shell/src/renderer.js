@@ -1038,7 +1038,16 @@ async function init() {
 			cableOverlay.update();
 		},
 		onUpdateLabel: (id, label) => {
-			updateConnectionLabel(id, label);
+			const conn = updateConnectionLabel(id, label);
+			if (conn) {
+				operationalEvents.record(createConnectionLabelEvent(
+					conn,
+					getTile(conn.tileAId),
+					getTile(conn.tileBId),
+					tileEventLabel,
+					"cable-inspector",
+				));
+			}
 			tileManager.saveCanvasImmediate();
 			cableOverlay.update();
 		},

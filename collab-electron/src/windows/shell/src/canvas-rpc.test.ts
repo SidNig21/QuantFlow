@@ -204,6 +204,22 @@ describe("createConnectionLabelEvent", () => {
       summary: "Worker -> Reviewer cable label cleared",
     });
   });
+
+  test("supports non-RPC label event sources", () => {
+    expect(createConnectionLabelEvent(
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b", label: "review" },
+      { id: "tile-a", userTitle: "Worker" },
+      { id: "tile-b", userTitle: "Reviewer" },
+      undefined,
+      "cable-inspector",
+    )).toMatchObject({
+      type: "connection.updated",
+      summary: "Worker -> Reviewer cable renamed: review",
+      meta: {
+        source: "cable-inspector",
+      },
+    });
+  });
 });
 
 describe("validateRpcConnectionCreate", () => {

@@ -43,6 +43,7 @@ export function createConnectionLabelEvent(
 	tileA,
 	tileB,
 	labelForTile = defaultTileLabel,
+	source = "canvas-rpc",
 ) {
 	const tileALabel = labelForTile(tileA);
 	const tileBLabel = labelForTile(tileB);
@@ -57,7 +58,7 @@ export function createConnectionLabelEvent(
 			connectionId: conn?.id,
 			tileAId: conn?.tileAId,
 			tileBId: conn?.tileBId,
-			source: "canvas-rpc",
+			source,
 		},
 	};
 }
