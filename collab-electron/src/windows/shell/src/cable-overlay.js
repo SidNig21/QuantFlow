@@ -218,6 +218,36 @@ export function formatCableRelayFailure(result, targetTile) {
 	return `${base} Target status: ${status.message}`;
 }
 
+export function getCableRelayResultFeedback(
+	result,
+	targetTile,
+	{
+		clearInputOnSuccess = false,
+		focusInputOnFailure = false,
+	} = {},
+) {
+	if (result?.ok === false) {
+		return {
+			ok: false,
+			relayState: "failed",
+			status: formatCableRelayFailure(result, targetTile),
+			statusKind: "error",
+			shouldClearInput: false,
+			shouldFocusInput: focusInputOnFailure,
+			shouldRemovePopover: false,
+		};
+	}
+	return {
+		ok: true,
+		relayState: "sent",
+		status: "",
+		statusKind: "",
+		shouldClearInput: clearInputOnSuccess,
+		shouldFocusInput: false,
+		shouldRemovePopover: true,
+	};
+}
+
 function defaultCableEndpointLabel(tile) {
 	return tile?.userTitle || tile?.autoTitle || tile?.id || "Target";
 }
@@ -560,20 +590,24 @@ export function createCableOverlay({
 			setCableRelayState(conn.id, "sending");
 			try {
 				const result = await onSendMessage?.(request);
-				if (result?.ok === false) {
-					setCableRelayState(conn.id, "failed");
-					const message = formatCableRelayFailure(result, resolvedTargetTile);
-					setStatus(message, "error");
-					onNotify?.(message, "error");
+				const feedback = getCableRelayResultFeedback(
+					result,
+					resolvedTargetTile,
+					{ clearInputOnSuccess, focusInputOnFailure },
+				);
+				if (!feedback.ok) {
+					setCableRelayState(conn.id, feedback.relayState);
+					setStatus(feedback.status, feedback.statusKind);
+					onNotify?.(feedback.status, "error");
 					await refreshHistory();
-					if (focusInputOnFailure) input.focus();
+					if (feedback.shouldFocusInput) input.focus();
 					return false;
 				}
-				setCableRelayState(conn.id, "sent");
+				setCableRelayState(conn.id, feedback.relayState);
 				pulseCable(conn.id);
-				if (clearInputOnSuccess) input.value = "";
+				if (feedback.shouldClearInput) input.value = "";
 				await refreshHistory();
-				removePopover();
+				if (feedback.shouldRemovePopover) removePopover();
 				setTimeout(() => setCableRelayState(conn.id, null), 1500);
 				return true;
 			} catch (err) {

@@ -9,6 +9,7 @@ import {
 	formatCableLogEntry,
 	formatCableEndpointSummary,
 	formatCableRelayFailure,
+	getCableRelayResultFeedback,
 	getCableSendBlockMessage,
 	getDirectedCableTiles,
 	getCableEndpointStatus,
@@ -269,6 +270,40 @@ describe("formatCableRelayFailure", () => {
 			{ ok: false, message: "No route." },
 			{ id: "tile-b", ptySessionId: "session-b" },
 		)).toBe("No route.");
+	});
+});
+
+describe("getCableRelayResultFeedback", () => {
+	test("keeps manual drafts open and focused after failed relay", () => {
+		expect(getCableRelayResultFeedback(
+			{ ok: false, message: "Target session is not active." },
+			{ id: "tile-b" },
+			{ clearInputOnSuccess: true, focusInputOnFailure: true },
+		)).toEqual({
+			ok: false,
+			relayState: "failed",
+			status: "Target session is not active. Target status: No active PTY session is attached.",
+			statusKind: "error",
+			shouldClearInput: false,
+			shouldFocusInput: true,
+			shouldRemovePopover: false,
+		});
+	});
+
+	test("clears drafts and closes popover only after successful relay", () => {
+		expect(getCableRelayResultFeedback(
+			{ ok: true, message: "Relay sent" },
+			{ id: "tile-b", ptySessionId: "session-b" },
+			{ clearInputOnSuccess: true, focusInputOnFailure: true },
+		)).toEqual({
+			ok: true,
+			relayState: "sent",
+			status: "",
+			statusKind: "",
+			shouldClearInput: true,
+			shouldFocusInput: false,
+			shouldRemovePopover: true,
+		});
 	});
 });
 
