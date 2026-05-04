@@ -1,6 +1,6 @@
-# Collaborator Canvas
+# QuantFlow Canvas
 
-Control Collaborator's spatial canvas from the terminal using the `collab-canvas` CLI.
+Control QuantFlow's spatial canvas from the terminal using the `collab-canvas` CLI.
 The canvas is a pannable, zoomable surface where tiles display terminals, files, images, and graphs.
 
 ## Coordinate System
@@ -209,4 +209,4 @@ Add this to `~/.zshrc` (macOS) or `~/.bashrc` (Linux) to persist across sessions
 |------|--------------------------------------------|
 | 0    | Success                                    |
 | 1    | RPC error (tile not found, invalid params) |
-| 2    | Connection failure (Collaborator not running) |
+| 2    | Connection failure (QuantFlow not running) |

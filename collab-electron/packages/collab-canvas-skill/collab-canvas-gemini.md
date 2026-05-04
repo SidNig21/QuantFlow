@@ -1,6 +1,6 @@
-# Collaborator Canvas — Gemini CLI Instructions
+# QuantFlow Canvas - Gemini CLI Instructions
 
-You have access to the `collab-canvas` CLI for controlling Collaborator's spatial canvas.
+You have access to the `collab-canvas` CLI for controlling QuantFlow's spatial canvas.
 The canvas is a pannable, zoomable surface where tiles display terminals, files, images, and graphs.
 
 ## Coordinate System
@@ -76,4 +76,4 @@ collab-canvas viewport set --pan 0,0 --zoom 0.8
 |------|---------|
 | 0 | Success |
 | 1 | RPC error |
-| 2 | Connection failure (Collaborator not running) |
+| 2 | Connection failure (QuantFlow not running) |

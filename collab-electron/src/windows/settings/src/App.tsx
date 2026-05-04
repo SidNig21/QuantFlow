@@ -208,7 +208,7 @@ function AppearancePane() {
       <div className="space-y-1">
         <h2 className="text-base font-semibold">Appearance</h2>
         <p className="text-sm text-muted-foreground">
-          Customize how Collaborator looks.
+          Customize how QuantFlow looks.
         </p>
       </div>
 

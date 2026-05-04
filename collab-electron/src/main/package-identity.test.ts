@@ -48,4 +48,24 @@ describe("QuantFlow release identity", () => {
       "github.com/collaborator-ai/collab-public",
     );
   });
+
+  test("user-facing app and agent help copy uses QuantFlow identity", () => {
+    const files = [
+      "collab-electron/src/windows/shell/index.html",
+      "collab-electron/src/windows/settings/src/App.tsx",
+      "collab-electron/packages/collab-canvas-skill/skills/collab-canvas/SKILL.md",
+      "collab-electron/packages/collab-canvas-skill/collab-canvas-codex.md",
+      "collab-electron/packages/collab-canvas-skill/collab-canvas-gemini.md",
+    ];
+
+    const text = files
+      .map((file) => readFileSync(join(repoRoot, file), "utf8"))
+      .join("\n");
+
+    expect(text).toContain("QuantFlow can install a canvas skill");
+    expect(text).toContain("Customize how QuantFlow looks.");
+    expect(text).toContain("Control QuantFlow's spatial canvas");
+    expect(text).toContain("Connection failure (QuantFlow not running)");
+    expect(text).not.toContain("Collaborator");
+  });
 });
