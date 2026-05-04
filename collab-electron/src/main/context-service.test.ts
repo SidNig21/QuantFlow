@@ -15,6 +15,7 @@ import {
   previewForTile,
   previewForVaultTile,
   resolveVaultPinnedPath,
+  setPinnedFileMode,
   toVaultRelativePath,
 } from "./context-service";
 
@@ -38,17 +39,17 @@ describe("pinFile / unpinFile", () => {
   test("pins and unpins a file", async () => {
     await pinFile("/vault/note.md");
     const ctx = await getContext();
-    expect(ctx.pinnedFiles).toContain("/vault/note.md");
+    expect(ctx.pinnedFiles.map((pin) => pin.path)).toContain("/vault/note.md");
     await unpinFile("/vault/note.md");
     const ctx2 = await getContext();
-    expect(ctx2.pinnedFiles).not.toContain("/vault/note.md");
+    expect(ctx2.pinnedFiles.map((pin) => pin.path)).not.toContain("/vault/note.md");
   });
 
   test("does not duplicate pinned files", async () => {
     await pinFile("/vault/a.md");
     await pinFile("/vault/a.md");
     const ctx = await getContext();
-    expect(ctx.pinnedFiles.filter((p) => p === "/vault/a.md").length).toBe(1);
+    expect(ctx.pinnedFiles.filter((pin) => pin.path === "/vault/a.md").length).toBe(1);
   });
 });
 
@@ -67,7 +68,7 @@ describe("vault-relative context pins", () => {
     await pinVaultFile("/vault/specs/a.md", "/vault");
 
     const ctx = await getContext();
-    expect(ctx.pinnedFiles).toEqual(["specs/a.md"]);
+    expect(ctx.pinnedFiles).toEqual([{ path: "specs/a.md", mode: "full" }]);
   });
 
   test("resolves relative pins under the vault", () => {
@@ -87,6 +88,25 @@ describe("addDecision", () => {
     const ctx = await getContext();
     expect(ctx.decisions[0]!.text).toBe("Use bun instead of node");
     expect(typeof ctx.decisions[0]!.ts).toBe("number");
+    expect(typeof ctx.decisions[0]!.timestamp).toBe("number");
+    expect(ctx.decisions[0]!.author).toBe("user");
+  });
+
+  test("adds decision metadata", async () => {
+    await addDecision("Use bounded context", {
+      author: "codex",
+      source: "cable",
+      linkedFile: "spec.md",
+      cableId: "conn-ab",
+    });
+    const ctx = await getContext();
+    expect(ctx.decisions[0]).toMatchObject({
+      text: "Use bounded context",
+      author: "codex",
+      source: "cable",
+      linkedFile: "spec.md",
+      cableId: "conn-ab",
+    });
   });
 
   test("caps at 50 decisions", async () => {
@@ -131,6 +151,8 @@ describe("previewForTile", () => {
       charCount: 11,
       includedCharCount: 11,
       omitted: false,
+      truncated: false,
+      mode: "full",
     }]);
     expect(preview.decisionsCount).toBe(1);
     expect(preview.injectedChars).toBeGreaterThan(0);
@@ -138,15 +160,17 @@ describe("previewForTile", () => {
     expect(preview.text).toContain("Use bounded context");
   });
 
-  test("marks oversized files as omitted", async () => {
+  test("truncates oversized files with a visible indicator", async () => {
     await pinFile("/vault/huge.md");
 
     const preview = await previewForTile(async () => "x".repeat(500), 120);
 
     expect(preview.files[0]?.omitted).toBe(true);
-    expect(preview.files[0]?.includedCharCount).toBe(0);
+    expect(preview.files[0]?.truncated).toBe(true);
+    expect(preview.files[0]?.includedCharCount).toBeGreaterThan(0);
+    expect(preview.truncated).toBe(true);
     expect(preview.injectedChars).toBeLessThanOrEqual(120);
-    expect(preview.text).toContain("omitted");
+    expect(preview.text).toContain("[truncated:");
     expect(preview.text).not.toContain("x".repeat(500));
   });
 
@@ -158,8 +182,39 @@ describe("previewForTile", () => {
     }, 200);
 
     expect(preview.files[0]?.ok).toBe(false);
-    expect(preview.files[0]?.error).toBe("could not read file");
-    expect(preview.text).toContain("could not read file");
+    expect(preview.files[0]?.error).toBe("missing");
+    expect(preview.text).toContain("warning: missing");
+  });
+
+  test("supports per-file include modes", async () => {
+    await pinFile("/vault/full.md");
+    await pinFile("/vault/summary.md");
+    await pinFile("/vault/excerpt.md");
+    await setPinnedFileMode("/vault/summary.md", "summary-header");
+    await setPinnedFileMode("/vault/excerpt.md", "excerpt", "selected excerpt");
+
+    const preview = await previewForTile(async (p) => `${p} content body`, 1_000);
+
+    expect(preview.files.map((file) => [file.path, file.mode])).toEqual([
+      ["/vault/full.md", "full"],
+      ["/vault/summary.md", "summary-header"],
+      ["/vault/excerpt.md", "excerpt"],
+    ]);
+    expect(preview.text).toContain("/vault/full.md content body");
+    expect(preview.text).toContain("summary-header-only");
+    expect(preview.text).toContain("selected excerpt");
+    expect(preview.text).not.toContain("/vault/excerpt.md content body");
+  });
+
+  test("truncates decisions within the configured context limit", async () => {
+    await addDecision("x".repeat(500));
+
+    const preview = await previewForTile(undefined, 80);
+
+    expect(preview.truncated).toBe(true);
+    expect(preview.omittedDecisionCount).toBe(1);
+    expect(preview.injectedChars).toBeLessThanOrEqual(80);
+    expect(preview.text).toContain("[truncated decisions]");
   });
 });
 
@@ -181,5 +236,15 @@ describe("vault-relative preview and compose", () => {
       return "again";
     }, 300);
     expect(text).toContain("again");
+  });
+
+  test("surfaces outside-vault pins as preview warnings", async () => {
+    await pinFile("../outside.md");
+
+    const preview = await previewForVaultTile("/vault", async () => "nope", 300);
+
+    expect(preview.files[0]?.ok).toBe(false);
+    expect(preview.files[0]?.error).toBe("Path is outside vault directory");
+    expect(preview.text).toContain("Path is outside vault directory");
   });
 });

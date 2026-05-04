@@ -55,17 +55,34 @@ describe("formatContextPreviewDetail", () => {
       decisionsCount: 2,
       files: [
         { path: "/vault/a.md", ok: true, omitted: false },
-        { path: "/vault/b.md", ok: true, omitted: true },
-        { path: "/vault/c.md", ok: false, omitted: false },
+        { path: "/vault/b.md", ok: true, omitted: true, mode: "summary-header" },
+        { path: "/vault/c.md", ok: false, omitted: false, error: "missing" },
       ],
     });
 
     expect(detail).toContain("3 pinned files, 2 decisions");
     expect(detail).toContain("1200 chars injected of 20000 max");
-    expect(detail).toContain("2 files omitted or unreadable");
+    expect(detail).toContain("2 files partial, truncated, omitted, or unreadable");
     expect(detail).toContain("included: /vault/a.md");
-    expect(detail).toContain("omitted: /vault/b.md");
-    expect(detail).toContain("unreadable: /vault/c.md");
+    expect(detail).toContain("partial (summary-header): /vault/b.md");
+    expect(detail).toContain("unreadable: /vault/c.md - missing");
+  });
+
+  test("surfaces context truncation and omitted decisions", () => {
+    const detail = formatContextPreviewDetail({
+      maxChars: 100,
+      injectedChars: 100,
+      decisionsCount: 4,
+      omittedDecisionCount: 2,
+      truncated: true,
+      files: [
+        { path: "/vault/huge.md", ok: true, omitted: true, truncated: true },
+      ],
+    });
+
+    expect(detail).toContain("context truncated to fit the configured limit");
+    expect(detail).toContain("2 decisions omitted or truncated");
+    expect(detail).toContain("truncated: /vault/huge.md");
   });
 });
 

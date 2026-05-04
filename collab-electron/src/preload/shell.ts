@@ -440,8 +440,14 @@ contextBridge.exposeInMainWorld("shellApi", {
     ipcRenderer.invoke("context:pin-file", filePath),
   contextUnpinFile: (filePath: string): Promise<unknown> =>
     ipcRenderer.invoke("context:unpin-file", filePath),
-  contextAddDecision: (text: string): Promise<unknown> =>
-    ipcRenderer.invoke("context:add-decision", text),
+  contextSetFileMode: (
+    filePath: string,
+    mode: "full" | "summary-header" | "excerpt",
+    excerpt?: string,
+  ): Promise<unknown> =>
+    ipcRenderer.invoke("context:set-file-mode", { filePath, mode, excerpt }),
+  contextAddDecision: (text: string, metadata?: Record<string, unknown>): Promise<unknown> =>
+    ipcRenderer.invoke("context:add-decision", text, metadata),
   contextPreviewForTile: (): Promise<unknown> =>
     ipcRenderer.invoke("context:preview-for-tile"),
   contextInjectToTile: (sessionId: string): Promise<unknown> =>

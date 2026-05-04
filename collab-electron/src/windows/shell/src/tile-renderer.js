@@ -25,17 +25,28 @@ export function formatContextPreviewDetail(preview) {
   const fileLines = files.slice(0, 5).map((file) => {
     const status = file.ok === false
       ? "unreadable"
-      : file.omitted ? "omitted" : "included";
-    return `${status}: ${file.path}`;
+      : file.truncated ? "truncated"
+        : file.omitted ? "partial" : "included";
+    const mode = file.mode ? ` (${file.mode})` : "";
+    const warning = file.error ? ` - ${file.error}` : "";
+    return `${status}${mode}: ${file.path}${warning}`;
   });
   const hiddenCount = Math.max(0, files.length - fileLines.length);
-  const omittedFiles = files.filter((file) => file.omitted || file.ok === false).length;
+  const warningFiles = files.filter((file) =>
+    file.omitted || file.truncated || file.ok === false
+  ).length;
   const lines = [
     `${files.length} pinned files, ${preview?.decisionsCount ?? 0} decisions`,
     `${preview?.injectedChars ?? 0} chars injected of ${preview?.maxChars ?? 0} max`,
   ];
-  if (omittedFiles > 0) {
-    lines.push(`${omittedFiles} files omitted or unreadable`);
+  if (preview?.truncated) {
+    lines.push("context truncated to fit the configured limit");
+  }
+  if (warningFiles > 0) {
+    lines.push(`${warningFiles} files partial, truncated, omitted, or unreadable`);
+  }
+  if (preview?.omittedDecisionCount > 0) {
+    lines.push(`${preview.omittedDecisionCount} decisions omitted or truncated`);
   }
   lines.push(...fileLines);
   if (hiddenCount > 0) {

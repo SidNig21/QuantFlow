@@ -1,9 +1,11 @@
 import { ipcMain } from "electron";
 import {
+  type ContextIncludeMode,
   getContext,
   injectVaultContextToTile,
   pinVaultFile,
   previewForVaultTile,
+  setPinnedFileMode,
   unpinFile,
   addDecision,
 } from "./context-service";
@@ -31,8 +33,18 @@ export function registerContextServiceHandlers(): void {
     return unpinFile(filePath);
   });
 
-  ipcMain.handle("context:add-decision", async (_event, text: string) => {
-    return addDecision(text);
+  ipcMain.handle(
+    "context:set-file-mode",
+    async (
+      _event,
+      params: { filePath: string; mode: ContextIncludeMode; excerpt?: string },
+    ) => {
+      return setPinnedFileMode(params.filePath, params.mode, params.excerpt);
+    },
+  );
+
+  ipcMain.handle("context:add-decision", async (_event, text: string, metadata?: object) => {
+    return addDecision(text, metadata as Parameters<typeof addDecision>[1] ?? {});
   });
 
   ipcMain.handle("context:preview-for-tile", async () => {
