@@ -9,6 +9,7 @@ import {
 	validateRpcConnectionCreate,
 	validateRpcTerminalRead,
 	validateRpcTerminalWrite,
+	validateRpcTileResize,
 } from "./canvas-rpc.js";
 
 interface Tile {
@@ -351,6 +352,44 @@ describe("validateRpcTerminalRead", () => {
         message: "Terminal read lines must be an integer from 1 to 500",
       });
     }
+  });
+});
+
+describe("validateRpcTileResize", () => {
+  test("accepts sizes at or above the tile type minimum", () => {
+    expect(validateRpcTileResize(
+      { id: "tile-a", type: "term" },
+      { width: 200, height: 120 },
+    )).toEqual({
+      ok: true,
+      width: 200,
+      height: 120,
+    });
+    expect(validateRpcTileResize(
+      { id: "tile-img", type: "image" },
+      { width: 80, height: 80 },
+    )).toMatchObject({
+      ok: true,
+    });
+  });
+
+  test("rejects non-finite and too-small tile sizes", () => {
+    expect(validateRpcTileResize(
+      { id: "tile-a", type: "term" },
+      { width: Number.NaN, height: 120 },
+    )).toMatchObject({
+      ok: false,
+      reason: "invalid_size",
+      message: "Invalid size",
+    });
+    expect(validateRpcTileResize(
+      { id: "tile-a", type: "term" },
+      { width: 199, height: 120 },
+    )).toMatchObject({
+      ok: false,
+      reason: "too_small",
+      message: "Tile size must be at least 200x120",
+    });
   });
 });
 

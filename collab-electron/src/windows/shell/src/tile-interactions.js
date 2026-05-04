@@ -1,6 +1,6 @@
 import { snapToGrid } from "./canvas-state.js";
 
-const MIN_SIZES = {
+export const MIN_SIZES = {
   term: { width: 200, height: 120 },
   note: { width: 200, height: 120 },
   code: { width: 200, height: 120 },

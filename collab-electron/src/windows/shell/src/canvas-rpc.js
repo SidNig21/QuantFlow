@@ -4,6 +4,7 @@ import {
 	getConnection,
 } from "./canvas-state.js";
 import { resolveCableDrop } from "./cable-drop.js";
+import { MIN_SIZES } from "./tile-interactions.js";
 
 function generateConnectionId() {
 	return "conn-" + Date.now() + "-" + Math.random().toString(36).slice(2, 9);
@@ -136,6 +137,24 @@ export function validateRpcTerminalRead(tile, lines) {
 		sessionId: tile.ptySessionId,
 		lines: lineCount,
 	};
+}
+
+export function validateRpcTileResize(tile, size) {
+	const width = size?.width;
+	const height = size?.height;
+	if (!Number.isFinite(width) || !Number.isFinite(height)) {
+		return { ok: false, code: 4, reason: "invalid_size", message: "Invalid size" };
+	}
+	const min = MIN_SIZES[tile?.type] || MIN_SIZES.term;
+	if (width < min.width || height < min.height) {
+		return {
+			ok: false,
+			code: 4,
+			reason: "too_small",
+			message: `Tile size must be at least ${min.width}x${min.height}`,
+		};
+	}
+	return { ok: true, width, height };
 }
 
 export function createTerminalWriteFailureEvent(
@@ -344,14 +363,17 @@ export function createCanvasRpc({
 				case "tileResize": {
 					const tile = requireTile(requestId, params.tileId);
 					if (!tile) return;
-					const rw = params.size?.width;
-					const rh = params.size?.height;
-					if (!Number.isFinite(rw) || !Number.isFinite(rh)) {
-						respondError(requestId, 4, "Invalid size");
+					const validation = validateRpcTileResize(tile, params.size);
+					if (!validation.ok) {
+						respondError(
+							requestId,
+							validation.code,
+							validation.message,
+						);
 						return;
 					}
-					tile.width = rw;
-					tile.height = rh;
+					tile.width = validation.width;
+					tile.height = validation.height;
 					snapToGrid(tile);
 					tileManager.repositionAllTiles();
 					tileManager.saveCanvasImmediate();
