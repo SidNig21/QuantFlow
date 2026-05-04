@@ -17,6 +17,12 @@ export interface Role {
   defaultShell?: "auto" | "powershell" | "wsl" | "shell";
   startupPrompt?: string;
   systemPrompt?: string;
+  statusParser?: RoleStatusParser;
+}
+
+export interface RoleStatusParser {
+  waiting?: string[];
+  blocked?: string[];
 }
 
 const BUILT_IN_ROLES: Role[] = [
@@ -39,6 +45,10 @@ const BUILT_IN_ROLES: Role[] = [
     cwdPolicy: "workspace",
     defaultShell: "auto",
     startupPrompt: "Review the current task context and wait for instructions.",
+    statusParser: {
+      waiting: ["approval required", "continue?", "waiting for", "confirm"],
+      blocked: ["error:", "failed:", "panic", "traceback"],
+    },
   },
   {
     id: "claude-worker",
@@ -50,6 +60,10 @@ const BUILT_IN_ROLES: Role[] = [
     cwdPolicy: "workspace",
     defaultShell: "auto",
     startupPrompt: "Act as the implementation worker for this workspace.",
+    statusParser: {
+      waiting: ["do you want", "proceed?", "continue?", "yes/no"],
+      blocked: ["error:", "failed:", "exception", "traceback"],
+    },
   },
   {
     id: "claude-reviewer",
@@ -61,6 +75,10 @@ const BUILT_IN_ROLES: Role[] = [
     cwdPolicy: "workspace",
     defaultShell: "auto",
     startupPrompt: "Act as the reviewer. Focus on defects, risks, and missing tests.",
+    statusParser: {
+      waiting: ["do you want", "proceed?", "continue?", "yes/no"],
+      blocked: ["error:", "failed:", "exception", "traceback"],
+    },
   },
   {
     id: "opencode",
@@ -72,6 +90,10 @@ const BUILT_IN_ROLES: Role[] = [
     cwdPolicy: "workspace",
     defaultShell: "auto",
     startupPrompt: "Open this workspace and wait for orchestration instructions.",
+    statusParser: {
+      waiting: ["approval required", "confirm", "continue?"],
+      blocked: ["error:", "failed:", "panic"],
+    },
   },
   {
     id: "coder",

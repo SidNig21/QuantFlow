@@ -70,6 +70,7 @@ interface TileSession {
   sessionId: string;
   label: string;
   routeHandle?: string;
+  statusParser?: TileStatusParser;
   lastLine?: string;
   lastActivityTs?: number;
 }
@@ -92,6 +93,11 @@ export type TileSnapshotStatus =
   | "blocked"
   | "exited";
 
+export interface TileStatusParser {
+  waiting?: string[];
+  blocked?: string[];
+}
+
 const logRings = new Map<string, RelayLogEntry[]>();
 const eventRing: RelayLogEntry[] = [];
 const tileRegistry = new Map<string, TileSession>();
@@ -109,6 +115,7 @@ export function watchtowerSnapshot(): TileSnapshot[] {
       hasActiveSession: activeSessionIds.has(entry.sessionId),
       lastLine: entry.lastLine ?? "",
       ageMs: age,
+      statusParser: entry.statusParser,
     });
     return {
       tileId,
@@ -126,14 +133,22 @@ export function inferTileSnapshotStatus({
   hasActiveSession,
   lastLine,
   ageMs,
+  statusParser,
 }: {
   hasActiveSession: boolean;
   lastLine?: string;
   ageMs: number;
+  statusParser?: TileStatusParser;
 }): TileSnapshotStatus {
   if (!hasActiveSession) return "exited";
   const normalized = String(lastLine ?? "").trim().toLowerCase();
   if (normalized) {
+    if (matchesStatusHints(normalized, statusParser?.blocked)) {
+      return "blocked";
+    }
+    if (matchesStatusHints(normalized, statusParser?.waiting)) {
+      return "waiting";
+    }
     if (/\b(blocked|fatal|traceback|exception|panic)\b/.test(normalized) ||
       /\b(error|failed|failure):/.test(normalized)) {
       return "blocked";
@@ -143,6 +158,14 @@ export function inferTileSnapshotStatus({
     }
   }
   return ageMs < 5_000 ? "active" : ageMs < 30_000 ? "idle" : "quiet";
+}
+
+function matchesStatusHints(normalizedLine: string, hints?: string[]): boolean {
+  if (!Array.isArray(hints)) return false;
+  return hints.some((hint) => {
+    const text = String(hint ?? "").trim().toLowerCase();
+    return text.length > 0 && normalizedLine.includes(text);
+  });
 }
 
 export function getAllRelayLogs(limit = 50): RelayLogEntry[] {
@@ -269,9 +292,11 @@ export function registerTileSession(
   sessionId: string,
   label: string,
   routeHandle?: string,
+  statusParser?: TileStatusParser,
 ): void {
   const entry: TileSession = { sessionId, label };
   if (routeHandle) entry.routeHandle = routeHandle;
+  if (statusParser) entry.statusParser = statusParser;
   tileRegistry.set(tileId, entry);
 }
 

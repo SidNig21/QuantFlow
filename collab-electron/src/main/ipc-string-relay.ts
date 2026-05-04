@@ -31,8 +31,9 @@ export function registerStringRelayHandlers(): void {
       sessionId: string,
       label: string,
       routeHandle?: string,
+      statusParser?: { waiting?: string[]; blocked?: string[] },
     ) => {
-      registerTileSession(tileId, sessionId, label, routeHandle);
+      registerTileSession(tileId, sessionId, label, routeHandle, statusParser);
       return { ok: true };
     },
   );

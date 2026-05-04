@@ -25,6 +25,7 @@
  * @property {string} [roleShellKind] - Shell/CLI kind for role-spawned tiles
  * @property {string} [roleCommandTemplate] - Startup command for role-spawned tiles
  * @property {string} [roleStartupPrompt] - Initial role instruction text
+ * @property {{waiting?: string[], blocked?: string[]}} [roleStatusParser] - Role-specific terminal status hints
  * @property {string} [roleStartupSessionId] - Session that already received startup command
  * @property {number} zIndex - Stacking order
  */

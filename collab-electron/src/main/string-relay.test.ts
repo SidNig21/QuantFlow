@@ -126,6 +126,17 @@ describe("watchtowerSnapshot", () => {
       },
     ]);
   });
+
+  test("uses registered role parser hints for tile status", () => {
+    activeSessions.add("session-a");
+    registerTileSession("tile-a", "session-a", "Codex", "codex", {
+      waiting: ["pick a command"],
+    });
+
+    onPtyData("session-a", "Please pick a command before continuing\n");
+
+    expect(watchtowerSnapshot()[0]?.status).toBe("waiting");
+  });
 });
 
 describe("inferTileSnapshotStatus", () => {
@@ -162,6 +173,26 @@ describe("inferTileSnapshotStatus", () => {
       hasActiveSession: true,
       lastLine: "ERROR: command failed",
       ageMs: 4_000,
+    })).toBe("blocked");
+  });
+
+  test("uses role-specific status parser hints before generic age status", () => {
+    expect(inferTileSnapshotStatus({
+      hasActiveSession: true,
+      lastLine: "Codex says: select a diff to continue",
+      ageMs: 45_000,
+      statusParser: {
+        waiting: ["select a diff"],
+      },
+    })).toBe("waiting");
+
+    expect(inferTileSnapshotStatus({
+      hasActiveSession: true,
+      lastLine: "Tool output: sandbox denied",
+      ageMs: 4_000,
+      statusParser: {
+        blocked: ["sandbox denied"],
+      },
     })).toBe("blocked");
   });
 });

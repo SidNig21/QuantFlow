@@ -63,6 +63,7 @@ export function createTileManager({
 			tile.ptySessionId,
 			label,
 			tile.routeHandle,
+			tile.roleStatusParser,
 		);
 	}
 
@@ -97,6 +98,7 @@ export function createTileManager({
 				roleShellKind: t.roleShellKind,
 				roleCommandTemplate: t.roleCommandTemplate,
 				roleStartupPrompt: t.roleStartupPrompt,
+				roleStatusParser: t.roleStatusParser,
 				roleStartupSessionId: t.roleStartupSessionId,
 			})),
 			connections: connections.map((conn) => ({
@@ -784,6 +786,7 @@ export function createTileManager({
 						roleShellKind: saved.roleShellKind,
 						roleCommandTemplate: saved.roleCommandTemplate,
 						roleStartupPrompt: saved.roleStartupPrompt,
+						roleStatusParser: saved.roleStatusParser,
 						roleStartupSessionId: saved.roleStartupSessionId,
 					},
 				);

@@ -396,12 +396,14 @@ contextBridge.exposeInMainWorld("shellApi", {
     sessionId: string,
     label: string,
     routeHandle?: string,
+    statusParser?: { waiting?: string[]; blocked?: string[] },
   ) => ipcRenderer.invoke(
     "string:register-tile-session",
     tileId,
     sessionId,
     label,
     routeHandle,
+    statusParser,
   ),
 
   stringUnregisterTileSession: (

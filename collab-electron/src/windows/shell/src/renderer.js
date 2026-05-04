@@ -1345,6 +1345,7 @@ async function init() {
 					roleShellKind: getRoleCommandName(role) || role.defaultShell || "shell",
 					roleCommandTemplate: role.commandTemplate,
 					roleStartupPrompt: role.startupPrompt,
+					roleStatusParser: role.statusParser,
 				},
 			);
 			operationalEvents.record({

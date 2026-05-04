@@ -35,6 +35,21 @@ describe("listRoles", () => {
         .toBe(true);
       expect(role.defaultShell === undefined || typeof role.defaultShell === "string")
         .toBe(true);
+      expect(role.statusParser === undefined || typeof role.statusParser === "object")
+        .toBe(true);
+    }
+  });
+
+  test("agent roles include status parser hints", async () => {
+    const roles = await listRoles();
+    const agentRoles = roles.filter((role) =>
+      ["codex", "claude-worker", "claude-reviewer", "opencode"].includes(role.id),
+    );
+
+    expect(agentRoles).toHaveLength(4);
+    for (const role of agentRoles) {
+      expect(role.statusParser?.waiting?.length).toBeGreaterThan(0);
+      expect(role.statusParser?.blocked?.length).toBeGreaterThan(0);
     }
   });
 });
