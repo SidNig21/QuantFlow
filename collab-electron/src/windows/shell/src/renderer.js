@@ -31,6 +31,7 @@ import {
 	createConnectionCounts,
 	formatWatchtowerDiagnostics,
 	formatWatchtowerFilterLabel,
+	getWatchtowerFocusPlan,
 	getWatchtowerRetryRequest,
 	renderWatchtowerAgents,
 	renderWatchtowerAttention,
@@ -1689,19 +1690,9 @@ async function init() {
 	function activateWatchtowerRow(target) {
 		const row = target.closest?.("[data-watchtower-kind]");
 		if (!row || !watchtowerEl.contains(row)) return;
-		if (row.dataset.watchtowerKind === "agent") {
-			focusWatchtowerTile(row.dataset.tileId);
-			return;
-		}
-		if (row.dataset.watchtowerKind === "message") {
-			focusWatchtowerRelay(row);
-			return;
-		}
-		if (row.dataset.watchtowerKind === "event") {
-			if (row.dataset.connId && focusWatchtowerRelay(row)) return;
-			if (row.dataset.tileId && focusWatchtowerTile(row.dataset.tileId)) return;
-			if (row.dataset.targetTileId && focusWatchtowerTile(row.dataset.targetTileId)) return;
-			if (row.dataset.fromTileId) focusWatchtowerTile(row.dataset.fromTileId);
+		for (const action of getWatchtowerFocusPlan(row.dataset)) {
+			if (action.type === "relay" && focusWatchtowerRelay(row)) return;
+			if (action.type === "tile" && focusWatchtowerTile(action.tileId)) return;
 		}
 	}
 

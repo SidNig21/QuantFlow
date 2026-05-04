@@ -189,6 +189,45 @@ export function shouldRenderWatchtowerRetry(entry) {
 	return true;
 }
 
+function nonBlankDatasetValue(dataset, key) {
+	const value = String(dataset?.[key] ?? "").trim();
+	return value || null;
+}
+
+export function getWatchtowerFocusPlan(dataset = {}) {
+	const kind = nonBlankDatasetValue(dataset, "watchtowerKind");
+	if (kind === "agent") {
+		const tileId = nonBlankDatasetValue(dataset, "tileId");
+		return tileId ? [{ type: "tile", tileId }] : [];
+	}
+
+	if (kind === "message") {
+		const actions = [];
+		const connId = nonBlankDatasetValue(dataset, "connId");
+		if (connId) actions.push({ type: "relay", connId });
+		const targetTileId = nonBlankDatasetValue(dataset, "targetTileId");
+		if (targetTileId) actions.push({ type: "tile", tileId: targetTileId });
+		const fromTileId = nonBlankDatasetValue(dataset, "fromTileId");
+		if (fromTileId) actions.push({ type: "tile", tileId: fromTileId });
+		return actions;
+	}
+
+	if (kind === "event") {
+		const actions = [];
+		const connId = nonBlankDatasetValue(dataset, "connId");
+		if (connId) actions.push({ type: "relay", connId });
+		const tileId = nonBlankDatasetValue(dataset, "tileId");
+		if (tileId) actions.push({ type: "tile", tileId });
+		const targetTileId = nonBlankDatasetValue(dataset, "targetTileId");
+		if (targetTileId) actions.push({ type: "tile", tileId: targetTileId });
+		const fromTileId = nonBlankDatasetValue(dataset, "fromTileId");
+		if (fromTileId) actions.push({ type: "tile", tileId: fromTileId });
+		return actions;
+	}
+
+	return [];
+}
+
 export function formatWatchtowerDiagnostics({
 	runtime = {},
 	agents = [],

@@ -12,6 +12,7 @@ import {
 	formatWatchtowerDiagnostics,
 	formatRelayRoute,
 	formatWatchtowerAge,
+	getWatchtowerFocusPlan,
 	getWatchtowerRetryRequest,
 	getWatchtowerAttentionItems,
 	getWatchtowerOperationalAttentionItems,
@@ -300,6 +301,53 @@ describe("redactDiagnosticText", () => {
 	test("preserves diagnostic keys while redacting values", () => {
 		expect(redactDiagnosticText("token=abc123 password: hunter2"))
 			.toBe("token=[REDACTED] password: [REDACTED]");
+	});
+});
+
+describe("getWatchtowerFocusPlan", () => {
+	test("focuses agent rows by tile id", () => {
+		expect(getWatchtowerFocusPlan({
+			watchtowerKind: "agent",
+			tileId: "tile-a",
+		})).toEqual([{ type: "tile", tileId: "tile-a" }]);
+	});
+
+	test("focuses message rows by cable first, then target and source fallback", () => {
+		expect(getWatchtowerFocusPlan({
+			watchtowerKind: "message",
+			connId: "conn-ab",
+			targetTileId: "tile-b",
+			fromTileId: "tile-a",
+		})).toEqual([
+			{ type: "relay", connId: "conn-ab" },
+			{ type: "tile", tileId: "tile-b" },
+			{ type: "tile", tileId: "tile-a" },
+		]);
+	});
+
+	test("focuses operational events by cable, tile, target, then source", () => {
+		expect(getWatchtowerFocusPlan({
+			watchtowerKind: "event",
+			connId: "conn-ab",
+			tileId: "tile-c",
+			targetTileId: "tile-b",
+			fromTileId: "tile-a",
+		})).toEqual([
+			{ type: "relay", connId: "conn-ab" },
+			{ type: "tile", tileId: "tile-c" },
+			{ type: "tile", tileId: "tile-b" },
+			{ type: "tile", tileId: "tile-a" },
+		]);
+	});
+
+	test("skips blank focus targets", () => {
+		expect(getWatchtowerFocusPlan({
+			watchtowerKind: "message",
+			connId: " ",
+			targetTileId: "",
+			fromTileId: "tile-a",
+		})).toEqual([{ type: "tile", tileId: "tile-a" }]);
+		expect(getWatchtowerFocusPlan({ watchtowerKind: "unknown" })).toEqual([]);
 	});
 });
 
