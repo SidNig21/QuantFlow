@@ -17,6 +17,7 @@ import { createCanvasRpc } from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
 import { createToastController } from "./toast-controller.js";
 import { createOperationalEventLog } from "./operational-event-log.js";
+import { resolveCableDrop } from "./cable-drop.js";
 import {
 	formatContextPreviewDetail,
 	updateTileTitle,
@@ -805,48 +806,38 @@ async function init() {
 			const cx = (ev.clientX - rect.left - viewportState.panX) / viewportState.zoom;
 			const cy = (ev.clientY - rect.top - viewportState.panY) / viewportState.zoom;
 			const targetTile = tileAtPoint(cx, cy);
+			const dropResult = resolveCableDrop({
+				sourceTile: tile,
+				targetTile,
+				connections,
+			});
 			let feedbackShown = false;
 
-			if (targetTile && targetTile.id !== tile.id) {
-				const duplicate = connections.some(
-					(c) =>
-						(c.tileAId === tile.id && c.tileBId === targetTile.id) ||
-						(c.tileAId === targetTile.id && c.tileBId === tile.id),
-				);
-				if (!duplicate) {
-					const now = Date.now();
-					const conn = {
-						id: `conn-${now}-${Math.random().toString(36).slice(2, 7)}`,
-						tileAId: tile.id,
-						tileBId: targetTile.id,
-						createdAt: now,
-						updatedAt: now,
-					};
-					addConnection(conn);
-					operationalEvents.record({
-						type: "connection.created",
-						severity: "info",
-						summary: `${tileEventLabel(tile)} connected to ${tileEventLabel(targetTile)}`,
-						meta: {
-							connectionId: conn.id,
-							tileAId: tile.id,
-							tileBId: targetTile.id,
-						},
-					});
-					tileManager.saveCanvasImmediate();
-					cableOverlay?.update();
-				} else {
-					showCableHud("Connection already exists.", "warn", 1800);
-					toasts.show({ message: "Connection already exists.", tone: "warn" });
-					feedbackShown = true;
-				}
-			} else if (targetTile?.id === tile.id) {
-				showCableHud("Drop on a different terminal.", "warn", 1800);
-				toasts.show({ message: "Drop on a different terminal.", tone: "warn" });
-				feedbackShown = true;
+			if (dropResult.ok) {
+				const now = Date.now();
+				const conn = {
+					id: `conn-${now}-${Math.random().toString(36).slice(2, 7)}`,
+					tileAId: dropResult.tileAId,
+					tileBId: dropResult.tileBId,
+					createdAt: now,
+					updatedAt: now,
+				};
+				addConnection(conn);
+				operationalEvents.record({
+					type: "connection.created",
+					severity: "info",
+					summary: `${tileEventLabel(tile)} connected to ${tileEventLabel(targetTile)}`,
+					meta: {
+						connectionId: conn.id,
+						tileAId: conn.tileAId,
+						tileBId: conn.tileBId,
+					},
+				});
+				tileManager.saveCanvasImmediate();
+				cableOverlay?.update();
 			} else {
-				showCableHud("Drop on a terminal to connect.", "warn", 1800);
-				toasts.show({ message: "Drop on a terminal to connect.", tone: "warn" });
+				showCableHud(dropResult.message, "warn", 1800);
+				toasts.show({ message: dropResult.message, tone: "warn" });
 				feedbackShown = true;
 			}
 			cableOverlay?.cancelPreview();
