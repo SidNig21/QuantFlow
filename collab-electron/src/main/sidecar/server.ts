@@ -2,6 +2,7 @@
 import * as net from "node:net";
 import * as fs from "node:fs";
 import * as crypto from "node:crypto";
+import { createRequire } from "node:module";
 import type { IDisposable, IPty } from "node-pty";
 import { displayCommandName } from "@collab/shared/path-utils";
 import { cleanupEndpoint, prepareEndpoint } from "../ipc-endpoint";
@@ -21,6 +22,8 @@ import {
   type PingResult,
   type PidFileData,
 } from "./protocol";
+
+const require = createRequire(import.meta.url);
 
 interface ServerOptions {
   controlSocketPath: string;

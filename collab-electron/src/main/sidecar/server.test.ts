@@ -778,7 +778,11 @@ describeNodeOnly("Windows WSL smoke", () => {
           timeout: 5000,
           windowsHide: true,
         });
-        return out.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? null;
+        return out
+          .replace(/\0/g, "")
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .find(Boolean) ?? null;
       } catch {
         return null;
       }
