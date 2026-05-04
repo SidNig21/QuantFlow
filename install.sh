@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-REPO="collaborator-ai/collab-public"
+APP_NAME="QuantFlow"
+REPO="SidNig21/QuantFlow"
 TMP_DIR=$(mktemp -d)
 
 cleanup() { rm -rf "$TMP_DIR"; }
@@ -39,15 +40,15 @@ case "$OS" in
     fi
 
     INSTALL_DIR="/Applications"
-    ARCHIVE_PATH="$TMP_DIR/Collaborator.zip"
+    ARCHIVE_PATH="$TMP_DIR/${APP_NAME}.zip"
     echo "Downloading $(basename "$ASSET_URL")..."
     curl -fSL --progress-bar "$ASSET_URL" -o "$ARCHIVE_PATH"
 
     echo "Installing to ${INSTALL_DIR}..."
     ditto -xk "$ARCHIVE_PATH" "$INSTALL_DIR"
 
-    echo "Done. Opening Collaborator..."
-    open "$INSTALL_DIR/Collaborator.app"
+    echo "Done. Opening ${APP_NAME}..."
+    open "$INSTALL_DIR/${APP_NAME}.app"
     ;;
   Linux)
     if [ "$ARCH" != "x86_64" ]; then
@@ -62,7 +63,7 @@ case "$OS" in
     fi
 
     INSTALL_DIR="${HOME}/.local/bin"
-    INSTALL_PATH="${INSTALL_DIR}/collaborator"
+    INSTALL_PATH="${INSTALL_DIR}/quantflow"
     mkdir -p "$INSTALL_DIR"
 
     echo "Downloading $(basename "$ASSET_URL")..."
