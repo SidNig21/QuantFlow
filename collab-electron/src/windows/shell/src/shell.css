@@ -1024,14 +1024,22 @@ body.platform-win {
 }
 
 .tile-cable-port {
+	align-self: center;
+	background: rgba(99, 102, 241, 0.1);
+	border: 1px solid rgba(129, 140, 248, 0.2);
+	border-radius: 999px;
 	color: #818cf8;
-	opacity: 0.75;
-	padding: 1px 3px;
+	height: 18px;
+	opacity: 0.9;
+	padding: 0;
+	width: 18px;
 }
 
 .tile-cable-port:hover {
 	opacity: 1;
 	background: rgba(99, 102, 241, 0.16);
+	border-color: rgba(165, 180, 252, 0.48);
+	box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
 }
 
 .tile-cable-port:active {

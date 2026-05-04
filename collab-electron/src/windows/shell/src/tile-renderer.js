@@ -60,6 +60,17 @@ export function formatRelaySyntax(routeHandle) {
   return handle ? `>>@${handle}: ` : "";
 }
 
+export function getCablePortMetadata(tile) {
+  if (tile?.type !== "term") return null;
+  const label = getTileLabel(tile).name || "terminal";
+  return {
+    title: "Drag cable to another terminal",
+    tooltip: "Drag cable",
+    shortcut: "C",
+    ariaLabel: `Drag cable from ${label} to another terminal`,
+  };
+}
+
 /**
  * Creates the DOM structure for a tile.
  * @param {import('./canvas-state.js').Tile} tile
@@ -196,11 +207,14 @@ export function createTileDOM(tile, callbacks) {
 
   let cablePort;
   if (tile.type === "term") {
+    const metadata = getCablePortMetadata(tile);
     cablePort = document.createElement("button");
     cablePort.type = "button";
     cablePort.className = "tile-action-btn tile-cable-port";
-    cablePort.title = "Drag to connect cable";
-    cablePort.setAttribute("aria-label", "Drag to connect cable");
+    cablePort.title = metadata.title;
+    cablePort.dataset.tooltip = metadata.tooltip;
+    cablePort.dataset.shortcut = metadata.shortcut;
+    cablePort.setAttribute("aria-label", metadata.ariaLabel);
     cablePort.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="3.5" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="1" fill="currentColor"/></svg>`;
     cablePort.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;

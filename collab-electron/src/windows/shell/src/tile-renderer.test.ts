@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   formatContextPreviewDetail,
+  getCablePortMetadata,
   formatRelaySyntax,
   getTileLabel,
   getTileRoleBadge,
@@ -97,6 +98,25 @@ describe("formatRelaySyntax", () => {
 
   test("returns empty string without a handle", () => {
     expect(formatRelaySyntax("   ")).toBe("");
+  });
+});
+
+describe("getCablePortMetadata", () => {
+  test("returns discoverable cable port metadata for terminals", () => {
+    expect(getCablePortMetadata({
+      type: "term",
+      id: "tile-a",
+      userTitle: "Reviewer",
+    })).toEqual({
+      title: "Drag cable to another terminal",
+      tooltip: "Drag cable",
+      shortcut: "C",
+      ariaLabel: "Drag cable from Reviewer to another terminal",
+    });
+  });
+
+  test("skips non-terminal tiles", () => {
+    expect(getCablePortMetadata({ type: "note", id: "tile-a" })).toBeNull();
   });
 });
 
