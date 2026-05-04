@@ -1422,13 +1422,13 @@ body.platform-win {
 .cable-hit {
 	fill: none;
 	stroke: transparent;
-	stroke-width: 18px;
+	stroke-width: 24px;
 	cursor: pointer;
 	pointer-events: all;
 }
 
 .cable-hit.cable-selected {
-	stroke-width: 22px;
+	stroke-width: 28px;
 }
 
 @keyframes cablePulse {

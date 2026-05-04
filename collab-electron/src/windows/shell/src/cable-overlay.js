@@ -119,6 +119,17 @@ export function getCableLabelLayout(
 	};
 }
 
+export function getCableHitStrokeWidth(zoom = 1, { selected = false } = {}) {
+	const normalizedZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+	let width = 24;
+	if (normalizedZoom <= 0.75) {
+		width = 30;
+	} else if (normalizedZoom >= 1.25) {
+		width = 20;
+	}
+	return selected ? width + 4 : width;
+}
+
 export function shouldSubmitCableMessage(e) {
 	return e.key === "Enter" && (e.ctrlKey || e.metaKey);
 }
@@ -766,10 +777,14 @@ export function createCableOverlay({
 
 	function updateCableClasses() {
 		for (const el of svg.querySelectorAll("[data-conn-id]")) {
-			el.classList.toggle(
-				"cable-selected",
-				el.dataset.connId === selectedConnectionId,
-			);
+			const selected = el.dataset.connId === selectedConnectionId;
+			el.classList.toggle("cable-selected", selected);
+			if (el.classList.contains("cable-hit")) {
+				el.style.strokeWidth = `${getCableHitStrokeWidth(
+					viewportState.zoom,
+					{ selected },
+				)}px`;
+			}
 			const state = relayStateByConnection.get(el.dataset.connId) ?? "";
 			el.classList.toggle("cable-sending", state === "sending");
 			el.classList.toggle("cable-sent", state === "sent");
@@ -804,6 +819,10 @@ export function createCableOverlay({
 			hit.setAttribute("d", d);
 			hit.setAttribute("class", "cable-hit");
 			hit.setAttribute("data-conn-id", conn.id);
+			hit.style.strokeWidth = `${getCableHitStrokeWidth(
+				viewportState.zoom,
+				{ selected: conn.id === selectedConnectionId },
+			)}px`;
 
 			hit.addEventListener("mouseenter", () => setCableHovered(conn.id, true));
 			hit.addEventListener("mouseleave", () => setCableHovered(conn.id, false));

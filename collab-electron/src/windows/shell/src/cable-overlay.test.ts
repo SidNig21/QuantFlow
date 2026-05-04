@@ -4,6 +4,7 @@ import {
 	formatCableContextRelay,
 	formatCableLabel,
 	getCableDefaultDirection,
+	getCableHitStrokeWidth,
 	formatCableLogDetail,
 	formatCableLogEntry,
 	formatCableEndpointSummary,
@@ -113,6 +114,25 @@ describe("getCableLabelLayout", () => {
 		expect(layout.x).toBe(6);
 		expect(layout.y).toBe(6);
 		expect(layout.x + layout.width).toBeLessThanOrEqual(234);
+	});
+});
+
+describe("getCableHitStrokeWidth", () => {
+	test("keeps cable hit targets generous at required zoom checkpoints", () => {
+		expect(getCableHitStrokeWidth(0.5)).toBe(30);
+		expect(getCableHitStrokeWidth(1)).toBe(24);
+		expect(getCableHitStrokeWidth(1.5)).toBe(20);
+	});
+
+	test("adds selected hit affordance without trusting CSS fallback", () => {
+		expect(getCableHitStrokeWidth(0.5, { selected: true })).toBe(34);
+		expect(getCableHitStrokeWidth(1, { selected: true })).toBe(28);
+		expect(getCableHitStrokeWidth(1.5, { selected: true })).toBe(24);
+	});
+
+	test("handles invalid zoom values conservatively", () => {
+		expect(getCableHitStrokeWidth(0)).toBe(24);
+		expect(getCableHitStrokeWidth(Number.NaN)).toBe(24);
 	});
 });
 
