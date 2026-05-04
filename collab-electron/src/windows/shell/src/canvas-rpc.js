@@ -120,6 +120,24 @@ export function validateRpcTerminalWrite(tile, input) {
 	};
 }
 
+export function validateRpcTerminalRead(tile, lines) {
+	if (tile?.type !== "term") {
+		return { ok: false, code: 4, reason: "not_terminal", message: "Tile is not a terminal" };
+	}
+	if (!tile.ptySessionId) {
+		return { ok: false, code: 4, reason: "missing_session", message: "Terminal has no session" };
+	}
+	const lineCount = lines ?? 50;
+	if (!Number.isInteger(lineCount) || lineCount < 1 || lineCount > 500) {
+		return { ok: false, code: 4, reason: "invalid_lines", message: "Terminal read lines must be an integer from 1 to 500" };
+	}
+	return {
+		ok: true,
+		sessionId: tile.ptySessionId,
+		lines: lineCount,
+	};
+}
+
 export function createTerminalWriteFailureEvent(
 	tile,
 	message,
@@ -130,6 +148,26 @@ export function createTerminalWriteFailureEvent(
 		type: "terminal.write_failed",
 		severity: "warn",
 		summary: `Terminal write failed: ${message}`,
+		detail: labelForTile(tile),
+		meta: {
+			tileId: tile?.id,
+			sessionId: tile?.ptySessionId,
+			reason,
+			source: "canvas-rpc",
+		},
+	};
+}
+
+export function createTerminalReadFailureEvent(
+	tile,
+	message,
+	reason,
+	labelForTile = defaultTileLabel,
+) {
+	return {
+		type: "terminal.read_failed",
+		severity: "warn",
+		summary: `Terminal read failed: ${message}`,
 		detail: labelForTile(tile),
 		meta: {
 			tileId: tile?.id,
@@ -182,6 +220,7 @@ export function createCanvasRpc({
 	onConnectionRemoved,
 	onConnectionUpdated,
 	onConnectionFailed,
+	onTerminalReadFailed,
 	onTerminalWriteFailed,
 }) {
 	function respond(requestId, result) {
@@ -460,19 +499,34 @@ export function createCanvasRpc({
 				case "terminalRead": {
 					const tile = requireTile(requestId, params.tileId);
 					if (!tile) return;
-					if (tile.type !== "term") {
-						respondError(requestId, 4, "Tile is not a terminal");
+					const validation = validateRpcTerminalRead(tile, params.lines);
+					if (!validation.ok) {
+						onTerminalReadFailed?.(tile, validation);
+						respondError(
+							requestId,
+							validation.code,
+							validation.message,
+						);
 						return;
 					}
-					if (!tile.ptySessionId) {
-						respondError(requestId, 4, "Terminal has no session");
+					try {
+						const output = await window.shellApi.ptyCapture(
+							validation.sessionId,
+							validation.lines,
+						);
+						result = { output };
+					} catch (err) {
+						const message = err instanceof Error
+							? err.message
+							: "Terminal read failed";
+						onTerminalReadFailed?.(tile, {
+							code: 4,
+							reason: "capture_failed",
+							message,
+						});
+						respondError(requestId, 4, message);
 						return;
 					}
-					const lines = params.lines ?? 50;
-					const output = await window.shellApi.ptyCapture(
-						tile.ptySessionId, lines,
-					);
-					result = { output };
 					break;
 				}
 				case "browserNavigate": {

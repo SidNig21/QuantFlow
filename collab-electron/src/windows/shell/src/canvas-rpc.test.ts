@@ -3,9 +3,11 @@ import {
 	createConnectionFailureEvent,
 	createConnectionLabelEvent,
 	createConnectionMutationEvent,
+	createTerminalReadFailureEvent,
 	createTerminalWriteFailureEvent,
 	findAutoPlacement,
 	validateRpcConnectionCreate,
+	validateRpcTerminalRead,
 	validateRpcTerminalWrite,
 } from "./canvas-rpc.js";
 
@@ -305,6 +307,53 @@ describe("validateRpcTerminalWrite", () => {
   });
 });
 
+describe("validateRpcTerminalRead", () => {
+  test("accepts default and bounded terminal read line counts", () => {
+    expect(validateRpcTerminalRead(
+      { id: "tile-a", type: "term", ptySessionId: "session-a" },
+      undefined,
+    )).toEqual({
+      ok: true,
+      sessionId: "session-a",
+      lines: 50,
+    });
+    expect(validateRpcTerminalRead(
+      { id: "tile-a", type: "term", ptySessionId: "session-a" },
+      500,
+    )).toMatchObject({
+      ok: true,
+      lines: 500,
+    });
+  });
+
+  test("rejects non-terminal, missing session, and invalid line counts", () => {
+    expect(validateRpcTerminalRead(
+      { id: "tile-a", type: "note" },
+      50,
+    )).toMatchObject({
+      ok: false,
+      reason: "not_terminal",
+    });
+    expect(validateRpcTerminalRead(
+      { id: "tile-a", type: "term" },
+      50,
+    )).toMatchObject({
+      ok: false,
+      reason: "missing_session",
+    });
+    for (const lines of [0, 501, 1.5, "50"]) {
+      expect(validateRpcTerminalRead(
+        { id: "tile-a", type: "term", ptySessionId: "session-a" },
+        lines,
+      )).toMatchObject({
+        ok: false,
+        reason: "invalid_lines",
+        message: "Terminal read lines must be an integer from 1 to 500",
+      });
+    }
+  });
+});
+
 describe("createTerminalWriteFailureEvent", () => {
   test("formats RPC terminal write failures for Watchtower", () => {
     expect(createTerminalWriteFailureEvent(
@@ -325,6 +374,32 @@ describe("createTerminalWriteFailureEvent", () => {
         tileId: "tile-a",
         sessionId: "session-a",
         reason: "empty_input",
+        source: "canvas-rpc",
+      },
+    });
+  });
+});
+
+describe("createTerminalReadFailureEvent", () => {
+  test("formats RPC terminal read failures for Watchtower", () => {
+    expect(createTerminalReadFailureEvent(
+      {
+        id: "tile-a",
+        type: "term",
+        ptySessionId: "session-a",
+        userTitle: "Worker",
+      },
+      "Terminal read lines must be an integer from 1 to 500",
+      "invalid_lines",
+    )).toEqual({
+      type: "terminal.read_failed",
+      severity: "warn",
+      summary: "Terminal read failed: Terminal read lines must be an integer from 1 to 500",
+      detail: "Worker",
+      meta: {
+        tileId: "tile-a",
+        sessionId: "session-a",
+        reason: "invalid_lines",
         source: "canvas-rpc",
       },
     });

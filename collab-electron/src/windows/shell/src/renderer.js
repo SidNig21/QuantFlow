@@ -17,6 +17,7 @@ import {
 	createCanvasRpc,
 	createConnectionLabelEvent,
 	createConnectionMutationEvent,
+	createTerminalReadFailureEvent,
 	createTerminalWriteFailureEvent,
 } from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
@@ -1102,6 +1103,19 @@ async function init() {
 			cableOverlay?.update();
 		},
 		onConnectionFailed(event) {
+			operationalEvents.record(event);
+			toasts.show({
+				message: event.summary,
+				tone: "warn",
+			});
+		},
+		onTerminalReadFailed(tile, failure) {
+			const event = createTerminalReadFailureEvent(
+				tile,
+				failure.message,
+				failure.reason,
+				tileEventLabel,
+			);
 			operationalEvents.record(event);
 			toasts.show({
 				message: event.summary,
