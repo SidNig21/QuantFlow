@@ -130,6 +130,42 @@ export function getCableHitStrokeWidth(zoom = 1, { selected = false } = {}) {
 	return selected ? width + 4 : width;
 }
 
+export function getCableRenderDescriptors({
+	connectionList = [],
+	tileList = [],
+	viewport = { panX: 0, panY: 0, zoom: 1 },
+	selectedConnectionId = null,
+	viewportWidth = 0,
+	viewportHeight = 0,
+} = {}) {
+	const descriptors = [];
+	for (const conn of connectionList) {
+		const presentation = getConnectionPresentation(
+			conn.id,
+			connectionList,
+			tileList,
+			viewport,
+		);
+		if (!presentation) continue;
+		const selected = conn.id === selectedConnectionId;
+		const labelLayout = conn.label
+			? getCableLabelLayout(
+				conn.label,
+				presentation.mid,
+				viewportWidth,
+				viewportHeight,
+			)
+			: null;
+		descriptors.push({
+			...presentation,
+			selected,
+			hitStrokeWidth: getCableHitStrokeWidth(viewport.zoom, { selected }),
+			labelLayout,
+		});
+	}
+	return descriptors;
+}
+
 export function shouldSubmitCableMessage(e) {
 	return e.key === "Enter" && (e.ctrlKey || e.metaKey);
 }
@@ -831,15 +867,17 @@ export function createCableOverlay({
 		labelLayer.replaceChildren();
 		hitLayer.replaceChildren();
 
-		for (const conn of connections) {
-			const presentation = getConnectionPresentation(
-				conn.id,
-				connections,
-				tiles,
-				viewportState,
-			);
-			if (!presentation) continue;
-			const { tileA, tileB, d, mid } = presentation;
+		const descriptors = getCableRenderDescriptors({
+			connectionList: connections,
+			tileList: tiles,
+			viewport: viewportState,
+			selectedConnectionId,
+			viewportWidth: containerEl.clientWidth,
+			viewportHeight: containerEl.clientHeight,
+		});
+
+		for (const descriptor of descriptors) {
+			const { conn, tileA, tileB, d, mid, hitStrokeWidth, labelLayout } = descriptor;
 
 			// Visible cable path
 			const path = document.createElementNS(SVG_NS, "path");
@@ -853,10 +891,7 @@ export function createCableOverlay({
 			hit.setAttribute("d", d);
 			hit.setAttribute("class", "cable-hit");
 			hit.setAttribute("data-conn-id", conn.id);
-			hit.style.strokeWidth = `${getCableHitStrokeWidth(
-				viewportState.zoom,
-				{ selected: conn.id === selectedConnectionId },
-			)}px`;
+			hit.style.strokeWidth = `${hitStrokeWidth}px`;
 
 			hit.addEventListener("mouseenter", () => setCableHovered(conn.id, true));
 			hit.addEventListener("mouseleave", () => setCableHovered(conn.id, false));
@@ -872,29 +907,23 @@ export function createCableOverlay({
 			hitLayer.appendChild(hit);
 
 			// Label
-			if (conn.label) {
-				const layout = getCableLabelLayout(
-					conn.label,
-					mid,
-					containerEl.clientWidth,
-					containerEl.clientHeight,
-				);
+			if (labelLayout) {
 				const group = document.createElementNS(SVG_NS, "g");
 				group.setAttribute("class", "cable-label-group");
 				group.setAttribute("data-conn-id", conn.id);
 				const bg = document.createElementNS(SVG_NS, "rect");
-				bg.setAttribute("x", layout.x);
-				bg.setAttribute("y", layout.y);
-				bg.setAttribute("width", layout.width);
-				bg.setAttribute("height", layout.height);
+				bg.setAttribute("x", labelLayout.x);
+				bg.setAttribute("y", labelLayout.y);
+				bg.setAttribute("width", labelLayout.width);
+				bg.setAttribute("height", labelLayout.height);
 				bg.setAttribute("rx", "5");
 				bg.setAttribute("class", "cable-label-bg");
 				const txt = document.createElementNS(SVG_NS, "text");
-				txt.setAttribute("x", layout.textX);
-				txt.setAttribute("y", layout.textY);
+				txt.setAttribute("x", labelLayout.textX);
+				txt.setAttribute("y", labelLayout.textY);
 				txt.setAttribute("class", "cable-label");
-				txt.textContent = layout.text;
-				if (layout.text !== conn.label) {
+				txt.textContent = labelLayout.text;
+				if (labelLayout.text !== conn.label) {
 					const title = document.createElementNS(SVG_NS, "title");
 					title.textContent = conn.label;
 					group.appendChild(title);

@@ -10,6 +10,7 @@ import {
 	formatCableEndpointSummary,
 	formatCableRelayFailure,
 	getCableRelayResultFeedback,
+	getCableRenderDescriptors,
 	getCableSendBlockMessage,
 	getDirectedCableTiles,
 	getCableEndpointStatus,
@@ -134,6 +135,51 @@ describe("getCableHitStrokeWidth", () => {
 	test("handles invalid zoom values conservatively", () => {
 		expect(getCableHitStrokeWidth(0)).toBe(24);
 		expect(getCableHitStrokeWidth(Number.NaN)).toBe(24);
+	});
+});
+
+describe("getCableRenderDescriptors", () => {
+	const tiles = [
+		{ id: "tile-a", x: 0, y: 0, width: 100, height: 100 },
+		{ id: "tile-b", x: 300, y: 0, width: 100, height: 100 },
+	];
+
+	test("describes visible cable paths, hit targets, and labels", () => {
+		const [descriptor] = getCableRenderDescriptors({
+			connectionList: [
+				{
+					id: "conn-ab",
+					tileAId: "tile-a",
+					tileBId: "tile-b",
+					label: "review handoff",
+				},
+			],
+			tileList: tiles,
+			viewport: { panX: 0, panY: 0, zoom: 1.5 },
+			selectedConnectionId: "conn-ab",
+			viewportWidth: 800,
+			viewportHeight: 600,
+		});
+
+		expect(descriptor.conn.id).toBe("conn-ab");
+		expect(descriptor.tileA.id).toBe("tile-a");
+		expect(descriptor.tileB.id).toBe("tile-b");
+		expect(descriptor.d).toBe("M 150 75 C 270 75, 330 75, 450 75");
+		expect(descriptor.selected).toBe(true);
+		expect(descriptor.hitStrokeWidth).toBe(24);
+		expect(descriptor.labelLayout?.text).toBe("review handoff");
+	});
+
+	test("skips connections with missing endpoints", () => {
+		const descriptors = getCableRenderDescriptors({
+			connectionList: [
+				{ id: "conn-missing", tileAId: "tile-a", tileBId: "tile-missing" },
+			],
+			tileList: tiles,
+			viewport: { panX: 0, panY: 0, zoom: 1 },
+		});
+
+		expect(descriptors).toEqual([]);
 	});
 });
 
