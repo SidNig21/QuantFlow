@@ -681,7 +681,7 @@ describe("formatCableContextRelay", () => {
 });
 
 describe("createCableOverlay interactions", () => {
-	function setupOverlay() {
+	function setupOverlay(options = {}) {
 		const container = document.createElement("div");
 		container.clientWidth = 800;
 		container.clientHeight = 600;
@@ -720,17 +720,30 @@ describe("createCableOverlay interactions", () => {
 		});
 		const focusedTileIds = [];
 		const removedConnections = [];
+		const notifications = [];
+		const sendRequests = [];
 		const overlay = createCableOverlay({
 			containerEl: container,
 			viewportState: { panX: 0, panY: 0, zoom: 1 },
+			onSendMessage: options.onSendMessage ?? (async (request) => {
+				sendRequests.push(request);
+				return { ok: true };
+			}),
 			onGetLog: async () => [],
+			onNotify: (message, tone) => notifications.push({ message, tone }),
 			onFocusTile: (id) => focusedTileIds.push(id),
 			onRemoveConnection: (id) => removedConnections.push(id),
 			onUpdateLabel: () => {},
 			onGetFocusedTileId: () => null,
 		});
 		overlay.update();
-		return { container, focusedTileIds, removedConnections };
+		return {
+			container,
+			focusedTileIds,
+			notifications,
+			removedConnections,
+			sendRequests,
+		};
 	}
 
 	test("opens the cable popover from the SVG hit path", () => {
@@ -770,5 +783,46 @@ describe("createCableOverlay interactions", () => {
 		const [removeItem] = menu.querySelectorAll(".cable-menu-item");
 		removeItem.dispatchEvent(createMouseEvent("click"));
 		expect(removedConnections).toEqual(["conn-ab"]);
+	});
+
+	test("keeps the draft and shows status when manual relay fails", async () => {
+		const { container, notifications, sendRequests } = setupOverlay({
+			onSendMessage: async (request) => {
+				sendRequests.push(request);
+				return {
+					ok: false,
+					errorCode: "missing_pty",
+					message: "Target PTY session is not active.",
+				};
+			},
+		});
+		container.querySelector(".cable-hit").dispatchEvent(createMouseEvent("click"));
+		const popover = container.querySelector(".cable-popover");
+		const input = popover.querySelector(".cable-input");
+		input.value = "please review the patch";
+
+		popover.querySelector(".cable-send-btn").dispatchEvent(createMouseEvent("click"));
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(sendRequests).toEqual([
+			{
+				connectionId: "conn-ab",
+				fromTileId: "tile-a",
+				fromLabel: "Worker",
+				targetTileId: "tile-b",
+				targetSessionId: "session-b",
+				text: "please review the patch",
+			},
+		]);
+		expect(container.querySelector(".cable-popover")).toBe(popover);
+		expect(input.value).toBe("please review the patch");
+		const status = popover.querySelector(".cable-status");
+		expect(status.hidden).toBe(false);
+		expect(status.dataset.kind).toBe("error");
+		expect(status.textContent).toBe("Target PTY session is not active.");
+		expect(notifications).toEqual([
+			{ message: "Target PTY session is not active.", tone: "error" },
+		]);
 	});
 });
