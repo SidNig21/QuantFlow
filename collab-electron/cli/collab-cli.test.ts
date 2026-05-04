@@ -1,0 +1,47 @@
+import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
+
+const cliPath = join(import.meta.dir, "collab-cli.mjs");
+
+function runCli(args: string[]) {
+  const result = Bun.spawnSync(["node", cliPath, ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  return {
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  };
+}
+
+describe("collab-canvas CLI", () => {
+  test("help documents viewport and connection commands", () => {
+    const result = runCli(["--help"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("connection list");
+    expect(result.stdout).toContain("connection create <a> <b> [opts]");
+    expect(result.stdout).toContain("connection label <id> <label>");
+    expect(result.stdout).toContain("viewport set [--pan x,y] [--zoom z]");
+  });
+
+  test("validates connection create before opening the RPC socket", () => {
+    const result = runCli(["connection", "create", "tile-a"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "connection create requires <tileA> <tileB>",
+    );
+  });
+
+  test("validates viewport set arguments before opening the RPC socket", () => {
+    const result = runCli(["viewport", "set"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "viewport set requires --pan x,y or --zoom n",
+    );
+  });
+});

@@ -38,6 +38,19 @@ collab-canvas tile move <id> --pos x,y
 # Resize a tile
 collab-canvas tile resize <id> --size w,h
 
+# Focus one or more tiles
+collab-canvas tile focus <id> [<id>...]
+
+# List cables
+collab-canvas connection list
+
+# Connect two tiles with a visible cable
+collab-canvas connection create <tileA> <tileB> [--label <text>]
+
+# Remove or relabel a cable
+collab-canvas connection rm <id>
+collab-canvas connection label <id> <label>
+
 # Get viewport state
 collab-canvas viewport
 
@@ -56,6 +69,7 @@ collab-canvas tile create code --file ./new.ts --pos 23,0
 collab-canvas tile create graph --file ./research.graph.json --pos 0,0 --size 30,25
 collab-canvas tile create note --file ./notes.md --pos 31,0
 collab-canvas tile create term --pos 0,26
+collab-canvas connection create <worker-id> <reviewer-id> --label review
 
 # Frame the viewport after arranging
 collab-canvas viewport set --pan 0,0 --zoom 0.8
@@ -64,11 +78,12 @@ collab-canvas viewport set --pan 0,0 --zoom 0.8
 ## Conventions
 
 1. Always `collab-canvas tile list` first to see existing tiles before creating new ones.
-2. Use `collab-canvas viewport set` to frame the view after arranging tiles.
-3. Remove tiles when no longer needed with `collab-canvas tile rm`.
-4. Leave 1 grid unit gap between adjacent tiles.
-5. File tiles auto-refresh when you write to the underlying file.
-6. Graph tiles support incremental updates — append nodes to `.graph.json` and the graph updates smoothly.
+2. Create visible connections with `collab-canvas connection create` before coordinating agents across tiles.
+3. Use `collab-canvas viewport set` or `collab-canvas tile focus` to frame the view after arranging tiles.
+4. Remove tiles and connections when no longer needed.
+5. Leave 1 grid unit gap between adjacent tiles.
+6. File tiles auto-refresh when you write to the underlying file.
+7. Graph tiles support incremental updates — append nodes to `.graph.json` and the graph updates smoothly.
 
 ## Exit Codes
 

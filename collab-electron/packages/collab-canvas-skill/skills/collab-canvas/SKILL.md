@@ -103,6 +103,58 @@ collab-canvas tile focus tile-abc123
 collab-canvas tile focus tile-abc123 tile-def456
 ```
 
+### collab-canvas connection list
+
+List all visible cables on the canvas.
+
+```bash
+collab-canvas connection list
+```
+
+### collab-canvas connection create
+
+Connect two tiles with a visible cable.
+
+```bash
+collab-canvas connection create <tileA> <tileB> [--label <text>]
+```
+
+Returns the new connection ID on stdout.
+
+**Examples:**
+```bash
+# Connect a worker terminal to a reviewer terminal
+collab-canvas connection create tile-worker tile-reviewer --label review-loop
+```
+
+### collab-canvas connection rm
+
+Remove a cable from the canvas.
+
+```bash
+collab-canvas connection rm <id>
+```
+
+### collab-canvas connection label
+
+Rename a cable label.
+
+```bash
+collab-canvas connection label <id> <label>
+```
+
+### collab-canvas viewport
+
+Read or set the canvas viewport.
+
+```bash
+collab-canvas viewport
+collab-canvas viewport set [--pan x,y] [--zoom level]
+```
+
+- `--pan x,y`: canvas pan in pixels
+- `--zoom level`: zoom level where `1` is 100%
+
 ### collab-canvas terminal write
 
 Send input to a terminal tile. The tile must be of type `term` with an active PTY session.
@@ -149,6 +201,7 @@ Knowledge graph on the left, notes on the right, terminal below.
 collab-canvas tile create graph --file ./research.graph.json --pos 0,0 --size 30,25
 collab-canvas tile create note --file ./notes.md --pos 31,0
 collab-canvas tile create term --pos 0,26
+collab-canvas connection create <worker-id> <reviewer-id> --label review
 ```
 
 ### Dashboard layout
@@ -186,12 +239,13 @@ collab-canvas terminal read <id> --lines 100
 ## Conventions
 
 1. **Always `tile list` first** to see what's already on the canvas before creating tiles.
-2. **Use `tile focus` to frame** after arranging tiles so the user can see them.
-3. **Clean up when done**: remove tiles you created when they're no longer needed.
-4. **Leave 1 grid unit gap** between adjacent tiles for visual clarity.
-5. **File tiles auto-refresh**: when you write to a file that has a tile, the tile updates automatically. No need to close and reopen.
-6. **Graph tiles support incremental updates**: append nodes to a `.graph.json` file and the graph tile smoothly incorporates them.
-7. **Terminal tiles need time to initialize**: after `tile create term`, wait a few seconds before `terminal write` so the PTY session can start.
+2. **Use visible connections for coordination**: create cables between terminals before asking agents to relay or hand off work.
+3. **Use `tile focus` to frame** after arranging tiles so the user can see them.
+4. **Clean up when done**: remove tiles and connections you created when they're no longer needed.
+5. **Leave 1 grid unit gap** between adjacent tiles for visual clarity.
+6. **File tiles auto-refresh**: when you write to a file that has a tile, the tile updates automatically. No need to close and reopen.
+7. **Graph tiles support incremental updates**: append nodes to a `.graph.json` file and the graph tile smoothly incorporates them.
+8. **Terminal tiles need time to initialize**: after `tile create term`, wait a few seconds before `terminal write` so the PTY session can start.
 
 ## Setup
 

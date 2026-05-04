@@ -111,6 +111,16 @@ function parseSize(s) {
   return { w, h };
 }
 
+function parsePair(s, label) {
+  const [xs, ys] = s.split(",");
+  const x = Number(xs);
+  const y = Number(ys);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    die(`invalid ${label}: ${s}`);
+  }
+  return { x, y };
+}
+
 // --- subcommands ----------------------------------------------------------
 
 async function cmdTileList() {
@@ -250,6 +260,84 @@ async function cmdTerminalRead(args) {
   console.log(pretty(result));
 }
 
+async function cmdConnectionList() {
+  const result = await rpcCall("canvas.connectionList");
+  console.log(pretty(result));
+}
+
+async function cmdConnectionCreate(args) {
+  if (args.length < 2) die("connection create requires <tileA> <tileB>");
+  const tileAId = args.shift();
+  const tileBId = args.shift();
+  const params = { tileAId, tileBId };
+
+  while (args.length > 0) {
+    const flag = args.shift();
+    if (flag === "--label") {
+      if (args.length === 0) die("--label requires text");
+      params.label = args.shift();
+    } else {
+      die(`unknown option: ${flag}`);
+    }
+  }
+
+  const result = await rpcCall("canvas.connectionCreate", params);
+  console.log(result.id);
+}
+
+async function cmdConnectionRm(args) {
+  if (args.length === 0) die("connection rm requires a connection id");
+  const id = args[0];
+  await rpcCall("canvas.connectionRemove", { id });
+  console.log(`removed ${id}`);
+}
+
+async function cmdConnectionLabel(args) {
+  if (args.length < 2) die("connection label requires <id> <label>");
+  const id = args[0];
+  const label = args[1];
+  const result = await rpcCall("canvas.connectionUpdateLabel", { id, label });
+  console.log(pretty(result));
+}
+
+async function cmdViewport(args) {
+  if (args.length === 0) {
+    const result = await rpcCall("canvas.viewportGet");
+    console.log(pretty(result));
+    return;
+  }
+
+  const sub = args.shift();
+  if (sub !== "set") die(`unknown viewport subcommand: ${sub}`);
+
+  const params = {};
+  while (args.length > 0) {
+    const flag = args.shift();
+    if (flag === "--pan") {
+      if (args.length === 0) die("--pan requires x,y");
+      const { x, y } = parsePair(args.shift(), "pan");
+      params.x = x;
+      params.y = y;
+    } else if (flag === "--zoom") {
+      if (args.length === 0) die("--zoom requires a number");
+      const zoom = Number(args.shift());
+      if (!Number.isFinite(zoom) || zoom <= 0) {
+        die("--zoom must be a positive number");
+      }
+      params.zoom = zoom;
+    } else {
+      die(`unknown option: ${flag}`);
+    }
+  }
+
+  if (params.x === undefined && params.zoom === undefined) {
+    die("viewport set requires --pan x,y or --zoom n");
+  }
+
+  await rpcCall("canvas.viewportSet", params);
+  console.log("viewport updated");
+}
+
 // --- browser subcommands --------------------------------------------------
 
 async function cmdBrowserNavigate(args) {
@@ -378,6 +466,12 @@ COMMANDS
   tile move <id> --pos x,y           Move a tile
   tile resize <id> --size w,h        Resize a tile
   tile focus <id> [<id>...]          Bring tiles into view
+  connection list                    List all canvas cables
+  connection create <a> <b> [opts]   Connect two tiles with a cable
+  connection rm <id>                 Remove a cable
+  connection label <id> <label>      Rename a cable label
+  viewport                           Get viewport pan and zoom
+  viewport set [--pan x,y] [--zoom z]
   terminal write <id> <input>        Send input to a terminal tile
   terminal read <id> [--lines N]     Read output from a terminal tile
   browser navigate <id> <url>        Navigate browser tile to URL
@@ -406,6 +500,13 @@ TILE RESIZE OPTIONS
 
 TERMINAL READ OPTIONS
   --lines N       Number of lines to capture (default: 50)
+
+CONNECTION CREATE OPTIONS
+  --label <text>  Optional visible cable label
+
+VIEWPORT SET OPTIONS
+  --pan x,y       Canvas pan in pixels
+  --zoom z        Zoom level, where 1 is 100%
 
 BROWSER SCREENSHOT OPTIONS
   --out <path>    Save screenshot to file instead of printing base64
@@ -471,6 +572,24 @@ try {
       }
       break;
     }
+    case "connection": {
+      if (argv.length < 2) {
+        die("connection requires a subcommand (list, create, rm, label)");
+      }
+      const sub = argv[1];
+      const rest = argv.slice(2);
+      switch (sub) {
+        case "list":   await cmdConnectionList(); break;
+        case "create": await cmdConnectionCreate(rest); break;
+        case "rm":     await cmdConnectionRm(rest); break;
+        case "label":  await cmdConnectionLabel(rest); break;
+        default: die(`unknown connection subcommand: ${sub}`);
+      }
+      break;
+    }
+    case "viewport":
+      await cmdViewport(argv.slice(1));
+      break;
     case "browser": {
       if (argv.length < 2) {
         die("browser requires a subcommand (navigate, screenshot, snapshot, click, type, scroll, eval, wait, info)");
