@@ -22,7 +22,11 @@ function resolveInput(raw) {
 
 export function formatContextPreviewDetail(preview) {
   const files = Array.isArray(preview?.files) ? preview.files : [];
-  const fileLines = files.slice(0, 5).map((file) => {
+  const sortedFiles = [
+    ...files.filter((file) => file.omitted || file.truncated || file.ok === false),
+    ...files.filter((file) => !(file.omitted || file.truncated || file.ok === false)),
+  ];
+  const fileLines = sortedFiles.slice(0, 5).map((file) => {
     const status = file.ok === false
       ? "unreadable"
       : file.truncated ? "truncated"

@@ -87,6 +87,25 @@ describe("formatContextPreviewDetail", () => {
     expect(detail).toContain("truncated: /vault/huge.md");
   });
 
+  test("prioritizes warning files when the preview list is long", () => {
+    const detail = formatContextPreviewDetail({
+      maxChars: 20_000,
+      injectedChars: 2_000,
+      decisionsCount: 0,
+      files: [
+        { path: "/vault/ready-1.md", ok: true, omitted: false },
+        { path: "/vault/ready-2.md", ok: true, omitted: false },
+        { path: "/vault/ready-3.md", ok: true, omitted: false },
+        { path: "/vault/ready-4.md", ok: true, omitted: false },
+        { path: "/vault/ready-5.md", ok: true, omitted: false },
+        { path: "/vault/missing.md", ok: false, omitted: false, error: "missing" },
+      ],
+    });
+
+    expect(detail).toContain("unreadable: /vault/missing.md - missing");
+    expect(detail).toContain("1 more files");
+  });
+
   test("labels pinned file include modes and warning states", () => {
     expect(formatContextPinMenuLabel(
       { path: "/vault/full.md", mode: "full" },
