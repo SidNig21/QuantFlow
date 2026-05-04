@@ -8,7 +8,7 @@ const TEST_ROOT = join(
   tmpdir(),
   `canvas-persistence-test-${Date.now()}`,
 );
-const COLLAB_DIR = join(TEST_ROOT, ".collaborator");
+const COLLAB_DIR = join(TEST_ROOT, ".quantflow");
 const STATE_FILE = join(COLLAB_DIR, "canvas-state.json");
 
 mock.module("./paths", () => ({

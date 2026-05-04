@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Integration tests for collab CLI canvas commands.
-# Requires: Collaborator app running, node installed, jq installed.
+# Requires: QuantFlow app running, node installed, jq installed.
 # Runs against the repo copy of collab-cli.mjs, not the installed one.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

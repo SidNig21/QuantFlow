@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
-import { homedir } from "node:os";
+import { COLLAB_DIR } from "./paths";
 
 const MAX_DECISIONS = 50;
 const DEFAULT_CONTEXT_MAX_CHARS = 20_000;
@@ -18,7 +18,7 @@ let ctxDir: string | null = null;
 
 function getCtxPath(): string {
   if (!ctxDir) {
-    ctxDir = join(homedir(), ".collaborator");
+    ctxDir = COLLAB_DIR;
   }
   return join(ctxDir, "context.json");
 }

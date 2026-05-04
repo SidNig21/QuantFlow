@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
-const BASE = join(homedir(), ".collaborator");
+export const QUANTFLOW_HOME = join(homedir(), ".quantflow");
 
 function normalizeWindowsPath(path: string): string {
   if (process.platform !== "win32") return path;
@@ -32,5 +32,5 @@ export const DEV_WORKTREE_ID = import.meta.env?.DEV
   : null;
 
 export const COLLAB_DIR = import.meta.env?.DEV
-  ? join(BASE, "dev", DEV_WORKTREE_ID ?? "worktree-unknown")
-  : BASE;
+  ? join(QUANTFLOW_HOME, "dev", DEV_WORKTREE_ID ?? "worktree-unknown")
+  : QUANTFLOW_HOME;

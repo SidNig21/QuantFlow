@@ -15,7 +15,7 @@ const IS_WIN = process.platform === "win32";
 const INSTALL_DIR = IS_WIN
   ? join(
     process.env["LOCALAPPDATA"] || join(homedir(), "AppData", "Local"),
-    "Collaborator",
+    "QuantFlow",
     "bin",
   )
   : join(homedir(), ".local", "bin");
@@ -32,9 +32,9 @@ function getMjsSource(): string {
 function generateUnixWrapper(): string {
   return `#!/usr/bin/env bash
 set -euo pipefail
-NODE_BIN="$(cat "$HOME/.collaborator/node-path" 2>/dev/null)" || true
+NODE_BIN="$(cat "$HOME/.quantflow/node-path" 2>/dev/null)" || true
 if [[ -z "$NODE_BIN" || ! -x "$NODE_BIN" ]]; then
-  echo "error: collaborator is not running (no node-path file)" >&2
+  echo "error: QuantFlow is not running (no node-path file)" >&2
   exit 2
 fi
 ELECTRON_RUN_AS_NODE=1 exec "$NODE_BIN" "$(dirname "$0")/collab-cli.mjs" "$@"
@@ -44,9 +44,9 @@ ELECTRON_RUN_AS_NODE=1 exec "$NODE_BIN" "$(dirname "$0")/collab-cli.mjs" "$@"
 function generateWindowsWrapper(): string {
   return `@echo off
 setlocal
-set "NP_FILE=%USERPROFILE%\\.collaborator\\node-path"
+set "NP_FILE=%USERPROFILE%\\.quantflow\\node-path"
 if not exist "%NP_FILE%" (
-  echo error: collaborator is not running ^(no node-path file^) >&2
+  echo error: QuantFlow is not running ^(no node-path file^) >&2
   exit /b 2
 )
 set /p NODE_BIN=<"%NP_FILE%"

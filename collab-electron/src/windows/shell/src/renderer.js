@@ -415,7 +415,7 @@ async function init() {
 			params.set("restored", "1");
 		} else {
 			const homeDir = window.shellApi.getHomePath?.() || "~";
-			params.set("cwd", `${homeDir}/.collaborator`);
+			params.set("cwd", `${homeDir}/.quantflow`);
 		}
 
 		const qs = params.toString();
@@ -470,7 +470,7 @@ async function init() {
 
 		const chatConfig = configs.agentChat;
 		const homeDir = window.shellApi.getHomePath?.() || "~";
-		const cwd = `${homeDir}/.collaborator`;
+		const cwd = `${homeDir}/.quantflow`;
 		const src = `${chatConfig.src}?cwd=${encodeURIComponent(cwd)}`;
 		const wv = document.createElement("webview");
 		wv.setAttribute("src", src);

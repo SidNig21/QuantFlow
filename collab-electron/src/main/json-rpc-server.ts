@@ -5,8 +5,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
-import { COLLAB_DIR } from "./paths";
+import { QUANTFLOW_HOME } from "./paths";
 import {
   cleanupEndpoint,
   makeEndpointPath,
@@ -14,12 +13,11 @@ import {
 } from "./ipc-endpoint";
 
 const SOCKET_PATH = makeEndpointPath("ipc");
-// Write the breadcrumb to the base directory (~/.collaborator/)
+// Write the breadcrumb to the base directory (~/.quantflow/)
 // so the hook script can discover the socket regardless of
 // whether the app is running in dev or prod mode.
-const BASE_DIR = join(homedir(), ".collaborator");
-const SOCKET_PATH_FILE = join(BASE_DIR, "socket-path");
-const NODE_PATH_FILE = join(BASE_DIR, "node-path");
+const SOCKET_PATH_FILE = join(QUANTFLOW_HOME, "socket-path");
+const NODE_PATH_FILE = join(QUANTFLOW_HOME, "node-path");
 
 type MethodHandler = (
   params: unknown,
@@ -177,7 +175,7 @@ export function registerMethod(
 export function startJsonRpcServer(): Promise<void> {
   return new Promise((resolve, reject) => {
     prepareEndpoint(SOCKET_PATH);
-    mkdirSync(BASE_DIR, { recursive: true });
+    mkdirSync(QUANTFLOW_HOME, { recursive: true });
 
     server = createServer(handleConnection);
 

@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { QUANTFLOW_HOME } from "./paths";
 import { execSync } from "node:child_process";
 
 export type AgentId = "claude" | "codex" | "gemini";
@@ -135,7 +136,7 @@ export function uninstallSkill(id: AgentId): void {
 // -- plugin offered marker --
 
 function markerPath(): string {
-  return join(homedir(), ".collaborator", "canvas-plugin-offered");
+  return join(QUANTFLOW_HOME, "canvas-plugin-offered");
 }
 
 export function hasOfferedPlugin(): boolean {
@@ -143,8 +144,7 @@ export function hasOfferedPlugin(): boolean {
 }
 
 export function markPluginOffered(): void {
-  const dir = join(homedir(), ".collaborator");
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(QUANTFLOW_HOME, { recursive: true });
   writeFileSync(markerPath(), new Date().toISOString(), "utf-8");
 }
 

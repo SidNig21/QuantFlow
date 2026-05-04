@@ -1,5 +1,5 @@
 {
-	"name": "@collaborator/electron",
+	"name": "@quantflow/electron",
 	"version": "0.8.0",
 	"private": true,
 	"license": "FSL-1.1-ALv2",
@@ -22,13 +22,13 @@
 		"postinstall": "node scripts/postinstall.mjs"
 	},
 	"build": {
-		"appId": "com.collaborator.desktop",
-		"productName": "Collaborator",
+		"appId": "com.quantflow.desktop",
+		"productName": "QuantFlow",
 		"publish": [
 			{
 				"provider": "github",
-				"owner": "collaborator-ai",
-				"repo": "collab-public"
+				"owner": "SidNig21",
+				"repo": "QuantFlow"
 			}
 		],
 		"directories": {
@@ -86,7 +86,7 @@
 			"entitlementsInherit": "build/entitlements.mac.plist",
 			"artifactName": "${productName}-${version}-${arch}-mac.${ext}",
 			"extendInfo": {
-				"NSMicrophoneUsageDescription": "Collaborator needs microphone access to enable voice input for CLI tools like Claude Code."
+				"NSMicrophoneUsageDescription": "QuantFlow needs microphone access to enable voice input for CLI tools like Claude Code."
 			},
 			"target": [
 				{

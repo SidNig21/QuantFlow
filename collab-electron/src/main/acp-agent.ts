@@ -20,6 +20,7 @@ import {
 import {
   getPref, setPref, type AppConfig,
 } from "./config";
+import { QUANTFLOW_HOME } from "./paths";
 
 type AgentSession = {
   sessionId: string;
@@ -35,11 +36,7 @@ let shellWindow: BrowserWindow | null = null;
 let appConfig: AppConfig | null = null;
 
 function getMessageCachePath(): string {
-  return resolve(
-    app.getPath("home"),
-    ".collaborator",
-    "agent-messages.json",
-  );
+  return resolve(QUANTFLOW_HOME, "agent-messages.json");
 }
 
 async function loadCachedMessages(): Promise<unknown[]> {
@@ -205,8 +202,8 @@ async function spawnAndInitialize(
       fs: { readTextFile: true, writeTextFile: true },
     },
     clientInfo: {
-      name: "collaborator",
-      title: "Collaborator",
+      name: "quantflow",
+      title: "QuantFlow",
       version: "1.0.0",
     },
   });

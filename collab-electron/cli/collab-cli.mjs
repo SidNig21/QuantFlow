@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 
 const VERSION = "0.1.0";
 const GRID = 20;
-const COLLAB_DIR = join(homedir(), ".collaborator");
+const COLLAB_DIR = join(homedir(), ".quantflow");
 const SOCKET_FILE = join(COLLAB_DIR, "socket-path");
 
 // --- helpers --------------------------------------------------------------
@@ -21,7 +21,7 @@ function readSocketPath() {
   try {
     raw = readFileSync(SOCKET_FILE, "utf-8").trim();
   } catch {
-    die("collaborator is not running (no socket-path file)", 2);
+    die("QuantFlow is not running (no socket-path file)", 2);
   }
   return raw;
 }
@@ -52,7 +52,7 @@ function rpcCall(method, params = {}) {
       try {
         resp = JSON.parse(buf.slice(0, nl));
       } catch {
-        rej(new Error("invalid response from collaborator"));
+        rej(new Error("invalid response from QuantFlow"));
         return;
       }
       if (resp.error) {
@@ -366,7 +366,7 @@ async function cmdBrowserInfo(args) {
 // --- usage ----------------------------------------------------------------
 
 function usage() {
-  console.log(`collab-canvas — control the Collaborator canvas from the command line
+  console.log(`collab-canvas — control the QuantFlow canvas from the command line
 
 USAGE
   collab-canvas <command> [options]

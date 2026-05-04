@@ -298,7 +298,7 @@ export function registerMiscHandlers(
         body: string;
       };
       const note = new Notification({
-        title: p.title ?? "Collaborator",
+        title: p.title ?? "QuantFlow",
         body: p.body,
       });
       note.show();
@@ -308,7 +308,7 @@ export function registerMiscHandlers(
       description: "Show a native macOS notification",
       params: {
         title:
-          "(optional) Notification title, defaults to 'Collaborator'",
+          "(optional) Notification title, defaults to 'QuantFlow'",
         body: "Notification body text",
       },
     },

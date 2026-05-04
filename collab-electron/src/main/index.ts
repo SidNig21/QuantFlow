@@ -53,11 +53,15 @@ import { readSessionMeta } from "./tmux";
 import { registerBrowserIpc } from "./ipc-browser";
 import { registerAgentIpc } from "./acp-agent";
 
+const APP_NAME = "QuantFlow";
+
 // macOS apps launched from Finder don't inherit the user's shell
 // LANG, so child processes (tmux, shells) default to ASCII.
 if (!process.env.LANG || !process.env.LANG.includes("UTF-8")) {
   process.env.LANG = "en_US.UTF-8";
 }
+
+app.setName(APP_NAME);
 
 process.on("uncaughtException", (error) => {
   trackEvent("app_crash", {
