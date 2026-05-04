@@ -1725,7 +1725,9 @@ async function init() {
 		watchtowerRelayLogCache = Array.isArray(relayLogs) ? relayLogs : [];
 		const agentItems = Array.isArray(items) ? items : [];
 		syncTerminalTileStatuses(agentItems);
-		const attentionHtml = renderWatchtowerAttention(watchtowerRelayLogCache);
+		const attentionHtml = renderWatchtowerAttention(watchtowerRelayLogCache, {
+			operationalEvents: operationalEvents.list(),
+		});
 		if (watchtowerTab === "agents") {
 			body.innerHTML = attentionHtml + renderWatchtowerAgents(agentItems, {
 				filter: watchtowerAgentFilter,

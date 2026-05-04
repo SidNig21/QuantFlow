@@ -14,6 +14,7 @@ import {
 	formatWatchtowerAge,
 	getWatchtowerRetryRequest,
 	getWatchtowerAttentionItems,
+	getWatchtowerOperationalAttentionItems,
 	renderWatchtowerAgents,
 	renderWatchtowerAttention,
 	renderWatchtowerEvents,
@@ -297,6 +298,21 @@ describe("getWatchtowerAttentionItems", () => {
 	});
 });
 
+describe("getWatchtowerOperationalAttentionItems", () => {
+	test("returns recent error and failed operational events newest first", () => {
+		const events = [
+			{ type: "connection.created", severity: "info" },
+			{ type: "context.failed", severity: "warn", summary: "old" },
+			{ type: "pty.failed", severity: "error", summary: "new" },
+		];
+
+		expect(getWatchtowerOperationalAttentionItems(events, 2)).toEqual([
+			{ type: "pty.failed", severity: "error", summary: "new" },
+			{ type: "context.failed", severity: "warn", summary: "old" },
+		]);
+	});
+});
+
 describe("formatRelayRoute", () => {
 	test("describes manual relay route with tile fallback", () => {
 		expect(formatRelayRoute({
@@ -471,5 +487,30 @@ describe("renderWatchtowerAttention", () => {
 		expect(html).toContain("agent / Planner -&gt; @Reviewer");
 		expect(html).toContain("&lt;target exited&gt;");
 		expect(html).not.toContain("<target exited>");
+	});
+
+	test("renders escaped operational failure cards", () => {
+		const html = renderWatchtowerAttention([], {
+			operationalEvents: [
+				{
+					type: "pty.failed",
+					severity: "error",
+					summary: "PTY start failed",
+					detail: "<spawn ENOENT>",
+					meta: {
+						tileId: `tile"<x>`,
+						targetTileId: "tile-b",
+					},
+				},
+			],
+		});
+
+		expect(html).toContain("Needs attention");
+		expect(html).toContain("data-watchtower-kind=\"event\"");
+		expect(html).toContain("data-tile-id=\"tile&quot;&lt;x&gt;\"");
+		expect(html).toContain("pty.failed");
+		expect(html).toContain("tile&quot;&lt;x&gt;");
+		expect(html).toContain("&lt;spawn ENOENT&gt;");
+		expect(html).not.toContain("<spawn ENOENT>");
 	});
 });

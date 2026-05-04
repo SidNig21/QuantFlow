@@ -81,6 +81,17 @@ export function getWatchtowerAttentionItems(logs, limit = 5) {
 		.reverse();
 }
 
+export function getWatchtowerOperationalAttentionItems(events, limit = 5) {
+	return (Array.isArray(events) ? events : [])
+		.filter((event) => {
+			if (!event) return false;
+			if (event.severity === "error") return true;
+			return String(event.type || "").endsWith(".failed");
+		})
+		.slice(-limit)
+		.reverse();
+}
+
 export function formatRelayRoute(entry) {
 	const method = entry?.routeMethod === "agent" ? "agent" : "manual";
 	const source = firstNonBlank(entry?.fromLabel, entry?.fromTileId) || "unknown";
@@ -249,14 +260,21 @@ export function renderWatchtowerAgents(
 	}).join("");
 }
 
-export function renderWatchtowerAttention(logs, { limit = 5 } = {}) {
-	const items = getWatchtowerAttentionItems(logs, limit);
-	if (!items.length) return "";
+export function renderWatchtowerAttention(
+	logs,
+	{ limit = 5, operationalEvents = [] } = {},
+) {
+	const relayItems = getWatchtowerAttentionItems(logs, limit);
+	const eventItems = getWatchtowerOperationalAttentionItems(
+		operationalEvents,
+		limit,
+	);
+	if (!relayItems.length && !eventItems.length) return "";
 
 	return `
 		<section class="wt-attention" aria-label="Needs attention">
 			<div class="wt-section-title">Needs attention</div>
-			${items.map((entry) => {
+			${relayItems.map((entry) => {
 				const code = entry.errorCode || "relay failed";
 				const text = entry.message || entry.formatted || entry.text || "";
 				const route = formatRelayRoute(entry);
@@ -267,6 +285,33 @@ export function renderWatchtowerAttention(logs, { limit = 5 } = {}) {
 						data-conn-id="${escapeHtml(entry.connectionId)}"
 						data-from-tile-id="${escapeHtml(entry.fromTileId)}"
 						data-target-tile-id="${escapeHtml(entry.targetTileId ?? "")}"
+						role="button"
+						tabindex="0"
+					>
+						<div class="wt-attention-code">${escapeHtml(code)}</div>
+						<div class="wt-attention-route">${escapeHtml(route)}</div>
+						<div class="wt-attention-text">${escapeHtml(String(text).slice(0, 160))}</div>
+					</div>
+				`;
+			}).join("")}
+			${eventItems.map((event) => {
+				const meta = event?.meta && typeof event.meta === "object" ? event.meta : {};
+				const code = event.type || "event.failed";
+				const route = firstNonBlank(
+					meta.connectionId,
+					meta.tileId,
+					meta.targetTileId,
+					meta.fromTileId,
+				) || "operational event";
+				const text = event.detail || event.summary || "";
+				return `
+					<div
+						class="wt-attention-card"
+						data-watchtower-kind="event"
+						data-conn-id="${escapeHtml(meta.connectionId ?? "")}"
+						data-tile-id="${escapeHtml(meta.tileId ?? "")}"
+						data-from-tile-id="${escapeHtml(meta.fromTileId ?? meta.tileAId ?? "")}"
+						data-target-tile-id="${escapeHtml(meta.targetTileId ?? meta.tileBId ?? "")}"
 						role="button"
 						tabindex="0"
 					>
