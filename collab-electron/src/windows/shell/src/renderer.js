@@ -41,6 +41,12 @@ import {
 } from "./tile-renderer.js";
 import { createCableOverlay, formatCableContextRelay } from "./cable-overlay.js";
 import {
+	shouldCancelCableDrawMode,
+	shouldEnterCableDrawMode,
+	shouldExitCableDrawModeOnKeyup,
+	shouldStartCableDraw,
+} from "./cable-draw-mode.js";
+import {
 	WATCHTOWER_AGENT_FILTERS,
 	WATCHTOWER_EVENT_FILTERS,
 	WATCHTOWER_MESSAGE_FILTERS,
@@ -798,7 +804,7 @@ async function init() {
 	}
 
 	function onCableMousedown(tile, e, opts = {}) {
-		if (!cableHeld && !opts.force) return false;
+		if (!shouldStartCableDraw({ cableHeld, force: opts.force })) return false;
 		e.preventDefault();
 		e.stopPropagation();
 		canvasEl.classList.add("cable-draw-mode");
@@ -2108,18 +2114,14 @@ async function init() {
 	// -- C key: cable draw mode --
 
 	window.addEventListener("keydown", (e) => {
-		if (e.key === "Escape" && cableHeld) {
+		if (shouldCancelCableDrawMode(e, cableHeld)) {
 			cableHeld = false;
 			canvasEl.classList.remove("cable-draw-mode");
 			cableOverlay?.cancelPreview();
 			hideCableHud();
 			return;
 		}
-		if (
-			e.code === "KeyC" && !e.repeat &&
-			!e.target.closest?.("webview") &&
-			!e.target.matches?.("input, textarea")
-		) {
+		if (shouldEnterCableDrawMode(e)) {
 			cableHeld = true;
 			canvasEl.classList.add("cable-draw-mode");
 			showCableModeHud();
@@ -2127,7 +2129,7 @@ async function init() {
 	});
 
 	window.addEventListener("keyup", (e) => {
-		if (e.code === "KeyC") {
+		if (shouldExitCableDrawModeOnKeyup(e)) {
 			cableHeld = false;
 			canvasEl.classList.remove("cable-draw-mode");
 			cableOverlay?.cancelPreview();

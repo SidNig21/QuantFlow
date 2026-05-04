@@ -12,6 +12,7 @@ import {
 import { toCollabFileUrl } from "@collab/shared/collab-file-url";
 import { workspaceRootMatch } from "@collab/shared/path-utils";
 import { attachDrag, attachResize } from "./tile-interactions.js";
+import { shouldForwardCableDrawMouseDown } from "./cable-draw-mode.js";
 import { findAutoPlacement } from "./canvas-rpc.js";
 import { ensureRouteHandle } from "./tile-route-handles.js";
 import { getRoleStartupWrites } from "./role-startup.js";
@@ -664,7 +665,7 @@ export function createTileManager({
 		// Cable draw: intercept mousedown before drag fires
 		if (onCableMousedown) {
 			dom.container.addEventListener("mousedown", (e) => {
-				if (e.button !== 0) return;
+				if (!shouldForwardCableDrawMouseDown(e)) return;
 				onCableMousedown(tile, e);
 			}, { capture: true });
 		}
