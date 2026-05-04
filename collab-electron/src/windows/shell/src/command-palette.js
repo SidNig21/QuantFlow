@@ -70,6 +70,49 @@ export function renderCommandItem(item, active) {
 	`;
 }
 
+export function formatConnectionCommandTitle(conn, tileAName, tileBName) {
+	const label = String(conn?.label ?? "").trim();
+	const prefix = label ? `Cable ${label}` : "Cable";
+	return `${prefix}: ${tileAName || conn?.tileAId || "unknown"} -> ${tileBName || conn?.tileBId || "unknown"}`;
+}
+
+function formatRelayLogRoute(entry) {
+	const method = entry?.routeMethod === "agent" ? "agent" : "manual";
+	const source = String(entry?.fromLabel || entry?.fromTileId || "unknown").trim();
+	const targetLabel = String(entry?.targetLabel || "").trim().replace(/^@/, "");
+	const target = targetLabel
+		? `@${targetLabel}`
+		: String(entry?.targetTileId || "unresolved").trim() || "unresolved";
+	return `${method} / ${source || "unknown"} -> ${target}`;
+}
+
+function summarizeRelayText(value, maxLength = 140) {
+	const text = String(value ?? "").replace(/\s+/g, " ").trim();
+	if (text.length <= maxLength) return text;
+	return `${text.slice(0, Math.max(0, maxLength - 1))}...`;
+}
+
+export function formatRelayLogDetail(entries) {
+	const list = Array.isArray(entries) ? entries : [];
+	if (list.length === 0) {
+		return "No relay events recorded for this cable.";
+	}
+	return list.map((entry) => {
+		const status = entry?.ok === false ? "failed" : "sent";
+		const ts = Number.isFinite(entry?.ts)
+			? new Date(entry.ts).toISOString()
+			: "unknown time";
+		const message = entry?.message
+			? ` (${entry.message})`
+			: "";
+		return [
+			`[${ts}] ${status}${message}`,
+			formatRelayLogRoute(entry),
+			summarizeRelayText(entry?.text),
+		].filter(Boolean).join("\n");
+	}).join("\n\n");
+}
+
 export function createCommandPalette({
 	document,
 	onClose,

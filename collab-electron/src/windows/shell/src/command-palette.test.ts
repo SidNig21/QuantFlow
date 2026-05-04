@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
 	filterCommandItems,
+	formatConnectionCommandTitle,
+	formatRelayLogDetail,
 	getCommandSearchText,
 	normalizeCommandQuery,
 	renderCommandItem,
@@ -63,5 +65,55 @@ describe("renderCommandItem", () => {
 		expect(html).toContain("&lt;Spawn&gt;");
 		expect(html).toContain("A &amp; B");
 		expect(html).toContain("Roles");
+	});
+});
+
+describe("formatConnectionCommandTitle", () => {
+	test("uses cable labels and endpoint names", () => {
+		expect(formatConnectionCommandTitle(
+			{ id: "conn-1", label: "review", tileAId: "tile-a", tileBId: "tile-b" },
+			"Worker",
+			"Reviewer",
+		)).toBe("Cable review: Worker -> Reviewer");
+	});
+
+	test("falls back to endpoint ids", () => {
+		expect(formatConnectionCommandTitle(
+			{ id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+		)).toBe("Cable: tile-a -> tile-b");
+	});
+});
+
+describe("formatRelayLogDetail", () => {
+	test("formats recent relay events with route and message", () => {
+		const detail = formatRelayLogDetail([
+			{
+				ts: Date.UTC(2026, 0, 2, 3, 4, 5),
+				ok: true,
+				routeMethod: "agent",
+				fromLabel: "Worker",
+				targetLabel: "@Reviewer",
+				text: "Please review this patch.",
+			},
+		]);
+
+		expect(detail).toContain("[2026-01-02T03:04:05.000Z] sent");
+		expect(detail).toContain("agent / Worker -> @Reviewer");
+		expect(detail).toContain("Please review this patch.");
+	});
+
+	test("surfaces failures and empty logs", () => {
+		expect(formatRelayLogDetail([]))
+			.toBe("No relay events recorded for this cable.");
+
+		expect(formatRelayLogDetail([
+			{
+				ok: false,
+				message: "Target PTY missing",
+				fromTileId: "tile-a",
+				targetTileId: "tile-b",
+				text: "hello",
+			},
+		])).toContain("failed (Target PTY missing)");
 	});
 });

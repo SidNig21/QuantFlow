@@ -8,7 +8,11 @@ import {
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
 import { createWebview, isFocusSearchShortcut } from "./webview-factory.js";
-import { createCommandPalette } from "./command-palette.js";
+import {
+	createCommandPalette,
+	formatConnectionCommandTitle,
+	formatRelayLogDetail,
+} from "./command-palette.js";
 import { createViewport } from "./canvas-viewport.js";
 import { createEdgeIndicators } from "./edge-indicators.js";
 import { createMinimap } from "./canvas-minimap.js";
@@ -1890,6 +1894,69 @@ async function init() {
 		}));
 	}
 
+	function focusConnection(conn, { openPopover = true } = {}) {
+		const selected = cableOverlay?.selectConnection(conn.id, { openPopover });
+		if (!selected?.tileA || !selected?.tileB) return false;
+		edgeIndicators.panToTiles([selected.tileA, selected.tileB]);
+		tileManager.focusCanvasTile(selected.tileB.id);
+		return true;
+	}
+
+	function buildConnectionCommandItems() {
+		return connections.flatMap((conn) => {
+			const tileA = getTile(conn.tileAId);
+			const tileB = getTile(conn.tileBId);
+			const title = formatConnectionCommandTitle(
+				conn,
+				tileA ? tileEventLabel(tileA) : "",
+				tileB ? tileEventLabel(tileB) : "",
+			);
+			const subtitle = conn.label
+				? `${conn.id} · ${conn.tileAId} -> ${conn.tileBId}`
+				: conn.id;
+			const keywords = [
+				conn.id,
+				conn.label,
+				conn.tileAId,
+				conn.tileBId,
+				tileA?.routeHandle,
+				tileB?.routeHandle,
+				tileA?.roleName,
+				tileB?.roleName,
+			];
+			return [
+				{
+					id: `inspect-cable:${conn.id}`,
+					title: `Inspect ${title}`,
+					subtitle,
+					section: "Cables",
+					keywords,
+					run: () => {
+						if (!focusConnection(conn)) {
+							toasts.show({ message: "Cable could not be focused.", tone: "warn" });
+						}
+					},
+				},
+				{
+					id: `relay-log:${conn.id}`,
+					title: `Show Relay Log ${title}`,
+					subtitle,
+					section: "Relay",
+					keywords: [...keywords, "message", "history"],
+					run: async () => {
+						focusConnection(conn, { openPopover: false });
+						const logs = await window.shellApi.stringGetLog?.(conn.id, 20);
+						await window.shellApi.showConfirmDialog({
+							message: title,
+							detail: formatRelayLogDetail(logs),
+							buttons: ["OK"],
+						});
+					},
+				},
+			];
+		});
+	}
+
 	async function openCommandPalette() {
 		const roles = await window.shellApi.rolesList?.() ?? [];
 		const baseCommands = [
@@ -1948,6 +2015,7 @@ async function init() {
 		commandPalette.open([
 			...baseCommands,
 			...buildRoleCommandItems(Array.isArray(roles) ? roles : []),
+			...buildConnectionCommandItems(),
 			...buildTileCommandItems(),
 		]);
 	}
