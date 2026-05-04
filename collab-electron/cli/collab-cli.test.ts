@@ -25,6 +25,9 @@ describe("collab-canvas CLI", () => {
     expect(result.stdout).toContain("connection create <a> <b> [opts]");
     expect(result.stdout).toContain("connection label <id> <label>");
     expect(result.stdout).toContain("connection send <id> --from <tile> <message>");
+    expect(result.stdout).toContain("connection log <id> [--limit N]");
+    expect(result.stdout).toContain("relay log [--limit N]");
+    expect(result.stdout).toContain("watchtower snapshot");
     expect(result.stdout).toContain("viewport set [--pan x,y] [--zoom z]");
   });
 
@@ -52,6 +55,29 @@ describe("collab-canvas CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain(
       "connection send requires --from <tileId>",
+    );
+  });
+
+  test("validates connection log before opening the RPC socket", () => {
+    const result = runCli(["connection", "log"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("connection log requires a connection id");
+  });
+
+  test("validates log limits before opening the RPC socket", () => {
+    const result = runCli(["relay", "log", "--limit", "0"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("--limit must be a positive integer");
+  });
+
+  test("validates watchtower subcommands before opening the RPC socket", () => {
+    const result = runCli(["watchtower"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "watchtower requires a subcommand (snapshot)",
     );
   });
 });

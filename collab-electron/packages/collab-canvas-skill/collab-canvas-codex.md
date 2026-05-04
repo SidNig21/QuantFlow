@@ -54,6 +54,11 @@ collab-canvas connection label <id> <label>
 # Send a cable-bounded message
 collab-canvas connection send <id> --from <tileId> <message>
 
+# Inspect relay history and agent status
+collab-canvas connection log <id> [--limit N]
+collab-canvas relay log [--limit N]
+collab-canvas watchtower snapshot
+
 # Get viewport state
 collab-canvas viewport
 
@@ -74,6 +79,7 @@ collab-canvas tile create note --file ./notes.md --pos 31,0
 collab-canvas tile create term --pos 0,26
 collab-canvas connection create <worker-id> <reviewer-id> --label review
 collab-canvas connection send <connection-id> --from <worker-id> "Please review the pinned notes."
+collab-canvas connection log <connection-id> --limit 10
 
 # Frame the viewport after arranging
 collab-canvas viewport set --pan 0,0 --zoom 0.8
@@ -83,11 +89,12 @@ collab-canvas viewport set --pan 0,0 --zoom 0.8
 
 1. Always `collab-canvas tile list` first to see existing tiles before creating new ones.
 2. Create visible connections with `collab-canvas connection create` before coordinating agents across tiles.
-3. Use `collab-canvas viewport set` or `collab-canvas tile focus` to frame the view after arranging tiles.
-4. Remove tiles and connections when no longer needed.
-5. Leave 1 grid unit gap between adjacent tiles.
-6. File tiles auto-refresh when you write to the underlying file.
-7. Graph tiles support incremental updates — append nodes to `.graph.json` and the graph updates smoothly.
+3. Inspect `connection log`, `relay log`, or `watchtower snapshot` before assuming a relay arrived.
+4. Use `collab-canvas viewport set` or `collab-canvas tile focus` to frame the view after arranging tiles.
+5. Remove tiles and connections when no longer needed.
+6. Leave 1 grid unit gap between adjacent tiles.
+7. File tiles auto-refresh when you write to the underlying file.
+8. Graph tiles support incremental updates — append nodes to `.graph.json` and the graph updates smoothly.
 
 ## Exit Codes
 

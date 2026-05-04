@@ -13,6 +13,12 @@ import {
   type ConnectionGraphEntry,
 } from "./string-relay";
 
+function readLimitParam(req: unknown, fallback = 50): number {
+  const input = req as { limit?: unknown } | null;
+  const limit = Number(input?.limit ?? fallback);
+  return Number.isInteger(limit) && limit > 0 ? limit : fallback;
+}
+
 export function registerStringRelayHandlers(): void {
   ipcMain.handle("string:relay", (_event, req: RelayRequest) => {
     return relayStringMessage(req);
@@ -31,6 +37,44 @@ export function registerStringRelayHandlers(): void {
         fromTileId: "Endpoint tile ID to send from",
         text: "Plain-English message to relay",
       },
+    },
+  );
+
+  registerMethod(
+    "relay.log",
+    (req) => getAllRelayLogs(readLimitParam(req)),
+    {
+      description: "List recent cable relay success and failure events",
+      params: {
+        limit: "(optional) Maximum number of relay events to return",
+      },
+    },
+  );
+
+  registerMethod(
+    "relay.connectionLog",
+    (req) => {
+      const input = req as { connectionId?: unknown; limit?: unknown } | null;
+      return getStringLog(
+        String(input?.connectionId ?? ""),
+        readLimitParam(req),
+      );
+    },
+    {
+      description: "List recent relay events for one cable/connection",
+      params: {
+        connectionId: "ID of the cable/connection",
+        limit: "(optional) Maximum number of relay events to return",
+      },
+    },
+  );
+
+  registerMethod(
+    "watchtower.snapshot",
+    () => watchtowerSnapshot(),
+    {
+      description: "List Watchtower agent status snapshots",
+      params: {},
     },
   );
 

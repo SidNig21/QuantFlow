@@ -121,6 +121,14 @@ function parsePair(s, label) {
   return { x, y };
 }
 
+function parseLimitValue(value) {
+  const limit = Number(value);
+  if (!Number.isInteger(limit) || limit <= 0) {
+    die("--limit must be a positive integer");
+  }
+  return limit;
+}
+
 // --- subcommands ----------------------------------------------------------
 
 async function cmdTileList() {
@@ -328,6 +336,58 @@ async function cmdConnectionSend(args) {
   console.log(pretty(result));
 }
 
+async function cmdConnectionLog(args) {
+  if (args.length === 0) die("connection log requires a connection id");
+  const connectionId = args.shift();
+  let limit = 50;
+
+  while (args.length > 0) {
+    const flag = args.shift();
+    if (flag === "--limit") {
+      if (args.length === 0) die("--limit requires a number");
+      limit = parseLimitValue(args.shift());
+    } else {
+      die(`unknown option: ${flag}`);
+    }
+  }
+
+  const result = await rpcCall("relay.connectionLog", {
+    connectionId,
+    limit,
+  });
+  console.log(pretty(result));
+}
+
+async function cmdRelay(args) {
+  if (args.length === 0) die("relay requires a subcommand (log)");
+  const sub = args.shift();
+  if (sub !== "log") die(`unknown relay subcommand: ${sub}`);
+  let limit = 50;
+
+  while (args.length > 0) {
+    const flag = args.shift();
+    if (flag === "--limit") {
+      if (args.length === 0) die("--limit requires a number");
+      limit = parseLimitValue(args.shift());
+    } else {
+      die(`unknown option: ${flag}`);
+    }
+  }
+
+  const result = await rpcCall("relay.log", { limit });
+  console.log(pretty(result));
+}
+
+async function cmdWatchtower(args) {
+  if (args.length === 0) die("watchtower requires a subcommand (snapshot)");
+  const sub = args.shift();
+  if (sub !== "snapshot") die(`unknown watchtower subcommand: ${sub}`);
+  if (args.length > 0) die(`unknown option: ${args[0]}`);
+
+  const result = await rpcCall("watchtower.snapshot");
+  console.log(pretty(result));
+}
+
 async function cmdViewport(args) {
   if (args.length === 0) {
     const result = await rpcCall("canvas.viewportGet");
@@ -499,6 +559,9 @@ COMMANDS
   connection rm <id>                 Remove a cable
   connection label <id> <label>      Rename a cable label
   connection send <id> --from <tile> <message>
+  connection log <id> [--limit N]    Show relay history for a cable
+  relay log [--limit N]              Show recent relay success/failure events
+  watchtower snapshot                Show agent status snapshots
   viewport                           Get viewport pan and zoom
   viewport set [--pan x,y] [--zoom z]
   terminal write <id> <input>        Send input to a terminal tile
@@ -535,6 +598,9 @@ CONNECTION CREATE OPTIONS
 
 CONNECTION SEND OPTIONS
   --from <id>     Source endpoint tile ID for cable-bounded send
+
+LOG OPTIONS
+  --limit N       Maximum number of events to return (default 50)
 
 VIEWPORT SET OPTIONS
   --pan x,y       Canvas pan in pixels
@@ -606,7 +672,7 @@ try {
     }
     case "connection": {
       if (argv.length < 2) {
-        die("connection requires a subcommand (list, create, rm, label, send)");
+        die("connection requires a subcommand (list, create, rm, label, send, log)");
       }
       const sub = argv[1];
       const rest = argv.slice(2);
@@ -616,10 +682,17 @@ try {
         case "rm":     await cmdConnectionRm(rest); break;
         case "label":  await cmdConnectionLabel(rest); break;
         case "send":   await cmdConnectionSend(rest); break;
+        case "log":    await cmdConnectionLog(rest); break;
         default: die(`unknown connection subcommand: ${sub}`);
       }
       break;
     }
+    case "relay":
+      await cmdRelay(argv.slice(1));
+      break;
+    case "watchtower":
+      await cmdWatchtower(argv.slice(1));
+      break;
     case "viewport":
       await cmdViewport(argv.slice(1));
       break;

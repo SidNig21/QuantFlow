@@ -158,6 +158,32 @@ Returns the structured relay result, including `ok`, `eventId`, and any relay er
 collab-canvas connection send conn-abc123 --from tile-worker "Please review the current diff."
 ```
 
+### collab-canvas connection log
+
+Inspect recent relay events for one cable.
+
+```bash
+collab-canvas connection log <id> [--limit N]
+```
+
+- `--limit N`: maximum number of events to return (default: 50)
+
+### collab-canvas relay log
+
+Inspect recent relay success and failure events across all cables.
+
+```bash
+collab-canvas relay log [--limit N]
+```
+
+### collab-canvas watchtower snapshot
+
+Inspect current Watchtower agent status snapshots.
+
+```bash
+collab-canvas watchtower snapshot
+```
+
 ### collab-canvas viewport
 
 Read or set the canvas viewport.
@@ -218,6 +244,7 @@ collab-canvas tile create note --file ./notes.md --pos 31,0
 collab-canvas tile create term --pos 0,26
 collab-canvas connection create <worker-id> <reviewer-id> --label review
 collab-canvas connection send <connection-id> --from <worker-id> "Please review the pinned notes."
+collab-canvas connection log <connection-id> --limit 10
 ```
 
 ### Dashboard layout
@@ -256,12 +283,13 @@ collab-canvas terminal read <id> --lines 100
 
 1. **Always `tile list` first** to see what's already on the canvas before creating tiles.
 2. **Use visible connections for coordination**: create cables between terminals before asking agents to relay or hand off work.
-3. **Use `tile focus` to frame** after arranging tiles so the user can see them.
-4. **Clean up when done**: remove tiles and connections you created when they're no longer needed.
-5. **Leave 1 grid unit gap** between adjacent tiles for visual clarity.
-6. **File tiles auto-refresh**: when you write to a file that has a tile, the tile updates automatically. No need to close and reopen.
-7. **Graph tiles support incremental updates**: append nodes to a `.graph.json` file and the graph tile smoothly incorporates them.
-8. **Terminal tiles need time to initialize**: after `tile create term`, wait a few seconds before `terminal write` so the PTY session can start.
+3. **Inspect relay results**: use `connection log`, `relay log`, or `watchtower snapshot` before assuming a message arrived.
+4. **Use `tile focus` to frame** after arranging tiles so the user can see them.
+5. **Clean up when done**: remove tiles and connections you created when they're no longer needed.
+6. **Leave 1 grid unit gap** between adjacent tiles for visual clarity.
+7. **File tiles auto-refresh**: when you write to a file that has a tile, the tile updates automatically. No need to close and reopen.
+8. **Graph tiles support incremental updates**: append nodes to a `.graph.json` file and the graph tile smoothly incorporates them.
+9. **Terminal tiles need time to initialize**: after `tile create term`, wait a few seconds before `terminal write` so the PTY session can start.
 
 ## Setup
 
