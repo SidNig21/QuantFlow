@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	clampFloatingPosition,
 	formatCableContextRelay,
+	formatCableLabel,
 	getCableDefaultDirection,
 	formatCableLogDetail,
 	formatCableLogEntry,
@@ -9,6 +10,7 @@ import {
 	formatCableRelayFailure,
 	getDirectedCableTiles,
 	getCableEndpointStatus,
+	getCableLabelLayout,
 	getConnectionPresentation,
 	getRetryCableRelayRequest,
 	shouldSubmitCableMessage,
@@ -73,6 +75,43 @@ describe("getConnectionPresentation", () => {
 			tiles.slice(0, 1),
 			viewport,
 		)).toBeNull();
+	});
+});
+
+describe("formatCableLabel", () => {
+	test("normalizes and truncates cable labels", () => {
+		expect(formatCableLabel("  review   loop  ")).toBe("review loop");
+		expect(formatCableLabel("abcdefghijklmnopqrstuvwxyz", 8)).toBe("abcdefg…");
+	});
+});
+
+describe("getCableLabelLayout", () => {
+	test("centers readable labels near the cable midpoint", () => {
+		const layout = getCableLabelLayout(
+			"review",
+			{ x: 200, y: 80 },
+			800,
+			600,
+		);
+
+		expect(layout.text).toBe("review");
+		expect(layout.textX).toBeCloseTo(200, 1);
+		expect(layout.y).toBe(56);
+		expect(layout.height).toBe(18);
+	});
+
+	test("keeps labels inside the canvas viewport", () => {
+		const layout = getCableLabelLayout(
+			"a very long cable label near the edge",
+			{ x: 2, y: 4 },
+			240,
+			160,
+		);
+
+		expect(layout.text).toBe("a very long cable label nea…");
+		expect(layout.x).toBe(6);
+		expect(layout.y).toBe(6);
+		expect(layout.x + layout.width).toBeLessThanOrEqual(234);
 	});
 });
 

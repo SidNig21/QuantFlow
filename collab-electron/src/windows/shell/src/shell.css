@@ -1441,13 +1441,29 @@ body.platform-win {
 	pointer-events: none;
 }
 
-.cable-label {
-	fill: rgba(148, 163, 184, 0.8);
-	font-size: 11px;
-	font-family: var(--font-sans);
-	text-anchor: middle;
+.cable-label-group {
 	pointer-events: none;
 	user-select: none;
+}
+
+.cable-label-bg {
+	fill: rgba(15, 23, 42, 0.78);
+	stroke: rgba(148, 163, 184, 0.22);
+	stroke-width: 1px;
+}
+
+.cable-label-group.cable-hovered .cable-label-bg,
+.cable-label-group.cable-selected .cable-label-bg {
+	fill: rgba(30, 41, 59, 0.94);
+	stroke: rgba(129, 140, 248, 0.45);
+}
+
+.cable-label {
+	fill: rgba(226, 232, 240, 0.86);
+	font-size: 11px;
+	font-family: var(--font-sans);
+	font-weight: 600;
+	text-anchor: middle;
 }
 
 /* Cable popover */

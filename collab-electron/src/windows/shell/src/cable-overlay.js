@@ -83,6 +83,42 @@ export function clampFloatingPosition(
 	};
 }
 
+export function formatCableLabel(label, maxLength = 28) {
+	const text = String(label ?? "").trim().replace(/\s+/g, " ");
+	const max = Math.max(4, Number.isFinite(maxLength) ? Math.floor(maxLength) : 28);
+	if (text.length <= max) return text;
+	return `${text.slice(0, max - 1)}…`;
+}
+
+export function getCableLabelLayout(
+	label,
+	mid,
+	viewportWidth,
+	viewportHeight,
+) {
+	const text = formatCableLabel(label);
+	const width = Math.max(32, Math.min(220, text.length * 6.4 + 16));
+	const height = 18;
+	const pos = clampFloatingPosition(
+		mid.x - width / 2,
+		mid.y - 24,
+		width,
+		height,
+		viewportWidth,
+		viewportHeight,
+		6,
+	);
+	return {
+		text,
+		x: pos.x,
+		y: pos.y,
+		width,
+		height,
+		textX: pos.x + width / 2,
+		textY: pos.y + 12.5,
+	};
+}
+
 export function shouldSubmitCableMessage(e) {
 	return e.key === "Enter" && (e.ctrlKey || e.metaKey);
 }
@@ -771,12 +807,35 @@ export function createCableOverlay({
 
 			// Label
 			if (conn.label) {
+				const layout = getCableLabelLayout(
+					conn.label,
+					mid,
+					containerEl.clientWidth,
+					containerEl.clientHeight,
+				);
+				const group = document.createElementNS(SVG_NS, "g");
+				group.setAttribute("class", "cable-label-group");
+				group.setAttribute("data-conn-id", conn.id);
+				const bg = document.createElementNS(SVG_NS, "rect");
+				bg.setAttribute("x", layout.x);
+				bg.setAttribute("y", layout.y);
+				bg.setAttribute("width", layout.width);
+				bg.setAttribute("height", layout.height);
+				bg.setAttribute("rx", "5");
+				bg.setAttribute("class", "cable-label-bg");
 				const txt = document.createElementNS(SVG_NS, "text");
-				txt.setAttribute("x", mid.x);
-				txt.setAttribute("y", mid.y - 8);
+				txt.setAttribute("x", layout.textX);
+				txt.setAttribute("y", layout.textY);
 				txt.setAttribute("class", "cable-label");
-				txt.textContent = conn.label;
-				labelLayer.appendChild(txt);
+				txt.textContent = layout.text;
+				if (layout.text !== conn.label) {
+					const title = document.createElementNS(SVG_NS, "title");
+					title.textContent = conn.label;
+					group.appendChild(title);
+				}
+				group.appendChild(bg);
+				group.appendChild(txt);
+				labelLayer.appendChild(group);
 			}
 		}
 		updateCableClasses();
