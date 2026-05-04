@@ -21,6 +21,7 @@ import {
 	renderWatchtowerAttention,
 	renderWatchtowerEvents,
 	renderWatchtowerMessages,
+	runWatchtowerFocusPlan,
 	shouldRenderWatchtowerRetry,
 } from "./watchtower-view.js";
 
@@ -348,6 +349,65 @@ describe("getWatchtowerFocusPlan", () => {
 			fromTileId: "tile-a",
 		})).toEqual([{ type: "tile", tileId: "tile-a" }]);
 		expect(getWatchtowerFocusPlan({ watchtowerKind: "unknown" })).toEqual([]);
+	});
+});
+
+describe("runWatchtowerFocusPlan", () => {
+	test("stops after the first successful relay focus", () => {
+		const calls = [];
+		const result = runWatchtowerFocusPlan({
+			watchtowerKind: "message",
+			connId: "conn-ab",
+			targetTileId: "tile-b",
+			fromTileId: "tile-a",
+		}, {
+			onRelay(connId) {
+				calls.push(["relay", connId]);
+				return true;
+			},
+			onTile(tileId) {
+				calls.push(["tile", tileId]);
+				return true;
+			},
+		});
+
+		expect(result).toEqual({ type: "relay", connId: "conn-ab" });
+		expect(calls).toEqual([["relay", "conn-ab"]]);
+	});
+
+	test("falls back through target and source tiles until one succeeds", () => {
+		const calls = [];
+		const result = runWatchtowerFocusPlan({
+			watchtowerKind: "message",
+			connId: "conn-ab",
+			targetTileId: "tile-b",
+			fromTileId: "tile-a",
+		}, {
+			onRelay(connId) {
+				calls.push(["relay", connId]);
+				return false;
+			},
+			onTile(tileId) {
+				calls.push(["tile", tileId]);
+				return tileId === "tile-a";
+			},
+		});
+
+		expect(result).toEqual({ type: "tile", tileId: "tile-a" });
+		expect(calls).toEqual([
+			["relay", "conn-ab"],
+			["tile", "tile-b"],
+			["tile", "tile-a"],
+		]);
+	});
+
+	test("returns null when no focus action succeeds", () => {
+		expect(runWatchtowerFocusPlan({
+			watchtowerKind: "agent",
+			tileId: "tile-a",
+		}, {
+			onTile: () => false,
+		})).toBeNull();
 	});
 });
 

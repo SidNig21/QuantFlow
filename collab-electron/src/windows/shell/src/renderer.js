@@ -53,12 +53,12 @@ import {
 	createConnectionCounts,
 	formatWatchtowerDiagnostics,
 	formatWatchtowerFilterLabel,
-	getWatchtowerFocusPlan,
 	getWatchtowerRetryRequest,
 	renderWatchtowerAgents,
 	renderWatchtowerAttention,
 	renderWatchtowerEvents,
 	renderWatchtowerMessages,
+	runWatchtowerFocusPlan,
 } from "./watchtower-view.js";
 import {
 	createPtyStartFailureDiagnostic,
@@ -1784,10 +1784,10 @@ async function init() {
 	function activateWatchtowerRow(target) {
 		const row = target.closest?.("[data-watchtower-kind]");
 		if (!row || !watchtowerEl.contains(row)) return;
-		for (const action of getWatchtowerFocusPlan(row.dataset)) {
-			if (action.type === "relay" && focusWatchtowerRelay(row)) return;
-			if (action.type === "tile" && focusWatchtowerTile(action.tileId)) return;
-		}
+		runWatchtowerFocusPlan(row.dataset, {
+			onRelay: () => focusWatchtowerRelay(row),
+			onTile: (tileId) => focusWatchtowerTile(tileId),
+		});
 	}
 
 	watchtowerEl.addEventListener("click", (e) => {

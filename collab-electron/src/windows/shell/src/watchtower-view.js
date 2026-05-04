@@ -228,6 +228,29 @@ export function getWatchtowerFocusPlan(dataset = {}) {
 	return [];
 }
 
+export function runWatchtowerFocusPlan(dataset = {}, {
+	onRelay = null,
+	onTile = null,
+} = {}) {
+	for (const action of getWatchtowerFocusPlan(dataset)) {
+		if (
+			action.type === "relay" &&
+			typeof onRelay === "function" &&
+			onRelay(action.connId, action)
+		) {
+			return action;
+		}
+		if (
+			action.type === "tile" &&
+			typeof onTile === "function" &&
+			onTile(action.tileId, action)
+		) {
+			return action;
+		}
+	}
+	return null;
+}
+
 export function formatWatchtowerDiagnostics({
 	runtime = {},
 	agents = [],
