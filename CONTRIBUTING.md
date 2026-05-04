@@ -1,16 +1,16 @@
-# Contributing to Collaborator
+# Contributing to QuantFlow
 
-Thanks for your interest in contributing to Collaborator. This guide covers
+Thanks for your interest in contributing to QuantFlow. This guide covers
 how to report issues, propose changes, and submit pull requests.
 
 ## Reporting Issues
 
-Open a [GitHub issue](https://github.com/collaborator-ai/collab-public/issues)
+Open a [GitHub issue](https://github.com/SidNig21/QuantFlow/issues)
 with a clear description of the bug or feature request. For bugs, include:
 
 - Steps to reproduce
 - Expected vs actual behavior
-- macOS version and Collaborator version
+- macOS version and QuantFlow version
 
 ## Submitting a Pull Request
 
@@ -35,5 +35,5 @@ added to the approved contributors list. Comment `@cla-bot check` to re-verify.
 
 ## License
 
-Collaborator is licensed under the [Functional Source License (FSL-1.1-ALv2)](LICENSE.md).
+QuantFlow is licensed under the [Functional Source License (FSL-1.1-ALv2)](LICENSE.md).
 Contributions are made under the same license.
