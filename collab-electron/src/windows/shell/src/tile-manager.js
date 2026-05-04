@@ -13,6 +13,7 @@ import { toCollabFileUrl } from "@collab/shared/collab-file-url";
 import { workspaceRootMatch } from "@collab/shared/path-utils";
 import { attachDrag, attachResize } from "./tile-interactions.js";
 import { findAutoPlacement } from "./canvas-rpc.js";
+import { ensureRouteHandle } from "./tile-route-handles.js";
 
 /**
  * Tile lifecycle manager: creation, deletion, persistence, webview
@@ -53,41 +54,9 @@ export function createTileManager({
 		return Number.isFinite(v) ? v : 0;
 	}
 
-	function slugifyHandle(value) {
-		const base = String(value || "terminal")
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "");
-		return base || "terminal";
-	}
-
-	function tileIdSuffix(tile) {
-		const compact = String(tile.id || "").replace(/[^a-z0-9]/gi, "");
-		return compact.slice(-5).toLowerCase() || "local";
-	}
-
-	function ensureRouteHandle(tile) {
-		if (tile.type !== "term") return;
-		if (tile.routeHandle) return;
-		const seed = tile.userTitle || tile.roleId || tile.autoTitle || tile.cwd || "terminal";
-		const base = slugifyHandle(seed);
-		let handle = `${base}-${tileIdSuffix(tile)}`;
-		let n = 2;
-		while (
-			tiles.some((t) =>
-				t.id !== tile.id &&
-				t.routeHandle?.toLowerCase() === handle.toLowerCase(),
-			)
-		) {
-			handle = `${base}-${tileIdSuffix(tile)}-${n}`;
-			n++;
-		}
-		tile.routeHandle = handle;
-	}
-
 	function registerTerminalTileSession(tile) {
 		if (tile.type !== "term" || !tile.ptySessionId) return;
-		ensureRouteHandle(tile);
+		ensureRouteHandle(tile, tiles);
 		const label = tile.userTitle || tile.autoTitle || tile.id;
 		window.shellApi.stringRegisterTileSession?.(
 			tile.id,
@@ -303,7 +272,7 @@ export function createTileManager({
 		wv.addEventListener("ipc-message", (event) => {
 			if (event.channel === "pty-session-id") {
 				tile.ptySessionId = event.args[0];
-				ensureRouteHandle(tile);
+				ensureRouteHandle(tile, tiles);
 				maybeRunRoleStartup(tile);
 				updateTileTitle(tileDOMs.get(tile.id), tile);
 				saveCanvasDebounced();
@@ -327,7 +296,7 @@ export function createTileManager({
 				if (cwd && cwd !== tile.autoTitle) {
 					tile.cwd = cwd;
 					tile.autoTitle = cwd;
-					ensureRouteHandle(tile);
+					ensureRouteHandle(tile, tiles);
 					updateTileTitle(tileDOMs.get(tile.id), tile);
 					saveCanvasDebounced();
 					registerTerminalTileSession(tile);
@@ -542,7 +511,7 @@ export function createTileManager({
 			height: extra.height || size.height,
 			...extra,
 		});
-		ensureRouteHandle(tile);
+		ensureRouteHandle(tile, tiles);
 		snapToGrid(tile);
 		window.shellApi.trackEvent("tile_created", { type });
 
