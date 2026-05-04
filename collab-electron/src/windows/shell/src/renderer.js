@@ -17,6 +17,9 @@ import {
 	createCanvasRpc,
 	createConnectionLabelEvent,
 	createConnectionMutationEvent,
+	buildRoleTileOptions,
+	createRoleSpawnedEvent,
+	createRoleSpawnFailureEvent,
 	createTerminalReadFailureEvent,
 	createTerminalWriteFailureEvent,
 } from "./canvas-rpc.js";
@@ -175,13 +178,6 @@ async function init() {
 			? ` (missing: ${command})`
 			: command ? ` (${command})` : "";
 		return `${role.name} — ${role.description}${suffix}`;
-	}
-
-	function normalizeRoleTerminalTarget(defaultShell) {
-		if (defaultShell === "powershell" || defaultShell === "shell") {
-			return defaultShell;
-		}
-		return undefined;
 	}
 
 	function tileEventLabel(tile) {
@@ -1135,6 +1131,16 @@ async function init() {
 				tone: "warn",
 			});
 		},
+		onRoleSpawned(event) {
+			operationalEvents.record(event);
+		},
+		onRoleSpawnFailed(event) {
+			operationalEvents.record(event);
+			toasts.show({
+				message: event.summary || "Role spawn failed.",
+				tone: "error",
+			});
+		},
 	});
 
 	Promise.resolve(window.shellApi.runtimeDiagnostics?.() ?? [])
@@ -1397,14 +1403,10 @@ async function init() {
 			const role = roles.find((r) => r.id === roleId);
 			if (!role) return;
 			if (isMissingRoleCommand(role)) {
-				operationalEvents.record({
-					type: "role.failed",
-					severity: "error",
-					summary: `${role.name} is missing command: ${getRoleCommandName(role)}`,
-					meta: { roleId: role.id, command: getRoleCommandName(role) },
-				});
+				const message = `${role.name} is missing command: ${getRoleCommandName(role)}`;
+				operationalEvents.record(createRoleSpawnFailureEvent(role, message));
 				toasts.show({
-					message: `${role.name} is missing command: ${getRoleCommandName(role)}`,
+					message,
 					tone: "error",
 				});
 				return;
@@ -1413,29 +1415,10 @@ async function init() {
 			const size = getTerminalSize();
 			const tile = tileManager.createCanvasTile(
 				"term", cx, cy, {
-					cwd, ...size,
-					userTitle: role.name,
-					terminalTarget: normalizeRoleTerminalTarget(role.defaultShell),
-					roleId: role.id,
-					roleName: role.name,
-					roleColor: role.color,
-					roleShellKind: getRoleCommandName(role) || role.defaultShell || "shell",
-					roleCommandTemplate: role.commandTemplate,
-					roleStartupPrompt: role.startupPrompt,
-					roleStatusParser: role.statusParser,
+					...buildRoleTileOptions(role, { cwd, size }),
 				},
 			);
-			operationalEvents.record({
-				type: "role.spawned",
-				severity: "info",
-				summary: `${role.name} role tile spawned`,
-				detail: role.commandTemplate || "shell",
-				meta: {
-					roleId: role.id,
-					tileId: tile.id,
-					command: role.commandTemplate,
-				},
-			});
+			operationalEvents.record(createRoleSpawnedEvent(tile, role));
 			tileManager.spawnTerminalWebview(tile, true);
 			tileManager.saveCanvasImmediate();
 			minimap.update();

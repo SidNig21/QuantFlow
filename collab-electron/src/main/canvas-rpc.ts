@@ -88,6 +88,20 @@ export function registerCanvasRpc(win: BrowserWindow): void {
   );
 
   registerMethod(
+    "canvas.roleSpawn",
+    (params) => sendToShell("canvas.roleSpawn", params),
+    {
+      description: "Spawn a terminal tile from a QuantFlow role",
+      params: {
+        role: "Role object returned by role.get",
+        cwd: "(optional) Working directory for the terminal",
+        position: "(optional) {x, y} canvas coordinates",
+        size: "(optional) {width, height} in pixels",
+      },
+    },
+  );
+
+  registerMethod(
     "canvas.tileRemove",
     (params) => sendToShell("canvas.tileRemove", params),
     {

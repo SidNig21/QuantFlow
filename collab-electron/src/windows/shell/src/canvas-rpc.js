@@ -15,6 +15,21 @@ function defaultTileLabel(tile) {
 	return tile?.userTitle || tile?.autoTitle || tile?.id || "unknown";
 }
 
+function getRpcRoleCommandName(role) {
+	const template = String(role?.commandTemplate ?? "").trim();
+	if (!template) return null;
+	const match = template.match(/^"([^"]+)"|^'([^']+)'|^(\S+)/);
+	return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+}
+
+function normalizeRpcRoleTerminalTarget(defaultShell) {
+	const value = String(defaultShell ?? "").trim();
+	if (value === "powershell") return "powershell";
+	if (value === "shell") return "shell";
+	if (value === "wsl") return "wsl";
+	return undefined;
+}
+
 export function createConnectionMutationEvent(
 	action,
 	conn,
@@ -253,6 +268,54 @@ export function buildRpcTileSummary(tile, existingConnections = []) {
 	return summary;
 }
 
+export function createRoleSpawnedEvent(tile, role) {
+	return {
+		type: "role.spawned",
+		severity: "info",
+		summary: `${role.name} role tile spawned`,
+		detail: role.commandTemplate || "shell",
+		meta: {
+			roleId: role.id,
+			tileId: tile.id,
+			command: role.commandTemplate,
+			source: "canvas-rpc",
+		},
+	};
+}
+
+export function createRoleSpawnFailureEvent(role, message) {
+	return {
+		type: "role.failed",
+		severity: "error",
+		summary: message,
+		meta: {
+			roleId: role?.id,
+			command: getRpcRoleCommandName(role),
+			source: "canvas-rpc",
+		},
+	};
+}
+
+export function buildRoleTileOptions(role, params = {}) {
+	const size = params.size ?? {};
+	const options = {
+		cwd: params.cwd,
+		userTitle: role.name,
+		terminalTarget: normalizeRpcRoleTerminalTarget(role.defaultShell),
+		roleId: role.id,
+		roleName: role.name,
+		roleColor: role.color,
+		roleShellKind:
+			getRpcRoleCommandName(role) || role.defaultShell || "shell",
+		roleCommandTemplate: role.commandTemplate,
+		roleStartupPrompt: role.startupPrompt,
+		roleStatusParser: role.statusParser,
+	};
+	if (Number.isFinite(size.width)) options.width = size.width;
+	if (Number.isFinite(size.height)) options.height = size.height;
+	return options;
+}
+
 /**
  * Find a non-overlapping position on the canvas for a tile of the
  * given size. Scans on a 20 px grid within a 4000x3000 region.
@@ -297,6 +360,8 @@ export function createCanvasRpc({
 	onConnectionFailed,
 	onTerminalReadFailed,
 	onTerminalWriteFailed,
+	onRoleSpawned,
+	onRoleSpawnFailed,
 }) {
 	function respond(requestId, result) {
 		window.shellApi.canvasRpcResponse({ requestId, result });
@@ -380,6 +445,42 @@ export function createCanvasRpc({
 					}
 					tileManager.saveCanvasImmediate();
 					result = { tileId: tile.id };
+					break;
+				}
+				case "roleSpawn": {
+					const role = params.role;
+					if (!role?.id || !role?.name || !role?.color) {
+						respondError(requestId, 4, "Role payload is invalid");
+						return;
+					}
+					if (role.commandTemplate && role.commandAvailable === false) {
+						const command = getRpcRoleCommandName(role);
+						const message = `${role.name} is missing command: ${command}`;
+						onRoleSpawnFailed?.(
+							createRoleSpawnFailureEvent(role, message),
+						);
+						respondError(requestId, 4, message);
+						return;
+					}
+					const defaultTermSize = defaultSize("term");
+					const requestedSize = params.size ?? defaultTermSize;
+					const pos = params.position
+						? { x: params.position.x, y: params.position.y }
+						: findAutoPlacement(
+							tiles,
+							requestedSize.width ?? defaultTermSize.width,
+							requestedSize.height ?? defaultTermSize.height,
+						);
+					const tile = tileManager.createCanvasTile(
+						"term",
+						pos.x,
+						pos.y,
+						buildRoleTileOptions(role, params),
+					);
+					onRoleSpawned?.(createRoleSpawnedEvent(tile, role));
+					tileManager.spawnTerminalWebview(tile, true);
+					tileManager.saveCanvasImmediate();
+					result = buildRpcTileSummary(tile, connections);
 					break;
 				}
 				case "tileRemove": {

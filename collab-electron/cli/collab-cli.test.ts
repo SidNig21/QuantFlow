@@ -28,6 +28,8 @@ describe("collab-canvas CLI", () => {
     expect(result.stdout).toContain("connection log <id> [--limit N]");
     expect(result.stdout).toContain("relay log [--limit N]");
     expect(result.stdout).toContain("watchtower snapshot");
+    expect(result.stdout).toContain("role list");
+    expect(result.stdout).toContain("role spawn <id> [options]");
     expect(result.stdout).toContain("viewport set [--pan x,y] [--zoom z]");
   });
 
@@ -79,5 +81,27 @@ describe("collab-canvas CLI", () => {
     expect(result.stderr).toContain(
       "watchtower requires a subcommand (snapshot)",
     );
+  });
+
+  test("validates role subcommands before opening the RPC socket", () => {
+    const missingSubcommand = runCli(["role"]);
+    expect(missingSubcommand.exitCode).toBe(1);
+    expect(missingSubcommand.stderr).toContain(
+      "role requires a subcommand (list, spawn)",
+    );
+
+    const missingRole = runCli(["role", "spawn"]);
+    expect(missingRole.exitCode).toBe(1);
+    expect(missingRole.stderr).toContain("role spawn requires a role id");
+  });
+
+  test("validates role spawn geometry before opening the RPC socket", () => {
+    const invalidPos = runCli(["role", "spawn", "codex", "--pos", "a,1"]);
+    expect(invalidPos.exitCode).toBe(1);
+    expect(invalidPos.stderr).toContain("invalid position: a,1");
+
+    const invalidSize = runCli(["role", "spawn", "codex", "--size", "20,no"]);
+    expect(invalidSize.exitCode).toBe(1);
+    expect(invalidSize.stderr).toContain("invalid size: 20,no");
   });
 });

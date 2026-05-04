@@ -103,6 +103,35 @@ collab-canvas tile focus tile-abc123
 collab-canvas tile focus tile-abc123 tile-def456
 ```
 
+### collab-canvas role list
+
+List configured terminal roles, including command availability diagnostics.
+
+```bash
+collab-canvas role list
+```
+
+### collab-canvas role spawn
+
+Spawn a terminal tile from a configured role. QuantFlow copies the role identity, shell target, startup command, startup prompt, and status parser metadata into the new terminal tile.
+
+```bash
+collab-canvas role spawn <id> [--cwd <path>] [--pos x,y] [--size w,h]
+```
+
+- `--cwd <path>`: working directory (default: current directory)
+- `--pos x,y`: position in grid units (default: auto placement)
+- `--size w,h`: size in grid units (default: terminal default)
+
+**Examples:**
+```bash
+# See available local agent roles
+collab-canvas role list
+
+# Spawn a Codex terminal for the current project
+collab-canvas role spawn codex --cwd . --pos 0,0
+```
+
 ### collab-canvas connection list
 
 List all visible cables on the canvas.
@@ -241,7 +270,8 @@ Knowledge graph on the left, notes on the right, terminal below.
 ```bash
 collab-canvas tile create graph --file ./research.graph.json --pos 0,0 --size 30,25
 collab-canvas tile create note --file ./notes.md --pos 31,0
-collab-canvas tile create term --pos 0,26
+collab-canvas role spawn codex --cwd . --pos 0,26
+collab-canvas role spawn claude-reviewer --cwd . --pos 21,26
 collab-canvas connection create <worker-id> <reviewer-id> --label review
 collab-canvas connection send <connection-id> --from <worker-id> "Please review the pinned notes."
 collab-canvas connection log <connection-id> --limit 10

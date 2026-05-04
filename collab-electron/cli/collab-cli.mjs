@@ -129,6 +129,19 @@ function parseLimitValue(value) {
   return limit;
 }
 
+function getRoleCommandName(role) {
+  const template = String(role?.commandTemplate ?? "").trim();
+  if (!template) return null;
+  const match = template.match(/^"([^"]+)"|^'([^']+)'|^(\S+)/);
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+}
+
+function resolveRoleCwd(role, override) {
+  if (override) return resolve(override);
+  if (role?.cwdPolicy === "home") return homedir();
+  return process.cwd();
+}
+
 // --- subcommands ----------------------------------------------------------
 
 async function cmdTileList() {
@@ -388,6 +401,63 @@ async function cmdWatchtower(args) {
   console.log(pretty(result));
 }
 
+async function cmdRole(args) {
+  if (args.length === 0) die("role requires a subcommand (list, spawn)");
+  const sub = args.shift();
+
+  if (sub === "list") {
+    if (args.length > 0) die(`unknown option: ${args[0]}`);
+    const result = await rpcCall("role.list");
+    console.log(pretty(result));
+    return;
+  }
+
+  if (sub !== "spawn") die(`unknown role subcommand: ${sub}`);
+  if (args.length === 0) die("role spawn requires a role id");
+
+  const roleId = args.shift();
+  const params = {};
+  let cwdOverride = null;
+
+  while (args.length > 0) {
+    const flag = args.shift();
+    switch (flag) {
+      case "--cwd": {
+        if (args.length === 0) die("--cwd requires a path");
+        cwdOverride = args.shift();
+        break;
+      }
+      case "--pos": {
+        if (args.length === 0) die("--pos requires x,y");
+        const { x, y } = parsePos(args.shift());
+        params.position = { x: x * GRID, y: y * GRID };
+        break;
+      }
+      case "--size": {
+        if (args.length === 0) die("--size requires w,h");
+        const { w, h } = parseSize(args.shift());
+        params.size = { width: w * GRID, height: h * GRID };
+        break;
+      }
+      default:
+        die(`unknown option: ${flag}`);
+    }
+  }
+
+  const role = await rpcCall("role.get", { id: roleId });
+  if (!role) die(`role not found: ${roleId}`);
+  if (role.commandTemplate && role.commandAvailable === false) {
+    die(`${role.name} is missing command: ${getRoleCommandName(role)}`);
+  }
+
+  const result = await rpcCall("canvas.roleSpawn", {
+    ...params,
+    cwd: resolveRoleCwd(role, cwdOverride),
+    role,
+  });
+  console.log(pretty(result));
+}
+
 async function cmdViewport(args) {
   if (args.length === 0) {
     const result = await rpcCall("canvas.viewportGet");
@@ -562,6 +632,8 @@ COMMANDS
   connection log <id> [--limit N]    Show relay history for a cable
   relay log [--limit N]              Show recent relay success/failure events
   watchtower snapshot                Show agent status snapshots
+  role list                          List configured terminal roles
+  role spawn <id> [options]          Spawn a terminal tile from a role
   viewport                           Get viewport pan and zoom
   viewport set [--pan x,y] [--zoom z]
   terminal write <id> <input>        Send input to a terminal tile
@@ -601,6 +673,11 @@ CONNECTION SEND OPTIONS
 
 LOG OPTIONS
   --limit N       Maximum number of events to return (default 50)
+
+ROLE SPAWN OPTIONS
+  --cwd <path>     Working directory (default: current directory)
+  --pos x,y        Position in grid units (default: auto)
+  --size w,h       Size in grid units (default: terminal default)
 
 VIEWPORT SET OPTIONS
   --pan x,y       Canvas pan in pixels
@@ -692,6 +769,9 @@ try {
       break;
     case "watchtower":
       await cmdWatchtower(argv.slice(1));
+      break;
+    case "role":
+      await cmdRole(argv.slice(1));
       break;
     case "viewport":
       await cmdViewport(argv.slice(1));

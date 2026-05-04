@@ -1,9 +1,12 @@
 import { describe, test, expect } from "bun:test";
 import {
+	buildRoleTileOptions,
 	buildRpcTileSummary,
 	createConnectionFailureEvent,
 	createConnectionLabelEvent,
 	createConnectionMutationEvent,
+	createRoleSpawnedEvent,
+	createRoleSpawnFailureEvent,
 	createTerminalReadFailureEvent,
 	createTerminalWriteFailureEvent,
 	findAutoPlacement,
@@ -147,6 +150,97 @@ describe("buildRpcTileSummary", () => {
       position: { x: 20, y: 40 },
       size: { width: 400, height: 500 },
       zIndex: 7,
+    });
+  });
+});
+
+describe("buildRoleTileOptions", () => {
+  test("copies role launch metadata into terminal tile options", () => {
+    expect(buildRoleTileOptions(
+      {
+        id: "codex",
+        name: "Codex",
+        color: "#38bdf8",
+        defaultShell: "wsl",
+        commandTemplate: "codex --full-auto",
+        startupPrompt: "Wait for instructions.",
+        statusParser: { waiting: ["confirm"], blocked: ["error:"] },
+      },
+      {
+        cwd: "/repo",
+        size: { width: 520, height: 420 },
+      },
+    )).toEqual({
+      cwd: "/repo",
+      userTitle: "Codex",
+      terminalTarget: "wsl",
+      roleId: "codex",
+      roleName: "Codex",
+      roleColor: "#38bdf8",
+      roleShellKind: "codex",
+      roleCommandTemplate: "codex --full-auto",
+      roleStartupPrompt: "Wait for instructions.",
+      roleStatusParser: { waiting: ["confirm"], blocked: ["error:"] },
+      width: 520,
+      height: 420,
+    });
+  });
+
+  test("leaves automatic shell selection unset for auto roles", () => {
+    expect(buildRoleTileOptions(
+      {
+        id: "shell",
+        name: "Shell",
+        color: "#64748b",
+        defaultShell: "auto",
+      },
+    )).toMatchObject({
+      userTitle: "Shell",
+      terminalTarget: undefined,
+      roleShellKind: "auto",
+    });
+  });
+});
+
+describe("role spawn operational events", () => {
+  test("formats successful role spawn events for Watchtower", () => {
+    expect(createRoleSpawnedEvent(
+      { id: "tile-codex" },
+      {
+        id: "codex",
+        name: "Codex",
+        commandTemplate: "codex",
+      },
+    )).toEqual({
+      type: "role.spawned",
+      severity: "info",
+      summary: "Codex role tile spawned",
+      detail: "codex",
+      meta: {
+        roleId: "codex",
+        tileId: "tile-codex",
+        command: "codex",
+        source: "canvas-rpc",
+      },
+    });
+  });
+
+  test("formats missing role command failures for Watchtower", () => {
+    expect(createRoleSpawnFailureEvent(
+      {
+        id: "claude-worker",
+        commandTemplate: "\"claude code\" --danger",
+      },
+      "Claude Worker is missing command: claude code",
+    )).toEqual({
+      type: "role.failed",
+      severity: "error",
+      summary: "Claude Worker is missing command: claude code",
+      meta: {
+        roleId: "claude-worker",
+        command: "claude code",
+        source: "canvas-rpc",
+      },
     });
   });
 });
