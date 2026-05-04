@@ -14,6 +14,7 @@ import { workspaceRootMatch } from "@collab/shared/path-utils";
 import { attachDrag, attachResize } from "./tile-interactions.js";
 import { findAutoPlacement } from "./canvas-rpc.js";
 import { ensureRouteHandle } from "./tile-route-handles.js";
+import { getRoleStartupWrites } from "./role-startup.js";
 
 /**
  * Tile lifecycle manager: creation, deletion, persistence, webview
@@ -100,6 +101,7 @@ export function createTileManager({
 				roleStartupPrompt: t.roleStartupPrompt,
 				roleStatusParser: t.roleStatusParser,
 				roleStartupSessionId: t.roleStartupSessionId,
+				roleStartupPromptSessionId: t.roleStartupPromptSessionId,
 			})),
 			connections: connections.map((conn) => ({
 				id: conn.id,
@@ -311,10 +313,30 @@ export function createTileManager({
 	}
 
 	function maybeRunRoleStartup(tile) {
-		if (!tile.ptySessionId || !tile.roleCommandTemplate) return;
-		if (tile.roleStartupSessionId === tile.ptySessionId) return;
-		tile.roleStartupSessionId = tile.ptySessionId;
-		window.shellApi.ptyWrite?.(tile.ptySessionId, `${tile.roleCommandTemplate}\r`);
+		const writes = getRoleStartupWrites(tile);
+		if (!writes.length) return;
+		const sessionId = tile.ptySessionId;
+
+		for (const write of writes) {
+			const send = () => {
+				const current = getTile(tile.id);
+				if (!current || current.ptySessionId !== sessionId) return;
+				if (write.kind === "command") {
+					current.roleStartupSessionId = sessionId;
+				}
+				if (write.kind === "prompt") {
+					current.roleStartupPromptSessionId = sessionId;
+				}
+				window.shellApi.ptyWrite?.(sessionId, write.data);
+				saveCanvasDebounced();
+			};
+
+			if (write.delayMs > 0) {
+				setTimeout(send, write.delayMs);
+			} else {
+				send();
+			}
+		}
 	}
 
 	function spawnGraphWebview(tile) {
@@ -788,6 +810,7 @@ export function createTileManager({
 						roleStartupPrompt: saved.roleStartupPrompt,
 						roleStatusParser: saved.roleStatusParser,
 						roleStartupSessionId: saved.roleStartupSessionId,
+						roleStartupPromptSessionId: saved.roleStartupPromptSessionId,
 					},
 				);
 				spawnTerminalWebview(tile);

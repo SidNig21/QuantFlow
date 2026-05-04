@@ -27,6 +27,7 @@
  * @property {string} [roleStartupPrompt] - Initial role instruction text
  * @property {{waiting?: string[], blocked?: string[]}} [roleStatusParser] - Role-specific terminal status hints
  * @property {string} [roleStartupSessionId] - Session that already received startup command
+ * @property {string} [roleStartupPromptSessionId] - Session that already received startup prompt
  * @property {number} zIndex - Stacking order
  */
 
