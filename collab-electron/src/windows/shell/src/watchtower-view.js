@@ -123,6 +123,33 @@ export function formatWatchtowerAge(ts, now = Date.now()) {
 	return `${days}d ago`;
 }
 
+const SECRET_PATTERNS = [
+	/\bsk-[A-Za-z0-9_-]{12,}\b/g,
+	/\bgh[opsu]_[A-Za-z0-9_]{12,}\b/g,
+	/\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
+	/\bglpat-[A-Za-z0-9_-]{12,}\b/g,
+	/\bxox[baprs]-[A-Za-z0-9-]{12,}\b/g,
+	/\b(?:api[_-]?key|token|secret|password|passwd|pwd)\s*[:=]\s*["']?[^"'\s,;]+/gi,
+];
+
+export function redactDiagnosticText(value) {
+	let text = String(value ?? "");
+	for (const pattern of SECRET_PATTERNS) {
+		text = text.replace(pattern, (match) => {
+			const separator = match.match(/\s*[:=]\s*/);
+			if (separator?.index !== undefined) {
+				return `${match.slice(0, separator.index)}${separator[0]}[REDACTED]`;
+			}
+			return "[REDACTED]";
+		});
+	}
+	return text;
+}
+
+function diagnosticValue(value, fallback = "") {
+	return redactDiagnosticText(firstNonBlank(value, fallback));
+}
+
 export function getWatchtowerRetryRequest(
 	entry,
 	connection,
@@ -163,25 +190,35 @@ export function shouldRenderWatchtowerRetry(entry) {
 }
 
 export function formatWatchtowerDiagnostics({
+	runtime = {},
 	agents = [],
 	connections = [],
 	relayLogs = [],
 	operationalEvents = [],
+	roles = [],
 	now = Date.now(),
 } = {}) {
 	const lines = [
 		"QuantFlow Watchtower diagnostics",
 		`Generated: ${new Date(now).toISOString()}`,
 		"",
+		"Runtime",
+		`- appVersion: ${diagnosticValue(runtime?.appVersion, "unknown")}`,
+		`- os: ${diagnosticValue(runtime?.os, "unknown")}`,
+		`- shellMode: ${diagnosticValue(runtime?.shellMode, "unknown")}`,
+		`- terminalTarget: ${diagnosticValue(runtime?.terminalTarget, "auto")}`,
+		"",
 		`Agents (${agents.length})`,
 	];
 	if (agents.length) {
 		for (const item of agents) {
-			const label = String(item?.label || item?.tileId || "unknown");
-			const handle = item?.routeHandle ? ` @${item.routeHandle}` : "";
-			const last = item?.lastLine ? ` last="${String(item.lastLine).slice(0, 160)}"` : "";
+			const label = diagnosticValue(item?.label || item?.tileId || "unknown");
+			const handle = item?.routeHandle ? ` @${diagnosticValue(item.routeHandle)}` : "";
+			const last = item?.lastLine
+				? ` last="${redactDiagnosticText(String(item.lastLine).slice(0, 160))}"`
+				: "";
 			lines.push(
-				`- ${label}${handle} [${item?.status || "unknown"}] tile=${item?.tileId || ""} session=${item?.sessionId || ""} ${formatWatchtowerAge(item?.lastActivityTs, now)}${last}`,
+				`- ${label}${handle} [${diagnosticValue(item?.status, "unknown")}] tile=${diagnosticValue(item?.tileId)} session=${diagnosticValue(item?.sessionId)} ${formatWatchtowerAge(item?.lastActivityTs, now)}${last}`,
 			);
 		}
 	} else {
@@ -191,8 +228,27 @@ export function formatWatchtowerDiagnostics({
 	lines.push("", `Cables (${connections.length})`);
 	if (connections.length) {
 		for (const conn of connections) {
-			const label = conn?.label ? ` label="${conn.label}"` : "";
-			lines.push(`- ${conn?.id || ""}: ${conn?.tileAId || ""} <-> ${conn?.tileBId || ""}${label}`);
+			const label = conn?.label ? ` label="${diagnosticValue(conn.label)}"` : "";
+			lines.push(`- ${diagnosticValue(conn?.id)}: ${diagnosticValue(conn?.tileAId)} <-> ${diagnosticValue(conn?.tileBId)}${label}`);
+		}
+	} else {
+		lines.push("- none");
+	}
+
+	lines.push("", `Roles (${roles.length})`);
+	if (roles.length) {
+		for (const role of roles) {
+			const command = role?.commandTemplate
+				? ` command="${redactDiagnosticText(role.commandTemplate)}"`
+				: "";
+			const available = role?.commandAvailable === false
+				? "missing"
+				: role?.commandAvailable === true
+					? "available"
+					: "n/a";
+			lines.push(
+				`- ${diagnosticValue(role?.name, role?.id || "role")} id=${diagnosticValue(role?.id)} shell=${diagnosticValue(role?.defaultShell, "auto")} cwd=${diagnosticValue(role?.cwdPolicy, "workspace")} command=${available}${command}`,
+			);
 		}
 	} else {
 		lines.push("- none");
@@ -202,9 +258,13 @@ export function formatWatchtowerDiagnostics({
 	if (operationalEvents.length) {
 		for (const event of operationalEvents.slice(-30).reverse()) {
 			const age = formatWatchtowerAge(event?.timestamp, now);
-			const summary = String(event?.summary || event?.type || "event").slice(0, 180);
-			const detail = event?.detail ? ` :: ${String(event.detail).slice(0, 180)}` : "";
-			lines.push(`- ${event?.severity || "info"} ${event?.type || "event"} ${age} :: ${summary}${detail}`);
+			const summary = redactDiagnosticText(
+				String(event?.summary || event?.type || "event").slice(0, 180),
+			);
+			const detail = event?.detail
+				? ` :: ${redactDiagnosticText(String(event.detail).slice(0, 180))}`
+				: "";
+			lines.push(`- ${diagnosticValue(event?.severity, "info")} ${diagnosticValue(event?.type, "event")} ${age} :: ${summary}${detail}`);
 		}
 	} else {
 		lines.push("- none");
@@ -213,9 +273,13 @@ export function formatWatchtowerDiagnostics({
 	lines.push("", `Relay events (${relayLogs.length})`);
 	if (relayLogs.length) {
 		for (const entry of relayLogs.slice(-20).reverse()) {
-			const status = entry?.ok === false ? `failed/${entry?.errorCode || "unknown"}` : "sent";
-			const text = String(entry?.message || entry?.formatted || entry?.text || "").slice(0, 180);
-			lines.push(`- ${status} ${formatRelayRoute(entry)} :: ${text}`);
+			const status = entry?.ok === false
+				? `failed/${diagnosticValue(entry?.errorCode, "unknown")}`
+				: "sent";
+			const text = redactDiagnosticText(
+				String(entry?.message || entry?.formatted || entry?.text || "").slice(0, 180),
+			);
+			lines.push(`- ${status} ${redactDiagnosticText(formatRelayRoute(entry))} :: ${text}`);
 		}
 	} else {
 		lines.push("- none");

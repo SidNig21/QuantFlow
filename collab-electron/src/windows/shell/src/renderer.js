@@ -1522,15 +1522,33 @@ async function init() {
 
 	watchtowerEl.querySelector(".wt-copy").addEventListener("click", async () => {
 		try {
-			const [items, relayLogs] = await Promise.all([
+			const [
+				items,
+				relayLogs,
+				roles,
+				appVersion,
+				terminalMode,
+				terminalTarget,
+			] = await Promise.all([
 				window.shellApi.watchtowerSnapshot?.() ?? [],
 				window.shellApi.watchtowerRelayLog?.(50) ?? [],
+				window.shellApi.rolesList?.() ?? [],
+				window.shellApi.appVersion?.() ?? "unknown",
+				window.shellApi.getPref("terminalMode"),
+				window.shellApi.getPref("terminalTarget"),
 			]);
 			const text = formatWatchtowerDiagnostics({
+				runtime: {
+					appVersion,
+					os: window.shellApi.getPlatform?.() ?? "unknown",
+					shellMode: terminalMode || "sidecar",
+					terminalTarget: terminalTarget || "auto",
+				},
 				agents: Array.isArray(items) ? items : [],
 				connections,
 				relayLogs: Array.isArray(relayLogs) ? relayLogs : [],
 				operationalEvents: operationalEvents.list(),
+				roles: Array.isArray(roles) ? roles : [],
 			});
 			await navigator.clipboard.writeText(text);
 			toasts.show({ message: "Watchtower diagnostics copied.", tone: "info" });

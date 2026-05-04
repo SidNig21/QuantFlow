@@ -15,6 +15,7 @@ import {
 	getWatchtowerRetryRequest,
 	getWatchtowerAttentionItems,
 	getWatchtowerOperationalAttentionItems,
+	redactDiagnosticText,
 	renderWatchtowerAgents,
 	renderWatchtowerAttention,
 	renderWatchtowerEvents,
@@ -162,6 +163,12 @@ describe("formatWatchtowerDiagnostics", () => {
 	test("formats copyable agent, cable, and relay diagnostics", () => {
 		const text = formatWatchtowerDiagnostics({
 			now: 4_000,
+			runtime: {
+				appVersion: "1.2.3",
+				os: "win32",
+				shellMode: "sidecar",
+				terminalTarget: "wsl:Ubuntu",
+			},
 			agents: [
 				{
 					tileId: "tile-a",
@@ -194,17 +201,105 @@ describe("formatWatchtowerDiagnostics", () => {
 					summary: "Planner connected to Reviewer",
 				},
 			],
+			roles: [
+				{
+					id: "codex",
+					name: "Codex",
+					defaultShell: "auto",
+					cwdPolicy: "workspace",
+					commandTemplate: "codex",
+					commandAvailable: true,
+				},
+			],
 		});
 
 		expect(text).toContain("QuantFlow Watchtower diagnostics");
+		expect(text).toContain("Runtime");
+		expect(text).toContain("appVersion: 1.2.3");
+		expect(text).toContain("os: win32");
+		expect(text).toContain("shellMode: sidecar");
+		expect(text).toContain("terminalTarget: wsl:Ubuntu");
 		expect(text).toContain("Agents (1)");
 		expect(text).toContain("Planner @planner [waiting]");
 		expect(text).toContain("Cables (1)");
 		expect(text).toContain("conn-ab: tile-a <-> tile-b");
+		expect(text).toContain("Roles (1)");
+		expect(text).toContain("Codex id=codex shell=auto cwd=workspace command=available command=\"codex\"");
 		expect(text).toContain("Relay events (1)");
 		expect(text).toContain("failed/missing_pty agent / Planner -> @Reviewer");
 		expect(text).toContain("Operational events (1)");
 		expect(text).toContain("connection.created 2s ago :: Planner connected to Reviewer");
+	});
+
+	test("redacts common secrets from diagnostic fields", () => {
+		const text = formatWatchtowerDiagnostics({
+			now: 4_000,
+			runtime: {
+				appVersion: "token=runtime-secret",
+				os: "win32",
+				shellMode: "sidecar",
+				terminalTarget: "auto",
+			},
+			agents: [
+				{
+					tileId: "tile-a",
+					label: "Planner",
+					status: "waiting",
+					sessionId: "session-a",
+					lastActivityTs: 1_000,
+					lastLine: "OPENAI_API_KEY=sk-supersecret123456789",
+				},
+			],
+			connections: [
+				{
+					id: "conn-ab",
+					tileAId: "tile-a",
+					tileBId: "tile-b",
+					label: "token=conn-secret",
+				},
+			],
+			relayLogs: [
+				{
+					ok: false,
+					errorCode: "write_failed",
+					routeMethod: "manual",
+					fromLabel: "Planner",
+					targetLabel: "Reviewer",
+					message: "password=hunter2",
+				},
+			],
+			operationalEvents: [
+				{
+					type: "context.failed",
+					severity: "error",
+					timestamp: 2_000,
+					summary: "secret=abc123",
+					detail: "ghp_abcdefghijklmnopqrstuvwxyz",
+				},
+			],
+			roles: [
+				{
+					id: "codex",
+					name: "Codex",
+					commandTemplate: "codex --api-key sk-rolekey123456789",
+				},
+			],
+		});
+
+		expect(text).toContain("[REDACTED]");
+		expect(text).not.toContain("supersecret");
+		expect(text).not.toContain("conn-secret");
+		expect(text).not.toContain("hunter2");
+		expect(text).not.toContain("abc123");
+		expect(text).not.toContain("abcdefghijklmnopqrstuvwxyz");
+		expect(text).not.toContain("rolekey");
+	});
+});
+
+describe("redactDiagnosticText", () => {
+	test("preserves diagnostic keys while redacting values", () => {
+		expect(redactDiagnosticText("token=abc123 password: hunter2"))
+			.toBe("token=[REDACTED] password: [REDACTED]");
 	});
 });
 
