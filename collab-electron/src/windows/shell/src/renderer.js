@@ -8,6 +8,7 @@ import {
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
 import { createWebview, isFocusSearchShortcut } from "./webview-factory.js";
+import { createCommandPalette } from "./command-palette.js";
 import { createViewport } from "./canvas-viewport.js";
 import { createEdgeIndicators } from "./edge-indicators.js";
 import { createMinimap } from "./canvas-minimap.js";
@@ -1143,6 +1144,58 @@ async function init() {
 		},
 	});
 
+	function getViewportCenterForSize(size) {
+		const rect = panelViewer.getBoundingClientRect();
+		return {
+			x: (rect.width / 2 - viewportState.panX) / viewportState.zoom -
+				size.width / 2,
+			y: (rect.height / 2 - viewportState.panY) / viewportState.zoom -
+				size.height / 2,
+		};
+	}
+
+	function spawnTerminalTileAt(x, y) {
+		const cwd = getTerminalCwd();
+		const size = getTerminalSize();
+		const tile = tileManager.createCanvasTile(
+			"term", x, y, { cwd, ...size },
+		);
+		tileManager.spawnTerminalWebview(tile, true);
+		tileManager.saveCanvasImmediate();
+		minimap.update();
+		return tile;
+	}
+
+	function spawnBrowserTileAt(x, y) {
+		const tile = tileManager.createCanvasTile("browser", x, y);
+		tileManager.spawnBrowserWebview(tile, true);
+		tileManager.saveCanvasImmediate();
+		minimap.update();
+		return tile;
+	}
+
+	function spawnRoleTileAt(role, x, y) {
+		if (!role) return null;
+		if (isMissingRoleCommand(role)) {
+			const message = `${role.name} is missing command: ${getRoleCommandName(role)}`;
+			operationalEvents.record(createRoleSpawnFailureEvent(role, message));
+			toasts.show({ message, tone: "error" });
+			return null;
+		}
+		const cwd = getTerminalCwd();
+		const size = getTerminalSize();
+		const tile = tileManager.createCanvasTile(
+			"term", x, y, {
+				...buildRoleTileOptions(role, { cwd, size }),
+			},
+		);
+		operationalEvents.record(createRoleSpawnedEvent(tile, role));
+		tileManager.spawnTerminalWebview(tile, true);
+		tileManager.saveCanvasImmediate();
+		minimap.update();
+		return tile;
+	}
+
 	Promise.resolve(window.shellApi.runtimeDiagnostics?.() ?? [])
 		.then((items) => {
 			if (Array.isArray(items) && items.length > 0) {
@@ -1374,21 +1427,9 @@ async function init() {
 		]);
 
 		if (selected === "new-terminal") {
-			const cwd = getTerminalCwd();
-			const size = getTerminalSize();
-			const tile = tileManager.createCanvasTile(
-				"term", cx, cy, { cwd, ...size },
-			);
-			tileManager.spawnTerminalWebview(tile, true);
-			tileManager.saveCanvasImmediate();
-			minimap.update();
+			spawnTerminalTileAt(cx, cy);
 		} else if (selected === "new-browser") {
-			const tile = tileManager.createCanvasTile(
-				"browser", cx, cy,
-			);
-			tileManager.spawnBrowserWebview(tile, true);
-			tileManager.saveCanvasImmediate();
-			minimap.update();
+			spawnBrowserTileAt(cx, cy);
 		} else if (selected === "spawn-role") {
 			const roles = await window.shellApi.rolesList?.() ?? [];
 			if (roles.length === 0) return;
@@ -1401,27 +1442,7 @@ async function init() {
 			if (!roleSelected?.startsWith("role:")) return;
 			const roleId = roleSelected.slice(5);
 			const role = roles.find((r) => r.id === roleId);
-			if (!role) return;
-			if (isMissingRoleCommand(role)) {
-				const message = `${role.name} is missing command: ${getRoleCommandName(role)}`;
-				operationalEvents.record(createRoleSpawnFailureEvent(role, message));
-				toasts.show({
-					message,
-					tone: "error",
-				});
-				return;
-			}
-			const cwd = getTerminalCwd();
-			const size = getTerminalSize();
-			const tile = tileManager.createCanvasTile(
-				"term", cx, cy, {
-					...buildRoleTileOptions(role, { cwd, size }),
-				},
-			);
-			operationalEvents.record(createRoleSpawnedEvent(tile, role));
-			tileManager.spawnTerminalWebview(tile, true);
-			tileManager.saveCanvasImmediate();
-			minimap.update();
+			spawnRoleTileAt(role, cx, cy);
 		}
 	});
 
@@ -1820,6 +1841,129 @@ async function init() {
 		clearInterval(watchtowerTimer);
 		watchtowerTimer = null;
 	}
+
+	const commandPalette = createCommandPalette({
+		document,
+		onClose: () => {
+			canvasEl.focus();
+			noteSurfaceFocus("canvas");
+		},
+		onNotify: (message, tone = "info") => toasts.show({ message, tone }),
+	});
+
+	function buildTileCommandItems() {
+		return tiles.map((tile) => {
+			const label = tileEventLabel(tile);
+			const role = tile.roleName || tile.roleId;
+			const subtitle = [
+				tile.type,
+				role ? `role: ${role}` : null,
+				tile.routeHandle ? `route: ${tile.routeHandle}` : null,
+			].filter(Boolean).join(" · ");
+			return {
+				id: `focus-tile:${tile.id}`,
+				title: `Focus ${label}`,
+				subtitle,
+				section: "Tiles",
+				keywords: [tile.id, tile.routeHandle, tile.roleName, tile.roleId],
+				run: () => {
+					edgeIndicators.panToTile(tile, { targetZoom: 1 });
+					tileManager.focusCanvasTile(tile.id);
+				},
+			};
+		});
+	}
+
+	function buildRoleCommandItems(roles) {
+		const size = getTerminalSize();
+		return roles.map((role) => ({
+			id: `spawn-role:${role.id}`,
+			title: `Spawn ${role.name}`,
+			subtitle: role.commandTemplate || role.description || "Terminal role",
+			section: "Roles",
+			disabled: isMissingRoleCommand(role),
+			keywords: [role.id, role.description, role.commandTemplate, "agent"],
+			run: () => {
+				const pos = getViewportCenterForSize(size);
+				spawnRoleTileAt(role, pos.x, pos.y);
+			},
+		}));
+	}
+
+	async function openCommandPalette() {
+		const roles = await window.shellApi.rolesList?.() ?? [];
+		const baseCommands = [
+			{
+				id: "new-terminal",
+				title: "New Terminal Tile",
+				subtitle: getTerminalCwd(),
+				section: "Canvas",
+				keywords: ["shell", "pty"],
+				run: () => {
+					const pos = getViewportCenterForSize(getTerminalSize());
+					spawnTerminalTileAt(pos.x, pos.y);
+				},
+			},
+			{
+				id: "new-browser",
+				title: "New Browser Tile",
+				subtitle: "Canvas browser",
+				section: "Canvas",
+				keywords: ["web"],
+				run: () => {
+					const pos = getViewportCenterForSize(defaultSize("browser"));
+					spawnBrowserTileAt(pos.x, pos.y);
+				},
+			},
+			{
+				id: "watchtower-toggle",
+				title: watchtowerVisible ? "Hide Watchtower" : "Open Watchtower",
+				subtitle: "Agents, relay messages, and operational events",
+				section: "Watchtower",
+				keywords: ["status", "relay", "events", "monitor"],
+				run: () => {
+					if (watchtowerVisible) hideWatchtower();
+					else showWatchtower();
+				},
+			},
+			{
+				id: "context-preview",
+				title: "Preview Shared Context",
+				subtitle: "Pinned files, decisions, warnings, and truncation",
+				section: "Context",
+				keywords: ["obsidian", "vault", "inject"],
+				run: async () => {
+					const preview = await window.shellApi.contextPreviewForTile?.();
+					await window.shellApi.showConfirmDialog({
+						message: "Shared context preview",
+						detail: preview
+							? formatContextPreviewDetail(preview)
+							: "No shared context preview is available.",
+						buttons: ["OK"],
+					});
+				},
+			},
+		];
+
+		commandPalette.open([
+			...baseCommands,
+			...buildRoleCommandItems(Array.isArray(roles) ? roles : []),
+			...buildTileCommandItems(),
+		]);
+	}
+
+	window.addEventListener("keydown", (e) => {
+		if (
+			(e.metaKey || e.ctrlKey) &&
+			!e.altKey &&
+			!e.shiftKey &&
+			!e.repeat &&
+			(e.code === "KeyK" || String(e.key).toLowerCase() === "k")
+		) {
+			e.preventDefault();
+			void openCommandPalette();
+		}
+	});
 
 	window.addEventListener("keydown", (e) => {
 		if (
@@ -2334,20 +2478,13 @@ async function init() {
 		]);
 		const type = selected === "new-terminal" ? "term" : selected === "new-browser" ? "browser" : null;
 		if (!type) return;
-		const rect = panelViewer.getBoundingClientRect();
 		const size = defaultSize(type);
-		const cx = (rect.width / 2 - viewportState.panX) / viewportState.zoom - size.width / 2;
-		const cy = (rect.height / 2 - viewportState.panY) / viewportState.zoom - size.height / 2;
+		const { x: cx, y: cy } = getViewportCenterForSize(size);
 		if (type === "term") {
-			const cwd = getTerminalCwd();
-			const tile = tileManager.createCanvasTile("term", cx, cy, { cwd });
-			tileManager.spawnTerminalWebview(tile, true);
+			spawnTerminalTileAt(cx, cy);
 		} else {
-			const tile = tileManager.createCanvasTile("browser", cx, cy);
-			tileManager.spawnBrowserWebview(tile, true);
+			spawnBrowserTileAt(cx, cy);
 		}
-		tileManager.saveCanvasImmediate();
-		minimap.update();
 	});
 
 	settingsBtn.addEventListener("click", () => {
