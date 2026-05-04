@@ -1,10 +1,10 @@
-const ZOOM_MIN = 0.25;
-const ZOOM_MAX = 1;
+export const ZOOM_MIN = 0.25;
+export const ZOOM_MAX = 1;
 const ZOOM_RUBBER_BAND_K = 400;
 const CELL = 20;
 const MAJOR = 80;
 
-const isMac = window.shellApi.getPlatform() === "darwin";
+const isMac = globalThis.window?.shellApi?.getPlatform?.() === "darwin";
 
 export function shouldZoom(e, mac = isMac) {
 	return e.ctrlKey || (mac && e.metaKey);

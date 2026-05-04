@@ -10,6 +10,7 @@ import {
 	validateRpcTerminalRead,
 	validateRpcTerminalWrite,
 	validateRpcTileResize,
+	validateRpcViewportSet,
 } from "./canvas-rpc.js";
 
 interface Tile {
@@ -390,6 +391,48 @@ describe("validateRpcTileResize", () => {
       reason: "too_small",
       message: "Tile size must be at least 200x120",
     });
+  });
+});
+
+describe("validateRpcViewportSet", () => {
+  test("accepts finite pan and zoom inside the viewport range", () => {
+    expect(validateRpcViewportSet({
+      pan: { x: -120, y: 240 },
+      zoom: 0.5,
+    })).toEqual({
+      ok: true,
+      pan: { x: -120, y: 240 },
+      zoom: 0.5,
+    });
+  });
+
+  test("accepts partial viewport updates", () => {
+    expect(validateRpcViewportSet({ pan: { x: 0, y: 0 } }))
+      .toEqual({
+        ok: true,
+        pan: { x: 0, y: 0 },
+      });
+    expect(validateRpcViewportSet({ zoom: 1 }))
+      .toEqual({
+        ok: true,
+        zoom: 1,
+      });
+  });
+
+  test("rejects non-finite pan and out-of-range zoom", () => {
+    expect(validateRpcViewportSet({ pan: { x: Infinity, y: 0 } }))
+      .toMatchObject({
+        ok: false,
+        reason: "invalid_pan",
+        message: "Viewport pan must use finite x and y values",
+      });
+    for (const zoom of [0, 1.5, Number.NaN]) {
+      expect(validateRpcViewportSet({ zoom })).toMatchObject({
+        ok: false,
+        reason: "invalid_zoom",
+        message: "Viewport zoom must be between 0.25 and 1",
+      });
+    }
   });
 });
 

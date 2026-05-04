@@ -5,6 +5,7 @@ import {
 } from "./canvas-state.js";
 import { resolveCableDrop } from "./cable-drop.js";
 import { MIN_SIZES } from "./tile-interactions.js";
+import { ZOOM_MAX, ZOOM_MIN } from "./canvas-viewport.js";
 
 function generateConnectionId() {
 	return "conn-" + Date.now() + "-" + Math.random().toString(36).slice(2, 9);
@@ -155,6 +156,26 @@ export function validateRpcTileResize(tile, size) {
 		};
 	}
 	return { ok: true, width, height };
+}
+
+export function validateRpcViewportSet(params = {}) {
+	const result = {};
+	if (params.pan !== undefined) {
+		const x = params.pan?.x;
+		const y = params.pan?.y;
+		if (!Number.isFinite(x) || !Number.isFinite(y)) {
+			return { ok: false, code: 4, reason: "invalid_pan", message: "Viewport pan must use finite x and y values" };
+		}
+		result.pan = { x, y };
+	}
+	if (params.zoom !== undefined) {
+		const zoom = params.zoom;
+		if (!Number.isFinite(zoom) || zoom < ZOOM_MIN || zoom > ZOOM_MAX) {
+			return { ok: false, code: 4, reason: "invalid_zoom", message: `Viewport zoom must be between ${ZOOM_MIN} and ${ZOOM_MAX}` };
+		}
+		result.zoom = zoom;
+	}
+	return { ok: true, ...result };
 }
 
 export function createTerminalWriteFailureEvent(
@@ -473,12 +494,21 @@ export function createCanvasRpc({
 					break;
 				}
 				case "viewportSet": {
-					if (params.pan) {
-						viewportState.panX = params.pan.x;
-						viewportState.panY = params.pan.y;
+					const validation = validateRpcViewportSet(params);
+					if (!validation.ok) {
+						respondError(
+							requestId,
+							validation.code,
+							validation.message,
+						);
+						return;
 					}
-					if (params.zoom !== undefined) {
-						viewportState.zoom = params.zoom;
+					if (validation.pan) {
+						viewportState.panX = validation.pan.x;
+						viewportState.panY = validation.pan.y;
+					}
+					if (validation.zoom !== undefined) {
+						viewportState.zoom = validation.zoom;
 					}
 					viewport.updateCanvas();
 					tileManager.saveCanvasDebounced();
