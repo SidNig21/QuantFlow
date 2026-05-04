@@ -31,8 +31,14 @@ const DEFAULT_CONFIG: AppConfig = {
   ui: {},
 };
 
+let configDir = COLLAB_DIR;
+
+export function _setConfigDir(dir: string): void {
+  configDir = dir;
+}
+
 function configPath(): string {
-  return join(COLLAB_DIR, "config.json");
+  return join(configDir, "config.json");
 }
 
 export function loadConfig(): AppConfig {

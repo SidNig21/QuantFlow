@@ -5,7 +5,6 @@
 //
 // Run: cd collab-electron && npx tsx --test src/main/sidecar/server.test.ts
 
-import { describe, it, afterEach } from "node:test";
 import * as assert from "node:assert/strict";
 import * as net from "node:net";
 import * as fs from "node:fs";
@@ -22,6 +21,12 @@ import {
   type SessionReconnectResult,
   type SessionInfo,
 } from "./protocol";
+
+const testApi = "Bun" in globalThis
+  ? await import("bun:test")
+  : await import("node:test");
+const { describe, it, afterEach } = testApi;
+const describeNodeOnly = "Bun" in globalThis ? describe.skip : describe;
 
 // Use short temp dir to stay under macOS 104-byte sun_path limit
 const TEST_DIR = path.join(os.tmpdir(), `sc-${process.pid}`);
@@ -251,7 +256,7 @@ function collectMessages(
   });
 }
 
-describe("SidecarServer", () => {
+describeNodeOnly("SidecarServer", () => {
   it("starts and responds to ping", async () => {
     fs.mkdirSync(TEST_DIR, { recursive: true });
     server = new SidecarServer({
@@ -274,7 +279,7 @@ describe("SidecarServer", () => {
   });
 });
 
-describe("SidecarServer session lifecycle", () => {
+describeNodeOnly("SidecarServer session lifecycle", () => {
   it("session.create spawns a shell and returns socketPath", async () => {
     fs.mkdirSync(TEST_DIR, { recursive: true });
     server = new SidecarServer({
@@ -544,7 +549,7 @@ describe("SidecarServer session lifecycle", () => {
   });
 });
 
-describe("Shell exit sends session.exited notification", () => {
+describeNodeOnly("Shell exit sends session.exited notification", () => {
   it("emits session.exited with sessionId and exitCode", async (t) => {
     if (process.platform === "win32") {
       t.skip(
@@ -583,7 +588,7 @@ describe("Shell exit sends session.exited notification", () => {
   });
 });
 
-describe("Last-attach-wins eviction", () => {
+describeNodeOnly("Last-attach-wins eviction", () => {
   it("closes socket A when socket B connects", async () => {
     server = createServer();
     await server.start();
@@ -623,7 +628,7 @@ describe("Last-attach-wins eviction", () => {
   });
 });
 
-describe("session.resize works", () => {
+describeNodeOnly("session.resize works", () => {
   it("returns { ok: true } when resizing", async () => {
     server = createServer();
     await server.start();
@@ -644,7 +649,7 @@ describe("session.resize works", () => {
   });
 });
 
-describe("session.foreground returns a command name", () => {
+describeNodeOnly("session.foreground returns a command name", () => {
   it("returns a non-empty command string", async () => {
     server = createServer();
     await server.start();
@@ -672,7 +677,7 @@ describe("session.foreground returns a command name", () => {
   });
 });
 
-describe("Reconnect queues output produced during gap", () => {
+describeNodeOnly("Reconnect queues output produced during gap", () => {
   it("scrollback includes output from both commands", async () => {
     server = createServer();
     await server.start();
@@ -746,7 +751,7 @@ describe("Reconnect queues output produced during gap", () => {
   });
 });
 
-describe("Unknown RPC method returns error", () => {
+describeNodeOnly("Unknown RPC method returns error", () => {
   it("returns error code -32601 for unknown method", async () => {
     server = createServer();
     await server.start();
@@ -762,7 +767,7 @@ describe("Unknown RPC method returns error", () => {
   });
 });
 
-describe("Windows WSL smoke", () => {
+describeNodeOnly("Windows WSL smoke", () => {
   const isWindows = process.platform === "win32";
   const runWslSmoke = process.env.RUN_WSL_SMOKE === "1";
   const defaultDistro = isWindows

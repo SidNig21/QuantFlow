@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -7,19 +7,15 @@ import { tmpdir } from "node:os";
 const TEST_ROOT = join(tmpdir(), `quantflow-app-data-${Date.now()}`);
 const APP_DATA_DIR = join(TEST_ROOT, ".quantflow");
 
-mock.module("./paths", () => ({
-  COLLAB_DIR: APP_DATA_DIR,
-  DEV_WORKTREE_ID: null,
-  QUANTFLOW_HOME: APP_DATA_DIR,
-}));
-
-const { saveState } = await import("./canvas-persistence");
-const { listRoles } = await import("./role-service");
+const { _setCanvasStateDir, saveState } = await import("./canvas-persistence");
+const { _setRolesDir, listRoles } = await import("./role-service");
 const { _setCtxDir, pinFile } = await import("./context-service");
 
 beforeEach(() => {
   rmSync(TEST_ROOT, { recursive: true, force: true });
   mkdirSync(APP_DATA_DIR, { recursive: true });
+  _setCanvasStateDir(APP_DATA_DIR);
+  _setRolesDir(join(APP_DATA_DIR, "roles"));
   _setCtxDir(APP_DATA_DIR);
 });
 

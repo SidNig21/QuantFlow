@@ -5,7 +5,6 @@
 //
 // Run: cd collab-electron && npx tsx --test src/main/sidecar/client.test.ts
 
-import { describe, it, afterEach } from "node:test";
 import * as assert from "node:assert/strict";
 import * as net from "node:net";
 import * as fs from "node:fs";
@@ -14,6 +13,12 @@ import * as os from "node:os";
 import { SidecarServer } from "./server";
 import { SidecarClient } from "./client";
 import { makeNotification } from "./protocol";
+
+const testApi = "Bun" in globalThis
+  ? await import("bun:test")
+  : await import("node:test");
+const { describe, it, afterEach } = testApi;
+const describeNodeOnly = "Bun" in globalThis ? describe.skip : describe;
 
 // Short temp dir to stay under macOS 104-byte sun_path limit
 const TEST_DIR = path.join(os.tmpdir(), `cc-${process.pid}`);
@@ -98,7 +103,7 @@ async function closeSessionGracefully(dataSock: net.Socket): Promise<void> {
   dataSock.destroy();
 }
 
-describe("SidecarClient", () => {
+describeNodeOnly("SidecarClient", () => {
   it("connects and pings", async () => {
     await startServer();
     client = new SidecarClient(CONTROL_SOCK);

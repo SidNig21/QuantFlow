@@ -2,8 +2,7 @@
 import * as net from "node:net";
 import * as fs from "node:fs";
 import * as crypto from "node:crypto";
-import * as pty from "node-pty";
-import type { IDisposable } from "node-pty";
+import type { IDisposable, IPty } from "node-pty";
 import { displayCommandName } from "@collab/shared/path-utils";
 import { cleanupEndpoint, prepareEndpoint } from "../ipc-endpoint";
 import { RingBuffer } from "./ring-buffer";
@@ -33,7 +32,7 @@ interface ServerOptions {
 
 interface Session {
   id: string;
-  pty: pty.IPty;
+  pty: IPty;
   terminateProcess: () => void;
   shell: string;
   displayName: string;
@@ -137,7 +136,7 @@ export class SidecarServer {
     }
   }
 
-  private createTerminateProcess(ptyProcess: pty.IPty): () => void {
+  private createTerminateProcess(ptyProcess: IPty): () => void {
     const originalKill = ptyProcess.kill.bind(ptyProcess);
     if (process.platform !== "win32") {
       return () => originalKill();
@@ -353,8 +352,9 @@ export class SidecarServer {
     const displayName = params.displayName || displayCommandName(command);
     const cwdHostPath = params.cwdHostPath || params.cwd;
 
-    let ptyProcess: pty.IPty;
+    let ptyProcess: IPty;
     try {
+      const pty = require("node-pty") as typeof import("node-pty");
       ptyProcess = pty.spawn(command, args, {
         name: "xterm-256color",
         cols: params.cols,

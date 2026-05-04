@@ -3,7 +3,11 @@ import { readFile, readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { COLLAB_DIR } from "./paths";
 
-const ROLES_DIR = join(COLLAB_DIR, "roles");
+let rolesDir = join(COLLAB_DIR, "roles");
+
+export function _setRolesDir(dir: string): void {
+  rolesDir = dir;
+}
 
 export interface Role {
   id: string;
@@ -163,15 +167,15 @@ export function withRoleDiagnostics(role: Role): Role {
 
 export async function listRoles(): Promise<Role[]> {
   try {
-    await mkdir(ROLES_DIR, { recursive: true });
-    const files = await readdir(ROLES_DIR);
+    await mkdir(rolesDir, { recursive: true });
+    const files = await readdir(rolesDir);
     const roleMap = new Map<string, Role>(
       BUILT_IN_ROLES.map((r) => [r.id, r]),
     );
     for (const file of files) {
       if (!file.endsWith(".json")) continue;
       try {
-        const raw = await readFile(join(ROLES_DIR, file), "utf-8");
+        const raw = await readFile(join(rolesDir, file), "utf-8");
         const parsed: Role = JSON.parse(raw);
         if (parsed.id && parsed.name && parsed.color) {
           roleMap.set(parsed.id, parsed);

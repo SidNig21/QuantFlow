@@ -16,9 +16,13 @@ export interface SessionMeta {
   backend?: "tmux" | "sidecar";
 }
 
-export const SESSION_DIR = path.join(
+export let SESSION_DIR = path.join(
   COLLAB_DIR, "terminal-sessions",
 );
+
+export function _setSessionDir(dir: string): void {
+  SESSION_DIR = dir;
+}
 function getSocketName(): string {
   const app = getApp();
   if (app && !app.isPackaged) {
@@ -63,7 +67,9 @@ export function getTmuxConf(): string {
   // fall back to cwd for unit tests.
   const app = getApp();
   const root = app?.getAppPath() ?? process.cwd();
-  return path.join(root, "resources", "tmux.conf");
+  const candidate = path.join(root, "resources", "tmux.conf");
+  if (fs.existsSync(candidate)) return candidate;
+  return path.join(process.cwd(), "resources", "tmux.conf");
 }
 
 export function getTerminfoDir(): string | undefined {

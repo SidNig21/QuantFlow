@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -8,18 +8,14 @@ const TEST_ROOT = join(
   tmpdir(),
   `canvas-persistence-test-${Date.now()}`,
 );
-const COLLAB_DIR = join(TEST_ROOT, ".quantflow");
-const STATE_FILE = join(COLLAB_DIR, "canvas-state.json");
-
-mock.module("./paths", () => ({
-  COLLAB_DIR,
-}));
+const STATE_DIR = join(TEST_ROOT, ".quantflow");
+const STATE_FILE = join(STATE_DIR, "canvas-state.json");
 
 const {
+  _setCanvasStateDir,
   loadState,
   saveState,
 } = await import("./canvas-persistence");
-mock.restore();
 
 type ConnectionState = {
   id: string;
@@ -29,6 +25,10 @@ type ConnectionState = {
   createdAt: number;
   updatedAt: number;
 };
+
+beforeEach(() => {
+  _setCanvasStateDir(STATE_DIR);
+});
 
 async function readSavedState() {
   return JSON.parse(await readFile(STATE_FILE, "utf-8"));

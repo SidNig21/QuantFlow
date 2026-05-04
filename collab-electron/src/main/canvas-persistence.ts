@@ -5,8 +5,15 @@ import { tmpdir } from "node:os";
 import * as crypto from "node:crypto";
 import { COLLAB_DIR } from "./paths";
 
-const STATE_DIR = COLLAB_DIR;
-const STATE_FILE = join(STATE_DIR, "canvas-state.json");
+let stateDir = COLLAB_DIR;
+
+function getStateFile(): string {
+  return join(stateDir, "canvas-state.json");
+}
+
+export function _setCanvasStateDir(dir: string): void {
+  stateDir = dir;
+}
 
 interface TileState {
   id: string;
@@ -52,7 +59,7 @@ function sanitizeCoord(v: unknown): number {
 
 export async function loadState(): Promise<CanvasState | null> {
   try {
-    const raw = await readFile(STATE_FILE, "utf-8");
+    const raw = await readFile(getStateFile(), "utf-8");
     const state = JSON.parse(raw) as CanvasState & {
       connections?: unknown;
     };
@@ -71,8 +78,8 @@ export async function loadState(): Promise<CanvasState | null> {
 }
 
 export async function saveState(state: CanvasState): Promise<void> {
-  if (!existsSync(STATE_DIR)) {
-    await mkdir(STATE_DIR, { recursive: true });
+  if (!existsSync(stateDir)) {
+    await mkdir(stateDir, { recursive: true });
   }
   const tmp = join(
     tmpdir(),
@@ -80,5 +87,5 @@ export async function saveState(state: CanvasState): Promise<void> {
   );
   const json = JSON.stringify(state, null, 2);
   await writeFile(tmp, json, "utf-8");
-  await rename(tmp, STATE_FILE);
+  await rename(tmp, getStateFile());
 }

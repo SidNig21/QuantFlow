@@ -1,6 +1,96 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-// Minimal DOM stub
+function createStyle() {
+  const values = new Map();
+  return {
+    setProperty(name, value) {
+      values.set(name, String(value));
+    },
+    getPropertyValue(name) {
+      return values.get(name) ?? "";
+    },
+  };
+}
+
+function createClassList() {
+  const values = new Set();
+  return {
+    add(name) {
+      values.add(name);
+    },
+    remove(name) {
+      values.delete(name);
+    },
+    contains(name) {
+      return values.has(name);
+    },
+  };
+}
+
+function createElement(tagName) {
+  const children = [];
+  const attributes = new Map();
+  const listeners = new Map();
+  return {
+    tagName: String(tagName).toUpperCase(),
+    id: "",
+    children,
+    parentNode: null,
+    style: createStyle(),
+    classList: createClassList(),
+    appendChild(child) {
+      child.parentNode = this;
+      children.push(child);
+      return child;
+    },
+    setAttribute(name, value) {
+      attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return attributes.get(name) ?? null;
+    },
+    addEventListener(name, handler) {
+      listeners.set(name, handler);
+    },
+    removeEventListener(name) {
+      listeners.delete(name);
+    },
+    getBoundingClientRect() {
+      return {
+        width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0,
+      };
+    },
+  };
+}
+
+function findById(node, id) {
+  if (node.id === id) return node;
+  for (const child of node.children ?? []) {
+    const match = findById(child, id);
+    if (match) return match;
+  }
+  return null;
+}
+
+function installDomStub() {
+  const documentElement = createElement("html");
+  const body = createElement("body");
+  documentElement.appendChild(body);
+  body.innerHTML = "";
+  globalThis.document = {
+    documentElement,
+    body,
+    createElement,
+    getElementById(id) {
+      return findById(documentElement, id);
+    },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  globalThis.window = {};
+  globalThis.getComputedStyle = (el) => el.style;
+}
+
 function makePanel(id) {
   const el = document.createElement("div");
   el.id = id;
@@ -20,6 +110,7 @@ describe("createPanel", () => {
   let panel, resizeHandle, toggle, viewer, panelsEl;
 
   beforeEach(() => {
+    installDomStub();
     document.body.innerHTML = "";
     panelsEl = document.createElement("div");
     panelsEl.id = "panels";
@@ -47,12 +138,12 @@ describe("createPanel", () => {
 
     // Stub shellApi
     window.shellApi = {
-      setPref: vi.fn(),
-      getPref: vi.fn().mockResolvedValue(null),
+      setPref: mock(() => {}),
+      getPref: mock(async () => null),
     };
   });
 
-  it("starts visible by default", async () => {
+  test("starts visible by default", async () => {
     const { createPanel } = await import("./panel-manager.js");
     const mgr = createPanel("nav", {
       panel, viewer, resizeHandle, toggle,
@@ -64,7 +155,7 @@ describe("createPanel", () => {
     expect(mgr.isVisible()).toBe(true);
   });
 
-  it("toggles visibility", async () => {
+  test("toggles visibility", async () => {
     const { createPanel } = await import("./panel-manager.js");
     const mgr = createPanel("nav", {
       panel, viewer, resizeHandle, toggle,
@@ -76,11 +167,11 @@ describe("createPanel", () => {
     mgr.toggle();
     expect(mgr.isVisible()).toBe(false);
     expect(window.shellApi.setPref).toHaveBeenCalledWith(
-      "panel-visible-nav", false,
+      "sidebar-mode", "closed",
     );
   });
 
-  it("persists width on pref key panel-width-{side}", async () => {
+  test("persists width on pref key panel-width-{side}", async () => {
     const { createPanel } = await import("./panel-manager.js");
     const mgr = createPanel("nav", {
       panel, viewer, resizeHandle, toggle,
@@ -93,7 +184,7 @@ describe("createPanel", () => {
     expect(panel.style.flex).toBe("0 0 350px");
   });
 
-  it("uses direction=-1 for right panels", async () => {
+  test("uses direction=-1 for right panels", async () => {
     const { createPanel } = await import("./panel-manager.js");
     const termPanel = makePanel("panel-terminal");
     const termResize = document.createElement("div");

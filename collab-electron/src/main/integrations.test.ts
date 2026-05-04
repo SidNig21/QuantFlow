@@ -27,25 +27,31 @@ function setupSkillSource(baseDir: string) {
   );
 }
 
-// -- Mock electron before importing the module --
-
 mock.module("electron", () => ({
   app: {
     isPackaged: false,
     getAppPath: () => FAKE_APP_PATH,
+    getVersion: () => "0.7.0-beta.1",
+    on: () => {},
+    quit: () => {},
+  },
+  BrowserWindow: {
+    getAllWindows: () => [
+      { isDestroyed: () => false, webContents: { send: () => {} } },
+    ],
   },
   ipcMain: {
     handle: () => {},
+    on: () => {},
+  },
+  powerMonitor: {
+    on: () => {},
   },
 }));
 
-// Mock homedir to isolate from real user config
-mock.module("node:os", () => ({
-  homedir: () => FAKE_HOME,
-  tmpdir,
-}));
-
 const {
+  _setIntegrationsApp,
+  _setIntegrationsHomeDir,
   skillSourceDir,
   installSkill,
   uninstallSkill,
@@ -58,9 +64,16 @@ const {
 beforeEach(() => {
   mkdirSync(FAKE_HOME, { recursive: true });
   mkdirSync(FAKE_APP_PATH, { recursive: true });
+  _setIntegrationsApp({
+    isPackaged: false,
+    getAppPath: () => FAKE_APP_PATH,
+  });
+  _setIntegrationsHomeDir(FAKE_HOME);
 });
 
 afterEach(() => {
+  _setIntegrationsApp(null);
+  _setIntegrationsHomeDir(null);
   rmSync(TEST_ROOT, { recursive: true, force: true });
 });
 

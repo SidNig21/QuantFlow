@@ -1,10 +1,9 @@
-import * as pty from "node-pty";
 import * as os from "os";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as net from "node:net";
 import * as crypto from "crypto";
-import { type IDisposable } from "node-pty";
+import type { IDisposable, IPty } from "node-pty";
 import { displayBasename } from "@collab/shared/path-utils";
 import { onPtyData as notifyStringRelay } from "./string-relay";
 import {
@@ -37,7 +36,7 @@ import { resolveTerminalTarget } from "./terminal-target";
 import { buildSidecarSessionCreateParams } from "./pty-spawn-params";
 
 interface PtySession {
-  pty: pty.IPty;
+  pty: IPty;
   shell: string;
   displayName: string;
   disposables: IDisposable[];
@@ -293,6 +292,9 @@ async function spawnSidecar(): Promise<void> {
         "pty-sidecar.js",
       )
     : path.join(__dirname, "pty-sidecar.js");
+  if (!fs.existsSync(sidecarPath)) {
+    throw new Error(`Sidecar entry not found: ${sidecarPath}`);
+  }
 
   const child = require("node:child_process").spawn(
     process.execPath,
@@ -341,10 +343,11 @@ function attachClient(
   cols: number,
   rows: number,
   senderWebContentsId?: number,
-): pty.IPty {
+): IPty {
   const tmuxBin = getTmuxBin();
   const name = tmuxSessionName(sessionId);
 
+  const pty = require("node-pty") as typeof import("node-pty");
   const ptyProcess = pty.spawn(
     tmuxBin,
     ["-L", getSocketName(), "-u", "attach-session", "-t", name],

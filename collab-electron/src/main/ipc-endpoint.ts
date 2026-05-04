@@ -1,9 +1,9 @@
 import * as crypto from "node:crypto";
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { COLLAB_DIR } from "./paths";
 
-const NAMESPACE = `collaborator-${crypto
+const NAMESPACE = `quantflow-${crypto
   .createHash("sha1")
   .update(COLLAB_DIR)
   .digest("hex")
@@ -21,8 +21,8 @@ export function makeEndpointPath(name: string): string {
 }
 
 export function prepareEndpoint(endpoint: string): void {
-  mkdirSync(COLLAB_DIR, { recursive: true });
   if (process.platform === "win32") return;
+  mkdirSync(dirname(endpoint), { recursive: true });
   if (existsSync(endpoint)) {
     try {
       unlinkSync(endpoint);

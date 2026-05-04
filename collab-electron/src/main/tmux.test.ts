@@ -1,7 +1,9 @@
 import { describe, test, expect, afterEach, beforeAll } from "bun:test";
 import * as fs from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
-import { loadConfig, setPref } from "./config";
+import { _setConfigDir, loadConfig, setPref } from "./config";
 import {
   getTmuxBin,
   getTmuxConf,
@@ -10,6 +12,7 @@ import {
   readSessionMeta,
   deleteSessionMeta,
   SESSION_DIR,
+  _setSessionDir,
   tmuxExec,
   tmuxSessionName,
 } from "./tmux";
@@ -23,9 +26,15 @@ import {
   verifyTmuxAvailable,
 } from "./pty";
 
+const tmuxBackendAvailableInProcess = process.platform === "darwin";
+const tmuxPtyTest = tmuxBackendAvailableInProcess ? test : test.skip;
+
 // Force tmux mode for these tests — the default is now "sidecar"
 // which requires Electron to spawn the sidecar process.
 beforeAll(() => {
+  const testRoot = join(tmpdir(), `tmux-config-test-${Date.now()}`);
+  _setConfigDir(testRoot);
+  _setSessionDir(join(testRoot, "terminal-sessions"));
   const config = loadConfig();
   setPref(config, "terminalMode", "tmux");
 });
@@ -78,24 +87,24 @@ describe("pty lifecycle via tmux", () => {
     killAll();
   });
 
-  test("createSession returns sessionId and shell", async () => {
+  tmuxPtyTest("createSession returns sessionId and shell", async () => {
     const result = await createSession("/tmp");
     expect(result.sessionId).toMatch(/^[0-9a-f]{16}$/);
     expect(result.shell).toBeTruthy();
   });
 
-  test("createSession appears in listSessions", async () => {
+  tmuxPtyTest("createSession appears in listSessions", async () => {
     const { sessionId } = await createSession("/tmp");
     expect(listSessions()).toContain(sessionId);
   });
 
-  test("killSession removes from listSessions", async () => {
+  tmuxPtyTest("killSession removes from listSessions", async () => {
     const { sessionId } = await createSession("/tmp");
     await killSession(sessionId);
     expect(listSessions()).not.toContain(sessionId);
   });
 
-  test("createSession sets COLLAB_PTY_SESSION_ID env", async () => {
+  tmuxPtyTest("createSession sets COLLAB_PTY_SESSION_ID env", async () => {
     const { sessionId } = await createSession("/tmp");
     const name = tmuxSessionName(sessionId);
     const env = tmuxExec(
@@ -112,7 +121,7 @@ describe("discoverSessions", () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  test("discovers sessions created by createSession", async () => {
+  tmuxPtyTest("discovers sessions created by createSession", async () => {
     const { sessionId } = await createSession("/tmp");
     killAll(); // detach client, tmux session survives
 
@@ -144,7 +153,7 @@ describe("discoverSessions", () => {
     expect(readSessionMeta(fakeId)).toBeNull();
   });
 
-  test("leaves orphan tmux sessions without metadata alone", async () => {
+  tmuxPtyTest("leaves orphan tmux sessions without metadata alone", async () => {
     const { sessionId } = await createSession("/tmp");
     killAll();
     deleteSessionMeta(sessionId);
@@ -175,7 +184,7 @@ describe("discoverSessions", () => {
 });
 
 describe("destroyAll", () => {
-  test("kills owned sessions without killing the tmux server", async () => {
+  tmuxPtyTest("kills owned sessions without killing the tmux server", async () => {
     const { sessionId } = await createSession("/tmp");
     const ownedName = tmuxSessionName(sessionId);
 
@@ -320,7 +329,7 @@ describe("cross-backend: reconnectSession defaults correctly", () => {
 });
 
 describe("stripTrailingBlanks via scrollback", () => {
-  test("scrollback capture strips trailing blank lines", async () => {
+  tmuxPtyTest("scrollback capture strips trailing blank lines", async () => {
     const { sessionId } = await createSession("/tmp");
     const name = tmuxSessionName(sessionId);
 

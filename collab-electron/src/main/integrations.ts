@@ -20,9 +20,29 @@ interface AgentStatus {
   installed: boolean;
 }
 
+type IntegrationApp = Pick<typeof app, "isPackaged" | "getAppPath">;
+
+let integrationsHomeDir: string | null = null;
+let integrationsApp: IntegrationApp | null = null;
+
+function homeDir(): string {
+  return integrationsHomeDir ?? homedir();
+}
+
+export function _setIntegrationsHomeDir(dir: string | null): void {
+  integrationsHomeDir = dir;
+}
+
+export function _setIntegrationsApp(appOverride: IntegrationApp | null): void {
+  integrationsApp = appOverride;
+}
+
+function electronApp(): IntegrationApp {
+  return integrationsApp ?? app;
+}
 
 function agentDetected(id: AgentId): boolean {
-  const home = homedir();
+  const home = homeDir();
   switch (id) {
     case "claude":
       return (
@@ -53,13 +73,14 @@ function isOnPath(command: string): boolean {
 export const VALID_AGENT_IDS = new Set<string>(["claude", "codex", "gemini"]);
 
 export function skillSourceDir(): string {
+  const currentApp = electronApp();
   const candidates = [
     // Packaged app: extraResources destination takes priority
-    ...(app.isPackaged && process.resourcesPath
+    ...(currentApp.isPackaged && process.resourcesPath
       ? [join(process.resourcesPath, "collab-canvas-skill")]
       : []),
     // Development: resolve from app root
-    join(app.getAppPath(), "packages", "collab-canvas-skill"),
+    join(currentApp.getAppPath(), "packages", "collab-canvas-skill"),
     join(__dirname, "..", "..", "packages", "collab-canvas-skill"),
     join(__dirname, "..", "packages", "collab-canvas-skill"),
   ];
@@ -76,7 +97,7 @@ export function skillSourceDir(): string {
 // -- install paths --
 
 function skillInstallPath(id: AgentId): string {
-  const home = homedir();
+  const home = homeDir();
   switch (id) {
     case "claude":
       return join(home, ".claude", "skills", "collab-canvas");
