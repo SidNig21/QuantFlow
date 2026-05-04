@@ -34,6 +34,7 @@ import {
 } from "./sidecar/protocol";
 import { COLLAB_DIR } from "./paths";
 import { resolveTerminalTarget } from "./terminal-target";
+import { buildSidecarSessionCreateParams } from "./pty-spawn-params";
 
 interface PtySession {
   pty: pty.IPty;
@@ -589,20 +590,12 @@ export async function createSession(
     }
   }
 
-  const createParams = withOptionalFields({
-    command: resolvedTarget.command,
-    args: resolvedTarget.args,
-    shell: resolvedTarget.command,
-    displayName: resolvedTarget.displayName,
-    target: resolvedTarget.target,
-    cwd: resolvedTarget.cwd,
-    cwdHostPath: resolvedTarget.cwdHostPath,
-    cols: c,
-    rows: r,
-    env: sidecarEnv,
-  }, {
-    cwdGuestPath: resolvedTarget.cwdGuestPath,
-  });
+  const createParams = buildSidecarSessionCreateParams(
+    resolvedTarget,
+    c,
+    r,
+    sidecarEnv,
+  );
   const { sessionId, socketPath } = await client.createSession(createParams);
 
   const dataSock = await client.attachDataSocket(
