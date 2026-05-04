@@ -43,6 +43,7 @@ import {
 	normalizeLaunchDiagnostic,
 	renderLaunchDiagnostics,
 } from "./launch-diagnostics-view.js";
+import { formatRoleStartupEvent } from "./role-startup.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
 const IS_WINDOWS = window.shellApi.getPlatform() === "win32";
@@ -908,6 +909,16 @@ async function init() {
 				tone: "error",
 			});
 			syncTileList();
+		},
+		onRoleStartupWrite(tile, write, err = null) {
+			const event = formatRoleStartupEvent(tile, write, err);
+			operationalEvents.record(event);
+			if (err) {
+				toasts.show({
+					message: `${event.summary}.`,
+					tone: "error",
+				});
+			}
 		},
 		onTerminalTileResized(width, height) {
 			setLastTerminalSize(width, height);

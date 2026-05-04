@@ -28,6 +28,7 @@ export function createTileManager({
 	onTerminalSessionCreated,
 	onTerminalCwdChanged,
 	onTerminalStartFailed,
+	onRoleStartupWrite,
 	onTerminalTileClosed,
 	onTerminalTileResized,
 	onTileFocused,
@@ -327,8 +328,13 @@ export function createTileManager({
 				if (write.kind === "prompt") {
 					current.roleStartupPromptSessionId = sessionId;
 				}
-				window.shellApi.ptyWrite?.(sessionId, write.data);
-				saveCanvasDebounced();
+				try {
+					window.shellApi.ptyWrite?.(sessionId, write.data);
+					onRoleStartupWrite?.(current, write);
+					saveCanvasDebounced();
+				} catch (err) {
+					onRoleStartupWrite?.(current, write, err);
+				}
 			};
 
 			if (write.delayMs > 0) {

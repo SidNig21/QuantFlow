@@ -37,3 +37,35 @@ export function getRoleStartupWrites(tile) {
 
 	return writes;
 }
+
+export function formatRoleStartupEvent(tile, write, err = null) {
+	const roleLabel = normalizeStartupText(
+		tile?.roleName || tile?.userTitle || tile?.autoTitle || tile?.id,
+	) || "Role";
+	const failed = Boolean(err);
+	const kindLabel = write?.kind === "prompt"
+		? "startup prompt"
+		: "startup command";
+	return {
+		type: failed
+			? "role.failed"
+			: write?.kind === "prompt"
+				? "role.startup_prompt_sent"
+				: "role.startup_command_sent",
+		severity: failed ? "error" : "info",
+		summary: failed
+			? `${roleLabel} ${kindLabel} failed`
+			: `${roleLabel} ${kindLabel} sent`,
+		detail: failed
+			? err?.message || `Could not write ${kindLabel}.`
+			: write?.kind === "prompt"
+				? "Initial role instruction delivered."
+				: tile?.roleCommandTemplate || "",
+		meta: {
+			tileId: tile?.id,
+			sessionId: tile?.ptySessionId,
+			roleId: tile?.roleId,
+			kind: write?.kind,
+		},
+	};
+}
