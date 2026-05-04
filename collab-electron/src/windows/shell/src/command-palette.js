@@ -113,6 +113,16 @@ export function formatRelayLogDetail(entries) {
 	}).join("\n\n");
 }
 
+export function formatContextInjectionTitle(tileLabel) {
+	return `Inject Context into ${tileLabel || "terminal"}`;
+}
+
+export function formatContextInjectionSubtitle(tile) {
+	if (tile?.ptySessionId) return "Shared context -> running terminal";
+	if (tile?.type !== "term") return "Only terminal tiles can receive context";
+	return "Terminal has no PTY session";
+}
+
 export function createCommandPalette({
 	document,
 	onClose,

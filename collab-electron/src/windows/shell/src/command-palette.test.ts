@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
 	filterCommandItems,
 	formatConnectionCommandTitle,
+	formatContextInjectionSubtitle,
+	formatContextInjectionTitle,
 	formatRelayLogDetail,
 	getCommandSearchText,
 	normalizeCommandQuery,
@@ -115,5 +117,23 @@ describe("formatRelayLogDetail", () => {
 				text: "hello",
 			},
 		])).toContain("failed (Target PTY missing)");
+	});
+});
+
+describe("context injection command labels", () => {
+	test("formats terminal context injection commands", () => {
+		expect(formatContextInjectionTitle("Codex Worker"))
+			.toBe("Inject Context into Codex Worker");
+		expect(formatContextInjectionSubtitle({
+			type: "term",
+			ptySessionId: "session-1",
+		})).toBe("Shared context -> running terminal");
+	});
+
+	test("explains disabled context injection commands", () => {
+		expect(formatContextInjectionSubtitle({ type: "term" }))
+			.toBe("Terminal has no PTY session");
+		expect(formatContextInjectionSubtitle({ type: "note" }))
+			.toBe("Only terminal tiles can receive context");
 	});
 });

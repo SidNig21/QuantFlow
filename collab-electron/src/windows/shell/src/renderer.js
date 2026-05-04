@@ -11,6 +11,8 @@ import { createWebview, isFocusSearchShortcut } from "./webview-factory.js";
 import {
 	createCommandPalette,
 	formatConnectionCommandTitle,
+	formatContextInjectionSubtitle,
+	formatContextInjectionTitle,
 	formatRelayLogDetail,
 } from "./command-palette.js";
 import { createViewport } from "./canvas-viewport.js";
@@ -1878,6 +1880,64 @@ async function init() {
 		});
 	}
 
+	function buildContextInjectionCommandItems() {
+		return tiles
+			.filter((tile) => tile.type === "term")
+			.map((tile) => {
+				const label = tileEventLabel(tile);
+				return {
+					id: `inject-context:${tile.id}`,
+					title: formatContextInjectionTitle(label),
+					subtitle: formatContextInjectionSubtitle(tile),
+					section: "Context",
+					disabled: !tile.ptySessionId,
+					keywords: [
+						tile.id,
+						tile.routeHandle,
+						tile.roleName,
+						tile.roleId,
+						"shared",
+						"obsidian",
+						"vault",
+					],
+					run: async () => {
+						edgeIndicators.panToTile(tile, { targetZoom: 1 });
+						tileManager.focusCanvasTile(tile.id);
+						const preview = await window.shellApi.contextPreviewForTile?.();
+						if (!preview?.injectedChars) {
+							operationalEvents.record({
+								type: "context.failed",
+								severity: "warn",
+								summary: `No shared context to inject into ${label}.`,
+								meta: { tileId: tile.id, sessionId: tile.ptySessionId },
+							});
+							toasts.show({ message: "No shared context to inject.", tone: "warn" });
+							return;
+						}
+						const response = await window.shellApi.showConfirmDialog({
+							message: `Inject shared context into ${label}?`,
+							detail: formatContextPreviewDetail(preview),
+							buttons: ["Cancel", "Inject"],
+						});
+						if (response !== 1) return;
+						await window.shellApi.contextInjectToTile?.(tile.ptySessionId);
+						operationalEvents.record({
+							type: "context.injected",
+							severity: "info",
+							summary: `Shared context injected into ${label}`,
+							meta: {
+								tileId: tile.id,
+								sessionId: tile.ptySessionId,
+								injectedChars: preview.injectedChars,
+								truncated: preview.truncated,
+							},
+						});
+						toasts.show({ message: "Shared context injected.", tone: "info" });
+					},
+				};
+			});
+	}
+
 	function buildRoleCommandItems(roles) {
 		const size = getTerminalSize();
 		return roles.map((role) => ({
@@ -2014,6 +2074,7 @@ async function init() {
 
 		commandPalette.open([
 			...baseCommands,
+			...buildContextInjectionCommandItems(),
 			...buildRoleCommandItems(Array.isArray(roles) ? roles : []),
 			...buildConnectionCommandItems(),
 			...buildTileCommandItems(),
