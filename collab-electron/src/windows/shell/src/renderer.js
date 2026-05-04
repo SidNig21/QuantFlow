@@ -1084,6 +1084,13 @@ async function init() {
 			));
 			cableOverlay?.update();
 		},
+		onConnectionFailed(event) {
+			operationalEvents.record(event);
+			toasts.show({
+				message: event.summary,
+				tone: "warn",
+			});
+		},
 	});
 
 	Promise.resolve(window.shellApi.runtimeDiagnostics?.() ?? [])

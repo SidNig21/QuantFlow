@@ -3,6 +3,7 @@ import {
 	addConnection, removeConnection, updateConnectionLabel,
 	getConnection,
 } from "./canvas-state.js";
+import { resolveCableDrop } from "./cable-drop.js";
 
 function generateConnectionId() {
 	return "conn-" + Date.now() + "-" + Math.random().toString(36).slice(2, 9);
@@ -35,6 +36,45 @@ export function createConnectionMutationEvent(
 			source: "canvas-rpc",
 		},
 	};
+}
+
+export function createConnectionFailureEvent(
+	message,
+	params = {},
+	tileA = null,
+	tileB = null,
+	labelForTile = defaultTileLabel,
+) {
+	const tileALabel = tileA ? labelForTile(tileA) : params.tileAId || "unknown";
+	const tileBLabel = tileB ? labelForTile(tileB) : params.tileBId || "unknown";
+	return {
+		type: "connection.failed",
+		severity: "warn",
+		summary: `Connection failed: ${message}`,
+		detail: `${tileALabel} -> ${tileBLabel}`,
+		meta: {
+			tileAId: params.tileAId,
+			tileBId: params.tileBId,
+			source: "canvas-rpc",
+		},
+	};
+}
+
+export function validateRpcConnectionCreate(tileA, tileB, existingConnections) {
+	const dropResult = resolveCableDrop({
+		sourceTile: tileA,
+		targetTile: tileB,
+		connections: existingConnections,
+	});
+	if (!dropResult.ok) {
+		return {
+			ok: false,
+			code: 4,
+			message: dropResult.message,
+			reason: dropResult.reason,
+		};
+	}
+	return dropResult;
 }
 
 /**
@@ -77,6 +117,7 @@ export function createCanvasRpc({
 	tileManager, viewportState, viewport, edgeIndicators,
 	onConnectionCreated,
 	onConnectionRemoved,
+	onConnectionFailed,
 }) {
 	function respond(requestId, result) {
 		window.shellApi.canvasRpcResponse({ requestId, result });
@@ -222,11 +263,30 @@ export function createCanvasRpc({
 					if (!tileA) return;
 					const tileB = requireTile(requestId, params.tileBId);
 					if (!tileB) return;
+					const validation = validateRpcConnectionCreate(
+						tileA, tileB, connections,
+					);
+					if (!validation.ok) {
+						onConnectionFailed?.(
+							createConnectionFailureEvent(
+								validation.message,
+								params,
+								tileA,
+								tileB,
+							),
+						);
+						respondError(
+							requestId,
+							validation.code,
+							validation.message,
+						);
+						return;
+					}
 					const now = Date.now();
 					result = addConnection({
 						id: generateConnectionId(),
-						tileAId: params.tileAId,
-						tileBId: params.tileBId,
+						tileAId: validation.tileAId,
+						tileBId: validation.tileBId,
 						label: params.label,
 						createdAt: now,
 						updatedAt: now,

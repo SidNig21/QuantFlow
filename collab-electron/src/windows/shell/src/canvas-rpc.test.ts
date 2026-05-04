@@ -1,7 +1,9 @@
 import { describe, test, expect } from "bun:test";
 import {
+	createConnectionFailureEvent,
 	createConnectionMutationEvent,
 	findAutoPlacement,
+	validateRpcConnectionCreate,
 } from "./canvas-rpc.js";
 
 interface Tile {
@@ -130,5 +132,69 @@ describe("createConnectionMutationEvent", () => {
         source: "canvas-rpc",
       },
     });
+  });
+});
+
+describe("createConnectionFailureEvent", () => {
+  test("formats rejected RPC connection attempts for Watchtower", () => {
+    const event = createConnectionFailureEvent(
+      "Connection already exists.",
+      { tileAId: "tile-a", tileBId: "tile-b" },
+      { id: "tile-a", userTitle: "Worker" },
+      { id: "tile-b", userTitle: "Reviewer" },
+    );
+
+    expect(event).toEqual({
+      type: "connection.failed",
+      severity: "warn",
+      summary: "Connection failed: Connection already exists.",
+      detail: "Worker -> Reviewer",
+      meta: {
+        tileAId: "tile-a",
+        tileBId: "tile-b",
+        source: "canvas-rpc",
+      },
+    });
+  });
+});
+
+describe("validateRpcConnectionCreate", () => {
+  const termA = { id: "tile-a", type: "term" };
+  const termB = { id: "tile-b", type: "term" };
+
+  test("accepts terminal-to-terminal connections", () => {
+    expect(validateRpcConnectionCreate(termA, termB, []))
+      .toMatchObject({
+        ok: true,
+        tileAId: "tile-a",
+        tileBId: "tile-b",
+      });
+  });
+
+  test("rejects duplicate connections in either direction", () => {
+    expect(validateRpcConnectionCreate(termA, termB, [
+      { tileAId: "tile-b", tileBId: "tile-a" },
+    ])).toMatchObject({
+      ok: false,
+      code: 4,
+      reason: "duplicate",
+      message: "Connection already exists.",
+    });
+  });
+
+  test("rejects non-terminal endpoints and self-connections", () => {
+    expect(validateRpcConnectionCreate(
+      { id: "tile-note", type: "note" },
+      termB,
+      [],
+    )).toMatchObject({
+      ok: false,
+      reason: "invalid_source",
+    });
+    expect(validateRpcConnectionCreate(termA, termA, []))
+      .toMatchObject({
+        ok: false,
+        reason: "same_tile",
+      });
   });
 });
