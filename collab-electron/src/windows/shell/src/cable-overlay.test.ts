@@ -1,6 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { connections, tiles } from "./canvas-state.js";
 import {
 	clampFloatingPosition,
+	createCableOverlay,
 	formatCableContextRelay,
 	formatCableLabel,
 	getCableDefaultDirection,
@@ -19,6 +21,182 @@ import {
 	getRetryCableRelayRequest,
 	shouldSubmitCableMessage,
 } from "./cable-overlay.js";
+
+function createClassList(element) {
+	return {
+		add(name) {
+			const values = new Set(
+				String(element.className || "").split(/\s+/).filter(Boolean),
+			);
+			values.add(name);
+			element.className = [...values].join(" ");
+		},
+		remove(name) {
+			const values = new Set(
+				String(element.className || "").split(/\s+/).filter(Boolean),
+			);
+			values.delete(name);
+			element.className = [...values].join(" ");
+		},
+		contains(name) {
+			return String(element.className || "").split(/\s+/).includes(name);
+		},
+		toggle(name, force) {
+			const shouldAdd = force ?? !this.contains(name);
+			if (shouldAdd) this.add(name);
+			else this.remove(name);
+			return shouldAdd;
+		},
+	};
+}
+
+function toDatasetKey(name) {
+	return name
+		.replace(/^data-/, "")
+		.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+}
+
+function matchSelector(element, selector) {
+	const attrMatch = selector.match(
+		/\[data-([a-z-]+)(?:=["']([^"']*)["'])?\]/,
+	);
+	const classMatch = selector.match(/\.([a-zA-Z0-9_-]+)/);
+	if (classMatch && !element.classList.contains(classMatch[1])) return false;
+	if (attrMatch) {
+		const key = toDatasetKey(`data-${attrMatch[1]}`);
+		if (!(key in element.dataset)) return false;
+		if (attrMatch[2] !== undefined && element.dataset[key] !== attrMatch[2]) return false;
+	}
+	return Boolean(classMatch || attrMatch);
+}
+
+function createElement(tagName) {
+	const attributes = new Map();
+	const listeners = new Map();
+	const element = {
+		tagName: String(tagName).toUpperCase(),
+		children: [],
+		parentNode: null,
+		style: {},
+		dataset: {},
+		className: "",
+		textContent: "",
+		hidden: false,
+		clientWidth: 0,
+		clientHeight: 0,
+		offsetWidth: 0,
+		offsetHeight: 0,
+		classList: null,
+		appendChild(child) {
+			child.parentNode = this;
+			this.children.push(child);
+			return child;
+		},
+		append(...childrenToAppend) {
+			for (const child of childrenToAppend) this.appendChild(child);
+		},
+		replaceChildren(...childrenToAppend) {
+			for (const child of this.children) child.parentNode = null;
+			this.children = [];
+			this.append(...childrenToAppend);
+		},
+		remove() {
+			if (!this.parentNode) return;
+			const siblings = this.parentNode.children;
+			const index = siblings.indexOf(this);
+			if (index >= 0) siblings.splice(index, 1);
+			this.parentNode = null;
+		},
+		setAttribute(name, value) {
+			const text = String(value);
+			attributes.set(name, text);
+			if (name === "class") this.className = text;
+			if (name.startsWith("data-")) this.dataset[toDatasetKey(name)] = text;
+		},
+		getAttribute(name) {
+			return attributes.get(name) ?? null;
+		},
+		addEventListener(name, handler) {
+			const handlers = listeners.get(name) ?? [];
+			handlers.push(handler);
+			listeners.set(name, handlers);
+		},
+		dispatchEvent(event) {
+			event.target ??= this;
+			for (const handler of listeners.get(event.type) ?? []) handler(event);
+			return !event.defaultPrevented;
+		},
+		querySelectorAll(selector) {
+			const matches = [];
+			function visit(node) {
+				if (matchSelector(node, selector)) matches.push(node);
+				for (const child of node.children ?? []) visit(child);
+			}
+			for (const child of this.children) visit(child);
+			return matches;
+		},
+		querySelector(selector) {
+			return this.querySelectorAll(selector)[0] ?? null;
+		},
+		getBoundingClientRect() {
+			return {
+				left: 0,
+				top: 0,
+				right: this.clientWidth,
+				bottom: this.clientHeight,
+				width: this.clientWidth,
+				height: this.clientHeight,
+			};
+		},
+		focus() {
+			globalThis.document.activeElement = this;
+		},
+	};
+	element.classList = createClassList(element);
+	return element;
+}
+
+function installDomStub() {
+	const body = createElement("body");
+	globalThis.document = {
+		body,
+		activeElement: null,
+		createElement,
+		createElementNS(_namespace, tagName) {
+			return createElement(tagName);
+		},
+		addEventListener() {},
+		removeEventListener() {},
+	};
+	globalThis.window = {};
+	globalThis.requestAnimationFrame = (callback) => {
+		callback();
+		return 1;
+	};
+}
+
+function createMouseEvent(type, overrides = {}) {
+	return {
+		type,
+		clientX: 200,
+		clientY: 50,
+		defaultPrevented: false,
+		propagationStopped: false,
+		preventDefault() {
+			this.defaultPrevented = true;
+		},
+		stopPropagation() {
+			this.propagationStopped = true;
+		},
+		...overrides,
+	};
+}
+
+beforeEach(() => {
+	installDomStub();
+	tiles.length = 0;
+	connections.length = 0;
+});
 
 describe("clampFloatingPosition", () => {
 	test("keeps an in-bounds position unchanged", () => {
@@ -499,5 +677,98 @@ describe("formatCableContextRelay", () => {
 
 	test("returns empty string for empty preview text", () => {
 		expect(formatCableContextRelay({ text: "   " })).toBe("");
+	});
+});
+
+describe("createCableOverlay interactions", () => {
+	function setupOverlay() {
+		const container = document.createElement("div");
+		container.clientWidth = 800;
+		container.clientHeight = 600;
+		document.body.appendChild(container);
+		tiles.push(
+			{
+				id: "tile-a",
+				type: "term",
+				x: 0,
+				y: 0,
+				width: 100,
+				height: 100,
+				userTitle: "Worker",
+				ptySessionId: "session-a",
+				ptyStatus: "running",
+			},
+			{
+				id: "tile-b",
+				type: "term",
+				x: 300,
+				y: 0,
+				width: 100,
+				height: 100,
+				userTitle: "Reviewer",
+				ptySessionId: "session-b",
+				ptyStatus: "running",
+			},
+		);
+		connections.push({
+			id: "conn-ab",
+			tileAId: "tile-a",
+			tileBId: "tile-b",
+			label: "review",
+			createdAt: 1,
+			updatedAt: 1,
+		});
+		const focusedTileIds = [];
+		const removedConnections = [];
+		const overlay = createCableOverlay({
+			containerEl: container,
+			viewportState: { panX: 0, panY: 0, zoom: 1 },
+			onGetLog: async () => [],
+			onFocusTile: (id) => focusedTileIds.push(id),
+			onRemoveConnection: (id) => removedConnections.push(id),
+			onUpdateLabel: () => {},
+			onGetFocusedTileId: () => null,
+		});
+		overlay.update();
+		return { container, focusedTileIds, removedConnections };
+	}
+
+	test("opens the cable popover from the SVG hit path", () => {
+		const { container, focusedTileIds } = setupOverlay();
+		const hit = container.querySelector(".cable-hit");
+		expect(hit?.getAttribute("data-conn-id")).toBe("conn-ab");
+		expect(hit?.style.strokeWidth).toBe("24px");
+
+		const event = createMouseEvent("click");
+		hit.dispatchEvent(event);
+
+		expect(event.propagationStopped).toBe(true);
+		const popover = container.querySelector(".cable-popover");
+		expect(popover).toBeTruthy();
+		expect(popover.querySelector(".cable-dir-btn")?.textContent)
+			.toBe("Worker → Reviewer");
+		expect(popover.querySelectorAll(".cable-endpoint-row")).toHaveLength(2);
+
+		const [focusWorker] = popover.querySelectorAll(".cable-action-btn");
+		focusWorker.dispatchEvent(createMouseEvent("click"));
+		expect(focusedTileIds).toEqual(["tile-a"]);
+	});
+
+	test("opens the cable context menu from the SVG hit path", () => {
+		const { container, removedConnections } = setupOverlay();
+		const hit = container.querySelector(".cable-hit");
+		const event = createMouseEvent("contextmenu", { clientX: 240, clientY: 80 });
+
+		hit.dispatchEvent(event);
+
+		expect(event.defaultPrevented).toBe(true);
+		expect(event.propagationStopped).toBe(true);
+		const menu = document.body.querySelector(".cable-context-menu");
+		expect(menu).toBeTruthy();
+		expect(menu.querySelectorAll(".cable-menu-item")).toHaveLength(2);
+
+		const [removeItem] = menu.querySelectorAll(".cable-menu-item");
+		removeItem.dispatchEvent(createMouseEvent("click"));
+		expect(removedConnections).toEqual(["conn-ab"]);
 	});
 });
