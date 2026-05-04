@@ -68,4 +68,15 @@ describe("QuantFlow release identity", () => {
     expect(text).toContain("Connection failure (QuantFlow not running)");
     expect(text).not.toContain("Collaborator");
   });
+
+  test("root README presents QuantFlow identity and app data path", () => {
+    const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
+
+    expect(readme).toContain("# QuantFlow");
+    expect(readme).toContain("![QuantFlow](screenshot.png)");
+    expect(readme).toContain("Open QuantFlow");
+    expect(readme).toContain("`~/.quantflow/`");
+    expect(readme).not.toContain("Collaborator");
+    expect(readme).not.toContain("`~/.collaborator/`");
+  });
 });

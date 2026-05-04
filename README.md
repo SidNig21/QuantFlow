@@ -2,9 +2,9 @@
 
 QuantFlow is a canvas-first cockpit for coordinating local coding agents and CLI tools.
 
-![Collaborator](screenshot.png)
+![QuantFlow](screenshot.png)
 
-Collaborator is an end-to-end environment for agentic development. Terminals, context files, and running code — all arranged on an infinite canvas in one place. No context switching, no tab hunting. Just your agents and your work, side by side.
+QuantFlow is an end-to-end environment for agentic development. Terminals, context files, and running code — all arranged on an infinite canvas in one place. No context switching, no tab hunting. Just your agents and your work, side by side.
 
 The app is early-stage and in active development, with native desktop targets for macOS, Windows, and Linux. On Windows, terminal sessions can target both PowerShell and WSL2 distros.
 
@@ -22,7 +22,7 @@ Windows: use the `.exe` installer from the releases page.
 
 ## Stack
 
-Collaborator is a native desktop app built with:
+QuantFlow is a native desktop app built with:
 
 * **Electron 40** — desktop shell with multi-webview architecture
 
@@ -48,7 +48,7 @@ All data is stored locally on disk.
 
 ## Quickstart
 
-1. Open Collaborator
+1. Open QuantFlow
 
 2. Add a workspace — click the workspace dropdown in the navigator and choose "Add workspace", or press Cmd+Shift+O, then select a local folder
 
@@ -62,7 +62,7 @@ All data is stored locally on disk.
 
 ### Application overview
 
-Collaborator is a single-window application for macOS, Windows, and Linux. It operates primarily on local files with no accounts required. Anonymous, non-identifying usage analytics are collected via PostHog.
+QuantFlow is a single-window application for macOS, Windows, and Linux. It operates primarily on local files with no accounts required. Anonymous, non-identifying usage analytics are collected via PostHog.
 
 The window is divided into two regions:
 
@@ -70,7 +70,7 @@ The window is divided into two regions:
 
 * **Main area** — the canvas, an infinite pan-and-zoom surface where tiles are arranged; also hosts the viewer, which displays the content of the file selected in the navigator
 
-All application state is stored as JSON files in `~/.collaborator/`.
+All application state is stored as JSON files in `~/.quantflow/`.
 
 ### Multiworkspace navigation
 
@@ -195,7 +195,7 @@ Pressing Escape closes the viewer (when not actively editing).
 
 ### Persistence
 
-All state is stored locally in `~/.collaborator/`.
+All state is stored locally in `~/.quantflow/`.
 
 #### Canvas state (`canvas-state.json`)
 
