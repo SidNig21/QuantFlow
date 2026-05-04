@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   formatContextPreviewDetail,
+  formatContextPinMenuLabel,
   getCablePortMetadata,
   formatRelaySyntax,
   getTileLabel,
@@ -84,6 +85,23 @@ describe("formatContextPreviewDetail", () => {
     expect(detail).toContain("context truncated to fit the configured limit");
     expect(detail).toContain("2 decisions omitted or truncated");
     expect(detail).toContain("truncated: /vault/huge.md");
+  });
+
+  test("labels pinned file include modes and warning states", () => {
+    expect(formatContextPinMenuLabel(
+      { path: "/vault/full.md", mode: "full" },
+      { path: "/vault/full.md", ok: true, omitted: false },
+    )).toBe("Full file - /vault/full.md (ready)");
+
+    expect(formatContextPinMenuLabel(
+      { path: "/vault/summary.md", mode: "summary-header" },
+      { path: "/vault/summary.md", ok: true, omitted: true },
+    )).toBe("Summary header - /vault/summary.md (partial)");
+
+    expect(formatContextPinMenuLabel(
+      { path: "/vault/missing.md", mode: "excerpt" },
+      { path: "/vault/missing.md", ok: false, error: "missing" },
+    )).toBe("Excerpt - /vault/missing.md (unreadable)");
   });
 });
 

@@ -55,6 +55,96 @@ export function formatContextPreviewDetail(preview) {
   return lines.join("\n");
 }
 
+const CONTEXT_MODE_LABELS = {
+  full: "Full file",
+  "summary-header": "Summary header",
+  excerpt: "Excerpt",
+};
+
+export function normalizeContextIncludeMode(mode) {
+  return mode === "summary-header" || mode === "excerpt" ? mode : "full";
+}
+
+export function formatContextPinMenuLabel(pin, previewFile = null) {
+  const mode = normalizeContextIncludeMode(pin?.mode);
+  const status = previewFile?.ok === false
+    ? "unreadable"
+    : previewFile?.truncated ? "truncated"
+      : previewFile?.omitted ? "partial" : "ready";
+  const path = String(pin?.path ?? "").trim() || "(missing path)";
+  return `${CONTEXT_MODE_LABELS[mode]} - ${path} (${status})`;
+}
+
+async function showSharedContextPreview() {
+  const preview = await window.shellApi.contextPreviewForTile?.();
+  const detail = preview
+    ? formatContextPreviewDetail(preview)
+    : "No shared context preview is available.";
+  await window.shellApi.showConfirmDialog?.({
+    message: "Shared context preview",
+    detail,
+    buttons: ["Close"],
+  });
+}
+
+async function pinSharedContextFile() {
+  const filePath = await window.shellApi.vaultPickFile?.();
+  if (!filePath) return;
+  await window.shellApi.contextPinFile?.(filePath);
+  await showSharedContextPreview();
+}
+
+async function manageSharedContextPins() {
+  const ctx = await window.shellApi.contextGet?.();
+  const pins = Array.isArray(ctx?.pinnedFiles) ? ctx.pinnedFiles : [];
+  if (pins.length === 0) {
+    await window.shellApi.showConfirmDialog?.({
+      message: "No shared context pins",
+      detail: "No pinned files.",
+      buttons: ["Close"],
+    });
+    return;
+  }
+
+  const preview = await window.shellApi.contextPreviewForTile?.();
+  const files = Array.isArray(preview?.files) ? preview.files : [];
+  const previewByPath = new Map(files.map((file) => [file.path, file]));
+  const selected = await window.shellApi.showContextMenu?.(
+    pins.map((pin, index) => ({
+      id: `pin:${index}`,
+      label: formatContextPinMenuLabel(pin, previewByPath.get(pin.path)),
+    })),
+  );
+  if (!selected?.startsWith("pin:")) return;
+  const pin = pins[Number(selected.slice(4))];
+  if (!pin?.path) return;
+
+  const action = await window.shellApi.showContextMenu?.([
+    { id: "full", label: "Use full file" },
+    { id: "summary-header", label: "Use summary header" },
+    { id: "excerpt", label: "Use excerpt" },
+    { id: "separator", label: "" },
+    { id: "unpin", label: "Unpin file" },
+  ]);
+  if (!action) return;
+
+  if (action === "unpin") {
+    await window.shellApi.contextUnpinFile?.(pin.path);
+  } else if (action === "excerpt") {
+    const current = typeof pin.excerpt === "string" ? pin.excerpt : "";
+    const excerpt = prompt("Excerpt to include:", current);
+    if (excerpt === null) return;
+    await window.shellApi.contextSetFileMode?.(pin.path, "excerpt", excerpt);
+  } else {
+    await window.shellApi.contextSetFileMode?.(
+      pin.path,
+      normalizeContextIncludeMode(action),
+    );
+  }
+
+  await showSharedContextPreview();
+}
+
 export function formatRelaySyntax(routeHandle) {
   const handle = String(routeHandle ?? "").trim().replace(/^@+/, "");
   return handle ? `>>@${handle}: ` : "";
@@ -282,6 +372,9 @@ export function createTileDOM(tile, callbacks) {
           enabled: Boolean(tile.routeHandle),
         },
         { id: "inject-vault", label: "Inject vault file…" },
+        { id: "pin-context-file", label: "Pin shared context file…" },
+        { id: "manage-context", label: "Shared context pins…" },
+        { id: "preview-context", label: "Preview shared context" },
         { id: "inject-context", label: "Inject shared context" },
       ]);
       if (selected === "rename" && callbacks.onRename) {
@@ -302,6 +395,24 @@ export function createTileDOM(tile, callbacks) {
           window.shellApi.ptyWrite(tile.ptySessionId, header + content + "\n");
         } catch (err) {
           console.warn("[vault] inject failed:", err);
+        }
+      } else if (selected === "pin-context-file") {
+        try {
+          await pinSharedContextFile();
+        } catch (err) {
+          console.warn("[context] pin failed:", err);
+        }
+      } else if (selected === "manage-context") {
+        try {
+          await manageSharedContextPins();
+        } catch (err) {
+          console.warn("[context] manage failed:", err);
+        }
+      } else if (selected === "preview-context") {
+        try {
+          await showSharedContextPreview();
+        } catch (err) {
+          console.warn("[context] preview failed:", err);
         }
       } else if (selected === "inject-context") {
         if (!tile.ptySessionId) return;

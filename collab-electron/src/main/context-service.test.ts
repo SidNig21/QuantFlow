@@ -109,6 +109,20 @@ describe("addDecision", () => {
     });
   });
 
+  test("includes decision metadata in composed preview text", async () => {
+    await addDecision("Use bounded context", {
+      author: "codex",
+      source: "cable",
+      linkedFile: "spec.md",
+      cableId: "conn-ab",
+    });
+
+    const preview = await previewForTile(undefined, 500);
+
+    expect(preview.text).toContain("codex source=cable file=spec.md cable=conn-ab");
+    expect(preview.text).toContain("Use bounded context");
+  });
+
   test("caps at 50 decisions", async () => {
     for (let i = 0; i < 55; i++) {
       await addDecision(`decision ${i}`);
