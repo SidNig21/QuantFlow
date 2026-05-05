@@ -852,7 +852,7 @@ async function init() {
 					},
 				});
 				tileManager.saveCanvasImmediate();
-				cableOverlay?.update();
+				updateCables();
 			} else {
 				showCableHud(dropResult.message, "warn", 1800);
 				toasts.show({ message: dropResult.message, tone: "warn" });
@@ -875,7 +875,7 @@ async function init() {
 		getAllWebviews,
 		isSpaceHeld: () => spaceHeld,
 		onCableMousedown,
-		onReposition: () => { viewport.redrawGrid(); minimapRef?.update(); cableOverlay?.update(); },
+		onReposition: () => { viewport.redrawGrid(); minimapRef?.update(); updateCables(); },
 		onSaveDebounced(state) {
 			window.shellApi.canvasSaveState(
 				toCenterPointState(state),
@@ -1108,19 +1108,19 @@ async function init() {
 			operationalEvents.record(createConnectionMutationEvent(
 				"created", conn, tileA, tileB, tileEventLabel,
 			));
-			cableOverlay?.update();
+			updateCables();
 		},
 		onConnectionRemoved(conn, tileA, tileB) {
 			operationalEvents.record(createConnectionMutationEvent(
 				"removed", conn, tileA, tileB, tileEventLabel,
 			));
-			cableOverlay?.update();
+			updateCables();
 		},
 		onConnectionUpdated(conn, tileA, tileB) {
 			operationalEvents.record(createConnectionLabelEvent(
 				conn, tileA, tileB, tileEventLabel,
 			));
-			cableOverlay?.update();
+			updateCables();
 		},
 		onConnectionFailed(event) {
 			operationalEvents.record(event);
