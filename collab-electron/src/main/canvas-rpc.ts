@@ -135,6 +135,18 @@ export function registerCanvasRpc(win: BrowserWindow): void {
   );
 
   registerMethod(
+    "canvas.tileRename",
+    (params) => sendToShell("canvas.tileRename", params),
+    {
+      description: "Rename a tile display title without changing its route handle",
+      params: {
+        tileId: "ID of the tile to rename",
+        title: "New display title; empty string clears the custom title",
+      },
+    },
+  );
+
+  registerMethod(
     "canvas.connectionList",
     (params) => sendToShell("canvas.connectionList", params),
     {

@@ -21,6 +21,9 @@ export default defineConfig({
       },
     },
     build: {
+      externalizeDeps: {
+        exclude: ["electron-log"],
+      },
       outDir: resolve(__dirname, outDir, "main"),
       rollupOptions: {
         external: ["node-pty", "@parcel/watcher", "typescript", "sharp"],

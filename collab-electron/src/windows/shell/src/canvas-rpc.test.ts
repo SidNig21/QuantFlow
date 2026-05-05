@@ -13,6 +13,7 @@ import {
 	validateRpcConnectionCreate,
 	validateRpcTerminalRead,
 	validateRpcTerminalWrite,
+	validateRpcTileRename,
 	validateRpcTileResize,
 	validateRpcViewportSet,
 } from "./canvas-rpc.js";
@@ -534,6 +535,27 @@ describe("validateRpcTileResize", () => {
       ok: false,
       reason: "too_small",
       message: "Tile size must be at least 200x120",
+    });
+  });
+});
+
+describe("validateRpcTileRename", () => {
+  test("accepts string titles and trims surrounding whitespace", () => {
+    expect(validateRpcTileRename("  Hermes Agent  ")).toEqual({
+      ok: true,
+      title: "Hermes Agent",
+    });
+    expect(validateRpcTileRename("")).toEqual({
+      ok: true,
+      title: "",
+    });
+  });
+
+  test("rejects non-string titles", () => {
+    expect(validateRpcTileRename(null)).toMatchObject({
+      ok: false,
+      reason: "invalid_title",
+      message: "Tile title must be a string",
     });
   });
 });

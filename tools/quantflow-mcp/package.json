@@ -1,0 +1,16 @@
+{
+  "name": "quantflow-mcp",
+  "version": "1.0.0",
+  "description": "MCP server exposing QuantFlow canvas RPC to Hermes",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "test": "node --test tool-definitions.test.js",
+    "smoke:relay": "node smoke-relay.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.25.76"
+  }
+}

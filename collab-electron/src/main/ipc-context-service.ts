@@ -205,4 +205,21 @@ export function registerContextServiceHandlers(): void {
       params: { maxChars: "(optional) Positive character limit" },
     },
   );
+
+  registerMethod(
+    "context.inject",
+    async (params) => {
+      const input = params as { sessionId?: unknown } | null;
+      await injectVaultContextToTile(
+        requireString(input?.sessionId, "sessionId"),
+        await requireVaultPath(),
+        (p) => readVaultFile(p, "utf-8"),
+      );
+      return { ok: true };
+    },
+    {
+      description: "Inject composed shared context into a terminal PTY session",
+      params: { sessionId: "PTY session ID for the target terminal tile" },
+    },
+  );
 }

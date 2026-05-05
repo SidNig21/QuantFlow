@@ -173,6 +173,13 @@ export function validateRpcTileResize(tile, size) {
 	return { ok: true, width, height };
 }
 
+export function validateRpcTileRename(title) {
+	if (typeof title !== "string") {
+		return { ok: false, code: 4, reason: "invalid_title", message: "Tile title must be a string" };
+	}
+	return { ok: true, title: title.trim() };
+}
+
 export function validateRpcViewportSet(params = {}) {
 	const result = {};
 	if (params.pan !== undefined) {
@@ -524,6 +531,27 @@ export function createCanvasRpc({
 					tileManager.repositionAllTiles();
 					tileManager.saveCanvasImmediate();
 					result = {};
+					break;
+				}
+				case "tileRename": {
+					const tile = requireTile(requestId, params.tileId);
+					if (!tile) return;
+					const validation = validateRpcTileRename(params.title);
+					if (!validation.ok) {
+						respondError(
+							requestId,
+							validation.code,
+							validation.message,
+						);
+						return;
+					}
+					const routeHandle = tile.routeHandle;
+					tileManager.renameTile(params.tileId, validation.title);
+					const renamed = getTile(params.tileId);
+					if (renamed && routeHandle) renamed.routeHandle = routeHandle;
+					result = renamed
+						? buildRpcTileSummary(renamed, connections)
+						: {};
 					break;
 				}
 				case "connectionList": {

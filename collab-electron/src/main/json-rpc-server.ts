@@ -1,4 +1,8 @@
-import { createServer, type Server, type Socket } from "node:net";
+import {
+  createServer,
+  type Server,
+  type Socket,
+} from "node:net";
 import {
   mkdirSync,
   unlinkSync,
@@ -13,6 +17,8 @@ import {
 } from "./ipc-endpoint";
 
 const SOCKET_PATH = makeEndpointPath("ipc");
+const DEFAULT_TCP_HOST = "0.0.0.0";
+const DEFAULT_TCP_PORT = 9811;
 // Write the breadcrumb to the base directory (~/.quantflow/)
 // so the hook script can discover the socket regardless of
 // whether the app is running in dev or prod mode.
@@ -56,8 +62,23 @@ function discoverMethods(): {
     ...(entry.params ? { params: entry.params } : {}),
   }));
 }
-let server: Server | null = null;
+let socketServer: Server | null = null;
+let tcpServer: Server | null = null;
 const connections = new Set<Socket>();
+
+export interface JsonRpcServerOptions {
+  enableSocket?: boolean;
+  tcpHost?: string;
+  tcpPort?: number;
+}
+
+export interface JsonRpcServerInfo {
+  socketPath?: string;
+  tcp?: {
+    host: string;
+    port: number;
+  };
+}
 
 function isJsonRpcRequest(obj: unknown): obj is JsonRpcRequest {
   if (typeof obj !== "object" || obj === null) return false;
@@ -172,33 +193,90 @@ export function registerMethod(
   );
 }
 
-export function startJsonRpcServer(): Promise<void> {
+function listenServer(
+  target: Server,
+  listen: () => void,
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    prepareEndpoint(SOCKET_PATH);
-    mkdirSync(QUANTFLOW_HOME, { recursive: true });
-
-    server = createServer(handleConnection);
-
-    server.on("error", (err) => {
-      console.error("[json-rpc] Server error:", err.message);
+    const onError = (err: Error) => {
+      target.off("listening", onListening);
       reject(err);
-    });
+    };
+    const onListening = () => {
+      target.off("error", onError);
+      resolve();
+    };
+    target.once("error", onError);
+    target.once("listening", onListening);
+    listen();
+  });
+}
 
-    registerMethod(
-      "rpc.discover",
-      () => ({ methods: discoverMethods() }),
-      { description: "List all available RPC methods" },
-    );
+export function getJsonRpcTcpAddress(): JsonRpcServerInfo["tcp"] | null {
+  if (!tcpServer) return null;
+  const address = tcpServer.address();
+  if (!address || typeof address === "string") return null;
+  return {
+    host: address.address,
+    port: address.port,
+  };
+}
 
-    server.listen(SOCKET_PATH, () => {
+export async function startJsonRpcServer(
+  options: JsonRpcServerOptions = {},
+): Promise<JsonRpcServerInfo> {
+  const enableSocket = options.enableSocket ?? true;
+  const tcpHost = options.tcpHost ?? DEFAULT_TCP_HOST;
+  const tcpPort = options.tcpPort ?? DEFAULT_TCP_PORT;
+
+  if (socketServer || tcpServer) {
+    throw new Error("JSON-RPC server is already running");
+  }
+
+  registerMethod(
+    "rpc.discover",
+    () => ({ methods: discoverMethods() }),
+    { description: "List all available RPC methods" },
+  );
+
+  const info: JsonRpcServerInfo = {};
+
+  try {
+    if (enableSocket) {
+      mkdirSync(QUANTFLOW_HOME, { recursive: true });
+      prepareEndpoint(SOCKET_PATH);
+
+      socketServer = createServer(handleConnection);
+      await listenServer(
+        socketServer,
+        () => socketServer!.listen(SOCKET_PATH),
+      );
+
       writeFileSync(SOCKET_PATH_FILE, SOCKET_PATH, "utf-8");
       writeFileSync(NODE_PATH_FILE, process.execPath, "utf-8");
+      console.log(`[json-rpc] Listening on ${SOCKET_PATH}`);
+      info.socketPath = SOCKET_PATH;
+    }
+
+    tcpServer = createServer(handleConnection);
+    await listenServer(
+      tcpServer,
+      () => tcpServer!.listen(tcpPort, tcpHost),
+    );
+
+    const tcpAddress = getJsonRpcTcpAddress();
+    if (tcpAddress) {
+      info.tcp = tcpAddress;
       console.log(
-        `[json-rpc] Listening on ${SOCKET_PATH}`,
+        `[json-rpc] TCP relay listening on ${tcpAddress.host}:${tcpAddress.port}`,
       );
-      resolve();
-    });
-  });
+    }
+
+    return info;
+  } catch (err) {
+    stopJsonRpcServer();
+    throw err;
+  }
 }
 
 export function stopJsonRpcServer(): void {
@@ -207,10 +285,13 @@ export function stopJsonRpcServer(): void {
   }
   connections.clear();
 
-  if (server) {
-    server.close();
-    server = null;
+  for (const srv of [socketServer, tcpServer]) {
+    if (srv) {
+      srv.close();
+    }
   }
+  socketServer = null;
+  tcpServer = null;
 
   cleanupEndpoint(SOCKET_PATH);
 
