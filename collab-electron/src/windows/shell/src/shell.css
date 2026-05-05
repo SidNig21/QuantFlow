@@ -2,21 +2,45 @@
 
 :root {
 	--font-sans: 'Geist', system-ui, sans-serif;
-	--font-mono: 'Geist Mono';
-	--bg: rgb(248, 248, 248);
-	--bg-rgb: 248, 248, 248;
-	--canvas-bg: rgb(240, 240, 240);
-	--canvas-bg-hi: rgb(244, 244, 244);
-	--canvas-bg-rgb: 240, 240, 240;
-	--canvas-opacity: 0.5;
-	--fg: rgb(32, 32, 32);
-	--border: rgb(206, 206, 206);
-	--tile-border: rgb(198, 198, 198);
-	--muted: rgb(113, 113, 123);
-	--edge-dot: rgb(34, 160, 90);
-	--edge-dot-hover: rgb(40, 190, 105);
-	--new-tile-btn-bg: rgb(224, 224, 224);
-	--new-tile-btn-bg-hover: rgb(212, 212, 212);
+	--font-mono: 'Geist Mono', 'IBM Plex Mono', ui-monospace, monospace;
+
+	/* Surface ramp — deep near-black */
+	--bg:           #0a0d12;
+	--bg-rgb:       10, 13, 18;
+	--canvas-bg:    #0c1117;
+	--canvas-bg-hi: #0f141b;
+	--canvas-bg-rgb: 12, 17, 23;
+	--canvas-opacity: 1;
+
+	/* Tile surfaces */
+	--tile-bg:       #0f141b;
+	--tile-bg-hi:    #131923;
+	--tile-border:   #1c232d;
+	--tile-border-hi:#2a3340;
+
+	/* Text */
+	--fg:    #e7ecf2;
+	--muted: #6b7686;
+	--muted-2: #4a5466;
+	--border: #1c232d;
+
+	/* Terminal-green accent */
+	--accent:      oklch(0.78 0.16 145);
+	--accent-dim:  oklch(0.62 0.13 145);
+	--accent-glow: oklch(0.78 0.16 145 / 0.18);
+
+	/* Status */
+	--running: oklch(0.78 0.16 145);
+	--idle:    #6b7686;
+	--error:   oklch(0.68 0.19 25);
+
+	/* Edge dot */
+	--edge-dot:       var(--accent);
+	--edge-dot-hover: oklch(0.85 0.17 145);
+
+	/* New-tile button matched to surface ramp */
+	--new-tile-btn-bg:       #13191f;
+	--new-tile-btn-bg-hover: #1a2129;
 
 	--panel-nav-min: 100;
 	--panel-nav-max: 1000;
@@ -25,22 +49,36 @@
 
 	--toolbar-height: 38px;
 	--nav-inset: 12px;
+
+	/* Compatibility shim for nav window (App.css references these) */
+	--foreground:        var(--fg);
+	--background:        var(--bg);
+	--muted-foreground:  var(--muted);
+	--primary:           var(--accent);
+	--primary-foreground: #0a0d12;
+	--destructive:       var(--error);
+	--card:              var(--tile-bg);
+	--scrollbar-width:   10px;
+	--scrollbar-thumb:   #1c232d;
+	--scrollbar-thumb-hover: #2a3340;
 }
 
+/* Dark is now the default — .dark selectors throughout this file remain
+   active because dark-mode.js always applies the .dark class to <html>.
+   Token redefinitions are unnecessary; the values below match :root for
+   any consumer that still scopes by .dark. */
 .dark {
-	--bg: rgb(18, 18, 18);
-	--bg-rgb: 18, 18, 18;
-	--canvas-bg: rgb(24, 24, 24);
-	--canvas-bg-hi: rgb(38, 38, 38);
-	--canvas-bg-rgb: 24, 24, 24;
-	--fg: rgb(220, 220, 220);
-	--border: rgba(255, 255, 255, 0.2);
-	--tile-border: rgb(70, 70, 70);
-	--muted: rgb(132, 132, 132);
-	--edge-dot: rgb(72, 210, 130);
-	--edge-dot-hover: rgb(90, 235, 150);
-	--new-tile-btn-bg: rgb(44, 44, 44);
-	--new-tile-btn-bg-hover: rgb(56, 56, 56);
+	--bg:           #0a0d12;
+	--canvas-bg:    #0c1117;
+	--canvas-bg-hi: #0f141b;
+	--fg:           #e7ecf2;
+	--border:       #1c232d;
+	--tile-border:  #1c232d;
+	--muted:        #6b7686;
+	--edge-dot:       var(--accent);
+	--edge-dot-hover: oklch(0.85 0.17 145);
+	--new-tile-btn-bg:       #13191f;
+	--new-tile-btn-bg-hover: #1a2129;
 }
 
 * {
@@ -87,19 +125,24 @@ body.platform-win {
 
 #alpha-label {
 	position: fixed;
-	bottom: 8px;
-	left: 50%;
-	transform: translateX(-50%);
+	top: 8px;
+	left: 14px;
+	transform: none;
 	font-family: var(--font-mono);
-	font-size: 11px;
+	font-size: 10px;
 	font-weight: 500;
-	color: red;
+	color: var(--error);
 	text-transform: uppercase;
 	user-select: none;
 	-webkit-user-select: none;
 	pointer-events: none;
 	white-space: nowrap;
-	z-index: 1000;
+	padding: 2px 8px;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
+	background: color-mix(in srgb, var(--error) 8%, transparent);
+	z-index: 200;
+	-webkit-app-region: no-drag;
 }
 
 #alpha-label a {
@@ -858,7 +901,7 @@ body.platform-win {
 }
 
 .dark #minimap-wrapper {
-	background: rgba(18, 18, 18, 0.25);
+	background: rgba(15, 20, 27, 0.5);
 }
 
 #minimap-wrapper.visible {
@@ -941,12 +984,13 @@ body.platform-win {
 
 .canvas-tile {
 	position: absolute;
-	border-radius: 0;
-	box-shadow: none;
+	border-radius: 8px;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 	display: flex;
 	flex-direction: column;
-	background: var(--bg);
+	background: var(--tile-bg);
 	border: 1px solid var(--tile-border);
+	overflow: hidden;
 	user-select: none;
 }
 
@@ -979,19 +1023,19 @@ body.platform-win {
 }
 
 .canvas-tile.tile-focused {
-	border-color: rgba(0, 0, 0, 0.5);
+	border-color: var(--tile-border-hi);
 }
 .canvas-tile.tile-focused::before,
 .canvas-tile.tile-focused::after {
-	border-color: rgba(0, 0, 0, 0.5);
+	border-color: var(--tile-border-hi);
 }
 
-.dark .canvas-tile.tile-focused {
-	border-color: rgba(255, 255, 255, 0.5);
+.canvas-tile.tile-selected {
+	border-color: var(--accent);
 }
-.dark .canvas-tile.tile-focused::before,
-.dark .canvas-tile.tile-focused::after {
-	border-color: rgba(255, 255, 255, 0.5);
+.canvas-tile.tile-selected::before,
+.canvas-tile.tile-selected::after {
+	border-color: var(--accent);
 }
 
 
@@ -1186,27 +1230,29 @@ body.platform-win {
 }
 
 .canvas-tile[data-tile-type="term"] {
-	background: rgba(250, 250, 250, 0.5);
+	background: var(--tile-bg);
 }
 
 .canvas-tile[data-tile-type="term"] .tile-title-bar {
 	background: transparent;
-	color: rgba(0, 0, 0, 0.6);
+	color: var(--fg);
+	opacity: 0.85;
 }
 
 .dark .canvas-tile[data-tile-type="term"] {
-	background: rgba(5, 5, 5, 0.2);
+	background: var(--tile-bg);
 }
 
 .dark .canvas-tile[data-tile-type="term"] .tile-title-bar {
 	background: transparent;
-	color: rgba(255, 255, 255, 0.7);
+	color: var(--fg);
+	opacity: 0.85;
 }
 
 .canvas-tile[data-tile-type="note"] .tile-title-bar,
 .canvas-tile[data-tile-type="code"] .tile-title-bar {
-	background: #e7e7e7;
-	color: rgba(0, 0, 0, 0.85);
+	background: var(--canvas-bg-hi);
+	color: var(--fg);
 	height: auto;
 	padding: 6px 8px;
 	border-radius: 0;
@@ -1214,8 +1260,8 @@ body.platform-win {
 
 .dark .canvas-tile[data-tile-type="note"] .tile-title-bar,
 .dark .canvas-tile[data-tile-type="code"] .tile-title-bar {
-	background: #000;
-	color: rgba(255, 255, 255, 0.85);
+	background: var(--canvas-bg-hi);
+	color: var(--fg);
 }
 
 .canvas-tile[data-tile-type="note"] .tile-title-text,

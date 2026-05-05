@@ -2,19 +2,8 @@
  * Dark mode detection and canvas opacity management.
  */
 
-export function initDarkMode(onThemeChange) {
-	const query = "(prefers-color-scheme: dark)";
-	function sync() {
-		document.documentElement.classList.toggle(
-			"dark",
-			window.matchMedia(query).matches,
-		);
-	}
-	sync();
-	window.matchMedia(query).addEventListener("change", () => {
-		sync();
-		onThemeChange();
-	});
+export function initDarkMode(_onThemeChange) {
+	document.documentElement.classList.add("dark");
 }
 
 export function applyCanvasOpacity(percent) {
