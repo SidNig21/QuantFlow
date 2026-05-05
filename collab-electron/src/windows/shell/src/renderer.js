@@ -40,6 +40,7 @@ import {
 	getTileLabel,
 } from "./tile-renderer.js";
 import { createCableOverlay, formatCableContextRelay } from "./cable-overlay.js";
+import { renderCables } from "./cable-renderer.js";
 import {
 	shouldCancelCableDrawMode,
 	shouldEnterCableDrawMode,
@@ -1046,7 +1047,7 @@ async function init() {
 				meta: { connectionId: id, tileAId: conn?.tileAId, tileBId: conn?.tileBId },
 			});
 			tileManager.saveCanvasImmediate();
-			cableOverlay.update();
+			updateCables();
 		},
 		onUpdateLabel: (id, label) => {
 			const conn = updateConnectionLabel(id, label);
@@ -1060,10 +1061,20 @@ async function init() {
 				));
 			}
 			tileManager.saveCanvasImmediate();
-			cableOverlay.update();
+			updateCables();
 		},
 		onGetFocusedTileId: () => tileManager.getFocusedTileId(),
 	});
+
+	// -- Cable layer (new SVG renderer; runs alongside cableOverlay until
+	//    the legacy overlay is retired in a later stage) --
+	const cableLayerContent = document.getElementById("cable-layer-content");
+	function updateCables() {
+		cableOverlay.update();
+		if (cableLayerContent) {
+			renderCables(cableLayerContent, connections, tiles, viewportState);
+		}
+	}
 
 	// -- Edge indicators --
 
@@ -1229,13 +1240,13 @@ async function init() {
 		tileManager.repositionAllTiles();
 		edgeIndicators.update();
 		minimap.update();
-		cableOverlay.update();
+		updateCables();
 		tileManager.saveCanvasDebounced();
 	});
 
 	edgeIndicators.update();
 	minimap.update();
-	cableOverlay.update();
+	updateCables();
 
 	// -- Agent panel init (after tileManager, since getAllWebviews references it) --
 
@@ -2790,7 +2801,7 @@ async function init() {
 		syncConnectionGraph();
 		viewport.redrawGrid();
 		minimap.update();
-		cableOverlay.update();
+		updateCables();
 
 		// Batch-sync metadata for restored terminal tiles
 		const restoredTermTiles = tiles.filter(

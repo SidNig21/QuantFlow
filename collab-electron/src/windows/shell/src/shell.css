@@ -928,9 +928,68 @@ body.platform-win {
 #edge-indicators {
 	position: absolute;
 	inset: 0;
-	z-index: 104;
+	z-index: 105;
 	pointer-events: none;
 	overflow: hidden;
+}
+
+/* ── Cable layer (SVG overlay between tile-layer and edge-indicators) ── */
+
+#cable-layer {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 104;
+	overflow: visible;
+}
+
+#cable-layer path.cable-hit {
+	stroke: transparent;
+	stroke-width: 14;
+	fill: none;
+	pointer-events: stroke;
+	cursor: pointer;
+}
+
+#cable-layer path.cable-glow {
+	stroke: var(--accent);
+	stroke-width: 7.6;
+	opacity: 0.18;
+	fill: none;
+	filter: blur(3px);
+	pointer-events: none;
+}
+
+#cable-layer path.cable-main {
+	stroke: var(--accent);
+	stroke-width: 1.6;
+	stroke-linecap: round;
+	fill: none;
+	pointer-events: none;
+}
+
+#cable-layer path.cable-flow {
+	stroke: var(--accent);
+	stroke-width: 1.6;
+	stroke-dasharray: 2 14;
+	stroke-linecap: round;
+	fill: none;
+	pointer-events: none;
+	animation: cableFlow 1.6s linear infinite;
+}
+
+#cable-layer path.cable-preview {
+	stroke: oklch(0.78 0.16 145 / 0.7);
+	stroke-width: 2;
+	stroke-dasharray: 4 4;
+	fill: none;
+	pointer-events: none;
+}
+
+@keyframes cableFlow {
+	to { stroke-dashoffset: -32; }
 }
 
 .edge-dot {
