@@ -15,18 +15,47 @@ describe("resolveCableDrop", () => {
 			reason: "ready",
 			tileAId: "tile-a",
 			tileBId: "tile-b",
+			from: { tileId: "tile-a", side: "E" },
+			to: { tileId: "tile-b", side: "W" },
 		});
 	});
 
-	test("rejects duplicate terminal connections in either direction", () => {
+	test("preserves explicit source and target port sides", () => {
+		expect(resolveCableDrop({
+			sourceTile: term("tile-a"),
+			targetTile: term("tile-b"),
+			connections: [],
+			sourceSide: "S",
+			targetSide: "N",
+		})).toMatchObject({
+			from: { tileId: "tile-a", side: "S" },
+			to: { tileId: "tile-b", side: "N" },
+		});
+	});
+
+	test("falls back from invalid port sides", () => {
+		expect(resolveCableDrop({
+			sourceTile: term("tile-a"),
+			targetTile: term("tile-b"),
+			connections: [],
+			sourceSide: "Q",
+			targetSide: "Z",
+		})).toMatchObject({
+			from: { tileId: "tile-a", side: "E" },
+			to: { tileId: "tile-b", side: "W" },
+		});
+	});
+
+	test("allows multiple terminal connections so cable bundles can be created", () => {
 		expect(resolveCableDrop({
 			sourceTile: term("tile-a"),
 			targetTile: term("tile-b"),
 			connections: [{ tileAId: "tile-b", tileBId: "tile-a" }],
-		})).toEqual({
-			ok: false,
-			reason: "duplicate",
-			message: "Connection already exists.",
+		})).toMatchObject({
+			ok: true,
+			reason: "ready",
+			tileAId: "tile-a",
+			tileBId: "tile-b",
 		});
 	});
 

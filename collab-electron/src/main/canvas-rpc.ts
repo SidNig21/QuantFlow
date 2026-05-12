@@ -164,6 +164,9 @@ export function registerCanvasRpc(win: BrowserWindow): void {
         tileAId: "ID of the first tile",
         tileBId: "ID of the second tile",
         label: "(optional) Label for the connection",
+        fromSide: "(optional) Source visual port side: N, E, S, or W",
+        toSide: "(optional) Target visual port side: N, E, S, or W",
+        kind: "(optional) Connection kind metadata; relay remains one-shot and cable-bounded",
       },
     },
   );

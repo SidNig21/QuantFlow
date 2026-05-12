@@ -739,6 +739,7 @@ describe("createCableOverlay interactions", () => {
 		overlay.update();
 		return {
 			container,
+			overlay,
 			focusedTileIds,
 			notifications,
 			removedConnections,
@@ -783,6 +784,23 @@ describe("createCableOverlay interactions", () => {
 		const [removeItem] = menu.querySelectorAll(".cable-menu-item");
 		removeItem.dispatchEvent(createMouseEvent("click"));
 		expect(removedConnections).toEqual(["conn-ab"]);
+	});
+
+	test("opens the cable context menu from the public overlay API", () => {
+		const { overlay, removedConnections } = setupOverlay();
+
+		expect(overlay.openContextMenu("conn-ab", 120, 90)?.id).toBe("conn-ab");
+		const menu = document.body.querySelector(".cable-context-menu");
+		expect(menu).toBeTruthy();
+
+		const [removeItem] = menu.querySelectorAll(".cable-menu-item");
+		removeItem.dispatchEvent(createMouseEvent("click"));
+		expect(removedConnections).toEqual(["conn-ab"]);
+	});
+
+	test("returns null when opening a context menu for a missing connection", () => {
+		const { overlay } = setupOverlay();
+		expect(overlay.openContextMenu("missing", 120, 90)).toBeNull();
 	});
 
 	test("keeps the draft and shows status when manual relay fails", async () => {

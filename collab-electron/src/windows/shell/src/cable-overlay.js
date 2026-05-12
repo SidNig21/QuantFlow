@@ -997,6 +997,13 @@ export function createCableOverlay({
 		return { connection: conn, tileA, tileB, mid };
 	}
 
+	function openContextMenu(connectionId, clientX, clientY) {
+		const conn = connections.find((item) => item.id === connectionId);
+		if (!conn) return null;
+		showContextMenu(conn, clientX, clientY);
+		return conn;
+	}
+
 	function destroy() {
 		svg.remove();
 		removePopover();
@@ -1009,6 +1016,7 @@ export function createCableOverlay({
 		updatePreview,
 		cancelPreview,
 		selectConnection,
+		openContextMenu,
 		pulseCable,
 		destroy,
 	};

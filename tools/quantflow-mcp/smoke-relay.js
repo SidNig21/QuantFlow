@@ -127,6 +127,17 @@ async function wait(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function waitForTerminalSession(tileId, timeoutMs = 10000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const listed = await rpc("canvas.tileList");
+    const tile = listed?.tiles?.find((item) => item.id === tileId);
+    if (tile?.ptySessionId) return tile;
+    await wait(250);
+  }
+  throw new Error(`Tile ${tileId} did not get an active PTY session`);
+}
+
 async function runWorkflowSmoke() {
   const createdTiles = [];
   try {
@@ -134,6 +145,11 @@ async function runWorkflowSmoke() {
     const worker = await createTile("Worker", 680, 100);
     const shell = await createTile("Shell", 1260, 100);
     createdTiles.push(hermes, worker, shell);
+    await Promise.all([
+      waitForTerminalSession(hermes),
+      waitForTerminalSession(worker),
+      waitForTerminalSession(shell),
+    ]);
 
     const hermesToWorker = await rpc("canvas.connectionCreate", {
       tileAId: hermes,

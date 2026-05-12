@@ -386,14 +386,14 @@ describe("validateRpcConnectionCreate", () => {
       });
   });
 
-  test("rejects duplicate connections in either direction", () => {
+  test("allows duplicate tile pairs so bundled cables can be created", () => {
     expect(validateRpcConnectionCreate(termA, termB, [
       { tileAId: "tile-b", tileBId: "tile-a" },
     ])).toMatchObject({
-      ok: false,
-      code: 4,
-      reason: "duplicate",
-      message: "Connection already exists.",
+      ok: true,
+      reason: "ready",
+      tileAId: "tile-a",
+      tileBId: "tile-b",
     });
   });
 

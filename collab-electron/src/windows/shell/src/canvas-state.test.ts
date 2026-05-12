@@ -141,12 +141,36 @@ describe("connection CRUD", () => {
       id: "conn-1",
       tileAId: "tile-a",
       tileBId: "tile-b",
+      from: { tileId: "tile-a", side: "E" },
+      to: { tileId: "tile-b", side: "W" },
+      kind: "relay",
       createdAt: 1,
       updatedAt: 1,
     });
 
     expect(conn).toEqual(connections[0]);
     expect(connections).toHaveLength(1);
+  });
+
+  test("addConnection strips invalid optional visual metadata", () => {
+    const conn = addConnection({
+      id: "conn-1",
+      tileAId: "tile-a",
+      tileBId: "tile-b",
+      from: { tileId: "tile-x", side: "E" },
+      to: { tileId: "tile-b", side: "Q" },
+      kind: "",
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    expect(conn).toEqual({
+      id: "conn-1",
+      tileAId: "tile-a",
+      tileBId: "tile-b",
+      createdAt: 1,
+      updatedAt: 1,
+    });
   });
 
   test("removeConnection removes by id", () => {

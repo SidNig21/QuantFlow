@@ -4,6 +4,7 @@ import {
 	selectTile, deselectTile, toggleTileSelection,
 	clearSelection, isSelected, getSelectedTiles,
 	connections, getConnectionsForTile, removeConnection,
+	normalizeConnection,
 } from "./canvas-state.js";
 import {
 	createTileDOM, positionTile, updateTileTitle, getTileLabel,
@@ -74,7 +75,7 @@ export function createTileManager({
 
 	function getCanvasStateForSave() {
 		return {
-			version: 1,
+			version: 2,
 			tiles: tiles.map((t) => ({
 				id: t.id,
 				type: t.type,
@@ -105,14 +106,9 @@ export function createTileManager({
 				roleStartupSessionId: t.roleStartupSessionId,
 				roleStartupPromptSessionId: t.roleStartupPromptSessionId,
 			})),
-			connections: connections.map((conn) => ({
-				id: conn.id,
-				tileAId: conn.tileAId,
-				tileBId: conn.tileBId,
-				label: conn.label,
-				createdAt: conn.createdAt,
-				updatedAt: conn.updatedAt,
-			})),
+			connections: connections
+				.map(normalizeConnection)
+				.filter(Boolean),
 			viewport: {
 				panX: viewportState.panX,
 				panY: viewportState.panY,
@@ -276,36 +272,40 @@ export function createTileManager({
 		});
 
 		wv.addEventListener("ipc-message", (event) => {
+			const currentTile = getTile(tile.id);
+			const currentDom = tileDOMs.get(tile.id);
+			if (!currentTile || !currentDom) return;
+
 			if (event.channel === "pty-session-id") {
-				tile.ptySessionId = event.args[0];
-				ensureRouteHandle(tile, tiles);
-				maybeRunRoleStartup(tile);
-				updateTileTitle(tileDOMs.get(tile.id), tile);
+				currentTile.ptySessionId = event.args[0];
+				ensureRouteHandle(currentTile, tiles);
+				maybeRunRoleStartup(currentTile);
+				updateTileTitle(currentDom, currentTile);
 				saveCanvasDebounced();
 				if (onTerminalSessionCreated) {
-					onTerminalSessionCreated(tile);
+					onTerminalSessionCreated(currentTile);
 				}
-				registerTerminalTileSession(tile);
+				registerTerminalTileSession(currentTile);
 			}
 			if (event.channel === "pty-start-failed") {
 				const payload = event.args[0] || {};
-				tile.ptyStatus = "error";
-				tile.ptyError = String(payload.message || "PTY start failed.");
-				updateTileTitle(tileDOMs.get(tile.id), tile);
+				currentTile.ptyStatus = "error";
+				currentTile.ptyError = String(payload.message || "PTY start failed.");
+				updateTileTitle(currentDom, currentTile);
 				saveCanvasDebounced();
 				if (onTerminalStartFailed) {
-					onTerminalStartFailed(tile, payload);
+					onTerminalStartFailed(currentTile, payload);
 				}
 			}
 			if (event.channel === "pty-cwd-changed") {
 				const cwd = event.args[1];
-				if (cwd && cwd !== tile.autoTitle) {
-					tile.cwd = cwd;
-					tile.autoTitle = cwd;
-					ensureRouteHandle(tile, tiles);
-					updateTileTitle(tileDOMs.get(tile.id), tile);
+				if (cwd && cwd !== currentTile.autoTitle) {
+					currentTile.cwd = cwd;
+					currentTile.autoTitle = cwd;
+					ensureRouteHandle(currentTile, tiles);
+					updateTileTitle(currentDom, currentTile);
 					saveCanvasDebounced();
-					registerTerminalTileSession(tile);
+					registerTerminalTileSession(currentTile);
 					if (onTerminalCwdChanged) {
 						onTerminalCwdChanged(cwd);
 					}

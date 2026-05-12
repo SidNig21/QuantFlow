@@ -34,7 +34,22 @@
 /** @type {Tile[]} */
 export const tiles = [];
 
-/** @type {Array<{id: string, tileAId: string, tileBId: string, label?: string, createdAt: number, updatedAt: number}>} */
+/**
+ * @typedef {'N'|'E'|'S'|'W'} ConnectionSide
+ * @typedef {{tileId: string, side: ConnectionSide}} ConnectionEndpoint
+ * @typedef {Object} Connection
+ * @property {string} id
+ * @property {string} tileAId - Legacy/canonical endpoint A, required for relay and MCP compatibility.
+ * @property {string} tileBId - Legacy/canonical endpoint B, required for relay and MCP compatibility.
+ * @property {string} [label]
+ * @property {ConnectionEndpoint} [from] - Optional visual port metadata.
+ * @property {ConnectionEndpoint} [to] - Optional visual port metadata.
+ * @property {string} [kind] - Optional semantic hint; existing relay remains one-shot and cable-bounded.
+ * @property {number} createdAt
+ * @property {number} updatedAt
+ */
+
+/** @type {Connection[]} */
 export const connections = [];
 
 let nextZIndex = 1;
@@ -85,8 +100,10 @@ export function getTile(id) {
 }
 
 export function addConnection(conn) {
-	connections.push(conn);
-	return conn;
+	const normalized = normalizeConnection(conn);
+	if (!normalized) return null;
+	connections.push(normalized);
+	return normalized;
 }
 
 export function removeConnection(id) {
@@ -120,6 +137,54 @@ export function updateConnectionLabel(id, label) {
 
 export function clearConnections() {
 	connections.length = 0;
+}
+
+/** @param {unknown} value */
+export function isConnectionSide(value) {
+	return value === "N" || value === "E" || value === "S" || value === "W";
+}
+
+function normalizeEndpoint(value, tileAId, tileBId) {
+	if (!value || typeof value !== "object") return null;
+	if (
+		typeof value.tileId !== "string" ||
+		!isConnectionSide(value.side) ||
+		(value.tileId !== tileAId && value.tileId !== tileBId)
+	) {
+		return null;
+	}
+	return { tileId: value.tileId, side: value.side };
+}
+
+/** @param {unknown} value */
+export function normalizeConnection(value) {
+	if (!value || typeof value !== "object") return null;
+	if (
+		typeof value.id !== "string" ||
+		typeof value.tileAId !== "string" ||
+		typeof value.tileBId !== "string"
+	) {
+		return null;
+	}
+
+	const normalized = {
+		id: value.id,
+		tileAId: value.tileAId,
+		tileBId: value.tileBId,
+		createdAt: Number.isFinite(value.createdAt) ? value.createdAt : 0,
+		updatedAt: Number.isFinite(value.updatedAt) ? value.updatedAt : 0,
+	};
+	if (typeof value.label === "string") normalized.label = value.label;
+	const from = normalizeEndpoint(value.from, value.tileAId, value.tileBId);
+	const to = normalizeEndpoint(value.to, value.tileAId, value.tileBId);
+	if (from && to) {
+		normalized.from = from;
+		normalized.to = to;
+	}
+	if (typeof value.kind === "string" && value.kind.trim()) {
+		normalized.kind = value.kind;
+	}
+	return normalized;
 }
 
 const IMAGE_EXTENSIONS = new Set([

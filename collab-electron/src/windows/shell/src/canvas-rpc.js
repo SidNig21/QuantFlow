@@ -3,7 +3,7 @@ import {
 	addConnection, removeConnection, updateConnectionLabel,
 	getConnection,
 } from "./canvas-state.js";
-import { resolveCableDrop } from "./cable-drop.js";
+import { normalizeCableSide, resolveCableDrop } from "./cable-drop.js";
 import { MIN_SIZES } from "./tile-interactions.js";
 import { ZOOM_MAX, ZOOM_MIN } from "./canvas-viewport.js";
 
@@ -588,6 +588,17 @@ export function createCanvasRpc({
 						tileAId: validation.tileAId,
 						tileBId: validation.tileBId,
 						label: params.label,
+						from: {
+							tileId: validation.tileAId,
+							side: normalizeCableSide(params.fromSide, "E"),
+						},
+						to: {
+							tileId: validation.tileBId,
+							side: normalizeCableSide(params.toSide, "W"),
+						},
+						kind: typeof params.kind === "string" && params.kind.trim()
+							? params.kind
+							: "relay",
 						createdAt: now,
 						updatedAt: now,
 					});
