@@ -20,7 +20,7 @@ const cacheDirs = new Set<string>();
 const pending = new Map<number, Pending>();
 
 export function setThumbnailCacheDir(workspacePath: string): void {
-  cacheDirs.add(join(workspacePath, ".collaborator", "thumbnails"));
+  cacheDirs.add(join(workspacePath, ".quantflow", "thumbnails"));
 }
 
 function ensureWorker(): Worker {

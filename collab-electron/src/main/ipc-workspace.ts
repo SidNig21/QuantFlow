@@ -55,20 +55,24 @@ function ensureGitignoreEntry(workspacePath: string): void {
   const content = readFileSync(gitignorePath, "utf-8");
   const lines = content.split("\n");
   const alreadyIgnored = lines.some(
-    (l) => l.trim() === ".collaborator" || l.trim() === ".collaborator/",
+    (l) =>
+      l.trim() === ".quantflow" ||
+      l.trim() === ".quantflow/" ||
+      l.trim() === ".collaborator" ||
+      l.trim() === ".collaborator/",
   );
   if (alreadyIgnored) return;
 
   const suffix = content.endsWith("\n") ? "" : "\n";
   appendFileSync(
     gitignorePath,
-    `${suffix}.collaborator\n`,
+    `${suffix}.quantflow\n`,
     "utf-8",
   );
 }
 
 function initWorkspaceFiles(workspacePath: string): void {
-  const collabDir = join(workspacePath, ".collaborator");
+  const collabDir = join(workspacePath, ".quantflow");
   mkdirSync(collabDir, { recursive: true });
   ensureGitignoreEntry(workspacePath);
 }
@@ -288,7 +292,7 @@ export function registerWorkspaceHandlers(
       return { workspaces: appConfig.workspaces };
     }
 
-    const collabDir = join(chosen, ".collaborator");
+    const collabDir = join(chosen, ".quantflow");
     const isNew = !existsSync(collabDir);
     if (isNew) {
       initWorkspaceFiles(chosen);

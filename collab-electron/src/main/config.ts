@@ -1,6 +1,6 @@
 import { readFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { COLLAB_DIR } from "./paths";
+import { QUANTFLOW_DIR } from "./paths";
 import { atomicWriteFileSync } from "./files";
 
 export interface WindowState {
@@ -31,7 +31,7 @@ const DEFAULT_CONFIG: AppConfig = {
   ui: {},
 };
 
-let configDir = COLLAB_DIR;
+let configDir = QUANTFLOW_DIR;
 
 export function _setConfigDir(dir: string): void {
   configDir = dir;

@@ -1,9 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { readFile, readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { COLLAB_DIR } from "./paths";
+import { QUANTFLOW_DIR } from "./paths";
 
-let rolesDir = join(COLLAB_DIR, "roles");
+let rolesDir = join(QUANTFLOW_DIR, "roles");
 
 export function _setRolesDir(dir: string): void {
   rolesDir = dir;

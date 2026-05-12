@@ -59,7 +59,7 @@ export function startReplay(workspacePath: string): boolean {
   if (!worker) startWorker();
   const cachePath = join(
     workspacePath,
-    ".collaborator",
+    ".quantflow",
     "replay-cache.json",
   );
   worker?.postMessage({ cmd: "start", workspacePath, cachePath });

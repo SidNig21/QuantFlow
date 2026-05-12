@@ -1,7 +1,7 @@
 import { execFileSync, execFile } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { COLLAB_DIR, DEV_WORKTREE_ID } from "./paths";
+import { QUANTFLOW_DIR, DEV_WORKTREE_ID } from "./paths";
 
 export interface SessionMeta {
   shell: string;
@@ -17,7 +17,7 @@ export interface SessionMeta {
 }
 
 export let SESSION_DIR = path.join(
-  COLLAB_DIR, "terminal-sessions",
+  QUANTFLOW_DIR, "terminal-sessions",
 );
 
 export function _setSessionDir(dir: string): void {

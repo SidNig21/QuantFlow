@@ -16,7 +16,10 @@ function normalizeWindowsPath(path: string): string {
 }
 
 function getDevWorktreeRoot(): string {
-  const root = process.env["COLLAB_DEV_WORKTREE_ROOT"] || process.cwd();
+  const root =
+    process.env["QUANTFLOW_DEV_WORKTREE_ROOT"] ||
+    process.env["COLLAB_DEV_WORKTREE_ROOT"] ||
+    process.cwd();
   return resolve(normalizeWindowsPath(root));
 }
 
@@ -31,6 +34,6 @@ export const DEV_WORKTREE_ID = import.meta.env?.DEV
   ? `worktree-${getDevWorktreeId()}`
   : null;
 
-export const COLLAB_DIR = import.meta.env?.DEV
+export const QUANTFLOW_DIR = import.meta.env?.DEV
   ? join(QUANTFLOW_HOME, "dev", DEV_WORKTREE_ID ?? "worktree-unknown")
   : QUANTFLOW_HOME;

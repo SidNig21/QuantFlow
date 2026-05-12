@@ -19,14 +19,14 @@ const INSTALL_DIR = IS_WIN
     "bin",
   )
   : join(homedir(), ".local", "bin");
-const WRAPPER_PATH = join(INSTALL_DIR, IS_WIN ? "collab-canvas.cmd" : "collab-canvas");
-const MJS_PATH = join(INSTALL_DIR, "collab-cli.mjs");
+const WRAPPER_PATH = join(INSTALL_DIR, IS_WIN ? "qf.cmd" : "qf");
+const MJS_PATH = join(INSTALL_DIR, "qf.mjs");
 
 function getMjsSource(): string {
   if (app.isPackaged) {
-    return join(process.resourcesPath, "collab-cli.mjs");
+    return join(process.resourcesPath, "qf.mjs");
   }
-  return join(app.getAppPath(), "cli", "collab-cli.mjs");
+  return join(app.getAppPath(), "cli", "qf.mjs");
 }
 
 function generateUnixWrapper(): string {
@@ -37,7 +37,7 @@ if [[ -z "$NODE_BIN" || ! -x "$NODE_BIN" ]]; then
   echo "error: QuantFlow is not running (no node-path file)" >&2
   exit 2
 fi
-ELECTRON_RUN_AS_NODE=1 exec "$NODE_BIN" "$(dirname "$0")/collab-cli.mjs" "$@"
+ELECTRON_RUN_AS_NODE=1 exec "$NODE_BIN" "$(dirname "$0")/qf.mjs" "$@"
 `;
 }
 
@@ -51,7 +51,7 @@ if not exist "%NP_FILE%" (
 )
 set /p NODE_BIN=<"%NP_FILE%"
 set ELECTRON_RUN_AS_NODE=1
-"%NODE_BIN%" "%~dp0collab-cli.mjs" %*
+"%NODE_BIN%" "%~dp0qf.mjs" %*
 `;
 }
 
@@ -63,8 +63,8 @@ export function installCli(): void {
   }
 
   const legacyNames = IS_WIN
-    ? ["collab.cmd", "collab.ps1", "collab-canvas.ps1"]
-    : ["collab"];
+    ? ["collab.cmd", "collab.ps1", "collab-canvas.ps1", "collab-canvas.cmd", "collab-cli.mjs"]
+    : ["collab", "collab-canvas", "collab-cli.mjs"];
   for (const name of legacyNames) {
     const legacy = join(INSTALL_DIR, name);
     if (existsSync(legacy)) {

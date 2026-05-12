@@ -69,8 +69,8 @@
 				"to": "terminfo"
 			},
 			{
-				"from": "cli/collab-cli.mjs",
-				"to": "collab-cli.mjs"
+				"from": "cli/qf.mjs",
+				"to": "qf.mjs"
 			},
 			{
 				"from": "packages/collab-canvas-skill",

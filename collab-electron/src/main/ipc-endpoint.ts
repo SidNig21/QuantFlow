@@ -1,11 +1,11 @@
 import * as crypto from "node:crypto";
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { COLLAB_DIR } from "./paths";
+import { QUANTFLOW_DIR } from "./paths";
 
 const NAMESPACE = `quantflow-${crypto
   .createHash("sha1")
-  .update(COLLAB_DIR)
+  .update(QUANTFLOW_DIR)
   .digest("hex")
   .slice(0, 8)}`;
 
@@ -17,7 +17,7 @@ export function makeEndpointPath(name: string): string {
   if (process.platform === "win32") {
     return pipePath(name);
   }
-  return join(COLLAB_DIR, `${name}.sock`);
+  return join(QUANTFLOW_DIR, `${name}.sock`);
 }
 
 export function prepareEndpoint(endpoint: string): void {
@@ -43,5 +43,5 @@ export function cleanupEndpoint(endpoint: string): void {
 }
 
 export function ensureEndpointDir(): void {
-  mkdirSync(COLLAB_DIR, { recursive: true });
+  mkdirSync(QUANTFLOW_DIR, { recursive: true });
 }

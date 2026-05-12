@@ -13,7 +13,7 @@ const DEFAULT_CONFIG: WorkspaceConfig = {
 };
 
 export function workspaceConfigPath(workspacePath: string): string {
-  return join(workspacePath, ".collaborator", "config.json");
+  return join(workspacePath, ".quantflow", "config.json");
 }
 
 export function loadWorkspaceConfig(

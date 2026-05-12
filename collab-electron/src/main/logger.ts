@@ -1,6 +1,6 @@
 import log from "electron-log/main.js";
 import { join } from "node:path";
-import { COLLAB_DIR } from "./paths";
+import { QUANTFLOW_DIR } from "./paths";
 
 const sessionTimestamp = new Date()
   .toISOString()
@@ -8,7 +8,7 @@ const sessionTimestamp = new Date()
   .replace(/\.\d+Z$/, "");
 
 log.transports.file.resolvePathFn = () =>
-  join(COLLAB_DIR, "logs", `main-${sessionTimestamp}.log`);
+  join(QUANTFLOW_DIR, "logs", `main-${sessionTimestamp}.log`);
 
 log.initialize();
 

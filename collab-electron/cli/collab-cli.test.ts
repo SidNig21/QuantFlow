@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-const cliPath = join(import.meta.dir, "collab-cli.mjs");
+const cliPath = join(import.meta.dir, "qf.mjs");
 
 function runCli(args: string[]) {
   const result = Bun.spawnSync(["node", cliPath, ...args], {
@@ -16,7 +16,7 @@ function runCli(args: string[]) {
   };
 }
 
-describe("collab-canvas CLI", () => {
+describe("qf CLI", () => {
   test("help documents viewport and connection commands", () => {
     const result = runCli(["--help"]);
 

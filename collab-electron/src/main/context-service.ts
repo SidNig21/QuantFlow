@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
-import { COLLAB_DIR } from "./paths";
+import { QUANTFLOW_DIR } from "./paths";
 
 const MAX_DECISIONS = 50;
 const DEFAULT_CONTEXT_MAX_CHARS = 20_000;
@@ -18,7 +18,7 @@ let ctxDir: string | null = null;
 
 function getCtxPath(): string {
   if (!ctxDir) {
-    ctxDir = COLLAB_DIR;
+    ctxDir = QUANTFLOW_DIR;
   }
   return join(ctxDir, "context.json");
 }

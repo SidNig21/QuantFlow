@@ -1,6 +1,31 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
+
+// When running in WSL with node_modules on a Windows drive (/mnt/c/...), bun
+// may cache Windows-native esbuild binaries from a previous Windows install.
+// These binaries are PE executables and fail with a version mismatch error when
+// electron-vite tries to spawn them on Linux. Detect and remove them so bun
+// re-fetches the correct Linux build before anything else runs.
+function isRunningInWSL() {
+  return !!(process.env.WSL_DISTRO_NAME || process.env.WSL_INTEROP);
+}
+
+if (isRunningInWSL()) {
+  const bunDir = join("node_modules", ".bun");
+  if (existsSync(bunDir)) {
+    const stale = readdirSync(bunDir).filter((d) => d.startsWith("esbuild@"));
+    if (stale.length > 0) {
+      for (const entry of stale) {
+        rmSync(join(bunDir, entry), { recursive: true, force: true });
+      }
+      console.log(
+        `WSL: removed ${stale.length} stale esbuild cache(s) — re-fetching Linux build...`,
+      );
+      execSync("bun install --ignore-scripts", { stdio: "inherit" });
+    }
+  }
+}
 
 // On Windows, node-pty's build files need two patches:
 // 1. winpty.gyp uses bare .bat filenames in cmd /c calls. Modern Windows may
