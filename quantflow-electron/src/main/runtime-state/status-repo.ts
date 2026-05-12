@@ -1,10 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { getDb } from "./database";
 import type { StatusTransitionRow, StatusFilter } from "./types";
 
-const TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-const MAX_ROWS = 20_000;
-
-let rows: StatusTransitionRow[] = [];
+// ─── Writes ──────────────────────────────────────────────────────────────────
 
 export function appendStatusTransition(params: {
   paneId: string;
@@ -20,38 +18,59 @@ export function appendStatusTransition(params: {
     to_status: params.toStatus,
     created_at: Date.now(),
   };
-  rows.push(row);
-  pruneIfNeeded();
+
+  getDb()
+    .prepare(
+      `INSERT INTO status_transitions (id, pane_id, tile_id, from_status, to_status, created_at)
+       VALUES (@id, @pane_id, @tile_id, @from_status, @to_status, @created_at)`,
+    )
+    .run(row);
+
   return row;
 }
 
+// ─── Reads ───────────────────────────────────────────────────────────────────
+
 export function listStatusTransitions(filter: StatusFilter = {}): StatusTransitionRow[] {
-  let result = rows;
-  if (filter.paneId !== undefined)
-    result = result.filter((r) => r.pane_id === filter.paneId);
-  if (filter.tileId !== undefined)
-    result = result.filter((r) => r.tile_id === filter.tileId);
-  if (filter.since !== undefined)
-    result = result.filter((r) => r.created_at >= filter.since!);
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (filter.paneId !== undefined) {
+    conditions.push("pane_id = @paneId");
+    params["paneId"] = filter.paneId;
+  }
+  if (filter.tileId !== undefined) {
+    conditions.push("tile_id = @tileId");
+    params["tileId"] = filter.tileId;
+  }
+  if (filter.since !== undefined) {
+    conditions.push("created_at >= @since");
+    params["since"] = filter.since;
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const limit = filter.limit ?? 500;
-  return result.slice(-limit);
+
+  return getDb()
+    .prepare(
+      `SELECT * FROM status_transitions ${where} ORDER BY created_at ASC LIMIT @limit`,
+    )
+    .all({ ...params, limit }) as StatusTransitionRow[];
 }
 
-/** Get the most recent status for a given pane. */
+/** Returns the most recent agent_status recorded for a pane. */
 export function latestStatus(paneId: string): string | null {
-  for (let i = rows.length - 1; i >= 0; i--) {
-    if (rows[i]!.pane_id === paneId) return rows[i]!.to_status;
-  }
-  return null;
+  const row = getDb()
+    .prepare(
+      "SELECT to_status FROM status_transitions WHERE pane_id = ? ORDER BY created_at DESC LIMIT 1",
+    )
+    .get(paneId) as { to_status: string } | undefined;
+
+  return row?.to_status ?? null;
 }
+
+// ─── Testing ─────────────────────────────────────────────────────────────────
 
 export function _resetForTesting(): void {
-  rows = [];
-}
-
-function pruneIfNeeded(): void {
-  if (rows.length <= MAX_ROWS) return;
-  const cutoff = Date.now() - TTL_MS;
-  rows = rows.filter((r) => r.created_at >= cutoff);
-  if (rows.length > MAX_ROWS) rows = rows.slice(-MAX_ROWS);
+  getDb().prepare("DELETE FROM status_transitions").run();
 }

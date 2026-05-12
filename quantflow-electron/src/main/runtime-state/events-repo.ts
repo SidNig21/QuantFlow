@@ -1,10 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { getDb } from "./database";
 import type { EventRow, EventFilter } from "./types";
 
-const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const MAX_ROWS = 50_000;
-
-let rows: EventRow[] = [];
+// ─── Writes ──────────────────────────────────────────────────────────────────
 
 export function appendEvent(params: {
   kind: string;
@@ -20,32 +18,52 @@ export function appendEvent(params: {
     data: params.data ?? {},
     created_at: Date.now(),
   };
-  rows.push(row);
-  pruneIfNeeded();
+
+  getDb()
+    .prepare(
+      `INSERT INTO events (id, kind, task_id, tile_id, data, created_at)
+       VALUES (@id, @kind, @task_id, @tile_id, @data, @created_at)`,
+    )
+    .run({ ...row, data: JSON.stringify(row.data) });
+
   return row;
 }
 
+// ─── Reads ───────────────────────────────────────────────────────────────────
+
 export function listEvents(filter: EventFilter = {}): EventRow[] {
-  let result = rows;
-  if (filter.kind !== undefined)
-    result = result.filter((r) => r.kind === filter.kind);
-  if (filter.taskId !== undefined)
-    result = result.filter((r) => r.task_id === filter.taskId);
-  if (filter.tileId !== undefined)
-    result = result.filter((r) => r.tile_id === filter.tileId);
-  if (filter.since !== undefined)
-    result = result.filter((r) => r.created_at >= filter.since!);
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (filter.kind !== undefined) {
+    conditions.push("kind = @kind");
+    params["kind"] = filter.kind;
+  }
+  if (filter.taskId !== undefined) {
+    conditions.push("task_id = @taskId");
+    params["taskId"] = filter.taskId;
+  }
+  if (filter.tileId !== undefined) {
+    conditions.push("tile_id = @tileId");
+    params["tileId"] = filter.tileId;
+  }
+  if (filter.since !== undefined) {
+    conditions.push("created_at >= @since");
+    params["since"] = filter.since;
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const limit = filter.limit ?? 500;
-  return result.slice(-limit);
+
+  const rows = getDb()
+    .prepare(`SELECT * FROM events ${where} ORDER BY created_at ASC LIMIT @limit`)
+    .all({ ...params, limit }) as (Omit<EventRow, "data"> & { data: string })[];
+
+  return rows.map((r) => ({ ...r, data: JSON.parse(r.data) as Record<string, unknown> }));
 }
+
+// ─── Testing ─────────────────────────────────────────────────────────────────
 
 export function _resetForTesting(): void {
-  rows = [];
-}
-
-function pruneIfNeeded(): void {
-  if (rows.length <= MAX_ROWS) return;
-  const cutoff = Date.now() - TTL_MS;
-  rows = rows.filter((r) => r.created_at >= cutoff);
-  if (rows.length > MAX_ROWS) rows = rows.slice(-MAX_ROWS);
+  getDb().prepare("DELETE FROM events").run();
 }

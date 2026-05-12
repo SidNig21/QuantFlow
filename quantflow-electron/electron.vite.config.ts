@@ -26,7 +26,7 @@ export default defineConfig({
       },
       outDir: resolve(__dirname, outDir, "main"),
       rollupOptions: {
-        external: ["node-pty", "@parcel/watcher", "typescript", "sharp"],
+        external: ["node-pty", "@parcel/watcher", "typescript", "sharp", "better-sqlite3"],
         input: {
           index: resolve(__dirname, "src/main/index.ts"),
           "pty-sidecar": resolve(__dirname, "src/main/sidecar/entry.ts"),

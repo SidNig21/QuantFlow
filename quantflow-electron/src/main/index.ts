@@ -53,6 +53,7 @@ import { readSessionMeta } from "./tmux";
 import { registerBrowserIpc } from "./ipc-browser";
 import { registerAgentIpc } from "./acp-agent";
 import { runMigrationIfNeeded } from "./migration/migrate-from-collaborator";
+import { closeDb } from "./runtime-state/database";
 
 const APP_NAME = "QuantFlow";
 
@@ -743,6 +744,7 @@ async function shutdownBackgroundServices(): Promise<void> {
   if (!DISABLE_GIT_REPLAY) gitReplay.stopWorker();
   stopJsonRpcServer();
   stopImageWorker();
+  closeDb();
 }
 
 app.on("open-file", (event, path) => {

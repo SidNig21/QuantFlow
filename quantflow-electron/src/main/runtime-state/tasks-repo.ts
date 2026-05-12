@@ -1,13 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { getDb } from "./database";
 import type { TaskRow, TaskStatus, TaskFilter } from "./types";
 
-// In-memory stub — Phase 7 swaps this implementation for better-sqlite3.
-// All callers are unchanged when that happens.
-
-const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const MAX_ROWS = 10_000;
-
-let rows: TaskRow[] = [];
+// ─── Writes ──────────────────────────────────────────────────────────────────
 
 export function createTask(params: {
   cableId: string | null;
@@ -27,8 +22,16 @@ export function createTask(params: {
     created_at: now,
     updated_at: now,
   };
-  rows.push(row);
-  pruneIfNeeded();
+
+  getDb()
+    .prepare(
+      `INSERT INTO tasks
+         (id, cable_id, from_tile_id, to_tile_id, status, payload, result, created_at, updated_at)
+       VALUES
+         (@id, @cable_id, @from_tile_id, @to_tile_id, @status, @payload, @result, @created_at, @updated_at)`,
+    )
+    .run(row);
+
   return row;
 }
 
@@ -36,43 +39,72 @@ export function updateTask(
   id: string,
   changes: { status?: TaskStatus; result?: string },
 ): TaskRow | null {
-  const row = rows.find((r) => r.id === id);
-  if (!row) return null;
-  if (changes.status !== undefined) row.status = changes.status;
-  if (changes.result !== undefined) row.result = changes.result;
-  row.updated_at = Date.now();
-  return row;
+  const db = getDb();
+  const existing = db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as
+    | TaskRow
+    | undefined;
+  if (!existing) return null;
+
+  const updated: TaskRow = {
+    ...existing,
+    status: changes.status ?? existing.status,
+    result: changes.result !== undefined ? changes.result : existing.result,
+    updated_at: Date.now(),
+  };
+
+  db.prepare(
+    "UPDATE tasks SET status = @status, result = @result, updated_at = @updated_at WHERE id = @id",
+  ).run({ id, status: updated.status, result: updated.result, updated_at: updated.updated_at });
+
+  return updated;
 }
 
+// ─── Reads ───────────────────────────────────────────────────────────────────
+
 export function getTask(id: string): TaskRow | null {
-  return rows.find((r) => r.id === id) ?? null;
+  return (
+    (getDb().prepare("SELECT * FROM tasks WHERE id = ?").get(id) as
+      | TaskRow
+      | undefined) ?? null
+  );
 }
 
 export function listTasks(filter: TaskFilter = {}): TaskRow[] {
-  let result = rows;
-  if (filter.cableId !== undefined)
-    result = result.filter((r) => r.cable_id === filter.cableId);
-  if (filter.fromTileId !== undefined)
-    result = result.filter((r) => r.from_tile_id === filter.fromTileId);
-  if (filter.toTileId !== undefined)
-    result = result.filter((r) => r.to_tile_id === filter.toTileId);
-  if (filter.status !== undefined)
-    result = result.filter((r) => r.status === filter.status);
-  if (filter.since !== undefined)
-    result = result.filter((r) => r.created_at >= filter.since!);
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (filter.cableId !== undefined) {
+    conditions.push("cable_id = @cableId");
+    params["cableId"] = filter.cableId;
+  }
+  if (filter.fromTileId !== undefined) {
+    conditions.push("from_tile_id = @fromTileId");
+    params["fromTileId"] = filter.fromTileId;
+  }
+  if (filter.toTileId !== undefined) {
+    conditions.push("to_tile_id = @toTileId");
+    params["toTileId"] = filter.toTileId;
+  }
+  if (filter.status !== undefined) {
+    conditions.push("status = @status");
+    params["status"] = filter.status;
+  }
+  if (filter.since !== undefined) {
+    conditions.push("created_at >= @since");
+    params["since"] = filter.since;
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const limit = filter.limit ?? 500;
-  return result.slice(-limit);
+
+  return getDb()
+    .prepare(`SELECT * FROM tasks ${where} ORDER BY created_at ASC LIMIT @limit`)
+    .all({ ...params, limit }) as TaskRow[];
 }
 
-/** Reset all rows — used in tests only. */
+// ─── Testing ─────────────────────────────────────────────────────────────────
+
+/** Truncates all task rows — used in tests only. */
 export function _resetForTesting(): void {
-  rows = [];
-}
-
-function pruneIfNeeded(): void {
-  if (rows.length <= MAX_ROWS) return;
-  const cutoff = Date.now() - TTL_MS;
-  rows = rows.filter((r) => r.created_at >= cutoff);
-  // If still over cap after TTL prune, hard-trim the oldest.
-  if (rows.length > MAX_ROWS) rows = rows.slice(-MAX_ROWS);
+  getDb().prepare("DELETE FROM tasks").run();
 }

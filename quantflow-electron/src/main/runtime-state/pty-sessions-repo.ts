@@ -1,10 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { getDb } from "./database";
 import type { PtySessionRow, PtySessionFilter } from "./types";
 
-const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const MAX_ROWS = 5_000;
-
-let rows: PtySessionRow[] = [];
+// ─── Writes ──────────────────────────────────────────────────────────────────
 
 export function createPtySession(params: {
   sessionId: string;
@@ -25,8 +22,16 @@ export function createPtySession(params: {
     ended_at: null,
     exit_code: null,
   };
-  rows.push(row);
-  pruneIfNeeded();
+
+  getDb()
+    .prepare(
+      `INSERT INTO pty_sessions
+         (id, tile_id, shell, pid, target, cwd, created_at, ended_at, exit_code)
+       VALUES
+         (@id, @tile_id, @shell, @pid, @target, @cwd, @created_at, @ended_at, @exit_code)`,
+    )
+    .run(row);
+
   return row;
 }
 
@@ -34,38 +39,62 @@ export function endPtySession(
   sessionId: string,
   exitCode?: number | null,
 ): PtySessionRow | null {
-  const row = rows.find((r) => r.id === sessionId);
-  if (!row) return null;
-  row.ended_at = Date.now();
-  row.exit_code = exitCode ?? null;
-  return row;
+  const db = getDb();
+  const existing = db
+    .prepare("SELECT * FROM pty_sessions WHERE id = ?")
+    .get(sessionId) as PtySessionRow | undefined;
+  if (!existing) return null;
+
+  const ended_at = Date.now();
+  const exit_code = exitCode ?? null;
+
+  db.prepare(
+    "UPDATE pty_sessions SET ended_at = @ended_at, exit_code = @exit_code WHERE id = @id",
+  ).run({ id: sessionId, ended_at, exit_code });
+
+  return { ...existing, ended_at, exit_code };
 }
 
+// ─── Reads ───────────────────────────────────────────────────────────────────
+
 export function getPtySession(sessionId: string): PtySessionRow | null {
-  return rows.find((r) => r.id === sessionId) ?? null;
+  return (
+    (getDb()
+      .prepare("SELECT * FROM pty_sessions WHERE id = ?")
+      .get(sessionId) as PtySessionRow | undefined) ?? null
+  );
 }
 
 export function listPtySessions(filter: PtySessionFilter = {}): PtySessionRow[] {
-  let result = rows;
-  if (filter.tileId !== undefined)
-    result = result.filter((r) => r.tile_id === filter.tileId);
-  if (filter.active === true)
-    result = result.filter((r) => r.ended_at === null);
-  if (filter.active === false)
-    result = result.filter((r) => r.ended_at !== null);
-  if (filter.since !== undefined)
-    result = result.filter((r) => r.created_at >= filter.since!);
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (filter.tileId !== undefined) {
+    conditions.push("tile_id = @tileId");
+    params["tileId"] = filter.tileId;
+  }
+  if (filter.active === true) {
+    conditions.push("ended_at IS NULL");
+  } else if (filter.active === false) {
+    conditions.push("ended_at IS NOT NULL");
+  }
+  if (filter.since !== undefined) {
+    conditions.push("created_at >= @since");
+    params["since"] = filter.since;
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const limit = filter.limit ?? 500;
-  return result.slice(-limit);
+
+  return getDb()
+    .prepare(
+      `SELECT * FROM pty_sessions ${where} ORDER BY created_at ASC LIMIT @limit`,
+    )
+    .all({ ...params, limit }) as PtySessionRow[];
 }
+
+// ─── Testing ─────────────────────────────────────────────────────────────────
 
 export function _resetForTesting(): void {
-  rows = [];
-}
-
-function pruneIfNeeded(): void {
-  if (rows.length <= MAX_ROWS) return;
-  const cutoff = Date.now() - TTL_MS;
-  rows = rows.filter((r) => r.created_at >= cutoff);
-  if (rows.length > MAX_ROWS) rows = rows.slice(-MAX_ROWS);
+  getDb().prepare("DELETE FROM pty_sessions").run();
 }

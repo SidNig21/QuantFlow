@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterAll } from "bun:test";
 import {
   createTask,
   updateTask,
@@ -24,12 +24,17 @@ import {
   listPtySessions,
   _resetForTesting as resetPtySessions,
 } from "./pty-sessions-repo";
+import { closeDb } from "./database";
 
 beforeEach(() => {
   resetTasks();
   resetEvents();
   resetStatus();
   resetPtySessions();
+});
+
+afterAll(() => {
+  closeDb();
 });
 
 // ─── Tasks ───────────────────────────────────────────────────────────────────

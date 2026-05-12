@@ -47,7 +47,8 @@
 		],
 		"asarUnpack": [
 			"node_modules/@img/sharp-libvips-linux-x64/**/*",
-			"node_modules/@img/sharp-libvips-linuxmusl-x64/**/*"
+			"node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
+			"node_modules/better-sqlite3/**/*"
 		],
 		"afterSign": "scripts/notarize.cjs",
 		"afterAllArtifactBuild": "scripts/fix-artifacts.cjs",
@@ -126,6 +127,7 @@
 		}
 	},
 	"dependencies": {
+		"better-sqlite3": "^12.9.0",
 		"@agentclientprotocol/claude-agent-acp": "^0.26.0",
 		"@agentclientprotocol/sdk": "^0.18.2",
 		"@assistant-ui/react": "^0.12.24",
@@ -200,6 +202,7 @@
 		"@parcel/watcher-darwin-x64": "2.5.6"
 	},
 	"devDependencies": {
+		"@types/better-sqlite3": "^7.6.13",
 		"@electron/notarize": "2.5.0",
 		"@electron/rebuild": "^4.0.3",
 		"@octokit/rest": "22.0.1",

@@ -1,0 +1,71 @@
+/**
+ * SQLite singleton for the QuantFlow runtime state layer (Phase 7).
+ *
+ * Opens (or creates) runtime.db in QUANTFLOW_DIR, enables WAL + foreign keys,
+ * then runs any pending SQL migration files in order.  All repo modules call
+ * getDb() — they never open their own connection.
+ */
+
+import Database from "better-sqlite3";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { QUANTFLOW_DIR } from "../paths";
+import migration001 from "./migrations/001-initial.sql?raw";
+
+let _db: Database.Database | null = null;
+
+/** Returns the singleton, initialising it on first call. */
+export function getDb(): Database.Database {
+  if (_db) return _db;
+
+  mkdirSync(QUANTFLOW_DIR, { recursive: true });
+  const dbPath = join(QUANTFLOW_DIR, "runtime.db");
+
+  _db = new Database(dbPath);
+  _db.pragma("journal_mode = WAL");
+  _db.pragma("foreign_keys = ON");
+  _db.pragma("synchronous = NORMAL");
+
+  runMigrations(_db);
+
+  return _db;
+}
+
+/** Close the database — used in tests and on app exit. */
+export function closeDb(): void {
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
+}
+
+// ─── Internal ────────────────────────────────────────────────────────────────
+
+function appliedVersions(db: Database.Database): Set<number> {
+  const tableExists = db
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'",
+    )
+    .get();
+
+  if (!tableExists) return new Set();
+
+  const rows = db
+    .prepare("SELECT version FROM schema_migrations ORDER BY version")
+    .all() as { version: number }[];
+
+  return new Set(rows.map((r) => r.version));
+}
+
+const MIGRATIONS: { version: number; sql: string }[] = [
+  { version: 1, sql: migration001 },
+];
+
+function runMigrations(db: Database.Database): void {
+  const applied = appliedVersions(db);
+
+  for (const { version, sql } of MIGRATIONS) {
+    if (applied.has(version)) continue;
+    db.exec(sql);
+  }
+}
