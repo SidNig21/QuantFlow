@@ -439,6 +439,22 @@ contextBridge.exposeInMainWorld("shellApi", {
   vaultReadFile: (filePath: string): Promise<string> =>
     ipcRenderer.invoke("vault:read-file", filePath),
 
+  // ── herdr bridge ──
+  herdrAvailable: (): Promise<boolean> =>
+    ipcRenderer.invoke("herdr:available"),
+  herdrList: (): Promise<unknown[]> =>
+    ipcRenderer.invoke("herdr:list"),
+  herdrRead: (paneId: string, lines?: number): Promise<string> =>
+    ipcRenderer.invoke("herdr:read", paneId, lines),
+  herdrSend: (paneId: string, text: string): Promise<void> =>
+    ipcRenderer.invoke("herdr:send", paneId, text),
+  herdrGetStatus: (paneId: string): Promise<string> =>
+    ipcRenderer.invoke("herdr:status", paneId),
+  herdrLinkPane: (tileId: string, paneId: string): Promise<void> =>
+    ipcRenderer.invoke("herdr:link-pane", tileId, paneId),
+  herdrUnlinkPane: (tileId: string): Promise<void> =>
+    ipcRenderer.invoke("herdr:unlink-pane", tileId),
+
   // ── Shared context ──
   contextGet: (): Promise<unknown> =>
     ipcRenderer.invoke("context:get"),

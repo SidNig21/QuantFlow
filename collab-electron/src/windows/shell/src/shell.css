@@ -970,6 +970,29 @@ body.platform-win {
 	pointer-events: none;
 }
 
+#cable-layer .cable-selected path.cable-main {
+	stroke: oklch(0.85 0.17 145);
+}
+
+#cable-layer .cable-sending path.cable-main,
+#cable-layer .cable-sending path.cable-flow {
+	stroke: #60a5fa;
+}
+
+#cable-layer .cable-sent path.cable-main,
+#cable-layer .cable-sent path.cable-flow {
+	stroke: #34d399;
+}
+
+#cable-layer .cable-failed path.cable-main,
+#cable-layer .cable-failed path.cable-flow {
+	stroke: #f87171;
+}
+
+#cable-layer path.cable-pulse {
+	animation: cablePulse 0.65s ease-out;
+}
+
 #cable-layer path.cable-flow {
 	stroke: var(--accent);
 	stroke-width: 1.6;
@@ -978,6 +1001,25 @@ body.platform-win {
 	fill: none;
 	pointer-events: none;
 	animation: cableFlow 1.6s linear infinite;
+}
+
+#cable-layer .cable-badge {
+	pointer-events: none;
+}
+
+#cable-layer .cable-badge-bg {
+	fill: #0d1218;
+	stroke: oklch(0.78 0.16 145 / 0.5);
+	stroke-width: 1;
+}
+
+#cable-layer .cable-badge-count {
+	fill: var(--accent);
+	font-family: var(--font-mono);
+	font-size: 10px;
+	font-weight: 700;
+	text-anchor: middle;
+	dominant-baseline: central;
 }
 
 #cable-layer path.cable-preview {
@@ -1218,6 +1260,45 @@ body.platform-win {
 	color: #fca5a5;
 }
 
+/* herdr pane-link badge */
+.tile-herdr-badge {
+	border: 1px solid rgba(139, 92, 246, 0.35);
+	border-radius: 4px;
+	color: #a78bfa;
+	flex-shrink: 0;
+	font-family: var(--font-mono);
+	font-size: 9px;
+	line-height: 1;
+	margin-left: 7px;
+	padding: 2px 4px;
+	text-transform: lowercase;
+}
+
+.tile-herdr-badge[data-status="idle"] {
+	border-color: rgba(139, 92, 246, 0.35);
+	color: #a78bfa;
+}
+
+.tile-herdr-badge[data-status="working"] {
+	border-color: rgba(16, 185, 129, 0.4);
+	color: #34d399;
+}
+
+.tile-herdr-badge[data-status="blocked"] {
+	border-color: rgba(249, 115, 22, 0.42);
+	color: #fb923c;
+}
+
+.tile-herdr-badge[data-status="done"] {
+	border-color: rgba(56, 189, 248, 0.38);
+	color: #7dd3fc;
+}
+
+.tile-herdr-badge[data-status="unknown"] {
+	border-color: rgba(100, 116, 139, 0.3);
+	color: var(--muted);
+}
+
 .tile-btn-group {
 	display: flex;
 	align-items: center;
@@ -1264,6 +1345,87 @@ body.platform-win {
 .tile-cable-port:active {
 	cursor: crosshair;
 	background: rgba(99, 102, 241, 0.24);
+}
+
+.tile-port {
+	position: absolute;
+	width: 12px;
+	height: 12px;
+	border: 2px solid var(--bg);
+	border-radius: 999px;
+	background: var(--tile-border);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+	cursor: crosshair;
+	/* Always visible as a subtle affordance — no keyboard shortcut needed to
+	   discover cables. Hover/focus/cable-mode bring opacity to 1. */
+	opacity: 0.22;
+	padding: 0;
+	pointer-events: auto;
+	transition:
+		opacity 0.12s ease,
+		transform 0.12s ease,
+		background 0.12s ease,
+		box-shadow 0.12s ease;
+	z-index: 12;
+}
+
+.tile-port[data-side="N"] {
+	left: 50%;
+	top: 0;
+	transform: translate(-50%, -50%);
+}
+
+.tile-port[data-side="S"] {
+	bottom: 0;
+	left: 50%;
+	transform: translate(-50%, 50%);
+}
+
+.tile-port[data-side="E"] {
+	right: 0;
+	top: 50%;
+	transform: translate(50%, -50%);
+}
+
+.tile-port[data-side="W"] {
+	left: 0;
+	top: 50%;
+	transform: translate(-50%, -50%);
+}
+
+.canvas-tile:hover .tile-port,
+.canvas-tile.tile-focused .tile-port,
+#panel-viewer.cable-draw-mode .tile-port {
+	opacity: 1;
+}
+
+.tile-port[data-side="N"]:hover {
+	background: var(--accent);
+	box-shadow: 0 0 12px var(--accent);
+	transform: translate(-50%, -50%) scale(1.4);
+}
+
+.tile-port[data-side="S"]:hover {
+	background: var(--accent);
+	box-shadow: 0 0 12px var(--accent);
+	transform: translate(-50%, 50%) scale(1.4);
+}
+
+.tile-port[data-side="E"]:hover {
+	background: var(--accent);
+	box-shadow: 0 0 12px var(--accent);
+	transform: translate(50%, -50%) scale(1.4);
+}
+
+.tile-port[data-side="W"]:hover {
+	background: var(--accent);
+	box-shadow: 0 0 12px var(--accent);
+	transform: translate(-50%, -50%) scale(1.4);
+}
+
+.canvas-tile[data-running="true"] .tile-port {
+	background: var(--accent);
+	box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 .tile-close-btn {

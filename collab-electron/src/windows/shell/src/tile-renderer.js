@@ -154,16 +154,19 @@ export function formatRelaySyntax(routeHandle) {
   return handle ? `>>@${handle}: ` : "";
 }
 
-export function getCablePortMetadata(tile) {
+export function getCablePortMetadata(tile, side = "E") {
   if (tile?.type !== "term") return null;
   const label = getTileLabel(tile).name || "terminal";
+  const sideName = { N: "top", E: "right", S: "bottom", W: "left" }[side] ?? "right";
   return {
-    title: "Drag cable to another terminal",
-    tooltip: "Drag cable",
+    title: `Drag cable from ${sideName} port to another terminal`,
+    tooltip: `Drag cable from ${sideName}`,
     shortcut: "C",
-    ariaLabel: `Drag cable from ${label} to another terminal`,
+    ariaLabel: `Drag cable from ${label} ${sideName} port to another terminal`,
   };
 }
+
+export const CABLE_PORT_SIDES = ["N", "E", "S", "W"];
 
 /**
  * Creates the DOM structure for a tile.
@@ -175,13 +178,14 @@ export function getCablePortMetadata(tile) {
  * @param {((id: string, url: string) => void)|null} [callbacks.onNavigate]
  * @param {((id: string) => void)|null} [callbacks.onRename]
  * @param {((id: string) => void)|null} [callbacks.onDuplicate]
- * @param {((id: string, e: MouseEvent) => void)|null} [callbacks.onCablePortMouseDown]
+ * @param {((id: string, side: 'N'|'E'|'S'|'W', e: MouseEvent) => void)|null} [callbacks.onCablePortMouseDown]
  */
 export function createTileDOM(tile, callbacks) {
   const container = document.createElement("div");
   container.className = "canvas-tile";
   container.dataset.tileId = tile.id;
   container.dataset.tileType = tile.type;
+  if (isTileRunning(tile)) container.dataset.running = "true";
 
   const titleBar = document.createElement("div");
   titleBar.className = "tile-title-bar";
@@ -299,24 +303,7 @@ export function createTileDOM(tile, callbacks) {
   const btnGroup = document.createElement("div");
   btnGroup.className = "tile-btn-group";
 
-  let cablePort;
-  if (tile.type === "term") {
-    const metadata = getCablePortMetadata(tile);
-    cablePort = document.createElement("button");
-    cablePort.type = "button";
-    cablePort.className = "tile-action-btn tile-cable-port";
-    cablePort.title = metadata.title;
-    cablePort.dataset.tooltip = metadata.tooltip;
-    cablePort.dataset.shortcut = metadata.shortcut;
-    cablePort.setAttribute("aria-label", metadata.ariaLabel);
-    cablePort.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="3.5" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="1" fill="currentColor"/></svg>`;
-    cablePort.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return;
-      e.stopPropagation();
-      callbacks.onCablePortMouseDown?.(tile.id, e);
-    });
-    btnGroup.appendChild(cablePort);
-  }
+  const cablePorts = [];
 
   const copyablePath = tile.filePath || tile.folderPath;
   if (copyablePath) {
@@ -449,7 +436,29 @@ export function createTileDOM(tile, callbacks) {
   container.appendChild(contentArea);
   contentArea.appendChild(contentOverlay);
 
-  return { container, titleBar, titleText, contentArea, contentOverlay, closeBtn, urlInput, navBack, navForward, navReload, cablePort };
+  if (tile.type === "term") {
+    for (const side of CABLE_PORT_SIDES) {
+      const metadata = getCablePortMetadata(tile, side);
+      const port = document.createElement("button");
+      port.type = "button";
+      port.className = "tile-port";
+      port.dataset.side = side;
+      port.dataset.tileId = tile.id;
+      port.dataset.tooltip = metadata.tooltip;
+      port.dataset.shortcut = metadata.shortcut;
+      port.title = metadata.title;
+      port.setAttribute("aria-label", metadata.ariaLabel);
+      port.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        callbacks.onCablePortMouseDown?.(tile.id, side, e);
+      });
+      container.appendChild(port);
+      cablePorts.push(port);
+    }
+  }
+
+  return { container, titleBar, titleText, contentArea, contentOverlay, closeBtn, urlInput, navBack, navForward, navReload, cablePorts, cablePort: cablePorts[1] ?? null };
 }
 
 export function getTileLabel(tile) {
@@ -483,6 +492,14 @@ export function getTileStatusBadge(tile) {
   if (tile.ptyStatus) return String(tile.ptyStatus);
   if (tile.ptySessionId) return "running";
   return "idle";
+}
+
+export function isTileRunning(tile) {
+  if (tile?.type !== "term") return false;
+  const status = String(tile.ptyStatus ?? "").toLowerCase();
+  if (status === "running" || status === "active") return true;
+  if (status === "idle" || status === "exited" || status === "error") return false;
+  return Boolean(tile.ptySessionId);
 }
 
 export function getTileRoleBadge(tile) {
@@ -532,7 +549,38 @@ function createTileStatusBadge(tile) {
   return badge;
 }
 
+/**
+ * Creates a herdr agent-status badge for tiles linked to a herdr pane.
+ * The badge is identified by the class `tile-herdr-badge` so the polling
+ * loop can update it in place without rebuilding the full title.
+ */
+function createHerdrBadge(tile) {
+  if (!tile.herdrPaneId) return null;
+  const badge = document.createElement("span");
+  badge.className = "tile-herdr-badge";
+  badge.dataset.status = "unknown";
+  badge.dataset.paneId = tile.herdrPaneId;
+  // Short pane ID label: last 6 chars only, e.g. "c41-1"
+  const shortId = tile.herdrPaneId.slice(-6);
+  badge.textContent = `herdr:${shortId}`;
+  badge.title = `herdr pane ${tile.herdrPaneId}`;
+  return badge;
+}
+
+/**
+ * Updates an existing herdr badge's visual status in place.
+ * Called by the polling loop — avoids a full title re-render.
+ */
+export function updateHerdrBadge(container, paneId, status) {
+  const badge = container.querySelector(`.tile-herdr-badge[data-pane-id="${paneId}"]`);
+  if (!badge) return;
+  badge.dataset.status = status;
+  badge.title = `herdr pane ${paneId} — ${status}`;
+}
+
 export function updateTileTitle(dom, tile) {
+  const container = dom.container ?? dom;
+  container.dataset.running = isTileRunning(tile) ? "true" : "false";
   const label = getTileLabel(tile);
   const titleText = dom.titleText;
   titleText.textContent = "";
@@ -554,6 +602,8 @@ export function updateTileTitle(dom, tile) {
     handleSpan.textContent = `@${tile.routeHandle}`;
     titleText.appendChild(handleSpan);
   }
+  const herdrBadge = createHerdrBadge(tile);
+  if (herdrBadge) titleText.appendChild(herdrBadge);
   const statusBadge = createTileStatusBadge(tile);
   if (statusBadge) titleText.appendChild(statusBadge);
   titleText.title = tile.routeHandle

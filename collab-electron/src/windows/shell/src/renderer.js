@@ -37,10 +37,12 @@ import { resolveCableDrop } from "./cable-drop.js";
 import {
 	formatContextPreviewDetail,
 	updateTileTitle,
+	updateHerdrBadge,
 	getTileLabel,
 } from "./tile-renderer.js";
-import { createCableOverlay, formatCableContextRelay } from "./cable-overlay.js";
-import { renderCables } from "./cable-renderer.js";
+import { formatCableContextRelay } from "./cable-overlay.js";
+import { createCableInspector } from "./cable-inspector.js";
+import { clearCablePreview, renderCablePreview, renderCables } from "./cable-renderer.js";
 import {
 	shouldCancelCableDrawMode,
 	shouldEnterCableDrawMode,
@@ -614,7 +616,10 @@ async function init() {
 			if (dom) updateTileTitle(dom, tile);
 			changed = true;
 		}
-		if (changed) syncTileList();
+		if (changed) {
+			syncTileList();
+			updateCables();
+		}
 	}
 
 	function buildTileListEntry(tile) {
@@ -804,30 +809,68 @@ async function init() {
 		);
 	}
 
+	function clientToCanvasPoint(clientX, clientY) {
+		const rect = canvasEl.getBoundingClientRect();
+		return {
+			x: (clientX - rect.left - viewportState.panX) / viewportState.zoom,
+			y: (clientY - rect.top - viewportState.panY) / viewportState.zoom,
+		};
+	}
+
 	function onCableMousedown(tile, e, opts = {}) {
 		if (!shouldStartCableDraw({ cableHeld, force: opts.force })) return false;
 		e.preventDefault();
 		e.stopPropagation();
 		canvasEl.classList.add("cable-draw-mode");
 		showCableModeHud();
-		cableOverlay?.startPreview(tile);
+		const sourceSide = opts.sourceSide ?? "E";
+		if (Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) {
+			renderCablePreview(
+				cableLayerContent,
+				tile,
+				sourceSide,
+				clientToCanvasPoint(e.clientX, e.clientY),
+			);
+		}
 
 		function onMove(ev) {
-			cableOverlay?.updatePreview(ev.clientX, ev.clientY);
+			renderCablePreview(
+				cableLayerContent,
+				tile,
+				sourceSide,
+				clientToCanvasPoint(ev.clientX, ev.clientY),
+			);
 		}
 
 		function onUp(ev) {
 			document.removeEventListener("mousemove", onMove);
 			document.removeEventListener("mouseup", onUp);
 
-			const rect = canvasEl.getBoundingClientRect();
-			const cx = (ev.clientX - rect.left - viewportState.panX) / viewportState.zoom;
-			const cy = (ev.clientY - rect.top - viewportState.panY) / viewportState.zoom;
-			const targetTile = tileAtPoint(cx, cy);
+			const point = clientToCanvasPoint(ev.clientX, ev.clientY);
+			const cx = point.x;
+			const cy = point.y;
+			const targetPort = ev.target?.closest?.(".tile-port");
+			const targetSide = targetPort?.dataset?.side ?? "W";
+			const targetTile = targetPort?.dataset?.tileId
+				? getTile(targetPort.dataset.tileId)
+				: tileAtPoint(cx, cy);
+
+			// Silent cancel: released over empty canvas — no toast, just clear.
+			if (!targetTile) {
+				clearCablePreview(cableLayerContent);
+				if (!cableHeld) {
+					canvasEl.classList.remove("cable-draw-mode");
+					hideCableHud();
+				}
+				return;
+			}
+
 			const dropResult = resolveCableDrop({
 				sourceTile: tile,
 				targetTile,
 				connections,
+				sourceSide,
+				targetSide,
 			});
 			let feedbackShown = false;
 
@@ -837,6 +880,9 @@ async function init() {
 					id: `conn-${now}-${Math.random().toString(36).slice(2, 7)}`,
 					tileAId: dropResult.tileAId,
 					tileBId: dropResult.tileBId,
+					from: dropResult.from,
+					to: dropResult.to,
+					kind: "relay",
 					createdAt: now,
 					updatedAt: now,
 				};
@@ -858,7 +904,7 @@ async function init() {
 				toasts.show({ message: dropResult.message, tone: "warn" });
 				feedbackShown = true;
 			}
-			cableOverlay?.cancelPreview();
+			clearCablePreview(cableLayerContent);
 			if (!cableHeld) {
 				canvasEl.classList.remove("cable-draw-mode");
 				if (!feedbackShown) hideCableHud();
@@ -901,6 +947,7 @@ async function init() {
 			syncTerminalTileMeta(tile, session?.meta);
 			tileManager.saveCanvasDebounced();
 			syncTileList();
+			updateCables();
 		},
 		onTerminalCwdChanged(cwd) {
 			setLastTerminalCwd(cwd);
@@ -950,129 +997,156 @@ async function init() {
 		onTileDblClick(tile) {
 			edgeIndicators.panToTile(tile);
 		},
-		onCablePortMouseDown(id, e) {
+		onCablePortMouseDown(id, side, e) {
 			const tile = getTile(id);
-			if (tile) onCableMousedown(tile, e, { force: true });
+			if (tile) onCableMousedown(tile, e, { force: true, sourceSide: side });
 		},
 		onConnectionsChanged: syncConnectionGraph,
 	});
 
 	// -- Cable overlay --
 
-	let cableOverlay = createCableOverlay({
+	function removeConnectionById(id) {
+		const conn = connections.find((item) => item.id === id);
+		const tileA = getTile(conn?.tileAId);
+		const tileB = getTile(conn?.tileBId);
+		removeConnection(id);
+		operationalEvents.record({
+			type: "connection.removed",
+			severity: "info",
+			summary: `${tileEventLabel(tileA)} disconnected from ${tileEventLabel(tileB)}`,
+			meta: { connectionId: id, tileAId: conn?.tileAId, tileBId: conn?.tileBId },
+		});
+		tileManager.saveCanvasImmediate();
+		updateCables();
+	}
+
+	async function sendCableMessage(req) {
+		try {
+			const result = await window.shellApi.stringRelay?.(req);
+			recordRelayOperationalEvent(result, req);
+			return result;
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Relay failed.";
+			recordRelayOperationalEvent({ ok: false, message }, req, message);
+			throw err;
+		}
+	}
+
+	function getCableLog(connectionId, limit) {
+		return window.shellApi.stringGetLog?.(connectionId, limit);
+	}
+
+	async function injectCableContext(req) {
+		const preview = await window.shellApi.contextPreviewForTile?.();
+		const text = formatCableContextRelay(preview);
+		if (!text) {
+			operationalEvents.record({
+				type: "context.failed",
+				severity: "warn",
+				summary: "No shared context to inject.",
+				meta: { connectionId: req.connectionId },
+			});
+			toasts.show({ message: "No shared context to inject.", tone: "warn" });
+			return { ok: false, message: "No shared context to inject." };
+		}
+		const detail = [
+			`${req.fromLabel} -> ${req.targetLabel}`,
+			"Destination format: relayed cable message",
+			formatContextPreviewDetail(preview),
+		].join("\n");
+		const response = await window.shellApi.showConfirmDialog({
+			message: "Inject shared context over cable?",
+			detail,
+			buttons: ["Cancel", "Inject"],
+		});
+		if (response !== 1) {
+			return { canceled: true };
+		}
+		const result = await window.shellApi.stringRelay?.({
+			connectionId: req.connectionId,
+			fromTileId: req.fromTileId,
+			fromLabel: req.fromLabel,
+			targetTileId: req.targetTileId,
+			targetSessionId: req.targetSessionId,
+			text,
+		});
+		if (result?.ok === false) {
+			operationalEvents.record({
+				type: "context.failed",
+				severity: "error",
+				summary: result.message || "Context relay failed.",
+				detail: `${req.fromLabel} -> ${req.targetLabel}`,
+				meta: { connectionId: req.connectionId, eventId: result.eventId },
+			});
+			toasts.show({ message: result.message || "Context relay failed.", tone: "error" });
+		} else {
+			operationalEvents.record({
+				type: "context.injected",
+				severity: "info",
+				summary: `Shared context injected over cable: ${req.fromLabel} -> ${req.targetLabel}`,
+				meta: { connectionId: req.connectionId, eventId: result?.eventId },
+			});
+		}
+		return result;
+	}
+
+	function focusCableTile(id) {
+		const tile = getTile(id);
+		if (!tile) return;
+		edgeIndicators.panToTile(tile, { targetZoom: 1 });
+		tileManager.focusCanvasTile(tile.id);
+	}
+
+	function updateCableLabel(id, label) {
+		const conn = updateConnectionLabel(id, label);
+		if (conn) {
+			operationalEvents.record(createConnectionLabelEvent(
+				conn,
+				getTile(conn.tileAId),
+				getTile(conn.tileBId),
+				tileEventLabel,
+				"cable-inspector",
+			));
+		}
+		tileManager.saveCanvasImmediate();
+		updateCables();
+	}
+
+	const cableInspector = createCableInspector({
 		containerEl: canvasEl,
 		viewportState,
-		onSendMessage: async (req) => {
-			try {
-				const result = await window.shellApi.stringRelay?.(req);
-				recordRelayOperationalEvent(result, req);
-				return result;
-			} catch (err) {
-				const message = err instanceof Error ? err.message : "Relay failed.";
-				recordRelayOperationalEvent({ ok: false, message }, req, message);
-				throw err;
-			}
-		},
-		onGetLog: (connectionId, limit) =>
-			window.shellApi.stringGetLog?.(connectionId, limit),
+		onSendMessage: sendCableMessage,
+		onGetLog: getCableLog,
 		onNotify: (message, tone = "info") => toasts.show({ message, tone }),
-		onInjectContext: async (req) => {
-			const preview = await window.shellApi.contextPreviewForTile?.();
-			const text = formatCableContextRelay(preview);
-			if (!text) {
-				operationalEvents.record({
-					type: "context.failed",
-					severity: "warn",
-					summary: "No shared context to inject.",
-					meta: { connectionId: req.connectionId },
-				});
-				toasts.show({ message: "No shared context to inject.", tone: "warn" });
-				return { ok: false, message: "No shared context to inject." };
-			}
-			const detail = [
-				`${req.fromLabel} -> ${req.targetLabel}`,
-				"Destination format: relayed cable message",
-				formatContextPreviewDetail(preview),
-			].join("\n");
-			const response = await window.shellApi.showConfirmDialog({
-				message: "Inject shared context over cable?",
-				detail,
-				buttons: ["Cancel", "Inject"],
-			});
-			if (response !== 1) {
-				return { canceled: true };
-			}
-			const result = await window.shellApi.stringRelay?.({
-				connectionId: req.connectionId,
-				fromTileId: req.fromTileId,
-				fromLabel: req.fromLabel,
-				targetTileId: req.targetTileId,
-				targetSessionId: req.targetSessionId,
-				text,
-			});
-			if (result?.ok === false) {
-				operationalEvents.record({
-					type: "context.failed",
-					severity: "error",
-					summary: result.message || "Context relay failed.",
-					detail: `${req.fromLabel} -> ${req.targetLabel}`,
-					meta: { connectionId: req.connectionId, eventId: result.eventId },
-				});
-				toasts.show({ message: result.message || "Context relay failed.", tone: "error" });
-			} else {
-				operationalEvents.record({
-					type: "context.injected",
-					severity: "info",
-					summary: `Shared context injected over cable: ${req.fromLabel} -> ${req.targetLabel}`,
-					meta: { connectionId: req.connectionId, eventId: result?.eventId },
-				});
-			}
-			return result;
-		},
-		onFocusTile: (id) => {
-			const tile = getTile(id);
-			if (!tile) return;
-			edgeIndicators.panToTile(tile, { targetZoom: 1 });
-			tileManager.focusCanvasTile(tile.id);
-		},
-		onRemoveConnection: (id) => {
-			const conn = connections.find((item) => item.id === id);
-			const tileA = getTile(conn?.tileAId);
-			const tileB = getTile(conn?.tileBId);
-			removeConnection(id);
-			operationalEvents.record({
-				type: "connection.removed",
-				severity: "info",
-				summary: `${tileEventLabel(tileA)} disconnected from ${tileEventLabel(tileB)}`,
-				meta: { connectionId: id, tileAId: conn?.tileAId, tileBId: conn?.tileBId },
-			});
-			tileManager.saveCanvasImmediate();
-			updateCables();
-		},
-		onUpdateLabel: (id, label) => {
-			const conn = updateConnectionLabel(id, label);
-			if (conn) {
-				operationalEvents.record(createConnectionLabelEvent(
-					conn,
-					getTile(conn.tileAId),
-					getTile(conn.tileBId),
-					tileEventLabel,
-					"cable-inspector",
-				));
-			}
-			tileManager.saveCanvasImmediate();
-			updateCables();
-		},
+		onInjectContext: injectCableContext,
+		onFocusTile: focusCableTile,
+		onRemoveConnection: removeConnectionById,
+		onUpdateLabel: updateCableLabel,
 		onGetFocusedTileId: () => tileManager.getFocusedTileId(),
+		onStateChanged: () => updateCables(),
 	});
 
-	// -- Cable layer (new SVG renderer; runs alongside cableOverlay until
-	//    the legacy overlay is retired in a later stage) --
+	// -- Cable layer (SVG renderer + inspector) --
 	const cableLayerContent = document.getElementById("cable-layer-content");
 	function updateCables() {
-		cableOverlay.update();
 		if (cableLayerContent) {
-			renderCables(cableLayerContent, connections, tiles, viewportState);
+			renderCables(cableLayerContent, connections, tiles, viewportState, {
+				onShiftDelete: removeConnectionById,
+				onSelect: (id, event) => {
+					const rect = canvasEl.getBoundingClientRect();
+					cableInspector.selectConnection(id, {
+						pointer: {
+							x: event.clientX - rect.left,
+							y: event.clientY - rect.top,
+						},
+					});
+				},
+				onContextMenu: (id, event) =>
+					cableInspector.openContextMenu(id, event.clientX, event.clientY),
+				selectedConnectionId: cableInspector.getSelectedConnectionId(),
+				getRelayState: (id) => cableInspector.getRelayState(id),
+			});
 		}
 	}
 
@@ -1728,7 +1802,7 @@ async function init() {
 
 	function focusWatchtowerRelay(row) {
 		const selected = row.dataset.connId
-			? cableOverlay?.selectConnection(row.dataset.connId)
+			? cableInspector.selectConnection(row.dataset.connId)
 			: null;
 		if (selected?.tileA && selected?.tileB) {
 			edgeIndicators.panToTiles([selected.tileA, selected.tileB]);
@@ -1972,7 +2046,7 @@ async function init() {
 	}
 
 	function focusConnection(conn, { openPopover = true } = {}) {
-		const selected = cableOverlay?.selectConnection(conn.id, { openPopover });
+		const selected = cableInspector.selectConnection(conn.id, { openPopover });
 		if (!selected?.tileA || !selected?.tileB) return false;
 		edgeIndicators.panToTiles([selected.tileA, selected.tileB]);
 		tileManager.focusCanvasTile(selected.tileB.id);
@@ -2128,7 +2202,7 @@ async function init() {
 		if (shouldCancelCableDrawMode(e, cableHeld)) {
 			cableHeld = false;
 			canvasEl.classList.remove("cable-draw-mode");
-			cableOverlay?.cancelPreview();
+			clearCablePreview(cableLayerContent);
 			hideCableHud();
 			return;
 		}
@@ -2143,7 +2217,7 @@ async function init() {
 		if (shouldExitCableDrawModeOnKeyup(e)) {
 			cableHeld = false;
 			canvasEl.classList.remove("cable-draw-mode");
-			cableOverlay?.cancelPreview();
+			clearCablePreview(cableLayerContent);
 			hideCableHud();
 		}
 	});
@@ -2152,7 +2226,7 @@ async function init() {
 		if (cableHeld) {
 			cableHeld = false;
 			canvasEl.classList.remove("cable-draw-mode");
-			cableOverlay?.cancelPreview();
+			clearCablePreview(cableLayerContent);
 			hideCableHud();
 		}
 	});
@@ -2827,6 +2901,27 @@ async function init() {
 	);
 
 	panelManager.applyVisibility();
+
+	// -- herdr status polling (5 s) --
+	// For every tile that has a herdrPaneId, refresh the header badge.
+	// Fire-and-forget per iteration; errors are silently swallowed so a
+	// missing/stopped herdr daemon never crashes the renderer.
+	setInterval(async () => {
+		const herdrTiles = tiles.filter((t) => t.herdrPaneId);
+		if (herdrTiles.length === 0) return;
+		for (const tile of herdrTiles) {
+			try {
+				const status = await window.shellApi.herdrGetStatus(tile.herdrPaneId);
+				const dom = tileManager.getTileDOMs().get(tile.id);
+				if (dom) {
+					const container = dom.container ?? dom;
+					updateHerdrBadge(container, tile.herdrPaneId, status ?? "unknown");
+				}
+			} catch {
+				// herdr unavailable — leave badge as-is
+			}
+		}
+	}, 5_000);
 
 	// -- beforeunload save --
 

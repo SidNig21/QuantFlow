@@ -8,8 +8,10 @@ import {
   getTileRoleBadge,
   getTileShellBadge,
   getTileStatusBadge,
+  isTileRunning,
   splitFilepath,
   positionTile,
+  updateTileTitle,
 } from "./tile-renderer.js";
 
 // -- splitFilepath --
@@ -145,11 +147,19 @@ describe("getCablePortMetadata", () => {
       id: "tile-a",
       userTitle: "Reviewer",
     })).toEqual({
-      title: "Drag cable to another terminal",
-      tooltip: "Drag cable",
+      title: "Drag cable from right port to another terminal",
+      tooltip: "Drag cable from right",
       shortcut: "C",
-      ariaLabel: "Drag cable from Reviewer to another terminal",
+      ariaLabel: "Drag cable from Reviewer right port to another terminal",
     });
+  });
+
+  test("labels all fixed port sides", () => {
+    const tile = { type: "term", id: "tile-a", userTitle: "Reviewer" };
+    expect(getCablePortMetadata(tile, "N")?.title).toContain("top port");
+    expect(getCablePortMetadata(tile, "E")?.title).toContain("right port");
+    expect(getCablePortMetadata(tile, "S")?.title).toContain("bottom port");
+    expect(getCablePortMetadata(tile, "W")?.title).toContain("left port");
   });
 
   test("skips non-terminal tiles", () => {
@@ -168,6 +178,66 @@ describe("getTileStatusBadge", () => {
 
   test("skips non-terminal tiles", () => {
     expect(getTileStatusBadge({ type: "note" })).toBeNull();
+  });
+});
+
+describe("isTileRunning", () => {
+  test("treats running and active terminal statuses as live", () => {
+    expect(isTileRunning({ type: "term", ptyStatus: "running" })).toBe(true);
+    expect(isTileRunning({ type: "term", ptyStatus: "active" })).toBe(true);
+  });
+
+  test("falls back to attached PTY sessions unless status is terminal", () => {
+    expect(isTileRunning({ type: "term", ptySessionId: "pty-1" })).toBe(true);
+    expect(isTileRunning({ type: "term", ptyStatus: "idle", ptySessionId: "pty-1" }))
+      .toBe(false);
+    expect(isTileRunning({ type: "note", ptySessionId: "pty-1" })).toBe(false);
+  });
+});
+
+describe("updateTileTitle", () => {
+  test("updates running state on the tile container wrapper", () => {
+    const oldDocument = globalThis.document;
+    function createElement() {
+      return {
+        className: "",
+        dataset: {},
+        textContent: "",
+        title: "",
+        children: [],
+        appendChild(child) {
+          this.children.push(child);
+          this.textContent += child.textContent || "";
+        },
+      };
+    }
+    globalThis.document = { createElement };
+    const container = createElement();
+    const titleText = createElement();
+    const dom = { container, titleText };
+
+    try {
+      updateTileTitle(dom, {
+        type: "term",
+        id: "tile-a",
+        userTitle: "Worker",
+        ptyStatus: "running",
+      });
+
+      expect(container.dataset.running).toBe("true");
+      expect(titleText.textContent).toContain("Worker");
+
+      updateTileTitle(dom, {
+        type: "term",
+        id: "tile-a",
+        userTitle: "Worker",
+        ptyStatus: "idle",
+      });
+
+      expect(container.dataset.running).toBe("false");
+    } finally {
+      globalThis.document = oldDocument;
+    }
   });
 });
 

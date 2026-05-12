@@ -1,9 +1,12 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { COLLAB_DIR } from "./paths";
+import { QUANTFLOW_DIR } from "./paths";
 import { listSessions, writeToSession } from "./pty";
+import { createTask } from "./runtime-state/tasks-repo";
+import { appendEvent } from "./runtime-state/events-repo";
+import { shouldRouteViaHerdr, routeViaHerdr } from "./herdr-routes";
 
-const RELAY_LOG_PATH = join(COLLAB_DIR, "string-relay-log.ndjson");
+const RELAY_LOG_PATH = join(QUANTFLOW_DIR, "string-relay-log.ndjson");
 const LOG_RING_CAP = 100;
 const EVENT_RING_CAP = 250;
 
@@ -300,6 +303,25 @@ export function relayStringMessage(
   }
 
   const formatted = `[${fromLabel}]: ${trimmed}`;
+
+  // Phase 3C: when BOTH tiles are herdr-linked, route through herdr instead.
+  // The function is async but relayStringMessage is sync; we fire-and-forget
+  // and immediately return a success frame so callers aren't blocked.
+  // The runtime state (event + task) is written inside routeViaHerdr.
+  if (shouldRouteViaHerdr(fromTileId, targetTileId)) {
+    void routeViaHerdr(connectionId, fromTileId, targetTileId, fromLabel, trimmed);
+    return relaySent({
+      connectionId,
+      fromTileId,
+      targetTileId,
+      fromLabel,
+      routeMethod,
+      text: trimmed,
+      formatted,
+    });
+  }
+
+  // Legacy PTY path for tiles without herdr pane links.
   try {
     writeToSession(targetSessionId, formatted + "\n");
   } catch (err) {
@@ -557,11 +579,33 @@ function pushRelayEvent(entry: RelayLogEntry): void {
   if (eventRing.length > EVENT_RING_CAP) eventRing.shift();
 
   appendRelayLog(entry);
+
+  // Mirror every relay event into the runtime state event log.
+  // relaySent also creates a task row so Phase 3C can track lifecycle.
+  appendEvent({
+    kind: entry.type,
+    tileId: entry.fromTileId,
+    data: {
+      connectionId: entry.connectionId,
+      targetTileId: entry.targetTileId ?? null,
+      routeMethod: entry.routeMethod,
+      text: entry.text,
+      ok: entry.ok,
+    },
+  });
+  if (entry.type === "relay.sent") {
+    createTask({
+      cableId: entry.connectionId,
+      fromTileId: entry.fromTileId,
+      toTileId: entry.targetTileId ?? "",
+      payload: entry.text,
+    });
+  }
 }
 
 async function appendRelayLog(entry: RelayLogEntry): Promise<void> {
   try {
-    await mkdir(COLLAB_DIR, { recursive: true });
+    await mkdir(QUANTFLOW_DIR, { recursive: true });
     await appendFile(RELAY_LOG_PATH, JSON.stringify(entry) + "\n", "utf-8");
   } catch {
     // Non-fatal: log write failures should not break relay

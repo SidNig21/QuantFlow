@@ -22,6 +22,9 @@ type ConnectionState = {
   tileAId: string;
   tileBId: string;
   label?: string;
+  from?: { tileId: string; side: "N" | "E" | "S" | "W" };
+  to?: { tileId: string; side: "N" | "E" | "S" | "W" };
+  kind?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -52,10 +55,11 @@ describe("canvas-persistence connections", () => {
     );
 
     const state = await loadState();
+    expect(state?.version).toBe(2);
     expect(state?.connections).toEqual([]);
   });
 
-  test("loadState with connections array round-trips correctly", async () => {
+  test("loadState accepts v1 connections without metadata", async () => {
     const connections: ConnectionState[] = [
       {
         id: "conn-1",
@@ -78,7 +82,72 @@ describe("canvas-persistence connections", () => {
     );
 
     const state = await loadState();
+    expect(state?.version).toBe(2);
     expect(state?.connections).toEqual(connections);
+  });
+
+  test("loadState accepts v2 connections with side and kind metadata", async () => {
+    const connections: ConnectionState[] = [
+      {
+        id: "conn-1",
+        tileAId: "tile-a",
+        tileBId: "tile-b",
+        label: "alpha",
+        from: { tileId: "tile-a", side: "E" },
+        to: { tileId: "tile-b", side: "W" },
+        kind: "relay",
+        createdAt: 1,
+        updatedAt: 2,
+      },
+    ];
+
+    await Bun.write(
+      STATE_FILE,
+      JSON.stringify({
+        version: 2,
+        tiles: [],
+        connections,
+        viewport: { centerX: 0, centerY: 0, zoom: 1 },
+      }, null, 2),
+    );
+
+    const state = await loadState();
+    expect(state?.version).toBe(2);
+    expect(state?.connections).toEqual(connections);
+  });
+
+  test("loadState strips unsafe connection metadata but keeps legacy endpoints", async () => {
+    await Bun.write(
+      STATE_FILE,
+      JSON.stringify({
+        version: 2,
+        tiles: [],
+        connections: [
+          {
+            id: "conn-1",
+            tileAId: "tile-a",
+            tileBId: "tile-b",
+            from: { tileId: "tile-x", side: "E" },
+            to: { tileId: "tile-b", side: "Q" },
+            kind: "",
+            createdAt: 1,
+            updatedAt: 2,
+          },
+        ],
+        viewport: { centerX: 0, centerY: 0, zoom: 1 },
+      }, null, 2),
+    );
+
+    const state = await loadState();
+    expect(state?.connections).toEqual([
+      {
+        id: "conn-1",
+        tileAId: "tile-a",
+        tileBId: "tile-b",
+        createdAt: 1,
+        updatedAt: 2,
+      },
+    ]);
   });
 
   test("saveState + loadState preserves a connection", async () => {
@@ -87,6 +156,9 @@ describe("canvas-persistence connections", () => {
       tileAId: "tile-a",
       tileBId: "tile-b",
       label: "persisted",
+      from: { tileId: "tile-a", side: "E" },
+      to: { tileId: "tile-b", side: "W" },
+      kind: "relay",
       createdAt: 10,
       updatedAt: 20,
     };
@@ -98,6 +170,7 @@ describe("canvas-persistence connections", () => {
       viewport: { centerX: 100, centerY: 200, zoom: 1.5 },
     });
 
+    expect((await readSavedState()).version).toBe(2);
     expect((await readSavedState()).connections).toEqual([connection]);
 
     const loaded = await loadState();
