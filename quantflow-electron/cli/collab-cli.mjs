@@ -6,8 +6,8 @@ import { homedir } from "node:os";
 
 const VERSION = "0.1.0";
 const GRID = 20;
-const COLLAB_DIR = join(homedir(), ".quantflow");
-const SOCKET_FILE = join(COLLAB_DIR, "socket-path");
+const QUANTFLOW_DIR = join(homedir(), ".quantflow");
+const SOCKET_FILE = join(QUANTFLOW_DIR, "socket-path");
 
 // --- helpers --------------------------------------------------------------
 

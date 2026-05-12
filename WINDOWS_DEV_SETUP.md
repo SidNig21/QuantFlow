@@ -27,21 +27,21 @@ Clone the QuantFlow fork and install Electron app dependencies:
 
 ```powershell
 git clone https://github.com/SidNig21/QuantFlow.git C:\Users\<you>\QuantFlow
-cd C:\Users\<you>\QuantFlow\collab-electron
+cd C:\Users\<you>\QuantFlow\quantflow-electron
 bun install
 ```
 
 For the active local workspace used by this branch:
 
 ```powershell
-cd C:\Users\rybow\QuantFlow\collab-electron
+cd C:\Users\rybow\QuantFlow\quantflow-electron
 bun install
 ```
 
 The equivalent WSL path is:
 
 ```bash
-cd /mnt/c/Users/rybow/QuantFlow/collab-electron
+cd /mnt/c/Users/rybow/QuantFlow/quantflow-electron
 bun install
 ```
 
@@ -50,7 +50,7 @@ bun install
 Start the Electron app with hot reload:
 
 ```powershell
-cd C:\Users\<you>\QuantFlow\collab-electron
+cd C:\Users\<you>\QuantFlow\quantflow-electron
 bun run dev
 ```
 

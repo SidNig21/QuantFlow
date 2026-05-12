@@ -265,7 +265,7 @@ Once the prerequisites are installed, clone the repo and install dependencies:
 
 ```sh
 git clone https://github.com/SidNig21/QuantFlow.git
-cd QuantFlow/collab-electron
+cd QuantFlow/quantflow-electron
 bun install
 ```
 
