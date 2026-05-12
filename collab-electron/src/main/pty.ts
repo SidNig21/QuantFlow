@@ -31,8 +31,9 @@ import {
   SIDECAR_SOCKET_PATH,
   SIDECAR_PID_PATH,
 } from "./sidecar/protocol";
-import { COLLAB_DIR } from "./paths";
+import { QUANTFLOW_DIR } from "./paths";
 import { resolveTerminalTarget } from "./terminal-target";
+import { createPtySession } from "./runtime-state/pty-sessions-repo";
 import { buildSidecarSessionCreateParams } from "./pty-spawn-params";
 
 interface PtySession {
@@ -398,7 +399,7 @@ function attachClient(
   return ptyProcess;
 }
 
-const ZSH_INTEGRATION_DIR = path.join(COLLAB_DIR, "shell-integration", "zsh");
+const ZSH_INTEGRATION_DIR = path.join(QUANTFLOW_DIR, "shell-integration", "zsh");
 
 function ensureZshIntegrationDir(): string | null {
   try {
@@ -561,6 +562,14 @@ export async function createSession(
       injectOsc7Hook(sessionId, shell);
     }
 
+    createPtySession({
+      sessionId,
+      tileId: tileId ?? "",
+      shell,
+      target: "tmux",
+      cwd: resolvedCwd,
+    });
+
     return {
       sessionId,
       shell,
@@ -634,6 +643,14 @@ export async function createSession(
   if (!zshIntegrated) {
     injectOsc7Hook(sessionId, resolvedTarget.command);
   }
+
+  createPtySession({
+    sessionId,
+    tileId: tileId ?? "",
+    shell: resolvedTarget.command,
+    target: resolvedTarget.target,
+    cwd: resolvedTarget.cwdHostPath,
+  });
 
   return withOptionalFields({
     sessionId,

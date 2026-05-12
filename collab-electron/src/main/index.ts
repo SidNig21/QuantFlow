@@ -39,7 +39,7 @@ import * as gitReplay from "./git-replay";
 import { DISABLE_GIT_REPLAY } from "@collab/shared/replay-types";
 import * as pty from "./pty";
 import { updateManager, setupUpdateIPC } from "./updater";
-import { DEV_WORKTREE_ID } from "./paths";
+import { DEV_WORKTREE_ID, QUANTFLOW_DIR } from "./paths";
 import {
   initMainAnalytics,
   trackEvent,
@@ -52,6 +52,7 @@ import { listTerminalTargets } from "./terminal-target";
 import { readSessionMeta } from "./tmux";
 import { registerBrowserIpc } from "./ipc-browser";
 import { registerAgentIpc } from "./acp-agent";
+import { runMigrationIfNeeded } from "./migration/migrate-from-collaborator";
 
 const APP_NAME = "QuantFlow";
 
@@ -808,6 +809,36 @@ app.on("web-contents-created", (_event, contents) => {
 });
 
 app.whenReady().then(async () => {
+  // Run ~/.collaborator → ~/.quantflow migration before anything else.
+  // The sentinel check makes this a no-op on subsequent launches.
+  try {
+    const migResult = await runMigrationIfNeeded(
+      QUANTFLOW_DIR,
+      app.getVersion(),
+    );
+    if (migResult.status === "migrated") {
+      console.log(
+        `[migration] Migrated ${migResult.itemsMigrated} items from ~/.collaborator. ` +
+          `Backup at ${migResult.backupPath}.`,
+      );
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[migration] Failed:", message);
+    await dialog.showMessageBox({
+      type: "error",
+      title: "QuantFlow — Migration Failed",
+      message: "Could not migrate your settings from the previous Collaborator install.",
+      detail:
+        message +
+        "\n\nYour original data is still intact in ~/.collaborator. " +
+        "Fix the error and relaunch, or contact support.",
+      buttons: ["Quit"],
+    });
+    app.quit();
+    return;
+  }
+
   // Set a standard Chrome user-agent on the browser tile session so sites
   // (especially Google OAuth) treat it as a real browser, not an embedded webview.
   const browserSession = session.fromPartition("persist:browser");
