@@ -6,6 +6,7 @@ import { createCorrelatedTask } from "./orchestration-service";
 import { transitionTask } from "./runtime-state/tasks-repo";
 import { appendEvent } from "./runtime-state/events-repo";
 import { shouldRouteViaHerdr, routeViaHerdr } from "./herdr-routes";
+import { validatePayload } from "./runtime-state/schemas-repo";
 
 const RELAY_LOG_PATH = join(QUANTFLOW_DIR, "string-relay-log.ndjson");
 const LOG_RING_CAP = 100;
@@ -18,12 +19,14 @@ export interface RelayRequest {
   targetTileId: string;
   targetSessionId: string | null;
   text: string;
+  schemaId?: string | null;
 }
 
 export interface RelayConnectionRequest {
   connectionId: string;
   fromTileId: string;
   text: string;
+  schemaId?: string | null;
 }
 
 export type RelayRouteMethod = "manual" | "agent";
@@ -34,7 +37,8 @@ export type RelayErrorCode =
   | "no_route"
   | "ambiguous_route"
   | "unconnected_target"
-  | "write_failed";
+  | "write_failed"
+  | "schema_validation_failed";
 
 export type RelayResult =
   | {
@@ -67,6 +71,7 @@ export interface RelayEvent {
   message: string;
   correlationId?: string;
   traceId?: string;
+  schemaId?: string | null;
 }
 
 export interface RelayLogEntry extends RelayEvent {}
@@ -236,6 +241,7 @@ export function relayConnectionMessage(
     targetTileId,
     targetSessionId: targetEntry?.sessionId ?? null,
     text,
+    schemaId: input.schemaId,
   }, "manual");
 }
 
@@ -250,6 +256,7 @@ export function relayStringMessage(
     fromLabel,
     targetSessionId,
     text,
+    schemaId,
   } = req;
 
   const trimmed = text.trim();
@@ -305,6 +312,24 @@ export function relayStringMessage(
     });
   }
 
+  // §5 schema validation — fires before task creation; permissive when schema not in registry.
+  if (schemaId) {
+    const rejection = validatePayload(schemaId, trimmed);
+    if (rejection) {
+      return relayFailed({
+        connectionId,
+        fromTileId,
+        targetTileId,
+        fromLabel,
+        routeMethod,
+        text: trimmed,
+        errorCode: "schema_validation_failed",
+        message: `Schema validation failed for schema '${schemaId}': ${rejection.violations.map((v) => v.message).join("; ")}`,
+        schemaRejection: rejection,
+      });
+    }
+  }
+
   const formatted = `[${fromLabel}]: ${trimmed}`;
 
   // Phase 3C: when BOTH tiles are herdr-linked, route through herdr instead.
@@ -321,6 +346,7 @@ export function relayStringMessage(
       routeMethod,
       text: trimmed,
       formatted,
+      schemaId,
     });
   }
 
@@ -348,6 +374,7 @@ export function relayStringMessage(
     routeMethod,
     text: trimmed,
     formatted,
+    schemaId,
   });
 }
 
@@ -509,6 +536,7 @@ function relayFailed(params: {
   text: string;
   errorCode: RelayErrorCode;
   message: string;
+  schemaRejection?: import("./runtime-state/types").SchemaValidationRejection;
 }): RelayResult {
   const eventId = makeEventId();
   const entry: RelayLogEntry = {
@@ -527,7 +555,7 @@ function relayFailed(params: {
     message: params.message,
   };
   if (params.targetLabel != null) entry.targetLabel = params.targetLabel;
-  pushRelayEvent(entry);
+  pushRelayEvent(entry, params.schemaRejection);
   return {
     ok: false,
     eventId,
@@ -544,6 +572,7 @@ function relaySent(params: {
   routeMethod: RelayRouteMethod;
   text: string;
   formatted: string;
+  schemaId?: string | null;
 }): RelayResult {
   const eventId = makeEventId();
   const entry: RelayLogEntry = {
@@ -559,6 +588,7 @@ function relaySent(params: {
     formatted: params.formatted,
     ts: Date.now(),
     message: "Relay sent",
+    schemaId: params.schemaId,
   };
   pushRelayEvent(entry);
   return {
@@ -569,7 +599,10 @@ function relaySent(params: {
   };
 }
 
-function pushRelayEvent(entry: RelayLogEntry): void {
+function pushRelayEvent(
+  entry: RelayLogEntry,
+  schemaRejection?: import("./runtime-state/types").SchemaValidationRejection,
+): void {
   let ring = logRings.get(entry.connectionId);
   if (!ring) {
     ring = [];
@@ -583,6 +616,20 @@ function pushRelayEvent(entry: RelayLogEntry): void {
 
   appendRelayLog(entry);
 
+  // For schema rejections, emit a structured event instead of creating a task.
+  if (schemaRejection) {
+    appendEvent({
+      kind: "schema.rejected",
+      tileId: entry.fromTileId,
+      cableId: entry.connectionId,
+      taskId: null,
+      correlationId: null,
+      traceId: null,
+      data: schemaRejection,
+    });
+    return;
+  }
+
   // For sent messages, create a correlated task first so we have the
   // correlation_id and trace_id to attach to the mirrored event row.
   let correlationId: string | undefined;
@@ -595,6 +642,7 @@ function pushRelayEvent(entry: RelayLogEntry): void {
       toTileId: entry.targetTileId ?? "",
       payload: entry.text,
       sentAt: entry.ts,
+      schemaId: entry.schemaId,
     });
     correlationId = task.correlation_id ?? undefined;
     traceId = task.trace_id ?? undefined;

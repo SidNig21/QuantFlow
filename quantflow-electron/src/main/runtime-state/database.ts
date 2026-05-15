@@ -13,6 +13,7 @@ import { QUANTFLOW_DIR } from "../paths";
 import migration001 from "./migrations/001-initial.sql?raw";
 import migration002 from "./migrations/002-orchestration-spine.sql?raw";
 import migration003 from "./migrations/003-task-message-schema.sql?raw";
+import migration004 from "./migrations/004-connections-contracts.sql?raw";
 
 let _db: Database.Database | null = null;
 
@@ -68,6 +69,7 @@ const MIGRATIONS: { version: number; sql: string }[] = [
   { version: 1, sql: migration001 },
   { version: 2, sql: migration002 },
   { version: 3, sql: migration003 },
+  { version: 4, sql: migration004 },
 ];
 
 function runMigrations(db: Database.Database): void {

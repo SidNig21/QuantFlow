@@ -78,6 +78,14 @@ mock.module("./runtime-state/events-repo", () => ({
   },
 }));
 
+mock.module("./runtime-state/tasks-repo", () => ({
+  transitionTask: () => null,
+}));
+
+mock.module("./runtime-state/schemas-repo", () => ({
+  validatePayload: () => null,
+}));
+
 import {
   getAllRelayLogs,
   getStringLog,

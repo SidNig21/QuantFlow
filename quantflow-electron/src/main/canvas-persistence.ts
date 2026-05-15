@@ -4,6 +4,13 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import * as crypto from "node:crypto";
 import { QUANTFLOW_DIR } from "./paths";
+import {
+  createConnection as dbCreateConnection,
+  listConnections as dbListConnections,
+  updateConnection as dbUpdateConnection,
+  getConnection as dbGetConnection,
+} from "./runtime-state/connections-repo";
+import type { ConnectionRow } from "./runtime-state/types";
 
 let stateDir = QUANTFLOW_DIR;
 
@@ -132,6 +139,53 @@ function normalizeConnection(value: unknown): ConnectionState | null {
   return normalized;
 }
 
+function connectionRowToState(row: ConnectionRow): ConnectionState {
+  const conn: ConnectionState = {
+    id: row.id,
+    tileAId: row.tile_a_id,
+    tileBId: row.tile_b_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+  if (row.label != null) conn.label = row.label;
+  if (row.from_tile_id && row.from_side) {
+    conn.from = { tileId: row.from_tile_id, side: row.from_side };
+  }
+  if (row.to_tile_id && row.to_side) {
+    conn.to = { tileId: row.to_tile_id, side: row.to_side };
+  }
+  if (row.kind && row.kind !== "string") conn.kind = row.kind;
+  return conn;
+}
+
+function upsertConnectionToDb(conn: ConnectionState): void {
+  const existing = dbGetConnection(conn.id);
+  if (existing) {
+    dbUpdateConnection(conn.id, {
+      label: conn.label ?? null,
+      fromTileId: conn.from?.tileId ?? null,
+      fromSide: conn.from?.side ?? null,
+      toTileId: conn.to?.tileId ?? null,
+      toSide: conn.to?.side ?? null,
+      kind: conn.kind ?? "string",
+    });
+  } else {
+    dbCreateConnection({
+      id: conn.id,
+      tileAId: conn.tileAId,
+      tileBId: conn.tileBId,
+      fromTileId: conn.from?.tileId,
+      fromSide: conn.from?.side,
+      toTileId: conn.to?.tileId,
+      toSide: conn.to?.side,
+      label: conn.label,
+      kind: conn.kind ?? "string",
+      createdAt: conn.createdAt,
+      updatedAt: conn.updatedAt,
+    });
+  }
+}
+
 export async function loadState(): Promise<CanvasState | null> {
   try {
     const raw = await readFile(getStateFile(), "utf-8");
@@ -143,11 +197,32 @@ export async function loadState(): Promise<CanvasState | null> {
       tile.x = sanitizeCoord(tile.x);
       tile.y = sanitizeCoord(tile.y);
     }
-    state.connections = Array.isArray(state.connections)
+    const jsonConnections: ConnectionState[] = Array.isArray(state.connections)
       ? state.connections
         .map(normalizeConnection)
         .filter((conn): conn is ConnectionState => Boolean(conn))
       : [];
+
+    // Merge with DB connections: DB wins for same id; DB-only rows appended.
+    let dbConnections: ConnectionState[] = [];
+    try {
+      dbConnections = dbListConnections().map(connectionRowToState);
+    } catch {
+      // DB unavailable (test environment or first boot) — use JSON only
+    }
+
+    if (dbConnections.length > 0) {
+      const dbById = new Map(dbConnections.map((c) => [c.id, c]));
+      const merged: ConnectionState[] = jsonConnections.map((c) => dbById.get(c.id) ?? c);
+      const jsonIds = new Set(jsonConnections.map((c) => c.id));
+      for (const dbConn of dbConnections) {
+        if (!jsonIds.has(dbConn.id)) merged.push(dbConn);
+      }
+      state.connections = merged;
+    } else {
+      state.connections = jsonConnections;
+    }
+
     state.version = 2;
     return state;
   } catch {
@@ -163,15 +238,26 @@ export async function saveState(state: CanvasState): Promise<void> {
     tmpdir(),
     `canvas-state-${crypto.randomUUID()}.json`,
   );
+  const normalizedConnections: ConnectionState[] = Array.isArray(state.connections)
+    ? state.connections
+      .map(normalizeConnection)
+      .filter((conn): conn is ConnectionState => Boolean(conn))
+    : [];
+
   const json = JSON.stringify({
     ...state,
     version: 2,
-    connections: Array.isArray(state.connections)
-      ? state.connections
-        .map(normalizeConnection)
-        .filter((conn): conn is ConnectionState => Boolean(conn))
-      : [],
+    connections: normalizedConnections,
   }, null, 2);
   await writeFile(tmp, json, "utf-8");
   await rename(tmp, getStateFile());
+
+  // Sync connections to SQLite so they survive restart independent of canvas-state.json.
+  try {
+    for (const conn of normalizedConnections) {
+      upsertConnectionToDb(conn);
+    }
+  } catch {
+    // Non-fatal: DB unavailable in test environment or during first boot before migration
+  }
 }

@@ -19,6 +19,7 @@ import { sendToPane } from "./herdr-bridge";
 import { createCorrelatedTask } from "./orchestration-service";
 import { transitionTask } from "./runtime-state/tasks-repo";
 import { appendEvent } from "./runtime-state/events-repo";
+import { validatePayload } from "./runtime-state/schemas-repo";
 
 /** Maps tileId → herdr paneId for linked tiles */
 const herdrLinks = new Map<string, string>();
@@ -116,10 +117,25 @@ export async function routeViaHerdr(
   targetTileId: string,
   fromLabel: string,
   text: string,
+  schemaId?: string | null,
 ): Promise<HerdrRouteResult> {
   const targetPaneId = herdrLinks.get(targetTileId);
   if (!targetPaneId) {
     return { outcome: "skipped", message: "target has no herdr pane link" };
+  }
+
+  // §5 schema validation — permissive when schema not in registry.
+  if (schemaId) {
+    const rejection = validatePayload(schemaId, text);
+    if (rejection) {
+      appendEvent({
+        kind: "schema.rejected",
+        tileId: fromTileId,
+        cableId: connectionId,
+        data: rejection,
+      });
+      return { outcome: "error", message: `schema_validation_failed: ${rejection.violations.map((v) => v.message).join("; ")}` };
+    }
   }
 
   const formatted = `[${fromLabel}]: ${text}`;
@@ -152,6 +168,7 @@ export async function routeViaHerdr(
     fromTileId,
     toTileId: targetTileId,
     payload: text,
+    schemaId,
   });
   transitionTask(task.id, "sent");
 

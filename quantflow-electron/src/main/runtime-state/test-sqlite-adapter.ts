@@ -3,6 +3,7 @@ import { _setDbForTesting } from "./database";
 import migration001 from "./migrations/001-initial.sql?raw";
 import migration002 from "./migrations/002-orchestration-spine.sql?raw";
 import migration003 from "./migrations/003-task-message-schema.sql?raw";
+import migration004 from "./migrations/004-connections-contracts.sql?raw";
 
 type BetterSqliteCompatibleDatabase = Parameters<typeof _setDbForTesting>[0];
 
@@ -50,6 +51,7 @@ export function createTestRuntimeDb(): Database {
   db.exec(migration001);
   db.exec(migration002);
   db.exec(migration003);
+  db.exec(migration004);
   return db;
 }
 

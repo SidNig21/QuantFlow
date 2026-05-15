@@ -17,6 +17,20 @@ import {
   listTasks,
 } from "./runtime-state/tasks-repo";
 import {
+  createSchema,
+  getSchema,
+  listSchemas,
+  deleteSchema,
+  validatePayload,
+} from "./runtime-state/schemas-repo";
+import {
+  createConnection,
+  getConnection,
+  listConnections,
+  updateConnection,
+  deleteConnection,
+} from "./runtime-state/connections-repo";
+import {
   appendEvent,
   listEvents,
 } from "./runtime-state/events-repo";
@@ -36,6 +50,7 @@ import type {
   EventFilter,
   StatusFilter,
   PtySessionFilter,
+  ConnectionFilter,
 } from "./runtime-state/types";
 
 export function registerRuntimeStateHandlers(): void {
@@ -143,5 +158,92 @@ export function registerRuntimeStateHandlers(): void {
   ipcMain.handle(
     "qf:runtime:pty-sessions.list",
     (_, filter: PtySessionFilter = {}) => listPtySessions(filter),
+  );
+
+  // ── Schemas ────────────────────────────────────────────────────────────────
+
+  ipcMain.handle(
+    "qf:runtime:schemas.create",
+    (_, params: { schemaId: string; schemaVersion?: string; body: string }) =>
+      createSchema(params),
+  );
+
+  ipcMain.handle(
+    "qf:runtime:schemas.get",
+    (_, schemaId: string) => getSchema(schemaId),
+  );
+
+  ipcMain.handle(
+    "qf:runtime:schemas.list",
+    () => listSchemas(),
+  );
+
+  ipcMain.handle(
+    "qf:runtime:schemas.delete",
+    (_, schemaId: string) => deleteSchema(schemaId),
+  );
+
+  ipcMain.handle(
+    "qf:runtime:schemas.validate",
+    (_, schemaId: string, payload: string) => validatePayload(schemaId, payload),
+  );
+
+  // ── Connections ────────────────────────────────────────────────────────────
+
+  ipcMain.handle(
+    "qf:runtime:connections.create",
+    (
+      _,
+      params: {
+        id?: string;
+        tileAId: string;
+        tileBId: string;
+        fromTileId?: string | null;
+        fromSide?: "N" | "E" | "S" | "W" | null;
+        toTileId?: string | null;
+        toSide?: "N" | "E" | "S" | "W" | null;
+        type?: string;
+        kind?: string;
+        label?: string | null;
+        config?: Record<string, unknown>;
+        watcherEnabled?: boolean;
+        watcherSyntax?: string;
+      },
+    ) => createConnection(params),
+  );
+
+  ipcMain.handle(
+    "qf:runtime:connections.get",
+    (_, id: string) => getConnection(id),
+  );
+
+  ipcMain.handle(
+    "qf:runtime:connections.list",
+    (_, filter: ConnectionFilter = {}) => listConnections(filter),
+  );
+
+  ipcMain.handle(
+    "qf:runtime:connections.update",
+    (
+      _,
+      id: string,
+      changes: {
+        fromTileId?: string | null;
+        fromSide?: "N" | "E" | "S" | "W" | null;
+        toTileId?: string | null;
+        toSide?: "N" | "E" | "S" | "W" | null;
+        type?: string;
+        kind?: string;
+        label?: string | null;
+        config?: Record<string, unknown>;
+        watcherEnabled?: boolean;
+        watcherSyntax?: string;
+      },
+    ) => updateConnection(id, changes),
+  );
+
+  ipcMain.handle(
+    "qf:runtime:connections.delete",
+    (_, id: string) => deleteConnection(id),
   );
 }

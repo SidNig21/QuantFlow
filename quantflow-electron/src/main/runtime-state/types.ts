@@ -207,3 +207,58 @@ export interface PtySessionFilter {
   since?: number;
   limit?: number;
 }
+
+/**
+ * A persisted connection (cable) between two tiles. Canonical per v2 §3.
+ * schema_id is intentionally absent here — it lives on TaskRow only (migration 003).
+ * Cross-schema compatibility checks are deferred to Goal 4+.
+ */
+export interface ConnectionRow {
+  id: string;
+  tile_a_id: string;
+  tile_b_id: string;
+  from_tile_id: string | null;
+  from_side: "N" | "E" | "S" | "W" | null;
+  to_tile_id: string | null;
+  to_side: "N" | "E" | "S" | "W" | null;
+  type: string;
+  kind: string;
+  label: string | null;
+  /** JSON blob for connection config */
+  config: string;
+  watcher_enabled: number;
+  watcher_syntax: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ConnectionFilter {
+  tileAId?: string;
+  tileBId?: string;
+  /** Match connections where either endpoint is this tileId */
+  tileId?: string;
+  label?: string;
+  limit?: number;
+}
+
+/** A JSON Schema registered in runtime.db for §5 payload validation. */
+export interface SchemaRow {
+  schema_id: string;
+  schema_version: string;
+  /** Raw JSON Schema document (JSON-serialised string). */
+  body: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/** Structured rejection when a payload fails schema validation. */
+export interface SchemaValidationRejection {
+  error: "schema_validation_failed";
+  schema_id: string;
+  violations: SchemaViolation[];
+}
+
+export interface SchemaViolation {
+  path: string;
+  message: string;
+}
