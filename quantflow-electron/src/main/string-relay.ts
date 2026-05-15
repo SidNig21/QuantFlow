@@ -2,7 +2,8 @@ import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { QUANTFLOW_DIR } from "./paths";
 import { listSessions, writeToSession } from "./pty";
-import { createTask } from "./runtime-state/tasks-repo";
+import { createCorrelatedTask } from "./orchestration-service";
+import { transitionTask } from "./runtime-state/tasks-repo";
 import { appendEvent } from "./runtime-state/events-repo";
 import { shouldRouteViaHerdr, routeViaHerdr } from "./herdr-routes";
 
@@ -64,6 +65,8 @@ export interface RelayEvent {
   ts: number;
   errorCode?: RelayErrorCode;
   message: string;
+  correlationId?: string;
+  traceId?: string;
 }
 
 export interface RelayLogEntry extends RelayEvent {}
@@ -580,11 +583,34 @@ function pushRelayEvent(entry: RelayLogEntry): void {
 
   appendRelayLog(entry);
 
-  // Mirror every relay event into the runtime state event log.
-  // relaySent also creates a task row so Phase 3C can track lifecycle.
+  // For sent messages, create a correlated task first so we have the
+  // correlation_id and trace_id to attach to the mirrored event row.
+  let correlationId: string | undefined;
+  let traceId: string | undefined;
+  let taskId: string | undefined;
+  if (entry.type === "relay.sent") {
+    const task = createCorrelatedTask({
+      cableId: entry.connectionId,
+      fromTileId: entry.fromTileId,
+      toTileId: entry.targetTileId ?? "",
+      payload: entry.text,
+      sentAt: entry.ts,
+    });
+    correlationId = task.correlation_id ?? undefined;
+    traceId = task.trace_id ?? undefined;
+    taskId = task.id;
+    entry.correlationId = correlationId;
+    entry.traceId = traceId;
+    transitionTask(task.id, "sent");
+  }
+
   appendEvent({
     kind: entry.type,
     tileId: entry.fromTileId,
+    cableId: entry.connectionId,
+    taskId: taskId ?? null,
+    correlationId: correlationId ?? null,
+    traceId: traceId ?? null,
     data: {
       connectionId: entry.connectionId,
       targetTileId: entry.targetTileId ?? null,
@@ -593,14 +619,6 @@ function pushRelayEvent(entry: RelayLogEntry): void {
       ok: entry.ok,
     },
   });
-  if (entry.type === "relay.sent") {
-    createTask({
-      cableId: entry.connectionId,
-      fromTileId: entry.fromTileId,
-      toTileId: entry.targetTileId ?? "",
-      payload: entry.text,
-    });
-  }
 }
 
 async function appendRelayLog(entry: RelayLogEntry): Promise<void> {

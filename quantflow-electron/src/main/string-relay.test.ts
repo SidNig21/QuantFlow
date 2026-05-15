@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 const writtenSessions: Array<{ sessionId: string; data: string }> = [];
 const activeSessions = new Set<string>();
+const runtimeTasks: unknown[] = [];
+const runtimeEvents: unknown[] = [];
 
 mock.module("./pty", () => ({
   listSessions: () => [...activeSessions],
@@ -15,6 +17,67 @@ mock.module("node:fs/promises", () => ({
   mkdir: async () => {},
 }));
 
+mock.module("./orchestration-service", () => ({
+  createCorrelatedTask: (params: {
+    cableId: string | null;
+    fromTileId: string;
+    toTileId: string;
+    payload: string;
+    sentAt?: number | null;
+  }) => {
+    const now = Date.now();
+    const task = {
+      id: `task-${runtimeTasks.length + 1}`,
+      run_id: `run-${runtimeTasks.length + 1}`,
+      parent_task_id: null,
+      cable_id: params.cableId,
+      from_tile_id: params.fromTileId,
+      to_tile_id: params.toTileId,
+      correlation_id: `corr-${runtimeTasks.length + 1}`,
+      thread_id: `corr-${runtimeTasks.length + 1}`,
+      trace_id: `trace-${runtimeTasks.length + 1}`,
+      origin: "orchestration",
+      status: "pending",
+      payload: params.payload,
+      payload_hash: null,
+      schema_id: null,
+      schema_version: null,
+      result: null,
+      sent_at: params.sentAt ?? now,
+      delivered_at: null,
+      completed_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+    runtimeTasks.push(task);
+    return task;
+  },
+}));
+
+mock.module("./runtime-state/events-repo", () => ({
+  appendEvent: (params: {
+    kind: string;
+    taskId?: string | null;
+    tileId?: string | null;
+    data?: Record<string, unknown>;
+  }) => {
+    runtimeEvents.push(params);
+    return {
+      id: `event-${runtimeEvents.length}`,
+      run_id: null,
+      kind: params.kind,
+      task_id: params.taskId ?? null,
+      tile_id: params.tileId ?? null,
+      trace_id: null,
+      correlation_id: null,
+      cable_id: null,
+      level: null,
+      data: params.data ?? {},
+      created_at: Date.now(),
+    };
+  },
+}));
+
 import {
   getAllRelayLogs,
   getStringLog,
@@ -26,10 +89,13 @@ import {
   resetStringRelayForTests,
   syncConnectionGraph,
   watchtowerSnapshot,
+  type RelayEvent,
 } from "./string-relay";
 
 beforeEach(() => {
   writtenSessions.length = 0;
+  runtimeTasks.length = 0;
+  runtimeEvents.length = 0;
   activeSessions.clear();
   resetStringRelayForTests();
 });
@@ -380,5 +446,64 @@ describe("agent-initiated relay", () => {
 
     expect(writtenSessions).toHaveLength(0);
     expect(getAllRelayLogs()).toHaveLength(0);
+  });
+});
+
+describe("correlated relay wiring", () => {
+  test("relay.sent creates a correlated task and attaches correlation_id + trace_id to the log entry", () => {
+    activeSessions.add("session-b");
+    syncConnectionGraph([
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
+
+    const result = relayStringMessage({
+      connectionId: "conn-1",
+      fromTileId: "tile-a",
+      fromLabel: "Hermes",
+      targetTileId: "tile-b",
+      targetSessionId: "session-b",
+      text: "run inference",
+    });
+
+    expect(result.ok).toBe(true);
+
+    // createCorrelatedTask was called once
+    expect(runtimeTasks).toHaveLength(1);
+    const task = runtimeTasks[0] as { correlation_id: string; trace_id: string };
+    expect(task.correlation_id).toBeTruthy();
+    expect(task.trace_id).toBeTruthy();
+
+    // The relay log entry carries the same IDs
+    const [entry] = getAllRelayLogs() as RelayEvent[];
+    expect(entry?.correlationId).toBe(task.correlation_id);
+    expect(entry?.traceId).toBe(task.trace_id);
+
+    // The mirrored event row also carries them
+    expect(runtimeEvents).toHaveLength(1);
+    const event = runtimeEvents[0] as { correlationId: string; traceId: string; cableId: string };
+    expect(event.correlationId).toBe(task.correlation_id);
+    expect(event.traceId).toBe(task.trace_id);
+    expect(event.cableId).toBe("conn-1");
+  });
+
+  test("relay.failed does not create a task but still carries cableId on the event", () => {
+    syncConnectionGraph([
+      { id: "conn-1", tileAId: "tile-a", tileBId: "tile-b" },
+    ]);
+    // session-b not in activeSessions → missing_pty
+
+    relayStringMessage({
+      connectionId: "conn-1",
+      fromTileId: "tile-a",
+      fromLabel: "Hermes",
+      targetTileId: "tile-b",
+      targetSessionId: "session-b",
+      text: "run inference",
+    });
+
+    expect(runtimeTasks).toHaveLength(0);
+    const event = runtimeEvents[0] as { cableId: string; correlationId: unknown };
+    expect(event.cableId).toBe("conn-1");
+    expect(event.correlationId).toBeNull();
   });
 });

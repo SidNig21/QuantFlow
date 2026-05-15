@@ -16,11 +16,60 @@
  */
 
 import { sendToPane } from "./herdr-bridge";
-import { createTask } from "./runtime-state/tasks-repo";
+import { createCorrelatedTask } from "./orchestration-service";
+import { transitionTask } from "./runtime-state/tasks-repo";
 import { appendEvent } from "./runtime-state/events-repo";
 
 /** Maps tileId → herdr paneId for linked tiles */
 const herdrLinks = new Map<string, string>();
+
+// ─── Correlated reply registry ────────────────────────────────────────────────
+
+type PendingReply = {
+  resolve: (result: string) => void;
+  reject: (err: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
+
+const pendingReplies = new Map<string, PendingReply>();
+
+/**
+ * Resolves an awaiting correlated reply. Called when a target tile sends
+ * a response carrying the original correlation_id.
+ * Returns true if a pending waiter was found and resolved.
+ */
+export function resolveCorrelatedReply(
+  correlationId: string,
+  result: string,
+): boolean {
+  const pending = pendingReplies.get(correlationId);
+  if (!pending) return false;
+  clearTimeout(pending.timer);
+  pendingReplies.delete(correlationId);
+  pending.resolve(result);
+  return true;
+}
+
+/**
+ * Returns a Promise that resolves when the target tile replies with the given
+ * correlation_id, or rejects after timeoutMs (default 30s).
+ */
+export function awaitCorrelatedReply(
+  correlationId: string,
+  timeoutMs = 30_000,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingReplies.delete(correlationId);
+      reject(
+        new Error(
+          `Correlated reply timeout after ${timeoutMs}ms (correlation_id: ${correlationId})`,
+        ),
+      );
+    }, timeoutMs);
+    pendingReplies.set(correlationId, { resolve, reject, timer });
+  });
+}
 
 export function registerHerdrPaneLink(tileId: string, paneId: string): void {
   herdrLinks.set(tileId, paneId);
@@ -51,6 +100,7 @@ export type HerdrRouteOutcome = "sent" | "skipped" | "error";
 export interface HerdrRouteResult {
   outcome: HerdrRouteOutcome;
   message: string;
+  correlationId?: string;
 }
 
 /**
@@ -82,6 +132,7 @@ export async function routeViaHerdr(
     appendEvent({
       kind: "relay.herdr.error",
       tileId: fromTileId,
+      cableId: connectionId,
       data: {
         connectionId,
         targetTileId,
@@ -96,9 +147,21 @@ export async function routeViaHerdr(
     return { outcome: "error", message };
   }
 
+  const task = createCorrelatedTask({
+    cableId: connectionId,
+    fromTileId,
+    toTileId: targetTileId,
+    payload: text,
+  });
+  transitionTask(task.id, "sent");
+
   appendEvent({
     kind: "relay.herdr.sent",
     tileId: fromTileId,
+    cableId: connectionId,
+    taskId: task.id,
+    correlationId: task.correlation_id,
+    traceId: task.trace_id,
     data: {
       connectionId,
       targetTileId,
@@ -109,17 +172,15 @@ export async function routeViaHerdr(
     },
   });
 
-  createTask({
-    cableId: connectionId,
-    fromTileId,
-    toTileId: targetTileId,
-    payload: text,
-  });
-
-  return { outcome: "sent", message: "Relay sent via herdr" };
+  return {
+    outcome: "sent",
+    message: "Relay sent via herdr",
+    correlationId: task.correlation_id ?? undefined,
+  };
 }
 
 /** Resets internal state — used only in tests */
 export function _resetHerdrRoutesForTests(): void {
   herdrLinks.clear();
+  pendingReplies.clear();
 }

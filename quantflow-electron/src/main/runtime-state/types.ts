@@ -10,24 +10,37 @@
  */
 
 export type TaskStatus =
-  | "pending"
-  | "running"
-  | "done"
-  | "error"
+  | "queued"
+  | "sent"
+  | "delivered"
+  | "failed"
   | "cancelled";
 
 /** One unit of work delegated via a cable from one tile to another. */
 export interface TaskRow {
   id: string;
+  run_id: string | null;
+  parent_task_id: string | null;
   /** The cable (connection) that carried the task, if any. */
   cable_id: string | null;
   from_tile_id: string;
   to_tile_id: string;
+  correlation_id: string | null;
+  thread_id: string | null;
+  trace_id: string | null;
+  origin: string | null;
   status: TaskStatus;
   /** Raw message text sent as the task payload. */
   payload: string;
+  payload_hash: string | null;
+  /** Optional contract id for §5 validation (null = legacy untyped payload). */
+  schema_id: string | null;
+  schema_version: string | null;
   /** Agent response, populated when status reaches 'done'. */
   result: string | null;
+  sent_at: number | null;
+  delivered_at: number | null;
+  completed_at: number | null;
   created_at: number; // ms since epoch
   updated_at: number;
 }
@@ -35,13 +48,66 @@ export interface TaskRow {
 /** One discrete event in the system — relay send, relay fail, PTY spawn, etc. */
 export interface EventRow {
   id: string;
+  run_id: string | null;
   /** Dot-separated kind: 'cable.send', 'cable.fail', 'pty.spawn', 'herdr.status_change' */
   kind: string;
   task_id: string | null;
   tile_id: string | null;
+  trace_id: string | null;
+  correlation_id: string | null;
+  cable_id: string | null;
+  level: string | null;
   /** Arbitrary structured payload for the event kind. */
   data: Record<string, unknown>;
   created_at: number;
+}
+
+export type RunStatus = "running" | "done" | "error" | "cancelled";
+
+export interface RunRow {
+  id: string;
+  root_task_id: string | null;
+  status: RunStatus;
+  title: string | null;
+  metadata: Record<string, unknown>;
+  started_at: number;
+  completed_at: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ArtifactRow {
+  id: string;
+  run_id: string | null;
+  task_id: string | null;
+  tile_id: string | null;
+  kind: string;
+  uri: string | null;
+  content_hash: string | null;
+  media_type: string | null;
+  size_bytes: number | null;
+  metadata: Record<string, unknown>;
+  created_at: number;
+}
+
+export interface TileCapabilityRow {
+  id: string;
+  tile_id: string;
+  capability: string;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface TileRuntimeRow {
+  tile_id: string;
+  pane_id: string | null;
+  status: string | null;
+  presence: string;
+  metadata: Record<string, unknown>;
+  last_seen_at: number | null;
+  created_at: number;
+  updated_at: number;
 }
 
 /** A herdr agent_status change for a pane — idle → working → done, etc. */
@@ -72,18 +138,58 @@ export interface PtySessionRow {
 // ─── Filter types used by list queries ───────────────────────────────────────
 
 export interface TaskFilter {
+  runId?: string;
+  parentTaskId?: string;
   cableId?: string;
   fromTileId?: string;
   toTileId?: string;
+  correlationId?: string;
+  traceId?: string;
   status?: TaskStatus;
   since?: number;
   limit?: number;
 }
 
 export interface EventFilter {
+  runId?: string;
   kind?: string;
   taskId?: string;
   tileId?: string;
+  traceId?: string;
+  correlationId?: string;
+  cableId?: string;
+  level?: string;
+  since?: number;
+  limit?: number;
+}
+
+export interface RunFilter {
+  rootTaskId?: string;
+  status?: RunStatus;
+  since?: number;
+  limit?: number;
+}
+
+export interface ArtifactFilter {
+  runId?: string;
+  taskId?: string;
+  tileId?: string;
+  kind?: string;
+  contentHash?: string;
+  since?: number;
+  limit?: number;
+}
+
+export interface TileCapabilityFilter {
+  tileId?: string;
+  capability?: string;
+  limit?: number;
+}
+
+export interface TileRuntimeFilter {
+  paneId?: string;
+  status?: string;
+  presence?: string;
   since?: number;
   limit?: number;
 }
