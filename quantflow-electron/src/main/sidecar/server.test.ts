@@ -3,7 +3,7 @@
 // Integration tests for SidecarServer. Must run with node (not bun)
 // because node-pty's native addon requires node's libuv event loop.
 //
-// Run: cd collab-electron && npx tsx --test src/main/sidecar/server.test.ts
+// Run: cd quantflow-electron && npx tsx --test src/main/sidecar/server.test.ts
 
 import * as assert from "node:assert/strict";
 import * as net from "node:net";

@@ -28,6 +28,17 @@ function plainText(value) {
   };
 }
 
+function metadataFromJson(metadataJson) {
+  if (!metadataJson) return undefined;
+  return JSON.parse(String(metadataJson));
+}
+
+function stringToBoolean(value) {
+  if (value === true) return true;
+  if (typeof value !== "string") return false;
+  return value.toLowerCase() === "true" || value === "1";
+}
+
 function normalizeTile(tile) {
   return {
     id: tile.id,
@@ -312,6 +323,110 @@ export const TOOL_DEFINITIONS = [
           : {}),
       }));
     },
+  },
+  {
+    name: "quantflow_orchestration_run_create",
+    description: "Create a QuantFlow orchestration run",
+    schema: {
+      title: { kind: "string", optional: true },
+      metadataJson: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("orchestration.runCreate", {
+        ...(params.title ? { title: params.title } : {}),
+        ...(params.metadataJson ? { metadata: metadataFromJson(params.metadataJson) } : {}),
+      })),
+  },
+  {
+    name: "quantflow_orchestration_run_get",
+    description: "Get a QuantFlow orchestration run",
+    schema: { runId: { kind: "string" } },
+    handle: (rpc) => async ({ runId }) =>
+      jsonText(await rpc("orchestration.runGet", { id: runId })),
+  },
+  {
+    name: "quantflow_orchestration_run_list",
+    description: "List QuantFlow orchestration runs",
+    schema: {
+      status: { kind: "string", optional: true },
+      limit: { kind: "number", optional: true },
+    },
+    handle: (rpc) => async (params = {}) => {
+      const rpcParams = {
+        ...(params.status ? { status: params.status } : {}),
+        ...(Number.isFinite(params.limit) ? { limit: params.limit } : {}),
+      };
+      return jsonText(await rpc("orchestration.runList", rpcParams));
+    },
+  },
+  {
+    name: "quantflow_orchestration_run_cancel",
+    description: "Cancel a QuantFlow orchestration run",
+    schema: { runId: { kind: "string" } },
+    handle: (rpc) => async ({ runId }) =>
+      jsonText(await rpc("orchestration.runCancel", { id: runId })),
+  },
+  {
+    name: "quantflow_orchestration_capability_register",
+    description: "Register a tile capability for orchestration routing",
+    schema: {
+      tileId: { kind: "string" },
+      capability: { kind: "string" },
+      schemaVersion: { kind: "string", optional: true },
+      metadataJson: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("orchestration.capabilityRegister", {
+        tileId: params.tileId,
+        capability: params.capability,
+        ...(params.schemaVersion ? { schemaVersion: params.schemaVersion } : {}),
+        ...(params.metadataJson ? { metadata: metadataFromJson(params.metadataJson) } : {}),
+      })),
+  },
+  {
+    name: "quantflow_orchestration_capability_list",
+    description: "List tile capabilities registered for orchestration routing",
+    schema: {
+      tileId: { kind: "string", optional: true },
+      capability: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("orchestration.capabilityList", {
+        ...(params.tileId ? { tileId: params.tileId } : {}),
+        ...(params.capability ? { capability: params.capability } : {}),
+      })),
+  },
+  {
+    name: "quantflow_orchestration_resolve_route",
+    description: "Resolve an orchestration capability to a tile route",
+    schema: {
+      capability: { kind: "string" },
+      requireOnline: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("orchestration.resolveRoute", {
+        capability: params.capability,
+        requireOnline: stringToBoolean(params.requireOnline),
+      })),
+  },
+  {
+    name: "quantflow_orchestration_tile_heartbeat",
+    description: "Update tile runtime heartbeat and presence",
+    schema: {
+      tileId: { kind: "string" },
+      paneId: { kind: "string", optional: true },
+      status: { kind: "string", optional: true },
+      presence: { kind: "string", optional: true },
+      metadataJson: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("orchestration.tileHeartbeat", {
+        tileId: params.tileId,
+        ...(params.paneId ? { paneId: params.paneId } : {}),
+        ...(params.status ? { status: params.status } : {}),
+        ...(params.presence ? { presence: params.presence } : {}),
+        ...(params.metadataJson ? { metadata: metadataFromJson(params.metadataJson) } : {}),
+      })),
   },
   {
     name: "quantflow_context_pin",

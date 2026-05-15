@@ -5,24 +5,36 @@ import type { EventRow, EventFilter } from "./types";
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
 export function appendEvent(params: {
+  runId?: string | null;
   kind: string;
   taskId?: string | null;
   tileId?: string | null;
+  traceId?: string | null;
+  correlationId?: string | null;
+  cableId?: string | null;
+  level?: string | null;
   data?: Record<string, unknown>;
 }): EventRow {
   const row: EventRow = {
     id: randomUUID(),
+    run_id: params.runId ?? null,
     kind: params.kind,
     task_id: params.taskId ?? null,
     tile_id: params.tileId ?? null,
+    trace_id: params.traceId ?? null,
+    correlation_id: params.correlationId ?? null,
+    cable_id: params.cableId ?? null,
+    level: params.level ?? null,
     data: params.data ?? {},
     created_at: Date.now(),
   };
 
   getDb()
     .prepare(
-      `INSERT INTO events (id, kind, task_id, tile_id, data, created_at)
-       VALUES (@id, @kind, @task_id, @tile_id, @data, @created_at)`,
+      `INSERT INTO events
+         (id, run_id, kind, task_id, tile_id, trace_id, correlation_id, cable_id, level, data, created_at)
+       VALUES
+         (@id, @run_id, @kind, @task_id, @tile_id, @trace_id, @correlation_id, @cable_id, @level, @data, @created_at)`,
     )
     .run({ ...row, data: JSON.stringify(row.data) });
 
@@ -39,6 +51,10 @@ export function listEvents(filter: EventFilter = {}): EventRow[] {
     conditions.push("kind = @kind");
     params["kind"] = filter.kind;
   }
+  if (filter.runId !== undefined) {
+    conditions.push("run_id = @runId");
+    params["runId"] = filter.runId;
+  }
   if (filter.taskId !== undefined) {
     conditions.push("task_id = @taskId");
     params["taskId"] = filter.taskId;
@@ -50,6 +66,22 @@ export function listEvents(filter: EventFilter = {}): EventRow[] {
   if (filter.since !== undefined) {
     conditions.push("created_at >= @since");
     params["since"] = filter.since;
+  }
+  if (filter.traceId !== undefined) {
+    conditions.push("trace_id = @traceId");
+    params["traceId"] = filter.traceId;
+  }
+  if (filter.correlationId !== undefined) {
+    conditions.push("correlation_id = @correlationId");
+    params["correlationId"] = filter.correlationId;
+  }
+  if (filter.cableId !== undefined) {
+    conditions.push("cable_id = @cableId");
+    params["cableId"] = filter.cableId;
+  }
+  if (filter.level !== undefined) {
+    conditions.push("level = @level");
+    params["level"] = filter.level;
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

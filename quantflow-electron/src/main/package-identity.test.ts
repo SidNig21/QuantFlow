@@ -7,7 +7,7 @@ const repoRoot = join(import.meta.dir, "../../..");
 describe("QuantFlow release identity", () => {
   test("publishes packaged builds to the QuantFlow repository", () => {
     const pkg = JSON.parse(
-      readFileSync(join(repoRoot, "collab-electron/package.json"), "utf8"),
+      readFileSync(join(repoRoot, "quantflow-electron/package.json"), "utf8"),
     );
 
     expect(pkg.name).toBe("@quantflow/electron");
@@ -36,7 +36,7 @@ describe("QuantFlow release identity", () => {
   test("user-facing issue links point to QuantFlow", () => {
     const contributing = readFileSync(join(repoRoot, "CONTRIBUTING.md"), "utf8");
     const shellHtml = readFileSync(
-      join(repoRoot, "collab-electron/src/windows/shell/index.html"),
+      join(repoRoot, "quantflow-electron/src/windows/shell/index.html"),
       "utf8",
     );
 
@@ -51,11 +51,11 @@ describe("QuantFlow release identity", () => {
 
   test("user-facing app and agent help copy uses QuantFlow identity", () => {
     const files = [
-      "collab-electron/src/windows/shell/index.html",
-      "collab-electron/src/windows/settings/src/App.tsx",
-      "collab-electron/packages/collab-canvas-skill/skills/collab-canvas/SKILL.md",
-      "collab-electron/packages/collab-canvas-skill/collab-canvas-codex.md",
-      "collab-electron/packages/collab-canvas-skill/collab-canvas-gemini.md",
+      "quantflow-electron/src/windows/shell/index.html",
+      "quantflow-electron/src/windows/settings/src/App.tsx",
+      "quantflow-electron/packages/collab-canvas-skill/skills/collab-canvas/SKILL.md",
+      "quantflow-electron/packages/collab-canvas-skill/collab-canvas-codex.md",
+      "quantflow-electron/packages/collab-canvas-skill/collab-canvas-gemini.md",
     ];
 
     const text = files

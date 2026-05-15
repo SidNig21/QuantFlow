@@ -25,6 +25,14 @@ const REQUIRED_TOOLS = [
   "quantflow_cable_send",
   "quantflow_role_list",
   "quantflow_role_spawn",
+  "quantflow_orchestration_run_create",
+  "quantflow_orchestration_run_get",
+  "quantflow_orchestration_run_list",
+  "quantflow_orchestration_run_cancel",
+  "quantflow_orchestration_capability_register",
+  "quantflow_orchestration_capability_list",
+  "quantflow_orchestration_resolve_route",
+  "quantflow_orchestration_tile_heartbeat",
   "quantflow_context_pin",
   "quantflow_context_inject",
   "quantflow_watchtower_snapshot",
@@ -96,6 +104,78 @@ test("maps cable send to one-shot relay.connectionSend", async () => {
         connectionId: "conn-1",
         fromTileId: "tile-a",
         text: "run tests",
+      },
+    },
+  ]);
+});
+
+test("maps orchestration run create to JSON-RPC", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "orchestration.runCreate": { id: "run-1" },
+  });
+  const tool = getToolDefinition("quantflow_orchestration_run_create");
+
+  await tool.handle(rpc)({
+    title: "Scout run",
+    metadataJson: "{\"phase\":\"7.5\"}",
+  });
+
+  assert.deepEqual(calls, [
+    {
+      method: "orchestration.runCreate",
+      params: {
+        title: "Scout run",
+        metadata: { phase: "7.5" },
+      },
+    },
+  ]);
+});
+
+test("maps orchestration route resolution to JSON-RPC", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "orchestration.resolveRoute": { tileId: "tile-1" },
+  });
+  const tool = getToolDefinition("quantflow_orchestration_resolve_route");
+
+  await tool.handle(rpc)({
+    capability: "shell.exec",
+    requireOnline: "true",
+  });
+
+  assert.deepEqual(calls, [
+    {
+      method: "orchestration.resolveRoute",
+      params: {
+        capability: "shell.exec",
+        requireOnline: true,
+      },
+    },
+  ]);
+});
+
+test("maps orchestration tile heartbeat to JSON-RPC", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "orchestration.tileHeartbeat": { tile_id: "tile-1" },
+  });
+  const tool = getToolDefinition("quantflow_orchestration_tile_heartbeat");
+
+  await tool.handle(rpc)({
+    tileId: "tile-1",
+    paneId: "pane-1",
+    status: "ready",
+    presence: "online",
+    metadataJson: "{\"cwd\":\"/tmp\"}",
+  });
+
+  assert.deepEqual(calls, [
+    {
+      method: "orchestration.tileHeartbeat",
+      params: {
+        tileId: "tile-1",
+        paneId: "pane-1",
+        status: "ready",
+        presence: "online",
+        metadata: { cwd: "/tmp" },
       },
     },
   ]);

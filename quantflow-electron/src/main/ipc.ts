@@ -24,6 +24,7 @@ import { registerContextServiceHandlers } from "./ipc-context-service";
 import { registerRuntimeDiagnosticsHandlers } from "./ipc-runtime-diagnostics";
 import { registerRuntimeStateHandlers } from "./ipc-runtime-state";
 import { registerHerdrHandlers } from "./ipc-herdr";
+import { registerOrchestrationHandlers } from "./ipc-orchestration";
 
 const FS_CHANGE_DELETED = 3;
 
@@ -146,4 +147,5 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerRuntimeDiagnosticsHandlers();
   registerRuntimeStateHandlers();
   registerHerdrHandlers();
+  registerOrchestrationHandlers();
 }
