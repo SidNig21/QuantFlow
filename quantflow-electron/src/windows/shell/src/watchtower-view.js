@@ -25,6 +25,18 @@ export const WATCHTOWER_EVENT_FILTERS = [
 	"warn",
 	"info",
 ];
+export const WATCHTOWER_ALERT_FILTERS = [
+	"all",
+	"error",
+	"warn",
+	"relay",
+];
+export const WATCHTOWER_TABS = [
+	"events",
+	"queues",
+	"agents",
+	"alerts",
+];
 
 export function escapeHtml(value) {
 	return String(value ?? "")
@@ -64,6 +76,12 @@ export function filterWatchtowerEvents(events, filter = "all") {
 	return events.filter((event) => event.severity === filter);
 }
 
+function matchesWatchtowerQuery(item, query, fields) {
+	const needle = String(query ?? "").trim().toLowerCase();
+	if (!needle) return true;
+	return fields.some((field) => String(field(item) ?? "").toLowerCase().includes(needle));
+}
+
 export function formatWatchtowerFilterLabel(filter) {
 	if (!filter) return "";
 	return String(filter)
@@ -90,6 +108,86 @@ export function getWatchtowerOperationalAttentionItems(events, limit = 5) {
 		})
 		.slice(-limit)
 		.reverse();
+}
+
+export function createWatchtowerQueueDepths(relayLogs = [], connections = []) {
+	const labels = new Map();
+	for (const conn of connections) {
+		if (!conn?.id) continue;
+		const fallback = `${conn.tileAId ?? "unknown"} -> ${conn.tileBId ?? "unknown"}`;
+		labels.set(conn.id, conn.label || fallback);
+	}
+
+	const counts = new Map();
+	for (const entry of relayLogs) {
+		const id = String(entry?.connectionId ?? "").trim();
+		if (!id) continue;
+		counts.set(id, (counts.get(id) ?? 0) + 1);
+		if (!labels.has(id)) labels.set(id, formatRelayRoute(entry));
+	}
+
+	return Array.from(counts.entries())
+		.map(([connectionId, depth]) => ({
+			connectionId,
+			label: labels.get(connectionId) || connectionId,
+			depth,
+			hot: depth > 8,
+		}))
+		.sort((a, b) => b.depth - a.depth || a.label.localeCompare(b.label));
+}
+
+export function createWatchtowerSummary({
+	agents = [],
+	relayLogs = [],
+	operationalEvents = [],
+	connections = [],
+} = {}) {
+	const failedRelayCount = relayLogs.filter((entry) => entry?.ok === false).length;
+	const eventAlerts = getWatchtowerOperationalAttentionItems(
+		operationalEvents,
+		operationalEvents.length || 1,
+	).length;
+	const queueDepths = createWatchtowerQueueDepths(relayLogs, connections);
+	const activeAgents = agents.filter((item) =>
+		["active", "running", "waiting", "blocked"].includes(String(item?.status ?? "")),
+	).length;
+
+	return {
+		tabs: {
+			events: operationalEvents.length,
+			queues: relayLogs.length,
+			agents: agents.length,
+			alerts: failedRelayCount + eventAlerts,
+		},
+		activeAgents,
+		failedRelayCount,
+		hotCableCount: queueDepths.filter((item) => item.hot).length,
+		queueDepths,
+	};
+}
+
+export function filterWatchtowerAlerts(
+	relayLogs = [],
+	operationalEvents = [],
+	filter = "all",
+) {
+	const relayItems = getWatchtowerAttentionItems(relayLogs, relayLogs.length || 1)
+		.map((entry) => ({ kind: "relay", entry }));
+	const eventItems = getWatchtowerOperationalAttentionItems(
+		operationalEvents,
+		operationalEvents.length || 1,
+	).map((event) => ({ kind: "event", event }));
+	const items = [...relayItems, ...eventItems];
+	if (filter === "relay") return relayItems;
+	if (filter === "error") {
+		return items.filter((item) =>
+			item.kind === "relay" || item.event?.severity === "error",
+		);
+	}
+	if (filter === "warn") {
+		return items.filter((item) => item.event?.severity === "warn");
+	}
+	return items;
 }
 
 export function formatRelayRoute(entry) {
@@ -356,9 +454,18 @@ export function renderWatchtowerAgents(
 		filter = "all",
 		connectionCounts = new Map(),
 		now = Date.now(),
+		query = "",
 	} = {},
 ) {
-	const filtered = filterWatchtowerAgents(items, filter);
+	const filtered = filterWatchtowerAgents(items, filter).filter((item) =>
+		matchesWatchtowerQuery(item, query, [
+			(agent) => agent?.label,
+			(agent) => agent?.tileId,
+			(agent) => agent?.status,
+			(agent) => agent?.routeHandle,
+			(agent) => agent?.lastLine,
+		]),
+	);
 	if (!filtered.length) {
 		const label = filter === "all" ? "" : `${filter} `;
 		return `<p class="wt-empty">No ${escapeHtml(label)}tile sessions.</p>`;
@@ -456,9 +563,22 @@ export function renderWatchtowerMessages(
 	{
 		filter = "all",
 		limit = 20,
+		query = "",
 	} = {},
 ) {
-	const filtered = filterWatchtowerMessages(logs, filter);
+	const filtered = filterWatchtowerMessages(logs, filter).filter((entry) =>
+		matchesWatchtowerQuery(entry, query, [
+			(item) => item?.errorCode,
+			(item) => item?.fromLabel,
+			(item) => item?.fromTileId,
+			(item) => item?.targetLabel,
+			(item) => item?.targetTileId,
+			(item) => item?.message,
+			(item) => item?.formatted,
+			(item) => item?.text,
+			(item) => formatRelayRoute(item),
+		]),
+	);
 	if (!filtered.length) {
 		const label = filter === "all" ? "" : `${filter.replace(/_/g, "-")} `;
 		return `<p class="wt-empty">No ${escapeHtml(label)}relay messages.</p>`;
@@ -494,15 +614,31 @@ export function renderWatchtowerMessages(
 	}).join("");
 }
 
+export function renderWatchtowerQueues(logs, options = {}) {
+	return renderWatchtowerMessages(logs, options);
+}
+
 export function renderWatchtowerEvents(
 	events,
 	{
 		filter = "all",
 		limit = 30,
 		now = Date.now(),
+		query = "",
 	} = {},
 ) {
-	const filtered = filterWatchtowerEvents(events, filter);
+	const filtered = filterWatchtowerEvents(events, filter).filter((event) =>
+		matchesWatchtowerQuery(event, query, [
+			(item) => item?.type,
+			(item) => item?.severity,
+			(item) => item?.summary,
+			(item) => item?.detail,
+			(item) => item?.meta?.connectionId,
+			(item) => item?.meta?.tileId,
+			(item) => item?.meta?.fromTileId ?? item?.meta?.tileAId,
+			(item) => item?.meta?.targetTileId ?? item?.meta?.tileBId,
+		]),
+	);
 	if (!filtered.length) {
 		const label = filter === "all" ? "" : `${filter} `;
 		return `<p class="wt-empty">No ${escapeHtml(label)}operational events.</p>`;
@@ -529,4 +665,145 @@ export function renderWatchtowerEvents(
 			</div>
 		`;
 	}).join("");
+}
+
+export function renderWatchtowerAlerts(
+	relayLogs,
+	{
+		operationalEvents = [],
+		filter = "all",
+		query = "",
+		limit = 20,
+	} = {},
+) {
+	const filtered = filterWatchtowerAlerts(
+		relayLogs,
+		operationalEvents,
+		filter,
+	).filter((item) => {
+		if (item.kind === "relay") {
+			return matchesWatchtowerQuery(item.entry, query, [
+				(entry) => entry?.errorCode,
+				(entry) => entry?.message,
+				(entry) => entry?.formatted,
+				(entry) => entry?.fromLabel,
+				(entry) => entry?.targetLabel,
+				(entry) => formatRelayRoute(entry),
+			]);
+		}
+		return matchesWatchtowerQuery(item.event, query, [
+			(event) => event?.type,
+			(event) => event?.severity,
+			(event) => event?.summary,
+			(event) => event?.detail,
+		]);
+	}).slice(0, limit);
+
+	if (!filtered.length) {
+		return `<p class="wt-empty">No ${filter === "all" ? "" : `${escapeHtml(filter)} `}alerts.</p>`;
+	}
+
+	return filtered.map((item) => {
+		if (item.kind === "relay") {
+			const entry = item.entry;
+			const route = formatRelayRoute(entry);
+			const text = entry.message || entry.formatted || entry.text || "";
+			return `
+				<div
+					class="wt-alert wt-alert-error"
+					data-watchtower-kind="message"
+					data-event-id="${escapeHtml(entry.eventId ?? "")}"
+					data-conn-id="${escapeHtml(entry.connectionId)}"
+					data-from-tile-id="${escapeHtml(entry.fromTileId)}"
+					data-target-tile-id="${escapeHtml(entry.targetTileId ?? "")}"
+					role="button"
+					tabindex="0"
+				>
+					<div class="wt-alert-kicker">Relay alert</div>
+					<div class="wt-alert-title">${escapeHtml(entry.errorCode || "relay failed")}</div>
+					<div class="wt-alert-detail">${escapeHtml(route)}</div>
+					<div class="wt-alert-text">${escapeHtml(String(text).slice(0, 180))}</div>
+					<button class="wt-alert-ack" type="button" tabindex="-1">Acknowledge</button>
+				</div>
+			`;
+		}
+
+		const event = item.event;
+		const meta = event?.meta && typeof event.meta === "object" ? event.meta : {};
+		return `
+			<div
+				class="wt-alert wt-alert-${escapeHtml(event.severity || "warn")}"
+				data-watchtower-kind="event"
+				data-conn-id="${escapeHtml(meta.connectionId ?? "")}"
+				data-tile-id="${escapeHtml(meta.tileId ?? "")}"
+				data-from-tile-id="${escapeHtml(meta.fromTileId ?? meta.tileAId ?? "")}"
+				data-target-tile-id="${escapeHtml(meta.targetTileId ?? meta.tileBId ?? "")}"
+				role="button"
+				tabindex="0"
+			>
+				<div class="wt-alert-kicker">Operational alert</div>
+				<div class="wt-alert-title">${escapeHtml(event.type || "event.failed")}</div>
+				<div class="wt-alert-detail">${escapeHtml(event.summary || "")}</div>
+				${event.detail ? `<div class="wt-alert-text">${escapeHtml(String(event.detail).slice(0, 180))}</div>` : ""}
+				<button class="wt-alert-ack" type="button" tabindex="-1">Acknowledge</button>
+			</div>
+		`;
+	}).join("");
+}
+
+export function renderWatchtowerRail({
+	agents = [],
+	relayLogs = [],
+	operationalEvents = [],
+	connections = [],
+} = {}) {
+	const summary = createWatchtowerSummary({
+		agents,
+		relayLogs,
+		operationalEvents,
+		connections,
+	});
+	const maxDepth = Math.max(1, ...summary.queueDepths.map((item) => item.depth));
+	const sparkItems = relayLogs.slice(-16);
+	const sparkMax = Math.max(1, sparkItems.length);
+	const queueHtml = summary.queueDepths.length
+		? summary.queueDepths.slice(0, 5).map((item) => {
+			const width = Math.max(6, Math.round((item.depth / maxDepth) * 100));
+			return `
+				<div class="wt-queue-row ${item.hot ? "is-hot" : ""}">
+					<div class="wt-queue-label">${escapeHtml(item.label)}</div>
+					<div class="wt-queue-bar" style="--queue-depth: ${width}%"></div>
+					<div class="wt-queue-count">${escapeHtml(item.depth)}</div>
+				</div>
+			`;
+		}).join("")
+		: `<p class="wt-rail-empty">No queued relay activity</p>`;
+	const sparkHtml = sparkItems.length
+		? sparkItems.map((entry, index) => {
+			const height = Math.max(18, Math.round(((index + 1) / sparkMax) * 100));
+			return `<span class="${entry?.ok === false ? "is-failed" : ""}" style="--spark-h: ${height}%"></span>`;
+		}).join("")
+		: "<span></span><span></span><span></span>";
+
+	return `
+		<aside class="wt-rail" aria-label="Watchtower metrics">
+			<section class="wt-rail-card">
+				<div class="wt-rail-label">Throughput</div>
+				<div class="wt-sparkline">${sparkHtml}</div>
+				<div class="wt-rail-value">${escapeHtml(relayLogs.length)} relay events</div>
+			</section>
+			<section class="wt-rail-card">
+				<div class="wt-rail-label">Queues</div>
+				${queueHtml}
+			</section>
+			<section class="wt-rail-card">
+				<div class="wt-rail-label">Agents</div>
+				<div class="wt-agent-rollup">
+					<span>${escapeHtml(summary.activeAgents)} live</span>
+					<span>${escapeHtml(agents.length)} total</span>
+					<span>${escapeHtml(summary.failedRelayCount)} failed relays</span>
+				</div>
+			</section>
+		</aside>
+	`;
 }

@@ -1,11 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import {
 	WATCHTOWER_AGENT_FILTERS,
+	WATCHTOWER_ALERT_FILTERS,
 	WATCHTOWER_EVENT_FILTERS,
 	WATCHTOWER_MESSAGE_FILTERS,
+	WATCHTOWER_TABS,
 	createConnectionCounts,
+	createWatchtowerQueueDepths,
+	createWatchtowerSummary,
 	escapeHtml,
 	filterWatchtowerAgents,
+	filterWatchtowerAlerts,
 	filterWatchtowerEvents,
 	filterWatchtowerMessages,
 	formatWatchtowerFilterLabel,
@@ -18,9 +23,12 @@ import {
 	getWatchtowerOperationalAttentionItems,
 	redactDiagnosticText,
 	renderWatchtowerAgents,
+	renderWatchtowerAlerts,
 	renderWatchtowerAttention,
 	renderWatchtowerEvents,
 	renderWatchtowerMessages,
+	renderWatchtowerQueues,
+	renderWatchtowerRail,
 	runWatchtowerFocusPlan,
 	shouldRenderWatchtowerRetry,
 } from "./watchtower-view.js";
@@ -139,6 +147,87 @@ describe("filterWatchtowerEvents", () => {
 			{ severity: "error", summary: "role failed" },
 		]);
 		expect(filterWatchtowerEvents(events)).toHaveLength(3);
+	});
+});
+
+describe("Watchtower redesign summary helpers", () => {
+	test("defines the Events-first tab model and alert filters", () => {
+		expect(WATCHTOWER_TABS).toEqual([
+			"events",
+			"queues",
+			"agents",
+			"alerts",
+		]);
+		expect(WATCHTOWER_ALERT_FILTERS).toEqual([
+			"all",
+			"error",
+			"warn",
+			"relay",
+		]);
+	});
+
+	test("counts tabs, active agents, failed relays, and hot cable queues", () => {
+		const relayLogs = Array.from({ length: 9 }, (_, index) => ({
+			ok: index !== 0,
+			connectionId: "conn-hot",
+			errorCode: index === 0 ? "missing_pty" : undefined,
+		}));
+		const summary = createWatchtowerSummary({
+			agents: [
+				{ status: "active" },
+				{ status: "idle" },
+				{ status: "blocked" },
+			],
+			relayLogs,
+			operationalEvents: [
+				{ type: "context.failed", severity: "warn" },
+				{ type: "connection.created", severity: "info" },
+			],
+			connections: [
+				{ id: "conn-hot", tileAId: "a", tileBId: "b", label: "hot path" },
+			],
+		});
+
+		expect(summary.tabs).toEqual({
+			events: 2,
+			queues: 9,
+			agents: 3,
+			alerts: 2,
+		});
+		expect(summary.activeAgents).toBe(2);
+		expect(summary.failedRelayCount).toBe(1);
+		expect(summary.hotCableCount).toBe(1);
+	});
+
+	test("builds sorted queue depths with hot cable markers", () => {
+		const depths = createWatchtowerQueueDepths([
+			{ connectionId: "b" },
+			{ connectionId: "a" },
+			{ connectionId: "a" },
+			{ connectionId: "a" },
+			{ connectionId: "a" },
+			{ connectionId: "a" },
+			{ connectionId: "a" },
+			{ connectionId: "a" },
+			{ connectionId: "a" },
+			{ connectionId: "a" },
+		], [
+			{ id: "a", label: "alpha" },
+			{ id: "b", label: "beta" },
+		]);
+
+		expect(depths[0]).toMatchObject({
+			connectionId: "a",
+			label: "alpha",
+			depth: 9,
+			hot: true,
+		});
+		expect(depths[1]).toMatchObject({
+			connectionId: "b",
+			label: "beta",
+			depth: 1,
+			hot: false,
+		});
 	});
 });
 
@@ -675,6 +764,29 @@ describe("renderWatchtowerMessages", () => {
 
 		expect(html).not.toContain("wt-msg-retry");
 	});
+
+	test("renderWatchtowerQueues reuses relay queue rows with search filtering", () => {
+		const html = renderWatchtowerQueues([
+			{
+				ok: true,
+				connectionId: "conn-ab",
+				fromLabel: "Planner",
+				targetLabel: "Reviewer",
+				formatted: "queued payload",
+			},
+			{
+				ok: true,
+				connectionId: "conn-cd",
+				fromLabel: "Trainer",
+				targetLabel: "Monitor",
+				formatted: "other payload",
+			},
+		], { query: "reviewer" });
+
+		expect(html).toContain("Planner");
+		expect(html).toContain("@Reviewer");
+		expect(html).not.toContain("Trainer");
+	});
 });
 
 describe("renderWatchtowerEvents", () => {
@@ -771,5 +883,74 @@ describe("renderWatchtowerAttention", () => {
 		expect(html).toContain("tile&quot;&lt;x&gt;");
 		expect(html).toContain("&lt;spawn ENOENT&gt;");
 		expect(html).not.toContain("<spawn ENOENT>");
+	});
+});
+
+describe("renderWatchtowerAlerts", () => {
+	test("renders zero-state when there are no alerts", () => {
+		expect(renderWatchtowerAlerts([], { operationalEvents: [] }))
+			.toContain("No alerts.");
+	});
+
+	test("renders relay and operational alerts with focus data and acknowledge buttons", () => {
+		const html = renderWatchtowerAlerts([
+			{
+				ok: false,
+				eventId: "relay-1",
+				errorCode: "missing_pty",
+				connectionId: "conn-ab",
+				fromTileId: "tile-a",
+				targetTileId: "tile-b",
+				message: "Target exited",
+			},
+		], {
+			operationalEvents: [
+				{
+					type: "context.failed",
+					severity: "warn",
+					summary: "Context build failed",
+					detail: "<details>",
+					meta: { tileId: "tile-c" },
+				},
+			],
+		});
+
+		expect(filterWatchtowerAlerts([
+			{ ok: false, errorCode: "missing_pty" },
+		], [], "relay")).toHaveLength(1);
+		expect(html).toContain("Relay alert");
+		expect(html).toContain("Operational alert");
+		expect(html).toContain("data-watchtower-kind=\"message\"");
+		expect(html).toContain("data-target-tile-id=\"tile-b\"");
+		expect(html).toContain("data-watchtower-kind=\"event\"");
+		expect(html).toContain("data-tile-id=\"tile-c\"");
+		expect(html).toContain("Acknowledge");
+		expect(html).toContain("&lt;details&gt;");
+	});
+});
+
+describe("renderWatchtowerRail", () => {
+	test("renders throughput, queue bars, hot cable markers, and agent rollup", () => {
+		const html = renderWatchtowerRail({
+			agents: [
+				{ status: "active" },
+				{ status: "idle" },
+			],
+			relayLogs: Array.from({ length: 9 }, (_, index) => ({
+				ok: index !== 1,
+				connectionId: "conn-hot",
+			})),
+			operationalEvents: [],
+			connections: [
+				{ id: "conn-hot", label: "hot cable" },
+			],
+		});
+
+		expect(html).toContain("Throughput");
+		expect(html).toContain("9 relay events");
+		expect(html).toContain("hot cable");
+		expect(html).toContain("is-hot");
+		expect(html).toContain("1 live");
+		expect(html).toContain("1 failed relays");
 	});
 });

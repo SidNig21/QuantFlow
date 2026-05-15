@@ -51,16 +51,21 @@ import {
 } from "./cable-draw-mode.js";
 import {
 	WATCHTOWER_AGENT_FILTERS,
+	WATCHTOWER_ALERT_FILTERS,
 	WATCHTOWER_EVENT_FILTERS,
 	WATCHTOWER_MESSAGE_FILTERS,
+	WATCHTOWER_TABS,
 	createConnectionCounts,
+	createWatchtowerSummary,
 	formatWatchtowerDiagnostics,
 	formatWatchtowerFilterLabel,
 	getWatchtowerRetryRequest,
 	renderWatchtowerAgents,
+	renderWatchtowerAlerts,
 	renderWatchtowerAttention,
 	renderWatchtowerEvents,
-	renderWatchtowerMessages,
+	renderWatchtowerQueues,
+	renderWatchtowerRail,
 	runWatchtowerFocusPlan,
 } from "./watchtower-view.js";
 import {
@@ -622,13 +627,82 @@ async function init() {
 		}
 	}
 
+	const tileListEntryFields = [
+		"title",
+		"description",
+		"status",
+		"groupLabel",
+		"metaLabel",
+		"routeHandle",
+	];
+
+	function sameTileListEntry(prev, next) {
+		return tileListEntryFields.every(
+			(field) => prev?.[field] === next?.[field],
+		);
+	}
+
+	function pathBaseName(value) {
+		const text = String(value ?? "").trim().replace(/[\\/]+$/, "");
+		if (!text) return "";
+		const parts = text.split(/[\\/]+/).filter(Boolean);
+		return parts.at(-1) ?? text;
+	}
+
+	function browserHost(value) {
+		const text = String(value ?? "").trim();
+		if (!text) return "";
+		try {
+			return new URL(text).hostname;
+		} catch {
+			return text;
+		}
+	}
+
+	function typeGroupLabel(type) {
+		if (type === "term") return "Terminal Sessions";
+		if (type === "browser") return "Browsers";
+		if (type === "graph") return "Graphs";
+		if (type === "note") return "Notes";
+		if (type === "code") return "Code";
+		if (type === "image") return "Images";
+		return "Other Tiles";
+	}
+
+	function buildTileGroupLabel(tile, label) {
+		if (tile.type === "term") {
+			return tile.roleName ? `${tile.roleName} Agents` : "Terminal Sessions";
+		}
+		const parent = pathBaseName(label.parent);
+		return parent || typeGroupLabel(tile.type);
+	}
+
+	function buildTileMetaLabel(tile, label, description) {
+		if (tile.type === "term") {
+			return [
+				tile.routeHandle ? `@${tile.routeHandle}` : null,
+				tile.roleName || tile.roleId || null,
+				description,
+			].filter(Boolean).join(" / ");
+		}
+		if (tile.type === "browser") return browserHost(tile.url) || "Browser";
+		if (label.parent) return label.parent;
+		return description;
+	}
+
+	function buildTileRegistryMeta() {
+		return {
+			workspaceName: pathBaseName(workspaceData.workspaces?.[0]) || "Workspace",
+		};
+	}
+
 	function buildTileListEntry(tile) {
 		let title = tile.id;
 		let description = "";
 		let status = null;
+		const label = getTileLabel(tile);
 
 		if (tile.type === "term") {
-			const label = getTileLabel(tile);
 			title = label.parent
 				? label.parent + label.name
 				: label.name;
@@ -660,6 +734,9 @@ async function init() {
 		return {
 			id: tile.id, type: tile.type,
 			title, description, status,
+			groupLabel: buildTileGroupLabel(tile, label),
+			metaLabel: buildTileMetaLabel(tile, label, description),
+			routeHandle: tile.routeHandle || null,
 		};
 	}
 
@@ -757,9 +834,7 @@ async function init() {
 			currentIds.add(id);
 			const entry = buildTileListEntry(tile);
 			const prev = lastTileSnapshot.get(id);
-			if (!prev || prev.title !== entry.title ||
-				prev.description !== entry.description ||
-				prev.status !== entry.status) {
+			if (!prev || !sameTileListEntry(prev, entry)) {
 				tileListWebview.send(
 					prev ? "tile-list:update" : "tile-list:add",
 					entry,
@@ -1670,10 +1745,13 @@ async function init() {
 	// -- W key: watchtower panel --
 
 	let watchtowerVisible = false;
-	let watchtowerTab = "agents";
+	let watchtowerTab = "events";
 	let watchtowerAgentFilter = "all";
 	let watchtowerMessageFilter = "all";
 	let watchtowerEventFilter = "all";
+	let watchtowerAlertFilter = "all";
+	let watchtowerQuery = "";
+	let watchtowerPaused = false;
 	let watchtowerTimer = null;
 	let watchtowerRelayLogCache = [];
 	const watchtowerEl = document.createElement("div");
@@ -1681,22 +1759,76 @@ async function init() {
 	watchtowerEl.hidden = true;
 	watchtowerEl.innerHTML = `
 		<div class="wt-header">
-			<span class="wt-title">Watchtower</span>
-			<div class="wt-tabs">
-				<button class="wt-tab active" data-tab="agents">Agents</button>
-				<button class="wt-tab" data-tab="messages">Messages</button>
-				<button class="wt-tab" data-tab="events">Events</button>
+			<div class="wt-title-block">
+				<span class="wt-live-dot" aria-hidden="true"></span>
+				<span class="wt-title">Watchtower</span>
 			</div>
-			<button class="wt-copy" title="Copy diagnostics">Copy</button>
-			<button class="wt-refresh" title="Refresh">Refresh</button>
-			<button class="wt-close">✕</button>
+			<div class="wt-tabs">
+				${WATCHTOWER_TABS.map((tab) => `
+					<button class="wt-tab ${tab === watchtowerTab ? "active" : ""}" data-tab="${tab}" type="button">
+						<span>${watchtowerTabLabel(tab)}</span>
+						<span class="wt-tab-count">0</span>
+					</button>
+				`).join("")}
+			</div>
+			<input class="wt-search" type="search" placeholder="Filter" spellcheck="false" />
+			<button class="wt-pause" type="button" aria-pressed="false">Pause</button>
+			<button class="wt-clear" type="button">Clear</button>
+			<button class="wt-copy" type="button" title="Copy diagnostics">Copy</button>
+			<button class="wt-refresh" type="button" title="Refresh">Refresh</button>
+			<button class="wt-close" type="button" aria-label="Collapse Watchtower">×</button>
 		</div>
 		<div class="wt-filter-bar"></div>
-		<div class="wt-body"></div>
+		<div class="wt-content">
+			<div class="wt-body"></div>
+			<div class="wt-rail-slot"></div>
+		</div>
 	`;
 	document.body.appendChild(watchtowerEl);
 
+	function watchtowerTabLabel(tab) {
+		if (tab === "queues") return "Queues";
+		if (tab === "agents") return "Agents";
+		if (tab === "alerts") return "Alerts";
+		return "Events";
+	}
+
+	function updateWatchtowerTabs(summary) {
+		for (const tab of watchtowerEl.querySelectorAll(".wt-tab")) {
+			const name = tab.dataset.tab;
+			tab.classList.toggle("active", name === watchtowerTab);
+			const count = tab.querySelector(".wt-tab-count");
+			if (count) count.textContent = String(summary?.tabs?.[name] ?? 0);
+		}
+	}
+
+	function setWatchtowerPaused(paused) {
+		watchtowerPaused = paused;
+		const button = watchtowerEl.querySelector(".wt-pause");
+		button.textContent = paused ? "Resume" : "Pause";
+		button.setAttribute("aria-pressed", String(paused));
+		clearInterval(watchtowerTimer);
+		watchtowerTimer = null;
+		if (watchtowerVisible && !watchtowerPaused) {
+			watchtowerTimer = setInterval(refreshWatchtower, 2000);
+		}
+	}
+
 	watchtowerEl.querySelector(".wt-refresh").addEventListener("click", () => {
+		refreshWatchtower();
+	});
+
+	watchtowerEl.querySelector(".wt-clear").addEventListener("click", () => {
+		operationalEvents.clear();
+		refreshWatchtower();
+	});
+
+	watchtowerEl.querySelector(".wt-pause").addEventListener("click", () => {
+		setWatchtowerPaused(!watchtowerPaused);
+	});
+
+	watchtowerEl.querySelector(".wt-search").addEventListener("input", (e) => {
+		watchtowerQuery = e.target.value;
 		refreshWatchtower();
 	});
 
@@ -1763,12 +1895,16 @@ async function init() {
 			? WATCHTOWER_AGENT_FILTERS
 			: watchtowerTab === "events"
 				? WATCHTOWER_EVENT_FILTERS
-				: WATCHTOWER_MESSAGE_FILTERS;
+				: watchtowerTab === "alerts"
+					? WATCHTOWER_ALERT_FILTERS
+					: WATCHTOWER_MESSAGE_FILTERS;
 		const activeFilter = watchtowerTab === "agents"
 			? watchtowerAgentFilter
 			: watchtowerTab === "events"
 				? watchtowerEventFilter
-				: watchtowerMessageFilter;
+				: watchtowerTab === "alerts"
+					? watchtowerAlertFilter
+					: watchtowerMessageFilter;
 		const filterBar = watchtowerEl.querySelector(".wt-filter-bar");
 		filterBar.innerHTML = filters.map((filter) => `
 			<button
@@ -1786,6 +1922,8 @@ async function init() {
 			watchtowerAgentFilter = button.dataset.filter;
 		} else if (watchtowerTab === "events") {
 			watchtowerEventFilter = button.dataset.filter;
+		} else if (watchtowerTab === "alerts") {
+			watchtowerAlertFilter = button.dataset.filter;
 		} else {
 			watchtowerMessageFilter = button.dataset.filter;
 		}
@@ -1876,6 +2014,13 @@ async function init() {
 	}
 
 	watchtowerEl.addEventListener("click", (e) => {
+		const ackButton = e.target.closest?.(".wt-alert-ack");
+		if (ackButton && watchtowerEl.contains(ackButton)) {
+			e.preventDefault();
+			e.stopPropagation();
+			ackButton.closest?.(".wt-alert")?.remove();
+			return;
+		}
 		const retryButton = e.target.closest?.(".wt-msg-retry");
 		if (retryButton && watchtowerEl.contains(retryButton)) {
 			e.preventDefault();
@@ -1897,28 +2042,52 @@ async function init() {
 	async function refreshWatchtower() {
 		renderWatchtowerFilters();
 		const body = watchtowerEl.querySelector(".wt-body");
+		const rail = watchtowerEl.querySelector(".wt-rail-slot");
 		const [items, relayLogs] = await Promise.all([
 			window.shellApi.watchtowerSnapshot?.() ?? [],
 			window.shellApi.watchtowerRelayLog?.(50) ?? [],
 		]);
 		watchtowerRelayLogCache = Array.isArray(relayLogs) ? relayLogs : [];
 		const agentItems = Array.isArray(items) ? items : [];
+		const eventItems = operationalEvents.list();
+		const summary = createWatchtowerSummary({
+			agents: agentItems,
+			relayLogs: watchtowerRelayLogCache,
+			operationalEvents: eventItems,
+			connections,
+		});
+		updateWatchtowerTabs(summary);
+		rail.innerHTML = renderWatchtowerRail({
+			agents: agentItems,
+			relayLogs: watchtowerRelayLogCache,
+			operationalEvents: eventItems,
+			connections,
+		});
 		syncTerminalTileStatuses(agentItems);
 		const attentionHtml = renderWatchtowerAttention(watchtowerRelayLogCache, {
-			operationalEvents: operationalEvents.list(),
+			operationalEvents: eventItems,
 		});
 		if (watchtowerTab === "agents") {
 			body.innerHTML = attentionHtml + renderWatchtowerAgents(agentItems, {
 				filter: watchtowerAgentFilter,
 				connectionCounts: createConnectionCounts(connections),
+				query: watchtowerQuery,
 			});
 		} else if (watchtowerTab === "events") {
-			body.innerHTML = attentionHtml + renderWatchtowerEvents(operationalEvents.list(), {
+			body.innerHTML = attentionHtml + renderWatchtowerEvents(eventItems, {
 				filter: watchtowerEventFilter,
+				query: watchtowerQuery,
+			});
+		} else if (watchtowerTab === "alerts") {
+			body.innerHTML = renderWatchtowerAlerts(watchtowerRelayLogCache, {
+				operationalEvents: eventItems,
+				filter: watchtowerAlertFilter,
+				query: watchtowerQuery,
 			});
 		} else {
-			body.innerHTML = attentionHtml + renderWatchtowerMessages(watchtowerRelayLogCache, {
+			body.innerHTML = attentionHtml + renderWatchtowerQueues(watchtowerRelayLogCache, {
 				filter: watchtowerMessageFilter,
+				query: watchtowerQuery,
 			});
 		}
 	}
@@ -1927,7 +2096,7 @@ async function init() {
 		watchtowerVisible = true;
 		watchtowerEl.hidden = false;
 		refreshWatchtower();
-		if (!watchtowerTimer) {
+		if (!watchtowerPaused && !watchtowerTimer) {
 			watchtowerTimer = setInterval(refreshWatchtower, 2000);
 		}
 	}
@@ -2537,7 +2706,11 @@ async function init() {
 					lastTileSnapshot.set(id, entry);
 				}
 			}
-			tileListWebview.send("tile-list:init", initEntries);
+			tileListWebview.send(
+				"tile-list:init",
+				initEntries,
+				buildTileRegistryMeta(),
+			);
 
 			const focusedId = tileManager.getFocusedTileId();
 			if (focusedId) {

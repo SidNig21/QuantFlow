@@ -1,18 +1,135 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap');
-
 :root {
-	--background: rgb(248, 248, 248);
-	--background-rgb: 248, 248, 248;
-	--foreground: rgb(32, 32, 32);
-	--border: rgb(206, 206, 206);
-	--muted-foreground: rgb(113, 113, 123);
+	--font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: ui-monospace, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
 
-	--font-sans: 'Geist', system-ui, sans-serif;
-	--font-mono: 'Geist Mono';
+	--bg: #0a0d12;
+	--bg-rgb: 10, 13, 18;
+	--canvas-bg: #0c1117;
+	--canvas-bg-hi: #0f141b;
+	--canvas-bg-rgb: 12, 17, 23;
+	--canvas-opacity: 1;
+	--canvas-gradient: linear-gradient(
+		to top,
+		#16092a 0%,
+		#0a0820 30%,
+		#06070d 65%,
+		#050812 100%
+	);
 
-	--scrollbar-width: 6px;
-	--scrollbar-thumb: color-mix(in srgb, var(--foreground) 10%, transparent);
-	--scrollbar-thumb-hover: color-mix(in srgb, var(--foreground) 18%, transparent);
+	--tile-bg: #0f141b;
+	--tile-bg-hi: #131923;
+	--tile-border: #1c232d;
+	--tile-border-hi: #2a3340;
+
+	--fg: #e7ecf2;
+	--muted: #6b7686;
+	--muted-2: #4a5466;
+	--border: #1c232d;
+
+	--accent: oklch(0.78 0.16 145);
+	--accent-dim: oklch(0.62 0.13 145);
+	--accent-glow: oklch(0.78 0.16 145 / 0.18);
+
+	--running: var(--accent);
+	--idle: var(--muted);
+	--selected: oklch(0.85 0.17 145);
+	--failed: oklch(0.68 0.19 25);
+	--error: var(--failed);
+	--armed: oklch(0.78 0.14 80);
+
+	--cable-pipe: var(--accent);
+	--cable-context: oklch(0.70 0.14 240);
+	--cable-trigger: var(--armed);
+	--cable-default: color-mix(in srgb, var(--accent) 70%, transparent);
+	--cable-hover: oklch(0.85 0.18 145);
+	--cable-selected: oklch(0.92 0.18 145);
+	--cable-failed: var(--failed);
+	--cable-idle: color-mix(in srgb, var(--muted-2) 70%, transparent);
+	--cable-w-default: 1.6px;
+	--cable-w-bundle: 3px;
+	--cable-w-hit: 14px;
+
+	--edge-dot: var(--accent);
+	--edge-dot-hover: oklch(0.85 0.17 145);
+	--new-tile-btn-bg: #13191f;
+	--new-tile-btn-bg-hover: #1a2129;
+
+	--fs-xxs: 9.5px;
+	--fs-xs: 10.5px;
+	--fs-sm: 11.5px;
+	--fs-md: 12.5px;
+	--fs-lg: 13px;
+	--fs-xl: 15px;
+	--fs-2xl: 18px;
+	--lh-body: 1.5;
+	--lh-terminal: 1.65;
+	--ls-eyebrow: 0.1em;
+	--ls-pill: 0.06em;
+
+	--space-1: 4px;
+	--space-2: 6px;
+	--space-3: 8px;
+	--space-4: 10px;
+	--space-5: 12px;
+	--space-6: 14px;
+	--space-7: 18px;
+	--space-8: 24px;
+
+	--tile-pad-y: 8px;
+	--tile-pad-x: 14px;
+	--tile-title-pad-y: 7px;
+	--tile-title-pad-x: 12px;
+
+	--r-tile: 8px;
+	--r-card: 7px;
+	--r-button: 6px;
+	--r-modal: 12px;
+	--r-pill: 999px;
+	--r-input: 6px;
+
+	--sh-tile: 0 6px 20px rgba(0, 0, 0, 0.4);
+	--sh-tile-running: 0 0 0 1px var(--accent-glow), 0 8px 24px rgba(0, 0, 0, 0.55);
+	--sh-tile-error: 0 0 0 1px color-mix(in srgb, var(--failed) 15%, transparent), 0 8px 24px rgba(0, 0, 0, 0.55);
+	--sh-floating: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	--sh-port-live: 0 0 6px var(--accent-glow);
+
+	--z-canvas-bg: 0;
+	--z-cable-layer: 102;
+	--z-tile: 100;
+	--z-tile-focused: 101;
+	--z-port: 103;
+	--z-edge-indicator: 104;
+	--z-watchtower: 200;
+	--z-tooltip: 300;
+	--z-modal: 400;
+
+	--toolbar-height: 38px;
+	--nav-inset: 12px;
+	--t-port-show: 0.12s;
+	--t-cable-flow: 1.6s;
+	--t-cursor-blink: 1.1s;
+
+	--background: var(--bg);
+	--background-rgb: var(--bg-rgb);
+	--foreground: var(--fg);
+	--muted-foreground: var(--muted);
+	--primary: var(--accent);
+	--primary-foreground: var(--bg);
+	--destructive: var(--failed);
+	--destructive-foreground: var(--failed);
+	--card: var(--tile-bg);
+	--card-foreground: var(--fg);
+	--input: #111720;
+	--ring: color-mix(in srgb, var(--accent) 55%, transparent);
+	--popover: #0d1218;
+	--popover-foreground: var(--fg);
+	--secondary: #111720;
+	--secondary-foreground: var(--fg);
+	--accent-foreground: var(--bg);
+
+	--scrollbar-width: 10px;
+	--scrollbar-thumb: #1c232d;
+	--scrollbar-thumb-hover: #2a3340;
 
 	--item-type-note: oklch(76.8% 0.233 130.85);
 	--item-type-doc: oklch(79.5% 0.184 86.047);
@@ -21,23 +138,27 @@
 	--item-type-concept: oklch(54.6% 0.245 262.881);
 	--item-type-skill: oklch(65% 0.2 195);
 	--item-type-default: #6b7280;
-
-	--destructive: rgb(251, 44, 54);
-	--primary: rgb(24, 24, 27);
-	--primary-foreground: rgb(250, 250, 250);
 }
 
 .dark {
-	--background: rgb(18, 18, 18);
-	--background-rgb: 18, 18, 18;
-	--foreground: rgb(220, 220, 220);
-	--border: rgb(255, 255, 255, 0.2);
-	--muted-foreground: rgb(132, 132, 132);
-	--scrollbar-thumb: color-mix(in srgb, var(--foreground) 10%, transparent);
-	--scrollbar-thumb-hover: color-mix(in srgb, var(--foreground) 20%, transparent);
-	--destructive: rgb(251, 44, 54);
-	--primary: rgb(250, 250, 250);
-	--primary-foreground: rgb(24, 24, 27);
+	--background: var(--bg);
+	--background-rgb: var(--bg-rgb);
+	--foreground: var(--fg);
+	--border: #1c232d;
+	--muted-foreground: var(--muted);
+	--input: #111720;
+	--ring: color-mix(in srgb, var(--accent) 55%, transparent);
+	--popover: #0d1218;
+	--popover-foreground: var(--fg);
+	--destructive: var(--failed);
+	--destructive-foreground: var(--failed);
+	--primary: var(--accent);
+	--primary-foreground: var(--bg);
+	--secondary: #111720;
+	--secondary-foreground: var(--fg);
+	--accent-foreground: var(--bg);
+	--scrollbar-thumb: #1c232d;
+	--scrollbar-thumb-hover: #2a3340;
 }
 
 body {
