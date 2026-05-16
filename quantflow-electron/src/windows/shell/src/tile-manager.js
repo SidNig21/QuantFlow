@@ -287,6 +287,10 @@ export function createTileManager({
 				}
 				registerTerminalTileSession(currentTile);
 			}
+			if (event.channel === "pty-restore-stale") {
+				currentTile.ptyStatus = "restoring";
+				updateTileTitle(currentDom, currentTile);
+			}
 			if (event.channel === "pty-start-failed") {
 				const payload = event.args[0] || {};
 				currentTile.ptyStatus = "error";

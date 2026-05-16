@@ -73,6 +73,7 @@ import {
 } from "./watchtower-view.js";
 import {
 	createPtyStartFailureDiagnostic,
+	createPtyRestoreFailureDiagnostic,
 	normalizeLaunchDiagnostic,
 	renderLaunchDiagnostics,
 } from "./launch-diagnostics-view.js";
@@ -1031,8 +1032,11 @@ async function init() {
 			setLastTerminalCwd(cwd);
 		},
 		onTerminalStartFailed(tile, payload) {
+			const wasRestoring = tile.ptyStatus === "restoring";
 			const diagnostic = upsertLaunchDiagnostic(
-				createPtyStartFailureDiagnostic(payload, tile),
+				wasRestoring
+					? createPtyRestoreFailureDiagnostic(payload, tile)
+					: createPtyStartFailureDiagnostic(payload, tile),
 			);
 			operationalEvents.record({
 				type: "pty.failed",

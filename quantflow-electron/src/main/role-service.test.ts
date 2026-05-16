@@ -1,12 +1,17 @@
-import { describe, test, expect, mock } from "bun:test";
+import { describe, test, expect, beforeEach } from "bun:test";
+import { mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-mock.module("node:fs/promises", () => ({
-  mkdir: async () => {},
-  readdir: async () => [],
-  readFile: async () => { throw new Error("no file"); },
-}));
+import { getRoleCommandName, listRoles, getRole, _setRolesDir } from "./role-service";
 
-import { getRoleCommandName, listRoles, getRole } from "./role-service";
+const TEST_ROOT = join(tmpdir(), `quantflow-roles-${Date.now()}`);
+
+beforeEach(() => {
+  rmSync(TEST_ROOT, { recursive: true, force: true });
+  mkdirSync(TEST_ROOT, { recursive: true });
+  _setRolesDir(TEST_ROOT);
+});
 
 describe("listRoles", () => {
   test("returns 5 built-in roles when no custom roles exist", async () => {

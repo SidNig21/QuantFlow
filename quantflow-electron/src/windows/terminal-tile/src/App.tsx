@@ -35,6 +35,8 @@ function App() {
     const target = params.get("target") || undefined;
     const tileId = params.get("tileId") || undefined;
 
+    let sessionRestoreAttempted = false;
+
     const createFreshSession = (
       target?: string,
       nextCwd?: string,
@@ -43,6 +45,14 @@ function App() {
       window.api
         .ptyCreate(nextCwd ?? cwd, est.cols, est.rows, target, tileId)
         .then((result) => {
+          if (sessionRestoreAttempted) {
+            window.api.runtimeAppendEvent?.({
+              kind: "terminal.restore.started",
+              tileId: tileId ?? null,
+              data: { oldSessionId: existingSessionId, newSessionId: result.sessionId },
+              level: "info",
+            });
+          }
           setSessionId(result.sessionId);
           window.api.notifyPtySessionId(
             result.sessionId,
@@ -52,6 +62,14 @@ function App() {
           const message = err instanceof Error
             ? err.message
             : "Terminal PTY failed to start.";
+          if (sessionRestoreAttempted) {
+            window.api.runtimeAppendEvent?.({
+              kind: "terminal.restore.failed",
+              tileId: tileId ?? null,
+              data: { message, oldSessionId: existingSessionId },
+              level: "error",
+            });
+          }
           setStartError(message);
           window.api.notifyPtyStartFailed?.({
             message,
@@ -93,6 +111,19 @@ function App() {
         })
         .catch(async () => {
           setRestored(false);
+          sessionRestoreAttempted = true;
+          window.api.runtimeAppendEvent?.({
+            kind: "terminal.restore.attempted",
+            tileId: tileId ?? null,
+            data: { oldSessionId: existingSessionId },
+            level: "info",
+          });
+          // Notify canvas that this tile's session is stale so it can
+          // show a "restoring" status badge while the fresh session starts.
+          window.api.sendToHost("pty-restore-stale", {
+            tileId,
+            oldSessionId: existingSessionId,
+          });
           // Recover the original working directory from session
           // metadata so the fallback session opens in the right place.
           let fallbackCwd = cwd;

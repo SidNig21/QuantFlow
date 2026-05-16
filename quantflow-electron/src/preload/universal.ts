@@ -550,6 +550,14 @@ contextBridge.exposeInMainWorld("api", {
     };
   },
 
+  // Runtime events — write a recovery/lifecycle event to runtime.db
+  runtimeAppendEvent: (params: {
+    kind: string;
+    tileId?: string | null;
+    data?: Record<string, unknown>;
+    level?: string;
+  }) => ipcRenderer.invoke("qf:runtime:events.append", params),
+
   // Canvas pinch forwarding
   forwardPinch: (deltaY: number) =>
     ipcRenderer.send("canvas:forward-pinch", deltaY),

@@ -33,7 +33,10 @@ import {
 } from "./sidecar/protocol";
 import { QUANTFLOW_DIR } from "./paths";
 import { resolveTerminalTarget } from "./terminal-target";
-import { createPtySession } from "./runtime-state/pty-sessions-repo";
+import {
+  createPtySession,
+  endPtySession,
+} from "./runtime-state/pty-sessions-repo";
 import { buildSidecarSessionCreateParams } from "./pty-spawn-params";
 
 interface PtySession {
@@ -253,6 +256,9 @@ async function doEnsureSidecar(): Promise<void> {
         dataSockets.delete(sessionId);
         sidecarPowerShellSessionIds.delete(sessionId);
         deleteSessionMeta(sessionId);
+        if (!shuttingDown) {
+          endPtySession(sessionId, exitCode);
+        }
         sendToMainWindow("pty:exit", { sessionId, exitCode });
       }
     });
@@ -377,6 +383,7 @@ function attachClient(
       }
       if (!tmuxHasSession(name)) {
         deleteSessionMeta(sessionId);
+        endPtySession(sessionId, 0);
         sendToSender(
           senderWebContentsId,
           "pty:exit",
@@ -866,6 +873,7 @@ export async function killSession(
     sidecarPowerShellSessionIds.delete(sessionId);
     clearPendingPtyData(sessionId);
     deleteSessionMeta(sessionId);
+    endPtySession(sessionId);
     return;
   }
 
@@ -886,6 +894,7 @@ export async function killSession(
   clearPendingPtyData(sessionId);
   sidecarPowerShellSessionIds.delete(sessionId);
   deleteSessionMeta(sessionId);
+  endPtySession(sessionId);
 }
 
 export function listSessions(): string[] {

@@ -771,6 +771,20 @@ function _buildDbEventSummary(kind, data) {
 		const to = data.targetTileId ?? "?";
 		return `relay sent ${from} -> ${to}`;
 	}
+	if (kind === "terminal.restore.attempted") {
+		const old = data.oldSessionId ? String(data.oldSessionId).slice(0, 8) : "unknown";
+		return `Terminal restore attempted (stale session ${old}…)`;
+	}
+	if (kind === "terminal.restore.started") {
+		const old = data.oldSessionId ? String(data.oldSessionId).slice(0, 8) : "unknown";
+		const next = data.newSessionId ? String(data.newSessionId).slice(0, 8) : "unknown";
+		return `Terminal restored: ${old}… → ${next}…`;
+	}
+	if (kind === "terminal.restore.failed") {
+		const old = data.oldSessionId ? String(data.oldSessionId).slice(0, 8) : "unknown";
+		const msg = data.message ? String(data.message).slice(0, 80) : "PTY start failed";
+		return `Terminal restore failed (${old}…): ${msg}`;
+	}
 	return String(data.summary ?? kind);
 }
 

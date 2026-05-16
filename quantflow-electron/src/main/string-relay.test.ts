@@ -1,9 +1,8 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 const writtenSessions: Array<{ sessionId: string; data: string }> = [];
 const activeSessions = new Set<string>();
 const runtimeTasks: unknown[] = [];
-const runtimeEvents: unknown[] = [];
 
 mock.module("./pty", () => ({
   listSessions: () => [...activeSessions],
@@ -54,41 +53,10 @@ mock.module("./orchestration-service", () => ({
   },
 }));
 
-mock.module("./runtime-state/events-repo", () => ({
-  appendEvent: (params: {
-    kind: string;
-    taskId?: string | null;
-    tileId?: string | null;
-    data?: Record<string, unknown>;
-  }) => {
-    runtimeEvents.push(params);
-    return {
-      id: `event-${runtimeEvents.length}`,
-      run_id: null,
-      kind: params.kind,
-      task_id: params.taskId ?? null,
-      tile_id: params.tileId ?? null,
-      trace_id: null,
-      correlation_id: null,
-      cable_id: null,
-      level: null,
-      data: params.data ?? {},
-      created_at: Date.now(),
-    };
-  },
-}));
-
-mock.module("./runtime-state/tasks-repo", () => ({
-  transitionTask: () => null,
-}));
-
-mock.module("./runtime-state/schemas-repo", () => ({
-  validatePayload: () => null,
-}));
-
-// connections-repo is NOT mocked — string-relay uses the real module backed by
-// the in-memory test DB installed in beforeEach. This avoids Bun mock.module
-// bleed across test files when run in the same worker.
+// events-repo, tasks-repo, and schemas-repo are NOT mocked — string-relay
+// uses their real implementations backed by the in-memory test DB installed
+// in beforeEach. This prevents mock.module bleed into other test files that
+// run in the same Bun worker and also need the real implementations.
 
 import {
   getAllRelayLogs,
@@ -104,6 +72,7 @@ import {
   type RelayEvent,
 } from "./string-relay";
 import { installTestRuntimeDb } from "./runtime-state/test-sqlite-adapter";
+import { listEvents } from "./runtime-state/events-repo";
 import {
   createConnection,
   getQueueDepth,
@@ -114,11 +83,13 @@ import {
 beforeEach(() => {
   writtenSessions.length = 0;
   runtimeTasks.length = 0;
-  runtimeEvents.length = 0;
   activeSessions.clear();
   resetStringRelayForTests();
   installTestRuntimeDb();
 });
+
+// Restore mocked modules so they don't bleed into other test files in the same worker.
+afterAll(() => mock.restore());
 
 describe("relayStringMessage", () => {
   test("returns structured success and logs relay.sent", () => {
@@ -245,13 +216,11 @@ describe("relay.overflow backpressure", () => {
     setupRelay();
     fillQueueToMax();
     sendOne();
-    const overflowEvents = runtimeEvents.filter(
-      (e: any) => e.kind === "relay.overflow",
-    );
+    const overflowEvents = listEvents({ kind: "relay.overflow" });
     expect(overflowEvents).toHaveLength(1);
-    const ev = overflowEvents[0] as any;
+    const ev = overflowEvents[0];
     expect(ev.data.connectionId).toBe("conn-bp");
-    expect(ev.data.queue_depth).toBeGreaterThan(QUEUE_DEPTH_MAX);
+    expect((ev.data as any).queue_depth).toBeGreaterThan(QUEUE_DEPTH_MAX);
   });
 
   test("no PTY write happens on overflow", () => {
@@ -571,12 +540,13 @@ describe("correlated relay wiring", () => {
     expect(entry?.correlationId).toBe(task.correlation_id);
     expect(entry?.traceId).toBe(task.trace_id);
 
-    // The mirrored event row also carries them
-    expect(runtimeEvents).toHaveLength(1);
-    const event = runtimeEvents[0] as { correlationId: string; traceId: string; cableId: string };
-    expect(event.correlationId).toBe(task.correlation_id);
-    expect(event.traceId).toBe(task.trace_id);
-    expect(event.cableId).toBe("conn-1");
+    // The mirrored event row also carries them — verify via the real DB
+    const dbEvents = listEvents({ kind: "relay.sent" });
+    expect(dbEvents).toHaveLength(1);
+    const event = dbEvents[0];
+    expect(event.correlation_id).toBe(task.correlation_id);
+    expect(event.trace_id).toBe(task.trace_id);
+    expect(event.cable_id).toBe("conn-1");
   });
 
   test("relay.failed does not create a task but still carries cableId on the event", () => {
@@ -595,8 +565,10 @@ describe("correlated relay wiring", () => {
     });
 
     expect(runtimeTasks).toHaveLength(0);
-    const event = runtimeEvents[0] as { cableId: string; correlationId: unknown };
-    expect(event.cableId).toBe("conn-1");
-    expect(event.correlationId).toBeNull();
+    const dbEvents = listEvents();
+    expect(dbEvents.length).toBeGreaterThanOrEqual(1);
+    const event = dbEvents.find((e) => e.cable_id === "conn-1") ?? dbEvents[0];
+    expect(event.cable_id).toBe("conn-1");
+    expect(event.correlation_id).toBeNull();
   });
 });
