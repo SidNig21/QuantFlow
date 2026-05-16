@@ -33,6 +33,7 @@ import {
 import {
   appendEvent,
   listEvents,
+  listEventCorrelationGroups,
 } from "./runtime-state/events-repo";
 import {
   appendStatusTransition,
@@ -100,6 +101,11 @@ export function registerRuntimeStateHandlers(): void {
   ipcMain.handle(
     "qf:runtime:events.list",
     (_, filter: EventFilter = {}) => listEvents(filter),
+  );
+
+  ipcMain.handle(
+    "qf:runtime:events.correlationGroups",
+    (_, filter: EventFilter = {}) => listEventCorrelationGroups(filter),
   );
 
   // ── Status transitions ─────────────────────────────────────────────────────

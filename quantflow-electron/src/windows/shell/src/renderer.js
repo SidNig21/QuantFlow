@@ -56,9 +56,12 @@ import {
 	WATCHTOWER_MESSAGE_FILTERS,
 	WATCHTOWER_TABS,
 	createConnectionCounts,
+	createWatchtowerQueueDepthsFromDb,
 	createWatchtowerSummary,
+	dbEventsToWatchtowerEvents,
 	formatWatchtowerDiagnostics,
 	formatWatchtowerFilterLabel,
+	groupEventsByCorrelation,
 	getWatchtowerRetryRequest,
 	renderWatchtowerAgents,
 	renderWatchtowerAlerts,
@@ -2043,18 +2046,38 @@ async function init() {
 		renderWatchtowerFilters();
 		const body = watchtowerEl.querySelector(".wt-body");
 		const rail = watchtowerEl.querySelector(".wt-rail-slot");
-		const [items, relayLogs] = await Promise.all([
+		const [
+			items,
+			relayLogs,
+			runtimeEventRows,
+			runtimeConnectionRows,
+			runtimeCorrelationGroups,
+		] = await Promise.all([
 			window.shellApi.watchtowerSnapshot?.() ?? [],
 			window.shellApi.watchtowerRelayLog?.(50) ?? [],
+			window.shellApi.watchtowerRuntimeEvents?.({ limit: 120 }) ?? [],
+			window.shellApi.watchtowerRuntimeConnections?.({ limit: 200 }) ?? [],
+			window.shellApi.watchtowerRuntimeEventCorrelationGroups?.({ limit: 120 }) ?? [],
 		]);
 		watchtowerRelayLogCache = Array.isArray(relayLogs) ? relayLogs : [];
 		const agentItems = Array.isArray(items) ? items : [];
-		const eventItems = operationalEvents.list();
+		const dbEventRows = Array.isArray(runtimeEventRows) ? runtimeEventRows : [];
+		const dbConnectionRows = Array.isArray(runtimeConnectionRows) ? runtimeConnectionRows : [];
+		const dbCorrelationGroups = Array.isArray(runtimeCorrelationGroups) && runtimeCorrelationGroups.length
+			? runtimeCorrelationGroups
+			: groupEventsByCorrelation(dbEventRows);
+		const eventItems = [
+			...operationalEvents.list(),
+			...dbEventsToWatchtowerEvents(dbEventRows),
+		];
+		const dbQueueDepths = createWatchtowerQueueDepthsFromDb(dbConnectionRows);
 		const summary = createWatchtowerSummary({
 			agents: agentItems,
 			relayLogs: watchtowerRelayLogCache,
 			operationalEvents: eventItems,
 			connections,
+			queueDepths: dbQueueDepths.length ? dbQueueDepths : undefined,
+			correlationGroups: dbCorrelationGroups,
 		});
 		updateWatchtowerTabs(summary);
 		rail.innerHTML = renderWatchtowerRail({
@@ -2062,6 +2085,8 @@ async function init() {
 			relayLogs: watchtowerRelayLogCache,
 			operationalEvents: eventItems,
 			connections,
+			queueDepths: dbQueueDepths.length ? dbQueueDepths : undefined,
+			correlationGroups: dbCorrelationGroups,
 		});
 		syncTerminalTileStatuses(agentItems);
 		const attentionHtml = renderWatchtowerAttention(watchtowerRelayLogCache, {

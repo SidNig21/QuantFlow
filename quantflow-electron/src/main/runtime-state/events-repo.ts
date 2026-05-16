@@ -94,6 +94,22 @@ export function listEvents(filter: EventFilter = {}): EventRow[] {
   return rows.map((r) => ({ ...r, data: JSON.parse(r.data) as Record<string, unknown> }));
 }
 
+export function listEventCorrelationGroups(
+  filter: EventFilter = {},
+): Array<{ correlationId: string; events: EventRow[] }> {
+  const rows = listEvents({ ...filter, limit: filter.limit ?? 500 });
+  const grouped = new Map<string, EventRow[]>();
+  for (const row of rows) {
+    if (!row.correlation_id) continue;
+    const group = grouped.get(row.correlation_id) ?? [];
+    group.push(row);
+    grouped.set(row.correlation_id, group);
+  }
+  return Array.from(grouped.entries())
+    .map(([correlationId, events]) => ({ correlationId, events }))
+    .sort((a, b) => (a.events[0]?.created_at ?? 0) - (b.events[0]?.created_at ?? 0));
+}
+
 // ─── Testing ─────────────────────────────────────────────────────────────────
 
 export function _resetForTesting(): void {

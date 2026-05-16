@@ -228,6 +228,8 @@ export interface ConnectionRow {
   config: string;
   watcher_enabled: number;
   watcher_syntax: string;
+  /** In-flight message count for this semantic cable. 0 when idle. */
+  queue_depth: number;
   created_at: number;
   updated_at: number;
 }

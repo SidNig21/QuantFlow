@@ -5,6 +5,10 @@ import {
   listConnections,
   updateConnection,
   deleteConnection,
+  incrementQueueDepth,
+  decrementQueueDepth,
+  getQueueDepth,
+  QUEUE_DEPTH_MAX,
   _resetForTesting,
 } from "./connections-repo";
 import { installTestRuntimeDb } from "./test-sqlite-adapter";
@@ -134,6 +138,56 @@ describe("deleteConnection", () => {
 
   test("returns false for unknown id", () => {
     expect(deleteConnection("never-existed")).toBe(false);
+  });
+});
+
+describe("queue_depth backpressure", () => {
+  test("starts at 0 after creation", () => {
+    const conn = createConnection({ tileAId: "a", tileBId: "b" });
+    expect(getQueueDepth(conn.id)).toBe(0);
+  });
+
+  test("incrementQueueDepth returns new depth and overflow=false below max", () => {
+    const conn = createConnection({ tileAId: "a", tileBId: "b" });
+    const result = incrementQueueDepth(conn.id);
+    expect(result.queue_depth).toBe(1);
+    expect(result.overflow).toBe(false);
+    expect(getQueueDepth(conn.id)).toBe(1);
+  });
+
+  test("decrementQueueDepth reduces depth", () => {
+    const conn = createConnection({ tileAId: "a", tileBId: "b" });
+    incrementQueueDepth(conn.id);
+    incrementQueueDepth(conn.id);
+    decrementQueueDepth(conn.id);
+    expect(getQueueDepth(conn.id)).toBe(1);
+  });
+
+  test("decrementQueueDepth clamps to 0", () => {
+    const conn = createConnection({ tileAId: "a", tileBId: "b" });
+    decrementQueueDepth(conn.id);
+    expect(getQueueDepth(conn.id)).toBe(0);
+  });
+
+  test("overflow fires when depth exceeds QUEUE_DEPTH_MAX", () => {
+    const conn = createConnection({ tileAId: "a", tileBId: "b" });
+    for (let i = 0; i < QUEUE_DEPTH_MAX; i++) {
+      const r = incrementQueueDepth(conn.id);
+      expect(r.overflow).toBe(false);
+    }
+    const overflow = incrementQueueDepth(conn.id);
+    expect(overflow.overflow).toBe(true);
+    expect(overflow.queue_depth).toBe(QUEUE_DEPTH_MAX + 1);
+  });
+
+  test("incrementQueueDepth is a no-op for unknown id (returns 0, no overflow)", () => {
+    const result = incrementQueueDepth("does-not-exist");
+    expect(result.queue_depth).toBe(0);
+    expect(result.overflow).toBe(false);
+  });
+
+  test("QUEUE_DEPTH_MAX is 10", () => {
+    expect(QUEUE_DEPTH_MAX).toBe(10);
   });
 });
 

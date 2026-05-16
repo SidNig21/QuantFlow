@@ -7,7 +7,9 @@ import {
 	WATCHTOWER_TABS,
 	createConnectionCounts,
 	createWatchtowerQueueDepths,
+	createWatchtowerQueueDepthsFromDb,
 	createWatchtowerSummary,
+	dbEventsToWatchtowerEvents,
 	escapeHtml,
 	filterWatchtowerAgents,
 	filterWatchtowerAlerts,
@@ -21,6 +23,7 @@ import {
 	getWatchtowerRetryRequest,
 	getWatchtowerAttentionItems,
 	getWatchtowerOperationalAttentionItems,
+	groupEventsByCorrelation,
 	redactDiagnosticText,
 	renderWatchtowerAgents,
 	renderWatchtowerAlerts,
@@ -105,10 +108,11 @@ describe("filterWatchtowerMessages", () => {
 		{ ok: false, errorCode: "ambiguous_route" },
 		{ ok: false, errorCode: "unconnected_target" },
 		{ ok: false, errorCode: "write_failed" },
+		{ ok: false, errorCode: "relay_overflow" },
 	];
 
 	test("filters failed relay events", () => {
-		expect(filterWatchtowerMessages(logs, "failed")).toHaveLength(5);
+		expect(filterWatchtowerMessages(logs, "failed")).toHaveLength(6);
 	});
 
 	test("includes relay failure codes as first-class filters", () => {
@@ -120,6 +124,7 @@ describe("filterWatchtowerMessages", () => {
 			"ambiguous_route",
 			"unconnected_target",
 			"write_failed",
+			"relay_overflow",
 		]);
 		for (const code of WATCHTOWER_MESSAGE_FILTERS.slice(2)) {
 			expect(filterWatchtowerMessages(logs, code)).toEqual([
@@ -197,6 +202,28 @@ describe("Watchtower redesign summary helpers", () => {
 		expect(summary.activeAgents).toBe(2);
 		expect(summary.failedRelayCount).toBe(1);
 		expect(summary.hotCableCount).toBe(1);
+	});
+
+	test("uses DB queue depths and correlation groups when supplied", () => {
+		const summary = createWatchtowerSummary({
+			agents: [],
+			relayLogs: [],
+			operationalEvents: [],
+			connections: [],
+			queueDepths: [
+				{ connectionId: "conn-db", label: "db path", depth: 11, hot: true },
+			],
+			correlationGroups: [
+				{ correlationId: "corr-1", events: [] },
+				{ correlationId: "corr-2", events: [] },
+			],
+		});
+
+		expect(summary.queueDepths).toEqual([
+			{ connectionId: "conn-db", label: "db path", depth: 11, hot: true },
+		]);
+		expect(summary.hotCableCount).toBe(1);
+		expect(summary.correlationGroupCount).toBe(2);
 	});
 
 	test("builds sorted queue depths with hot cable markers", () => {
@@ -944,6 +971,9 @@ describe("renderWatchtowerRail", () => {
 			connections: [
 				{ id: "conn-hot", label: "hot cable" },
 			],
+			correlationGroups: [
+				{ correlationId: "corr-1", events: [] },
+			],
 		});
 
 		expect(html).toContain("Throughput");
@@ -952,5 +982,170 @@ describe("renderWatchtowerRail", () => {
 		expect(html).toContain("is-hot");
 		expect(html).toContain("1 live");
 		expect(html).toContain("1 failed relays");
+		expect(html).toContain("1 correlations");
+	});
+});
+
+// ─── DB-backed Watchtower data path (T004) ────────────────────────────────────
+
+describe("dbEventsToWatchtowerEvents", () => {
+	const overflowRow = {
+		id: "evt-overflow-1",
+		kind: "relay.overflow",
+		level: "warn",
+		tile_id: "tile-from",
+		cable_id: "conn-ab",
+		correlation_id: "corr-1",
+		trace_id: "trace-1",
+		run_id: null,
+		task_id: null,
+		created_at: 1_000_000,
+		data: {
+			connectionId: "conn-ab",
+			fromTileId: "tile-from",
+			targetTileId: "tile-to",
+			queue_depth: 11,
+			queue_depth_max: 10,
+		},
+	};
+
+	test("maps relay.overflow DB row to watchtower operational event", () => {
+		const events = dbEventsToWatchtowerEvents([overflowRow]);
+		expect(events).toHaveLength(1);
+		const ev = events[0];
+		expect(ev.type).toBe("relay.overflow");
+		expect(ev.severity).toBe("warn");
+		expect(ev.timestamp).toBe(1_000_000);
+		expect(ev.summary).toContain("conn-ab");
+		expect(ev.summary).toContain("11/10");
+		expect(ev.meta.connectionId).toBe("conn-ab");
+		expect(ev.meta.fromTileId).toBe("tile-from");
+		expect(ev.meta.targetTileId).toBe("tile-to");
+		expect(ev.meta.correlationId).toBe("corr-1");
+		expect(ev.meta.traceId).toBe("trace-1");
+	});
+
+	test("maps relay.sent DB row with tile_id fallback", () => {
+		const row = {
+			id: "evt-sent-1",
+			kind: "relay.sent",
+			level: "info",
+			tile_id: "tile-from",
+			cable_id: "conn-ab",
+			correlation_id: null,
+			trace_id: null,
+			run_id: null,
+			task_id: null,
+			created_at: 2_000,
+			data: { fromTileId: "tile-from", targetTileId: "tile-to" },
+		};
+		const events = dbEventsToWatchtowerEvents([row]);
+		expect(events[0].type).toBe("relay.sent");
+		expect(events[0].severity).toBe("info");
+		expect(events[0].summary).toContain("tile-from");
+		expect(events[0].meta.tileId).toBe("tile-from");
+	});
+
+	test("defaults severity to info when level is null", () => {
+		const row = {
+			id: "evt-2",
+			kind: "context.created",
+			level: null,
+			tile_id: null,
+			cable_id: null,
+			correlation_id: null,
+			trace_id: null,
+			run_id: null,
+			task_id: null,
+			created_at: 3_000,
+			data: {},
+		};
+		expect(dbEventsToWatchtowerEvents([row])[0].severity).toBe("info");
+	});
+
+	test("overflow event surfaces in filterWatchtowerEvents by severity", () => {
+		const events = dbEventsToWatchtowerEvents([overflowRow]);
+		expect(filterWatchtowerEvents(events, "warn")).toHaveLength(1);
+		expect(filterWatchtowerEvents(events, "error")).toHaveLength(0);
+		expect(filterWatchtowerEvents(events, "all")).toHaveLength(1);
+	});
+});
+
+describe("createWatchtowerQueueDepthsFromDb", () => {
+	test("returns empty when no connections have queue_depth > 0", () => {
+		expect(createWatchtowerQueueDepthsFromDb([
+			{ id: "conn-a", tile_a_id: "a", tile_b_id: "b", label: null, queue_depth: 0 },
+		])).toEqual([]);
+	});
+
+	test("builds sorted queue depths from DB connection rows", () => {
+		const depths = createWatchtowerQueueDepthsFromDb([
+			{ id: "conn-b", tile_a_id: "x", tile_b_id: "y", label: "beta", queue_depth: 2 },
+			{ id: "conn-a", tile_a_id: "a", tile_b_id: "b", label: "alpha", queue_depth: 9 },
+		]);
+
+		expect(depths).toHaveLength(2);
+		expect(depths[0]).toMatchObject({
+			connectionId: "conn-a",
+			label: "alpha",
+			depth: 9,
+			hot: true,
+		});
+		expect(depths[1]).toMatchObject({
+			connectionId: "conn-b",
+			label: "beta",
+			depth: 2,
+			hot: false,
+		});
+	});
+
+	test("uses tile_a_id -> tile_b_id as label when label is null", () => {
+		const depths = createWatchtowerQueueDepthsFromDb([
+			{ id: "conn-a", tile_a_id: "tile-x", tile_b_id: "tile-y", label: null, queue_depth: 3 },
+		]);
+		expect(depths[0].label).toBe("tile-x -> tile-y");
+	});
+
+	test("marks hot when depth exceeds 8", () => {
+		const depths = createWatchtowerQueueDepthsFromDb([
+			{ id: "conn-a", tile_a_id: "a", tile_b_id: "b", label: "ab", queue_depth: 8 },
+			{ id: "conn-b", tile_a_id: "c", tile_b_id: "d", label: "cd", queue_depth: 9 },
+		]);
+		expect(depths.find((d) => d.connectionId === "conn-a")!.hot).toBe(false);
+		expect(depths.find((d) => d.connectionId === "conn-b")!.hot).toBe(true);
+	});
+});
+
+describe("groupEventsByCorrelation", () => {
+	test("groups rows by correlation_id, omits rows without one", () => {
+		const rows = [
+			{ id: "e1", correlation_id: "corr-a", created_at: 1_000, kind: "relay.sent" },
+			{ id: "e2", correlation_id: "corr-a", created_at: 2_000, kind: "relay.sent" },
+			{ id: "e3", correlation_id: "corr-b", created_at: 3_000, kind: "relay.sent" },
+			{ id: "e4", correlation_id: null, created_at: 4_000, kind: "heartbeat" },
+		];
+
+		const groups = groupEventsByCorrelation(rows);
+		expect(groups).toHaveLength(2);
+		expect(groups[0].correlationId).toBe("corr-a");
+		expect(groups[0].events).toHaveLength(2);
+		expect(groups[1].correlationId).toBe("corr-b");
+		expect(groups[1].events).toHaveLength(1);
+	});
+
+	test("sorts groups by first event created_at ascending", () => {
+		const rows = [
+			{ id: "e1", correlation_id: "corr-late", created_at: 5_000, kind: "relay.sent" },
+			{ id: "e2", correlation_id: "corr-early", created_at: 1_000, kind: "relay.sent" },
+		];
+		const groups = groupEventsByCorrelation(rows);
+		expect(groups[0].correlationId).toBe("corr-early");
+		expect(groups[1].correlationId).toBe("corr-late");
+	});
+
+	test("returns empty for rows with no correlation_id", () => {
+		expect(groupEventsByCorrelation([
+			{ id: "e1", correlation_id: null, created_at: 1_000 },
+		])).toEqual([]);
 	});
 });

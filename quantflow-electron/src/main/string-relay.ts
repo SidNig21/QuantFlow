@@ -7,6 +7,11 @@ import { transitionTask } from "./runtime-state/tasks-repo";
 import { appendEvent } from "./runtime-state/events-repo";
 import { shouldRouteViaHerdr, routeViaHerdr } from "./herdr-routes";
 import { validatePayload } from "./runtime-state/schemas-repo";
+import {
+  incrementQueueDepth,
+  decrementQueueDepth,
+  QUEUE_DEPTH_MAX,
+} from "./runtime-state/connections-repo";
 
 const RELAY_LOG_PATH = join(QUANTFLOW_DIR, "string-relay-log.ndjson");
 const LOG_RING_CAP = 100;
@@ -38,7 +43,8 @@ export type RelayErrorCode =
   | "ambiguous_route"
   | "unconnected_target"
   | "write_failed"
-  | "schema_validation_failed";
+  | "schema_validation_failed"
+  | "relay_overflow";
 
 export type RelayResult =
   | {
@@ -330,14 +336,46 @@ export function relayStringMessage(
     }
   }
 
+  // §6 / spine §2.6 backpressure — increment queue_depth before send.
+  // If depth exceeds QUEUE_DEPTH_MAX, emit relay.overflow event and reject.
+  const { queue_depth, overflow } = incrementQueueDepth(connectionId);
+  if (overflow) {
+    appendEvent({
+      kind: "relay.overflow",
+      tileId: fromTileId,
+      cableId: connectionId,
+      level: "warn",
+      data: {
+        connectionId,
+        fromTileId,
+        targetTileId,
+        queue_depth,
+        queue_depth_max: QUEUE_DEPTH_MAX,
+      },
+    });
+    decrementQueueDepth(connectionId);
+    return relayFailed({
+      connectionId,
+      fromTileId,
+      targetTileId,
+      fromLabel,
+      routeMethod,
+      text: trimmed,
+      errorCode: "relay_overflow",
+      message: `Cable ${connectionId} is at capacity (queue_depth ${queue_depth} > ${QUEUE_DEPTH_MAX}). Message dropped.`,
+    });
+  }
+
   const formatted = `[${fromLabel}]: ${trimmed}`;
 
   // Phase 3C: when BOTH tiles are herdr-linked, route through herdr instead.
   // The function is async but relayStringMessage is sync; we fire-and-forget
   // and immediately return a success frame so callers aren't blocked.
   // The runtime state (event + task) is written inside routeViaHerdr.
+  // Decrement is called inside routeViaHerdr after async completion.
   if (shouldRouteViaHerdr(fromTileId, targetTileId)) {
-    void routeViaHerdr(connectionId, fromTileId, targetTileId, fromLabel, trimmed);
+    void routeViaHerdr(connectionId, fromTileId, targetTileId, fromLabel, trimmed)
+      .finally(() => decrementQueueDepth(connectionId));
     return relaySent({
       connectionId,
       fromTileId,
@@ -354,6 +392,7 @@ export function relayStringMessage(
   try {
     writeToSession(targetSessionId, formatted + "\n");
   } catch (err) {
+    decrementQueueDepth(connectionId);
     return relayFailed({
       connectionId,
       fromTileId,
@@ -366,6 +405,7 @@ export function relayStringMessage(
     });
   }
 
+  decrementQueueDepth(connectionId);
   return relaySent({
     connectionId,
     fromTileId,

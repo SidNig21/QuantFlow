@@ -143,6 +143,47 @@ export function deleteConnection(id: string): boolean {
   return result.changes > 0;
 }
 
+// ─── Backpressure ─────────────────────────────────────────────────────────────
+
+/** Maximum in-flight messages per semantic cable before overflow fires. */
+export const QUEUE_DEPTH_MAX = 10;
+
+/**
+ * Atomically increment queue_depth for a connection and report whether the
+ * new depth exceeds QUEUE_DEPTH_MAX (overflow).  Returns the updated depth.
+ * No-ops gracefully if the connection does not exist (returns depth=0, overflow=false).
+ */
+export function incrementQueueDepth(id: string): { queue_depth: number; overflow: boolean } {
+  getDb()
+    .prepare("UPDATE connections SET queue_depth = queue_depth + 1 WHERE id = ?")
+    .run(id);
+
+  const row = getDb()
+    .prepare("SELECT queue_depth FROM connections WHERE id = ?")
+    .get(id) as { queue_depth: number } | undefined;
+
+  const depth = row?.queue_depth ?? 0;
+  return { queue_depth: depth, overflow: depth > QUEUE_DEPTH_MAX };
+}
+
+/**
+ * Decrement queue_depth for a connection, clamping to 0.
+ * Called after a send completes (success or error path).
+ */
+export function decrementQueueDepth(id: string): void {
+  getDb()
+    .prepare("UPDATE connections SET queue_depth = MAX(0, queue_depth - 1) WHERE id = ?")
+    .run(id);
+}
+
+/** Returns current queue_depth for a connection, or 0 if not found. */
+export function getQueueDepth(id: string): number {
+  const row = getDb()
+    .prepare("SELECT queue_depth FROM connections WHERE id = ?")
+    .get(id) as { queue_depth: number } | undefined;
+  return row?.queue_depth ?? 0;
+}
+
 export function _resetForTesting(): void {
   getDb().prepare("DELETE FROM connections").run();
 }

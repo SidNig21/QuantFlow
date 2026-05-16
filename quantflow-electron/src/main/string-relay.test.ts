@@ -86,6 +86,10 @@ mock.module("./runtime-state/schemas-repo", () => ({
   validatePayload: () => null,
 }));
 
+// connections-repo is NOT mocked — string-relay uses the real module backed by
+// the in-memory test DB installed in beforeEach. This avoids Bun mock.module
+// bleed across test files when run in the same worker.
+
 import {
   getAllRelayLogs,
   getStringLog,
@@ -99,6 +103,13 @@ import {
   watchtowerSnapshot,
   type RelayEvent,
 } from "./string-relay";
+import { installTestRuntimeDb } from "./runtime-state/test-sqlite-adapter";
+import {
+  createConnection,
+  getQueueDepth,
+  incrementQueueDepth,
+  QUEUE_DEPTH_MAX,
+} from "./runtime-state/connections-repo";
 
 beforeEach(() => {
   writtenSessions.length = 0;
@@ -106,6 +117,7 @@ beforeEach(() => {
   runtimeEvents.length = 0;
   activeSessions.clear();
   resetStringRelayForTests();
+  installTestRuntimeDb();
 });
 
 describe("relayStringMessage", () => {
@@ -182,6 +194,79 @@ describe("relayStringMessage", () => {
       expect(result.errorCode).toBe("unconnected_target");
     }
     expect(writtenSessions).toHaveLength(0);
+  });
+});
+
+describe("relay.overflow backpressure", () => {
+  function setupRelay() {
+    activeSessions.add("session-b");
+    registerTileSession("tile-a", "session-a", "Source", "source");
+    registerTileSession("tile-b", "session-b", "Target", "target");
+    syncConnectionGraph([{ id: "conn-bp", tileAId: "tile-a", tileBId: "tile-b" }]);
+  }
+
+  function fillQueueToMax() {
+    // Create the connection in the real DB so queue_depth updates stick.
+    createConnection({ id: "conn-bp", tileAId: "tile-a", tileBId: "tile-b" });
+    for (let i = 0; i < QUEUE_DEPTH_MAX; i++) {
+      incrementQueueDepth("conn-bp");
+    }
+  }
+
+  function sendOne() {
+    return relayStringMessage({
+      connectionId: "conn-bp",
+      fromTileId: "tile-a",
+      fromLabel: "Source",
+      targetTileId: "tile-b",
+      targetSessionId: "session-b",
+      text: "hello",
+    });
+  }
+
+  test("send succeeds when queue_depth is below max", () => {
+    setupRelay();
+    // conn-bp not in DB → incrementQueueDepth is a no-op (depth stays 0, no overflow)
+    const result = sendOne();
+    expect(result.ok).toBe(true);
+  });
+
+  test("send fails with relay_overflow when queue exceeds QUEUE_DEPTH_MAX", () => {
+    setupRelay();
+    fillQueueToMax();
+    const result = sendOne();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorCode).toBe("relay_overflow");
+    }
+  });
+
+  test("relay.overflow event is written to runtime.db on overflow", () => {
+    setupRelay();
+    fillQueueToMax();
+    sendOne();
+    const overflowEvents = runtimeEvents.filter(
+      (e: any) => e.kind === "relay.overflow",
+    );
+    expect(overflowEvents).toHaveLength(1);
+    const ev = overflowEvents[0] as any;
+    expect(ev.data.connectionId).toBe("conn-bp");
+    expect(ev.data.queue_depth).toBeGreaterThan(QUEUE_DEPTH_MAX);
+  });
+
+  test("no PTY write happens on overflow", () => {
+    setupRelay();
+    fillQueueToMax();
+    sendOne();
+    expect(writtenSessions).toHaveLength(0);
+  });
+
+  test("queue_depth is decremented after overflow (depth returns to QUEUE_DEPTH_MAX)", () => {
+    setupRelay();
+    fillQueueToMax();
+    // overflow increments to MAX+1, then decrementQueueDepth brings it back to MAX
+    sendOne();
+    expect(getQueueDepth("conn-bp")).toBe(QUEUE_DEPTH_MAX);
   });
 });
 

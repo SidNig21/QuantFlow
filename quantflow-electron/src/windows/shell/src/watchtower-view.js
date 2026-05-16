@@ -13,6 +13,7 @@ export const WATCHTOWER_RELAY_ERROR_FILTERS = [
 	"ambiguous_route",
 	"unconnected_target",
 	"write_failed",
+	"relay_overflow",
 ];
 export const WATCHTOWER_MESSAGE_FILTERS = [
 	"all",
@@ -141,13 +142,17 @@ export function createWatchtowerSummary({
 	relayLogs = [],
 	operationalEvents = [],
 	connections = [],
+	queueDepths,
+	correlationGroups = [],
 } = {}) {
 	const failedRelayCount = relayLogs.filter((entry) => entry?.ok === false).length;
 	const eventAlerts = getWatchtowerOperationalAttentionItems(
 		operationalEvents,
 		operationalEvents.length || 1,
 	).length;
-	const queueDepths = createWatchtowerQueueDepths(relayLogs, connections);
+	const resolvedQueueDepths = Array.isArray(queueDepths)
+		? queueDepths
+		: createWatchtowerQueueDepths(relayLogs, connections);
 	const activeAgents = agents.filter((item) =>
 		["active", "running", "waiting", "blocked"].includes(String(item?.status ?? "")),
 	).length;
@@ -161,8 +166,9 @@ export function createWatchtowerSummary({
 		},
 		activeAgents,
 		failedRelayCount,
-		hotCableCount: queueDepths.filter((item) => item.hot).length,
-		queueDepths,
+		correlationGroupCount: Array.isArray(correlationGroups) ? correlationGroups.length : 0,
+		hotCableCount: resolvedQueueDepths.filter((item) => item.hot).length,
+		queueDepths: resolvedQueueDepths,
 	};
 }
 
@@ -751,17 +757,103 @@ export function renderWatchtowerAlerts(
 	}).join("");
 }
 
+// ─── DB-backed Watchtower data path ──────────────────────────────────────────
+
+function _buildDbEventSummary(kind, data) {
+	if (kind === "relay.overflow") {
+		const id = data.connectionId ?? "unknown";
+		const depth = data.queue_depth ?? "?";
+		const max = data.queue_depth_max ?? 10;
+		return `Cable ${id} overflow (depth ${depth}/${max})`;
+	}
+	if (kind === "relay.sent") {
+		const from = data.fromTileId ?? "?";
+		const to = data.targetTileId ?? "?";
+		return `relay sent ${from} -> ${to}`;
+	}
+	return String(data.summary ?? kind);
+}
+
+/**
+ * Converts raw runtime.db EventRow objects (snake_case) to the operational
+ * event shape the Watchtower view functions expect.
+ */
+export function dbEventsToWatchtowerEvents(rows = []) {
+	return rows.map((row) => {
+		const data = row.data && typeof row.data === "object" ? row.data : {};
+		return {
+			type: row.kind,
+			severity: row.level ?? "info",
+			timestamp: row.created_at,
+			summary: _buildDbEventSummary(row.kind, data),
+			meta: {
+				connectionId: data.connectionId ?? row.cable_id ?? null,
+				tileId: row.tile_id ?? data.tileId ?? null,
+				fromTileId: data.fromTileId ?? null,
+				targetTileId: data.targetTileId ?? null,
+				correlationId: row.correlation_id ?? null,
+				traceId: row.trace_id ?? null,
+			},
+		};
+	});
+}
+
+/**
+ * Builds queue depths from DB ConnectionRow objects (snake_case, includes
+ * real queue_depth column written by the backpressure layer).
+ * Use instead of createWatchtowerQueueDepths when reading from runtime.db.
+ */
+export function createWatchtowerQueueDepthsFromDb(connections = []) {
+	return connections
+		.filter((conn) => conn?.id && (conn.queue_depth ?? 0) > 0)
+		.map((conn) => {
+			const label = conn.label || `${conn.tile_a_id ?? "?"} -> ${conn.tile_b_id ?? "?"}`;
+			const depth = conn.queue_depth ?? 0;
+			return {
+				connectionId: conn.id,
+				label,
+				depth,
+				hot: depth > 8,
+			};
+		})
+		.sort((a, b) => b.depth - a.depth || a.label.localeCompare(b.label));
+}
+
+/**
+ * Groups EventRow objects by correlation_id for timeline display.
+ * Rows without a correlation_id are omitted.
+ */
+export function groupEventsByCorrelation(rows = []) {
+	const grouped = new Map();
+	for (const row of rows) {
+		const key = row.correlation_id ?? null;
+		if (!key) continue;
+		const group = grouped.get(key) ?? { correlationId: key, events: [] };
+		group.events.push(row);
+		grouped.set(key, group);
+	}
+	return Array.from(grouped.values()).sort((a, b) => {
+		const aTs = a.events[0]?.created_at ?? 0;
+		const bTs = b.events[0]?.created_at ?? 0;
+		return aTs - bTs;
+	});
+}
+
 export function renderWatchtowerRail({
 	agents = [],
 	relayLogs = [],
 	operationalEvents = [],
 	connections = [],
+	queueDepths,
+	correlationGroups = [],
 } = {}) {
 	const summary = createWatchtowerSummary({
 		agents,
 		relayLogs,
 		operationalEvents,
 		connections,
+		queueDepths,
+		correlationGroups,
 	});
 	const maxDepth = Math.max(1, ...summary.queueDepths.map((item) => item.depth));
 	const sparkItems = relayLogs.slice(-16);
@@ -802,6 +894,7 @@ export function renderWatchtowerRail({
 					<span>${escapeHtml(summary.activeAgents)} live</span>
 					<span>${escapeHtml(agents.length)} total</span>
 					<span>${escapeHtml(summary.failedRelayCount)} failed relays</span>
+					<span>${escapeHtml(summary.correlationGroupCount)} correlations</span>
 				</div>
 			</section>
 		</aside>

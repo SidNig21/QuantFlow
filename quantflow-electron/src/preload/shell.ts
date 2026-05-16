@@ -424,6 +424,14 @@ contextBridge.exposeInMainWorld("shellApi", {
     ipcRenderer.invoke("watchtower:snapshot"),
   watchtowerRelayLog: (limit?: number): Promise<unknown[]> =>
     ipcRenderer.invoke("watchtower:relay-log", limit),
+  watchtowerRuntimeEvents: (filter?: Record<string, unknown>): Promise<unknown[]> =>
+    ipcRenderer.invoke("qf:runtime:events.list", filter ?? {}),
+  watchtowerRuntimeEventCorrelationGroups: (
+    filter?: Record<string, unknown>,
+  ): Promise<unknown[]> =>
+    ipcRenderer.invoke("qf:runtime:events.correlationGroups", filter ?? {}),
+  watchtowerRuntimeConnections: (filter?: Record<string, unknown>): Promise<unknown[]> =>
+    ipcRenderer.invoke("qf:runtime:connections.list", filter ?? {}),
 
   // ── Role service ──
   rolesList: () => ipcRenderer.invoke("roles:list"),
