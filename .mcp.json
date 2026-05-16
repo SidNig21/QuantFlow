@@ -1,5 +1,13 @@
 {
   "mcpServers": {
+    "quantflow": {
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "node",
+        "C:\\Users\\rybow\\QuantFlow\\tools\\quantflow-mcp\\server.js"
+      ]
+    },
     "colorsandfonts": {
       "command": "npx",
       "args": ["-y", "@colorsandfonts/mcp"]

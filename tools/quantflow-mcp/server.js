@@ -5,28 +5,46 @@ import { z } from "zod";
 import net from "node:net";
 import fs from "node:fs";
 import os from "node:os";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { TOOL_DEFINITIONS } from "./tool-definitions.js";
 
-function detectRelayHost() {
-  if (process.env.QUANTFLOW_RELAY_HOST) return process.env.QUANTFLOW_RELAY_HOST;
-  if (os.platform() !== "linux") return "127.0.0.1";
+const execFileAsync = promisify(execFile);
+const RPC_ONCE_SCRIPT = fileURLToPath(new URL("./rpc-once.js", import.meta.url));
+
+function detectRelayHosts() {
+  if (process.env.QUANTFLOW_RELAY_HOST) return [process.env.QUANTFLOW_RELAY_HOST];
+  const hosts = ["127.0.0.1"];
+  if (os.platform() !== "linux") return hosts;
+
+  // On WSL2, 127.0.0.1 works with mirrored networking. Classic WSL2 needs the
+  // Windows host gateway from /etc/resolv.conf. Try both so Hermes does not get
+  // stuck on one networking mode.
   try {
     const resolv = fs.readFileSync("/etc/resolv.conf", "utf8");
     const match = /nameserver\s+([\d.]+)/.exec(resolv);
-    if (match) return match[1];
+    if (match && !hosts.includes(match[1])) hosts.push(match[1]);
   } catch {
-    // Fall back to loopback outside WSL.
+    // Fall back to loopback if resolv.conf unreadable.
   }
-  return "127.0.0.1";
+  return hosts;
 }
 
-const RELAY_HOST = detectRelayHost();
+function toWindowsPath(path) {
+  const normalized = path.replaceAll("\\", "/");
+  const match = /^\/mnt\/([a-z])\/(.+)$/i.exec(normalized);
+  if (!match) return path;
+  return `${match[1].toUpperCase()}:\\${match[2].replaceAll("/", "\\")}`;
+}
+
 const RELAY_PORT = Number.parseInt(process.env.QUANTFLOW_RELAY_PORT || "9811", 10);
+const RELAY_HOSTS = detectRelayHosts();
 let rpcId = 1;
 
-function rpc(method, params = {}) {
+function rpcAtHost(host, method, params = {}) {
   return new Promise((resolve, reject) => {
-    const socket = net.createConnection({ host: RELAY_HOST, port: RELAY_PORT }, () => {
+    const socket = net.createConnection({ host, port: RELAY_PORT }, () => {
       const id = rpcId++;
       socket.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
     });
@@ -34,7 +52,7 @@ function rpc(method, params = {}) {
     let buffer = "";
     const timer = setTimeout(() => {
       socket.destroy();
-      reject(new Error(`QuantFlow relay timeout at ${RELAY_HOST}:${RELAY_PORT}`));
+      reject(new Error(`QuantFlow relay timeout at ${host}:${RELAY_PORT}`));
     }, 15000);
 
     socket.on("data", (chunk) => {
@@ -61,6 +79,38 @@ function rpc(method, params = {}) {
       reject(err);
     });
   });
+}
+
+async function rpcViaWindowsNode(method, params = {}) {
+  const encodedParams = Buffer.from(JSON.stringify(params), "utf8").toString("base64");
+  const scriptPath = toWindowsPath(RPC_ONCE_SCRIPT);
+  const { stdout } = await execFileAsync(
+    "cmd.exe",
+    ["/c", "node", scriptPath, method, encodedParams],
+    { timeout: 20000 },
+  );
+  const payload = JSON.parse(stdout.trim().split(/\r?\n/).at(-1) || "{}");
+  if (!payload.ok) throw new Error(payload.error || "Windows relay proxy failed");
+  return payload.result;
+}
+
+async function rpc(method, params = {}) {
+  const errors = [];
+  for (const host of RELAY_HOSTS) {
+    try {
+      return await rpcAtHost(host, method, params);
+    } catch (err) {
+      errors.push(`${host}:${RELAY_PORT} ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  if (os.platform() === "linux") {
+    try {
+      return await rpcViaWindowsNode(method, params);
+    } catch (err) {
+      errors.push(`windows-node-proxy ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  throw new Error(`QuantFlow relay unavailable: ${errors.join("; ")}`);
 }
 
 function toZodField(field) {

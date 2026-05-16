@@ -11,6 +11,7 @@ const { _setCanvasStateDir, saveState } = await import("./canvas-persistence");
 const { _setRolesDir, listRoles } = await import("./role-service");
 const { _setCtxDir, pinFile } = await import("./context-service");
 const { _setSessionDir, writeSessionMeta } = await import("./tmux");
+const { _setProfilesDir, loadProfileRegistry } = await import("./profiles/profiles-repo");
 
 beforeEach(() => {
   rmSync(TEST_ROOT, { recursive: true, force: true });
@@ -19,6 +20,7 @@ beforeEach(() => {
   _setRolesDir(join(APP_DATA_DIR, "roles"));
   _setCtxDir(APP_DATA_DIR);
   _setSessionDir(join(APP_DATA_DIR, "terminal-sessions"));
+  _setProfilesDir(APP_DATA_DIR);
 });
 
 afterEach(() => {
@@ -68,5 +70,12 @@ describe("QuantFlow app-data storage", () => {
       "terminal-sessions",
       "session-a.json",
     ))).toBe(true);
+  });
+
+  test("creates profiles registry under QuantFlow app data", async () => {
+    const registry = await loadProfileRegistry({ reload: true });
+
+    expect(registry).toEqual({ version: 1, profiles: [] });
+    expect(existsSync(join(APP_DATA_DIR, "profiles.json"))).toBe(true);
   });
 });

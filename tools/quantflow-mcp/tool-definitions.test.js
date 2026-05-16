@@ -18,6 +18,10 @@ const REQUIRED_TOOLS = [
   "quantflow_viewport_set",
   "quantflow_terminal_write",
   "quantflow_terminal_read",
+  "quantflow_route_task",
+  "quantflow_tile_read",
+  "quantflow_pty_write",
+  "quantflow_pty_expect",
   "quantflow_cable_list",
   "quantflow_cable_create",
   "quantflow_cable_remove",
@@ -153,6 +157,36 @@ test("maps orchestration route resolution to JSON-RPC", async () => {
   ]);
 });
 
+test("maps route task to orchestration route resolution", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "orchestration.resolveRoute": { tileId: "tile-agent", capability: "code.edit" },
+  });
+  const tool = getToolDefinition("quantflow_route_task");
+
+  const response = await tool.handle(rpc)({
+    task: "Edit the profile repo",
+    capability: "code.edit",
+    requireOnline: "true",
+    metadataJson: "{\"priority\":\"high\"}",
+  });
+
+  assert.deepEqual(calls, [
+    {
+      method: "orchestration.resolveRoute",
+      params: {
+        capability: "code.edit",
+        requireOnline: true,
+      },
+    },
+  ]);
+  assert.deepEqual(JSON.parse(textPayload(response)), {
+    task: "Edit the profile repo",
+    capability: "code.edit",
+    metadata: { priority: "high" },
+    route: { tileId: "tile-agent", capability: "code.edit" },
+  });
+});
+
 test("maps orchestration tile heartbeat to JSON-RPC", async () => {
   const { calls, rpc } = makeRpcStub({
     "orchestration.tileHeartbeat": { tile_id: "tile-1" },
@@ -220,6 +254,68 @@ test("strips ANSI from terminal reads", async () => {
   });
 
   assert.equal(textPayload(response), "green");
+});
+
+test("reads terminal tiles through quantflow_tile_read", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "canvas.tileList": {
+      tiles: [{ id: "tile-term", type: "term", ptySessionId: "session-a" }],
+    },
+    "canvas.terminalRead": { output: "\u001b[33mready\u001b[0m" },
+  });
+  const tool = getToolDefinition("quantflow_tile_read");
+
+  const response = JSON.parse(textPayload(await tool.handle(rpc)({
+    tileId: "tile-term",
+    lines: 12,
+  })));
+
+  assert.equal(response.readType, "terminal");
+  assert.equal(response.text, "ready");
+  assert.deepEqual(calls, [
+    { method: "canvas.tileList", params: {} },
+    { method: "canvas.terminalRead", params: { tileId: "tile-term", lines: 12 } },
+  ]);
+});
+
+test("reads browser tiles through snapshot and info RPCs", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "canvas.tileList": {
+      tiles: [{ id: "tile-browser", type: "browser", url: "https://example.com" }],
+    },
+    "canvas.browserSnapshot": { text: "Example Domain" },
+    "canvas.browserInfo": { title: "Example", url: "https://example.com" },
+  });
+  const tool = getToolDefinition("quantflow_tile_read");
+
+  const response = JSON.parse(textPayload(await tool.handle(rpc)({
+    tileId: "tile-browser",
+  })));
+
+  assert.equal(response.readType, "browser");
+  assert.equal(response.text, "Example Domain");
+  assert.deepEqual(calls, [
+    { method: "canvas.tileList", params: {} },
+    { method: "canvas.browserSnapshot", params: { tileId: "tile-browser" } },
+    { method: "canvas.browserInfo", params: { tileId: "tile-browser" } },
+  ]);
+});
+
+test("returns metadata-only tile reads for unsupported tile types", async () => {
+  const { rpc } = makeRpcStub({
+    "canvas.tileList": {
+      tiles: [{ id: "tile-note", type: "note", filePath: "/vault/note.md" }],
+    },
+  });
+  const tool = getToolDefinition("quantflow_tile_read");
+
+  const response = JSON.parse(textPayload(await tool.handle(rpc)({
+    tileId: "tile-note",
+  })));
+
+  assert.equal(response.readType, "metadata");
+  assert.equal(response.unsupported, true);
+  assert.match(response.reason, /note/);
 });
 
 test("context inject resolves tile id to PTY session id", async () => {
@@ -347,4 +443,88 @@ test("covers terminal write/read round-trip through MCP handlers", async () => {
       },
     },
   ]);
+});
+
+test("writes PTY input with optional newline", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "canvas.terminalWrite": { ok: true },
+  });
+  const tool = getToolDefinition("quantflow_pty_write");
+
+  const response = JSON.parse(textPayload(await tool.handle(rpc)({
+    tileId: "tile-worker",
+    input: "npm test",
+    appendNewline: "true",
+  })));
+
+  assert.equal(response.ok, true);
+  assert.equal(response.inputBytes, "npm test\n".length);
+  assert.deepEqual(calls, [
+    {
+      method: "canvas.terminalWrite",
+      params: {
+        tileId: "tile-worker",
+        input: "npm test\n",
+      },
+    },
+  ]);
+});
+
+test("expects PTY output by polling terminal reads", async () => {
+  let readCount = 0;
+  const { calls, rpc } = makeRpcStub({
+    "canvas.terminalRead": () => {
+      readCount += 1;
+      return {
+        output: readCount === 1
+          ? "before marker\n\u001b[31mbooting\u001b[0m"
+          : "before marker\nready: 200",
+      };
+    },
+  });
+  const tool = getToolDefinition("quantflow_pty_expect");
+
+  const response = JSON.parse(textPayload(await tool.handle(rpc)({
+    tileId: "tile-worker",
+    pattern: "ready: \\d+",
+    matchMode: "regex",
+    timeoutMs: 1000,
+    intervalMs: 0,
+    afterText: "before marker",
+  })));
+
+  assert.equal(response.ok, true);
+  assert.equal(response.matched, true);
+  assert.equal(response.attempts, 2);
+  assert.match(response.output, /ready: 200/);
+  assert.deepEqual(calls, [
+    {
+      method: "canvas.terminalRead",
+      params: { tileId: "tile-worker", lines: 400 },
+    },
+    {
+      method: "canvas.terminalRead",
+      params: { tileId: "tile-worker", lines: 400 },
+    },
+  ]);
+});
+
+test("returns timed out PTY expect results without throwing", async () => {
+  const { rpc } = makeRpcStub({
+    "canvas.terminalRead": { output: "still running" },
+  });
+  const tool = getToolDefinition("quantflow_pty_expect");
+
+  const response = JSON.parse(textPayload(await tool.handle(rpc)({
+    tileId: "tile-worker",
+    pattern: "done",
+    timeoutMs: 0,
+    intervalMs: 0,
+  })));
+
+  assert.equal(response.ok, false);
+  assert.equal(response.matched, false);
+  assert.equal(response.timedOut, true);
+  assert.equal(response.attempts, 1);
+  assert.match(response.staleOutputPolicy, /no timestamps/);
 });

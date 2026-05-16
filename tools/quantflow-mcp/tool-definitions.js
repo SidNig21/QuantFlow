@@ -1,4 +1,6 @@
 const DEFAULT_TERMINAL_READ_LINES = 400;
+const DEFAULT_PTY_EXPECT_TIMEOUT_MS = 10_000;
+const DEFAULT_PTY_EXPECT_INTERVAL_MS = 250;
 
 export const ANSI_PATTERN = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07/g;
 
@@ -37,6 +39,32 @@ function stringToBoolean(value) {
   if (value === true) return true;
   if (typeof value !== "string") return false;
   return value.toLowerCase() === "true" || value === "1";
+}
+
+function positiveNumber(value, fallback) {
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function textAfterMarker(text, marker) {
+  if (!marker) return text;
+  const index = text.lastIndexOf(marker);
+  if (index === -1) return "";
+  return text.slice(index + marker.length);
+}
+
+function outputTail(text, maxChars = 4000) {
+  return text.length > maxChars ? text.slice(text.length - maxChars) : text;
+}
+
+function patternMatches(text, pattern, mode) {
+  if (mode === "regex") {
+    return new RegExp(pattern, "m").test(text);
+  }
+  return text.includes(pattern);
 }
 
 function normalizeTile(tile) {
@@ -107,6 +135,140 @@ async function injectContextIntoTile(rpc, params) {
     throw new Error(`Tile ${tileId} has no PTY session for context injection`);
   }
   return rpc("context.inject", { sessionId: tile.ptySessionId });
+}
+
+async function routeTask(rpc, params = {}) {
+  const metadata = params.metadataJson ? metadataFromJson(params.metadataJson) : undefined;
+  const route = await rpc("orchestration.resolveRoute", {
+    capability: params.capability,
+    requireOnline: stringToBoolean(params.requireOnline),
+  });
+  return {
+    task: params.task || null,
+    capability: params.capability,
+    metadata,
+    route,
+  };
+}
+
+function browserSnapshotText(snapshot, info) {
+  if (typeof snapshot === "string") return snapshot;
+  if (typeof snapshot?.text === "string") return snapshot.text;
+  if (typeof snapshot?.markdown === "string") return snapshot.markdown;
+  const parts = [
+    info?.title,
+    info?.url,
+    snapshot?.title,
+    snapshot?.url,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join("\n") : JSON.stringify(snapshot ?? info ?? {}, null, 2);
+}
+
+async function readTile(rpc, params = {}) {
+  const tileId = String(params.tileId ?? "");
+  const tile = await findTile(rpc, tileId);
+  if (!tile) throw new Error(`Tile not found: ${tileId}`);
+
+  const requestedMode = params.mode || "auto";
+  const readMode = requestedMode === "auto"
+    ? tile.type === "browser"
+      ? "browser"
+      : tile.type === "term" || tile.ptySessionId
+        ? "terminal"
+        : "metadata"
+    : requestedMode;
+  const includeRaw = stringToBoolean(params.includeRaw);
+
+  if (readMode === "terminal") {
+    const lines = positiveNumber(params.lines, DEFAULT_TERMINAL_READ_LINES);
+    const result = await rpc("canvas.terminalRead", { tileId, lines });
+    return {
+      tile: normalizeTile(tile),
+      readType: "terminal",
+      text: stripAnsi(result?.output || ""),
+      ...(includeRaw ? { raw: result } : {}),
+    };
+  }
+
+  if (readMode === "browser") {
+    const [snapshot, info] = await Promise.all([
+      rpc("canvas.browserSnapshot", { tileId }),
+      rpc("canvas.browserInfo", { tileId }),
+    ]);
+    return {
+      tile: normalizeTile(tile),
+      readType: "browser",
+      text: browserSnapshotText(snapshot, info),
+      snapshot,
+      info,
+    };
+  }
+
+  return {
+    tile: normalizeTile(tile),
+    readType: "metadata",
+    text: "",
+    unsupported: true,
+    reason: `No content read adapter is available for tile type ${tile.type}`,
+    ...(includeRaw ? { raw: tile } : {}),
+  };
+}
+
+async function expectPty(rpc, params = {}) {
+  const tileId = String(params.tileId ?? "");
+  const pattern = String(params.pattern ?? "");
+  const matchMode = params.matchMode === "regex" ? "regex" : "contains";
+  const timeoutMs = positiveNumber(params.timeoutMs, DEFAULT_PTY_EXPECT_TIMEOUT_MS);
+  const intervalMs = positiveNumber(params.intervalMs, DEFAULT_PTY_EXPECT_INTERVAL_MS);
+  const lines = positiveNumber(params.lines, DEFAULT_TERMINAL_READ_LINES);
+  const shouldStripAnsi = params.stripAnsi === undefined || stringToBoolean(params.stripAnsi);
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutMs;
+  let attempts = 0;
+  let lastOutput = "";
+
+  do {
+    attempts += 1;
+    const result = await rpc("canvas.terminalRead", { tileId, lines });
+    const output = String(result?.output ?? "");
+    const cleanOutput = shouldStripAnsi ? stripAnsi(output) : output;
+    const searchable = textAfterMarker(cleanOutput, params.afterText);
+    lastOutput = cleanOutput;
+    if (patternMatches(searchable, pattern, matchMode)) {
+      return {
+        ok: true,
+        matched: true,
+        tileId,
+        pattern,
+        matchMode,
+        attempts,
+        elapsedMs: Date.now() - startedAt,
+        staleOutputPolicy: params.afterText
+          ? "searched captured output after the provided afterText marker"
+          : "canvas.terminalRead has no timestamps; searched current captured buffer",
+        output: outputTail(searchable),
+      };
+    }
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await sleep(Math.min(intervalMs, remaining));
+  } while (true);
+
+  return {
+    ok: false,
+    matched: false,
+    timedOut: true,
+    tileId,
+    pattern,
+    matchMode,
+    attempts,
+    timeoutMs,
+    staleOutputPolicy: params.afterText
+      ? "searched captured output after the provided afterText marker"
+      : "canvas.terminalRead has no timestamps; searched current captured buffer",
+    lastOutput: outputTail(lastOutput),
+  };
 }
 
 export const TOOL_DEFINITIONS = [
@@ -238,6 +400,64 @@ export const TOOL_DEFINITIONS = [
       const result = await rpc("canvas.terminalRead", { tileId, lines });
       return plainText(stripAnsi(result?.output || ""));
     },
+  },
+  {
+    name: "quantflow_route_task",
+    description: "Resolve a task capability to the current best QuantFlow route",
+    schema: {
+      capability: { kind: "string" },
+      task: { kind: "string", optional: true },
+      requireOnline: { kind: "string", optional: true },
+      metadataJson: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) => jsonText(await routeTask(rpc, params)),
+  },
+  {
+    name: "quantflow_tile_read",
+    description: "Read a terminal or browser tile through existing QuantFlow RPC surfaces",
+    schema: {
+      tileId: { kind: "string" },
+      mode: { kind: "enum", values: ["auto", "terminal", "browser"], default: "auto" },
+      lines: { kind: "number", default: DEFAULT_TERMINAL_READ_LINES },
+      includeRaw: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) => jsonText(await readTile(rpc, params)),
+  },
+  {
+    name: "quantflow_pty_write",
+    description: "Write input to a terminal tile PTY, optionally appending a newline",
+    schema: {
+      tileId: { kind: "string" },
+      input: { kind: "string" },
+      appendNewline: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async ({ tileId, input, appendNewline }) => {
+      const text = stringToBoolean(appendNewline) && !String(input).endsWith("\n")
+        ? `${input}\n`
+        : input;
+      const result = await rpc("canvas.terminalWrite", { tileId, input: text });
+      return jsonText({
+        ok: true,
+        tileId,
+        inputBytes: Buffer.byteLength(String(text), "utf8"),
+        result,
+      });
+    },
+  },
+  {
+    name: "quantflow_pty_expect",
+    description: "Poll a terminal tile PTY until output contains text or matches a regex",
+    schema: {
+      tileId: { kind: "string" },
+      pattern: { kind: "string" },
+      matchMode: { kind: "enum", values: ["contains", "regex"], default: "contains" },
+      timeoutMs: { kind: "number", default: DEFAULT_PTY_EXPECT_TIMEOUT_MS },
+      intervalMs: { kind: "number", default: DEFAULT_PTY_EXPECT_INTERVAL_MS },
+      lines: { kind: "number", default: DEFAULT_TERMINAL_READ_LINES },
+      afterText: { kind: "string", optional: true },
+      stripAnsi: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) => jsonText(await expectPty(rpc, params)),
   },
   {
     name: "quantflow_cable_list",

@@ -1,6 +1,77 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from "fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  readdirSync,
+  rmSync,
+  lstatSync,
+  realpathSync,
+} from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
+
+function removeIfExists(path, reason) {
+  try {
+    lstatSync(path);
+  } catch (err) {
+    if (!["EACCES", "EPERM"].includes(err?.code)) return false;
+  }
+  rmSync(path, { recursive: true, force: true });
+  console.log(`${reason}: removed ${path}`);
+  return true;
+}
+
+function cleanupForeignEsbuildLinks() {
+  const scopedDir = join("node_modules", ".bun", "node_modules", "@esbuild");
+  if (!existsSync(scopedDir)) return;
+
+  const keepPrefix = process.platform === "win32"
+    ? "win32-"
+    : process.platform === "darwin"
+      ? "darwin-"
+      : "linux-";
+
+  for (const entry of readdirSync(scopedDir)) {
+    if (entry.startsWith(keepPrefix)) continue;
+    removeIfExists(
+      join(scopedDir, entry),
+      "postinstall: removed foreign esbuild optional dependency",
+    );
+  }
+}
+
+function cleanupBrokenBunModuleLinks() {
+  const root = join("node_modules", ".bun", "node_modules");
+  if (!existsSync(root)) return;
+
+  const candidates = [];
+  for (const entry of readdirSync(root)) {
+    const entryPath = join(root, entry);
+    if (entry.startsWith("@")) {
+      try {
+        for (const scopedEntry of readdirSync(entryPath)) {
+          candidates.push(join(entryPath, scopedEntry));
+        }
+      } catch {
+        candidates.push(entryPath);
+      }
+    } else {
+      candidates.push(entryPath);
+    }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      realpathSync.native(candidate);
+    } catch (err) {
+      if (!["EACCES", "ENOENT", "EPERM"].includes(err?.code)) continue;
+      removeIfExists(
+        candidate,
+        "postinstall: removed broken bun optional dependency link",
+      );
+    }
+  }
+}
 
 // When running in WSL with node_modules on a Windows drive (/mnt/c/...), bun
 // may cache Windows-native esbuild binaries from a previous Windows install.
@@ -11,21 +82,110 @@ function isRunningInWSL() {
   return !!(process.env.WSL_DISTRO_NAME || process.env.WSL_INTEROP);
 }
 
-if (isRunningInWSL()) {
+function clearStaleEsbuildCaches(label) {
   const bunDir = join("node_modules", ".bun");
-  if (existsSync(bunDir)) {
-    const stale = readdirSync(bunDir).filter((d) => d.startsWith("esbuild@"));
-    if (stale.length > 0) {
-      for (const entry of stale) {
-        rmSync(join(bunDir, entry), { recursive: true, force: true });
+  if (!existsSync(bunDir)) return;
+  const stale = readdirSync(bunDir).filter((d) => d.startsWith("esbuild@"));
+  if (stale.length === 0) return;
+  for (const entry of stale) {
+    const fullPath = join(bunDir, entry);
+    if (process.platform === "win32") {
+      try {
+        execSync(`cmd /c rd /s /q "${fullPath}"`, { stdio: "pipe" });
+      } catch {
+        // Non-fatal — proceed and let re-fetch overwrite.
       }
-      console.log(
-        `WSL: removed ${stale.length} stale esbuild cache(s) — re-fetching Linux build...`,
-      );
-      execSync("bun install --ignore-scripts", { stdio: "inherit" });
+    } else {
+      rmSync(fullPath, { recursive: true, force: true });
+    }
+  }
+  console.log(`${label}: removed ${stale.length} stale esbuild cache(s) — re-fetching...`);
+  execSync("bun install --ignore-scripts", { stdio: "inherit" });
+}
+
+if (isRunningInWSL()) {
+  clearStaleEsbuildCaches("WSL");
+}
+
+// Same stale-cache problem occurs on Windows: a previous install may have left an
+// old esbuild@0.x.y directory in .bun/ that mismatches the version bun just
+// resolved. Clear it and re-fetch before anything spawns the esbuild binary.
+if (process.platform === "win32") {
+  clearStaleEsbuildCaches("Windows");
+}
+
+// On Windows, bun (especially when invoked from a WSL context on a Windows-mounted
+// drive) installs Linux-only optional packages into node_modules/@img, @rollup,
+// @parcel, @tailwindcss, and lightningcss-linux-*. cleanupBrokenBunModuleLinks
+// removes the .bun/ symlinks but leaves the real directories in node_modules/.
+// electron-rebuild then tries to realpath() those directories and fails with
+// EACCES because WSL created them with Linux-mode ACLs that Windows cannot read.
+// Use cmd /c rd (which bypasses Node.js ACL restrictions) to remove them before
+// electron-rebuild runs.
+function cleanupLinuxNativePackages() {
+  if (process.platform !== "win32") return;
+
+  // @img/sharp-* are ALL Linux-only native packages — safe to nuke entirely.
+  const imgDir = join("node_modules", "@img");
+  try {
+    if (existsSync(imgDir)) {
+      execSync(`cmd /c rd /s /q "${imgDir}"`, { stdio: "pipe" });
+      console.log("postinstall: removed Linux-only @img packages");
+    }
+  } catch {
+    // Non-fatal: electron-rebuild may still succeed without it.
+  }
+
+  // For scoped packages that mix platform variants, only remove linux entries.
+  const selectiveScopes = [
+    join("node_modules", "@rollup"),
+    join("node_modules", "@parcel"),
+    join("node_modules", "@tailwindcss"),
+  ];
+  for (const dir of selectiveScopes) {
+    let entries;
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.includes("linux")) continue;
+      try {
+        execSync(`cmd /c rd /s /q "${join(dir, entry)}"`, { stdio: "pipe" });
+        console.log(`postinstall: removed Linux-only package: ${join(dir, entry)}`);
+      } catch {
+        // Non-fatal.
+      }
+    }
+  }
+
+  // lightningcss-linux-* lives at the top level of node_modules.
+  let topEntries;
+  try {
+    topEntries = readdirSync("node_modules");
+  } catch {
+    topEntries = [];
+  }
+  for (const entry of topEntries) {
+    if (!entry.startsWith("lightningcss-linux")) continue;
+    try {
+      execSync(`cmd /c rd /s /q "${join("node_modules", entry)}"`, { stdio: "pipe" });
+      console.log(`postinstall: removed Linux-only package: ${join("node_modules", entry)}`);
+    } catch {
+      // Non-fatal.
     }
   }
 }
+
+// Bun can leave cross-platform optional package junctions under
+// node_modules/.bun/node_modules/@esbuild. On Windows, electron-rebuild walks
+// every package before selecting node-pty and fails if a foreign junction points
+// at a missing target (seen with @esbuild/linux-x64). Remove foreign esbuild
+// links before the rebuild; bun will recreate the platform package it needs.
+cleanupLinuxNativePackages();
+cleanupForeignEsbuildLinks();
+cleanupBrokenBunModuleLinks();
 
 // On Windows, node-pty's build files need two patches:
 // 1. winpty.gyp uses bare .bat filenames in cmd /c calls. Modern Windows may
