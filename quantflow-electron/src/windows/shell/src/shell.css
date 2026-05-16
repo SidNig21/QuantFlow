@@ -162,38 +162,6 @@ body.platform-win {
 	align-items: center;
 }
 
-#alpha-label {
-	position: fixed;
-	top: 8px;
-	left: 14px;
-	transform: none;
-	font-family: var(--font-mono);
-	font-size: 10px;
-	font-weight: 500;
-	color: var(--error);
-	text-transform: uppercase;
-	user-select: none;
-	-webkit-user-select: none;
-	pointer-events: none;
-	white-space: nowrap;
-	padding: 2px 8px;
-	border-radius: 999px;
-	border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
-	background: color-mix(in srgb, var(--error) 8%, transparent);
-	z-index: 200;
-	-webkit-app-region: no-drag;
-}
-
-#alpha-label a {
-	pointer-events: auto;
-	color: inherit;
-	text-decoration: none;
-}
-
-#alpha-label a:hover span {
-	text-decoration: underline;
-}
-
 /* ── Panels ── */
 
 #panels {

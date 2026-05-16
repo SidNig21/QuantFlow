@@ -42,8 +42,6 @@ describe("QuantFlow release identity", () => {
 
     expect(contributing).toContain("github.com/SidNig21/QuantFlow/issues");
     expect(shellHtml).toContain("<title>QuantFlow</title>");
-    expect(shellHtml).toContain("QUANTFLOW ALPHA");
-    expect(shellHtml).toContain("github.com/SidNig21/QuantFlow/issues/new");
     expect(`${contributing}\n${shellHtml}`).not.toContain(
       "github.com/collaborator-ai/collab-public",
     );
