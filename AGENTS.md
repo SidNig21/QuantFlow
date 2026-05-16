@@ -1,3 +1,47 @@
+## QuantFlow Project Memory
+
+QuantFlow is the active project in this repo. Treat `C:\Users\rybow\QuantFlow`
+as the repo root and `quantflow-electron/` as the Electron app. The old
+Collaborator codebase is the canvas platform lineage, but current naming,
+paths, commits, and docs should say QuantFlow.
+
+Current shipped state:
+- Branch `QuantFlow` is current through `4649a75`:
+  `feat(goal-3): add profiles and MCP routing tools`.
+- Unification phases 0-7 are done: QuantFlow identity, SQLite `runtime.db`,
+  herdr bridge, MCP verification, cable UX, and the PTY decision.
+- Phase 7.5, Goal 1, Goal 2, redesign, and Goal 3 are done.
+- Next implementation target is Goal 4: Section 6 inspector/Watchtower plus
+  Section 8 reliability foundation.
+
+Canonical planning docs live in the Obsidian vault:
+- `C:\Users\rybow\Obsidian\Cursor Collab\Specs\Cursor Opus QuantFlow Plan - INDEX.md`
+  or the same file using the em dash in its filename.
+- `C:\Users\rybow\Obsidian\Cursor Collab\quantflow-goalbuddy-goals3.md`.
+
+Architecture facts that must not drift:
+- `node-pty` is the terminal backend. Do not replace it with herdr.
+- herdr is orchestration-only: read panes, send text, wait on output/status,
+  and link QuantFlow tiles via `herdrPaneId`. herdr is not a raw PTY renderer.
+- herdr has no MCP server. Use herdr CLI commands or QuantFlow MCP tools.
+- QuantFlow MCP is configured by `.mcp.json` and talks to the app relay on
+  port `9811`. The app must be running for live tile tools.
+- Canonical cable persistence uses `connections[]`, never top-level `cables[]`.
+- Runtime cable/message types are `message` now, with `handoff` and `trigger`
+  deferred. Do not implement `pipe`.
+
+Recent Goal 3 MCP tools:
+- `quantflow_route_task`
+- `quantflow_tile_read`
+- `quantflow_pty_write`
+- `quantflow_pty_expect`
+
+Before substantial work:
+1. Read this file, then read the INDEX and `quantflow-goalbuddy-goals3.md`.
+2. Check `git status --short --branch` in `C:\Users\rybow\QuantFlow`.
+3. Keep Hermes-specific memory separate from Claude Code project memory.
+4. Do not touch `Agents/Hermes/hermes-home` unless the user explicitly asks.
+
 ## Hydra Orchestration Toolkit
 
 Hydra is a Lead-driven orchestration toolkit. You (the Lead) make strategic
