@@ -154,6 +154,18 @@ contextBridge.exposeInMainWorld("api", {
   getPref: (key: string) => ipcRenderer.invoke("pref:get", key),
   setPref: (key: string, value: unknown) =>
     ipcRenderer.invoke("pref:set", key, value),
+  diagnosticsHealth: () =>
+    ipcRenderer.invoke("qf:diagnostics:health"),
+  diagnosticsRunProbe: (name: string) =>
+    ipcRenderer.invoke("qf:diagnostics:run-probe", name),
+  diagnosticsTailLogs: (request?: unknown) =>
+    ipcRenderer.invoke("qf:diagnostics:tail-logs", request ?? {}),
+  diagnosticsBackupDb: () =>
+    ipcRenderer.invoke("qf:diagnostics:backup-db"),
+  diagnosticsListCrashes: () =>
+    ipcRenderer.invoke("qf:diagnostics:list-crashes"),
+  diagnosticsListLaunchTraces: () =>
+    ipcRenderer.invoke("qf:diagnostics:list-launch-traces"),
   listTerminalTargets: () =>
     ipcRenderer.invoke("terminal:list-targets"),
   getWorkspacePref: (key: string, workspacePath: string) =>

@@ -1,6 +1,6 @@
 # QuantFlow Canvas
 
-Control QuantFlow's spatial canvas from the terminal using the `collab-canvas` CLI.
+Control QuantFlow's spatial canvas from the terminal using the `qf` CLI.
 The canvas is a pannable, zoomable surface where tiles display terminals, files, images, and graphs.
 
 ## Coordinate System
@@ -27,20 +27,20 @@ Type is inferred from the file when `--file` is used:
 
 ## Commands
 
-### collab-canvas tile list
+### qf tile list
 
 List all tiles on the canvas. Returns JSON with id, type, position, size, route handle, relay syntax, role/status identity, and connected cable IDs for each tile.
 
 ```bash
-collab-canvas tile list
+qf tile list
 ```
 
-### collab-canvas tile create
+### qf tile create
 
 Create a new tile on the canvas.
 
 ```bash
-collab-canvas tile create <type> [--file <path>] [--pos x,y] [--size w,h]
+qf tile create <type> [--file <path>] [--pos x,y] [--size w,h]
 ```
 
 - `<type>`: term, note, code, image, or graph
@@ -53,70 +53,70 @@ Returns the new tile's ID on stdout.
 **Examples:**
 ```bash
 # Open a terminal at position (5, 5)
-collab-canvas tile create term --pos 5,5
+qf tile create term --pos 5,5
 
 # Open a markdown file with default placement
-collab-canvas tile create note --file ./README.md
+qf tile create note --file ./README.md
 
 # Open a graph file at a specific position and size
-collab-canvas tile create graph --file ./entities.graph.json --pos 25,0 --size 35,30
+qf tile create graph --file ./entities.graph.json --pos 25,0 --size 35,30
 ```
 
-### collab-canvas tile rm
+### qf tile rm
 
 Remove a tile from the canvas.
 
 ```bash
-collab-canvas tile rm <id>
+qf tile rm <id>
 ```
 
-### collab-canvas tile move
+### qf tile move
 
 Reposition a tile.
 
 ```bash
-collab-canvas tile move <id> --pos x,y
+qf tile move <id> --pos x,y
 ```
 
-### collab-canvas tile resize
+### qf tile resize
 
 Resize a tile.
 
 ```bash
-collab-canvas tile resize <id> --size w,h
+qf tile resize <id> --size w,h
 ```
 
-### collab-canvas tile focus
+### qf tile focus
 
 Pan and zoom the viewport to bring one or more tiles into view, then flash their focus rings.
 
 ```bash
-collab-canvas tile focus <id> [<id>...]
+qf tile focus <id> [<id>...]
 ```
 
 **Examples:**
 ```bash
 # Focus a single tile
-collab-canvas tile focus tile-abc123
+qf tile focus tile-abc123
 
 # Focus multiple tiles (viewport zooms to fit all)
-collab-canvas tile focus tile-abc123 tile-def456
+qf tile focus tile-abc123 tile-def456
 ```
 
-### collab-canvas role list
+### qf role list
 
 List configured terminal roles, including command availability diagnostics.
 
 ```bash
-collab-canvas role list
+qf role list
 ```
 
-### collab-canvas role spawn
+### qf role spawn
 
 Spawn a terminal tile from a configured role. QuantFlow copies the role identity, shell target, startup command, startup prompt, and status parser metadata into the new terminal tile.
 
 ```bash
-collab-canvas role spawn <id> [--cwd <path>] [--pos x,y] [--size w,h]
+qf role spawn <id> [--cwd <path>] [--pos x,y] [--size w,h]
 ```
 
 - `--cwd <path>`: working directory (default: current directory)
@@ -126,51 +126,51 @@ collab-canvas role spawn <id> [--cwd <path>] [--pos x,y] [--size w,h]
 **Examples:**
 ```bash
 # See available local agent roles
-collab-canvas role list
+qf role list
 
 # Spawn a Codex terminal for the current project
-collab-canvas role spawn codex --cwd . --pos 0,0
+qf role spawn codex --cwd . --pos 0,0
 ```
 
-### collab-canvas context
+### qf context
 
 Inspect, prepare, and inject shared context from the configured Obsidian vault. Context pins stay vault-relative inside QuantFlow; the vault remains the durable memory source.
 
 ```bash
-collab-canvas context get
-collab-canvas context preview [--max-chars N] [--text]
-collab-canvas context pin <file> [--mode full|summary-header|excerpt] [--excerpt <text>]
-collab-canvas context unpin <file>
-collab-canvas context mode <file> <mode> [--excerpt <text>]
-collab-canvas context decision [--author <name>] [--source <name>] [--file <path>] [--cable <id>] <text>
-collab-canvas context inject <tileId> [--max-chars N]
+qf context get
+qf context preview [--max-chars N] [--text]
+qf context pin <file> [--mode full|summary-header|excerpt] [--excerpt <text>]
+qf context unpin <file>
+qf context mode <file> <mode> [--excerpt <text>]
+qf context decision [--author <name>] [--source <name>] [--file <path>] [--cable <id>] <text>
+qf context inject <tileId> [--max-chars N]
 ```
 
 **Examples:**
 ```bash
 # Pin the active hardening spec and preview what will be sent
-collab-canvas context pin "/mnt/c/Users/rybow/Obsidian/Cursor Collab/Specs/QuantFlow-phase-9-hardening-spec.md" --mode summary-header
-collab-canvas context preview --max-chars 12000
+qf context pin "/mnt/c/Users/rybow/Obsidian/Cursor Collab/Specs/QuantFlow-phase-9-hardening-spec.md" --mode summary-header
+qf context preview --max-chars 12000
 
 # Record an inspectable decision and inject the current pack to a terminal tile
-collab-canvas context decision --author codex --source cli "Use cable-bounded routing for agent handoffs."
-collab-canvas context inject tile-worker --max-chars 12000
+qf context decision --author codex --source cli "Use cable-bounded routing for agent handoffs."
+qf context inject tile-worker --max-chars 12000
 ```
 
-### collab-canvas connection list
+### qf connection list
 
 List all visible cables on the canvas.
 
 ```bash
-collab-canvas connection list
+qf connection list
 ```
 
-### collab-canvas connection create
+### qf connection create
 
 Connect two tiles with a visible cable.
 
 ```bash
-collab-canvas connection create <tileA> <tileB> [--label <text>]
+qf connection create <tileA> <tileB> [--label <text>]
 ```
 
 Returns the new connection ID on stdout.
@@ -178,101 +178,101 @@ Returns the new connection ID on stdout.
 **Examples:**
 ```bash
 # Connect a worker terminal to a reviewer terminal
-collab-canvas connection create tile-worker tile-reviewer --label review-loop
+qf connection create tile-worker tile-reviewer --label review-loop
 ```
 
-### collab-canvas connection rm
+### qf connection rm
 
 Remove a cable from the canvas.
 
 ```bash
-collab-canvas connection rm <id>
+qf connection rm <id>
 ```
 
-### collab-canvas connection label
+### qf connection label
 
 Rename a cable label.
 
 ```bash
-collab-canvas connection label <id> <label>
+qf connection label <id> <label>
 ```
 
-### collab-canvas connection send
+### qf connection send
 
 Send a plain-English message across an existing cable from one endpoint tile to the other. The `--from` tile must be one endpoint of the cable.
 
 ```bash
-collab-canvas connection send <id> --from <tileId> <message>
+qf connection send <id> --from <tileId> <message>
 ```
 
 Returns the structured relay result, including `ok`, `eventId`, and any relay error code.
 
 **Examples:**
 ```bash
-collab-canvas connection send conn-abc123 --from tile-worker "Please review the current diff."
+qf connection send conn-abc123 --from tile-worker "Please review the current diff."
 ```
 
-### collab-canvas connection log
+### qf connection log
 
 Inspect recent relay events for one cable.
 
 ```bash
-collab-canvas connection log <id> [--limit N]
+qf connection log <id> [--limit N]
 ```
 
 - `--limit N`: maximum number of events to return (default: 50)
 
-### collab-canvas relay log
+### qf relay log
 
 Inspect recent relay success and failure events across all cables.
 
 ```bash
-collab-canvas relay log [--limit N]
+qf relay log [--limit N]
 ```
 
-### collab-canvas watchtower snapshot
+### qf watchtower snapshot
 
 Inspect current Watchtower agent status snapshots.
 
 ```bash
-collab-canvas watchtower snapshot
+qf watchtower snapshot
 ```
 
-### collab-canvas viewport
+### qf viewport
 
 Read or set the canvas viewport.
 
 ```bash
-collab-canvas viewport
-collab-canvas viewport set [--pan x,y] [--zoom level]
+qf viewport
+qf viewport set [--pan x,y] [--zoom level]
 ```
 
 - `--pan x,y`: canvas pan in pixels
 - `--zoom level`: zoom level where `1` is 100%
 
-### collab-canvas terminal write
+### qf terminal write
 
 Send input to a terminal tile. The tile must be of type `term` with an active PTY session.
 
 ```bash
-collab-canvas terminal write <id> <input>
+qf terminal write <id> <input>
 ```
 
 **Examples:**
 ```bash
 # Run a command in a terminal tile
-collab-canvas terminal write tile-abc123 $'ls -la\n'
+qf terminal write tile-abc123 $'ls -la\n'
 
 # Launch Claude Code in headless JSON mode
-collab-canvas terminal write tile-abc123 $'claude -p "fix the bug" --output-format json\n'
+qf terminal write tile-abc123 $'claude -p "fix the bug" --output-format json\n'
 ```
 
-### collab-canvas terminal read
+### qf terminal read
 
 Read recent output from a terminal tile. Returns raw terminal output from the PTY session's ring buffer.
 
 ```bash
-collab-canvas terminal read <id> [--lines N]
+qf terminal read <id> [--lines N]
 ```
 
 - `--lines N`: number of lines to capture (default: 50)
@@ -284,8 +284,8 @@ collab-canvas terminal read <id> [--lines N]
 Two files next to each other for comparison.
 
 ```bash
-collab-canvas tile create code --file ./old.ts --pos 0,0
-collab-canvas tile create code --file ./new.ts --pos 23,0
+qf tile create code --file ./old.ts --pos 0,0
+qf tile create code --file ./new.ts --pos 23,0
 ```
 
 ### Research workspace
@@ -293,15 +293,15 @@ collab-canvas tile create code --file ./new.ts --pos 23,0
 Knowledge graph on the left, notes on the right, terminal below.
 
 ```bash
-collab-canvas tile create graph --file ./research.graph.json --pos 0,0 --size 30,25
-collab-canvas tile create note --file ./notes.md --pos 31,0
-collab-canvas role spawn codex --cwd . --pos 0,26
-collab-canvas role spawn claude-reviewer --cwd . --pos 21,26
-collab-canvas connection create <worker-id> <reviewer-id> --label review
-collab-canvas context preview --max-chars 12000
-collab-canvas context inject <worker-id> --max-chars 12000
-collab-canvas connection send <connection-id> --from <worker-id> "Please review the pinned notes."
-collab-canvas connection log <connection-id> --limit 10
+qf tile create graph --file ./research.graph.json --pos 0,0 --size 30,25
+qf tile create note --file ./notes.md --pos 31,0
+qf role spawn codex --cwd . --pos 0,26
+qf role spawn claude-reviewer --cwd . --pos 21,26
+qf connection create <worker-id> <reviewer-id> --label review
+qf context preview --max-chars 12000
+qf context inject <worker-id> --max-chars 12000
+qf connection send <connection-id> --from <worker-id> "Please review the pinned notes."
+qf connection log <connection-id> --limit 10
 ```
 
 ### Dashboard layout
@@ -309,10 +309,10 @@ collab-canvas connection log <connection-id> --limit 10
 Multiple views arranged in a grid.
 
 ```bash
-collab-canvas tile create graph --file ./entities.graph.json --pos 0,0 --size 30,25
-collab-canvas tile create note --file ./log.md --pos 31,0
-collab-canvas tile create note --file ./report.md --pos 31,14
-collab-canvas tile create term --pos 0,26
+qf tile create graph --file ./entities.graph.json --pos 0,0 --size 30,25
+qf tile create note --file ./log.md --pos 31,0
+qf tile create note --file ./report.md --pos 31,14
+qf tile create term --pos 0,26
 ```
 
 ### Focus view
@@ -320,7 +320,7 @@ collab-canvas tile create term --pos 0,26
 Single tile centered with generous size.
 
 ```bash
-collab-canvas tile create code --file ./main.ts --pos 5,2 --size 40,35
+qf tile create code --file ./main.ts --pos 5,2 --size 40,35
 ```
 
 ### Agent in a terminal
@@ -329,11 +329,11 @@ Launch a Claude Code instance in a terminal tile for the human to observe.
 
 ```bash
 # Create terminal, wait for PTY, then launch agent
-collab-canvas tile create term --pos 0,0
+qf tile create term --pos 0,0
 # (use tile list to get the tile ID, then)
-collab-canvas terminal write <id> $'claude -p "summarize this project" --output-format json\n'
+qf terminal write <id> $'claude -p "summarize this project" --output-format json\n'
 # Read the result when done
-collab-canvas terminal read <id> --lines 100
+qf terminal read <id> --lines 100
 ```
 
 ## Conventions
@@ -350,7 +350,7 @@ collab-canvas terminal read <id> --lines 100
 
 ## Setup
 
-The `collab-canvas` CLI is installed to `~/.local/bin/`. If the command is not found, the user needs to add it to their PATH:
+The `qf` CLI is installed to `~/.local/bin/`. If the command is not found, the user needs to add it to their PATH:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"

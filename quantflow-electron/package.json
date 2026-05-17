@@ -48,27 +48,15 @@
 		"asarUnpack": [
 			"node_modules/@img/sharp-libvips-linux-x64/**/*",
 			"node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
-			"node_modules/better-sqlite3/**/*"
+			"node_modules/better-sqlite3/**/*",
+			"node_modules/node-pty/**/*",
+			"node_modules/@parcel/watcher-win32-x64/**/*",
+			"node_modules/@parcel/watcher-darwin-arm64/**/*",
+			"node_modules/@parcel/watcher-darwin-x64/**/*"
 		],
 		"afterSign": "scripts/notarize.cjs",
 		"afterAllArtifactBuild": "scripts/fix-artifacts.cjs",
 		"extraResources": [
-			{
-				"from": "vendor/tmux/tmux",
-				"to": "tmux"
-			},
-			{
-				"from": "vendor/tmux/lib",
-				"to": "lib"
-			},
-			{
-				"from": "resources/tmux.conf",
-				"to": "tmux.conf"
-			},
-			{
-				"from": "resources/terminfo",
-				"to": "terminfo"
-			},
 			{
 				"from": "cli/qf.mjs",
 				"to": "qf.mjs"
@@ -89,6 +77,24 @@
 			"extendInfo": {
 				"NSMicrophoneUsageDescription": "QuantFlow needs microphone access to enable voice input for CLI tools like Claude Code."
 			},
+			"extraResources": [
+				{
+					"from": "vendor/tmux/tmux",
+					"to": "tmux"
+				},
+				{
+					"from": "vendor/tmux/lib",
+					"to": "lib"
+				},
+				{
+					"from": "resources/tmux.conf",
+					"to": "tmux.conf"
+				},
+				{
+					"from": "resources/terminfo",
+					"to": "terminfo"
+				}
+			],
 			"target": [
 				{
 					"target": "zip",

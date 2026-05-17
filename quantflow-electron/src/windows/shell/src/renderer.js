@@ -7,6 +7,11 @@ import {
 } from "./canvas-state.js";
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
+import { applyDensity } from "./density-controller.js";
+import {
+	applyThemeMode,
+	watchSystemTheme,
+} from "./theme-controller.js";
 import { createWebview, isFocusSearchShortcut } from "./webview-factory.js";
 import {
 	createCommandPalette,
@@ -20,6 +25,13 @@ import { createEdgeIndicators } from "./edge-indicators.js";
 import { createMinimap } from "./canvas-minimap.js";
 import { createPanel } from "./panel-manager.js";
 import { createWorkspaceManager } from "./workspace-manager.js";
+import { confirmTileClose } from "./pty-close-confirmation.js";
+import {
+	SHORTCUTS,
+	shortcutToCommand,
+	shouldOpenShortcutPanel,
+} from "./shortcut-registry.js";
+import { createShortcutPanel } from "./shortcut-panel.js";
 import {
 	createCanvasRpc,
 	createConnectionLabelEvent,
@@ -80,7 +92,9 @@ import {
 import { formatRoleStartupEvent } from "./role-startup.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
-const IS_WINDOWS = window.shellApi.getPlatform() === "win32";
+const PLATFORM = window.shellApi.getPlatform();
+const IS_WINDOWS = PLATFORM === "win32";
+const IS_MAC = PLATFORM === "darwin";
 
 const viewportState = { panX: 0, panY: 0, zoom: 1 };
 
@@ -89,13 +103,38 @@ const gridCanvas = document.getElementById("grid-canvas");
 canvasEl.tabIndex = -1;
 const toasts = createToastController({ document });
 const operationalEvents = createOperationalEventLog({ limit: 120 });
+const viewport = createViewport(canvasEl, gridCanvas, tiles);
 
 document.documentElement.classList.toggle("platform-win", IS_WINDOWS);
 document.body.classList.toggle("platform-win", IS_WINDOWS);
 
-// -- Dark mode --
+// -- Appearance --
 
-initDarkMode(() => viewport.updateCanvas());
+let activeThemeMode = "dark";
+let stopSystemThemeWatch = () => {};
+let viewportReady = false;
+
+function applyThemePreference(value) {
+	activeThemeMode = applyThemeMode(value);
+	if (viewportReady) viewport.updateCanvas();
+	stopSystemThemeWatch();
+	stopSystemThemeWatch = activeThemeMode === "system"
+		? watchSystemTheme(() => {
+			applyThemeMode(activeThemeMode);
+			if (viewportReady) viewport.updateCanvas();
+		})
+		: () => {};
+}
+
+initDarkMode();
+
+window.shellApi.getPref("theme")
+	.then((value) => applyThemePreference(value))
+	.catch(() => applyThemePreference("dark"));
+
+window.shellApi.getPref("density")
+	.then((value) => applyDensity(value))
+	.catch(() => applyDensity("comfortable"));
 
 let broadcastCanvasOpacity = () => {};
 const DEFAULT_CANVAS_OPACITY = 50;
@@ -112,12 +151,12 @@ window.shellApi.onPrefChanged((key, value) => {
 		lastCanvasOpacity = value;
 		applyCanvasOpacity(value);
 		broadcastCanvasOpacity();
+	} else if (key === "theme") {
+		applyThemePreference(value);
+	} else if (key === "density") {
+		applyDensity(value);
 	}
 });
-
-// -- Viewport --
-
-const viewport = createViewport(canvasEl, gridCanvas, tiles);
 
 /** Convert in-memory panX/panY state to a center-point for persistence. */
 function toCenterPointState(state) {
@@ -693,6 +732,82 @@ async function init() {
 		};
 	}
 
+	const statusEls = {
+		workspace: document.getElementById("status-workspace-name"),
+		tileCount: document.getElementById("status-tile-count"),
+		healthLed: document.getElementById("status-health-led"),
+		healthLabel: document.getElementById("status-health-label"),
+		zoom: document.getElementById("status-zoom"),
+		version: document.getElementById("status-version"),
+		paletteHint: document.getElementById("status-palette-hint"),
+	};
+
+	function normalizeHealthLevel(value) {
+		const level = value?.level;
+		if (level === "healthy" || level === "degraded" || level === "down") {
+			return level;
+		}
+		if (value?.ok === true) return "healthy";
+		if (value?.ok === false) return "down";
+		return "unknown";
+	}
+
+	function healthLabel(level) {
+		if (level === "healthy") return "Health good";
+		if (level === "degraded") return "Health degraded";
+		if (level === "down" || level === "error") return "Health down";
+		return "Health unknown";
+	}
+
+	function updateStatusBar() {
+		if (statusEls.workspace) {
+			statusEls.workspace.textContent =
+				pathBaseName(workspaceData.workspaces?.[0]) || "Workspace";
+		}
+		if (statusEls.tileCount) {
+			statusEls.tileCount.textContent = String(tiles.length);
+		}
+		if (statusEls.zoom) {
+			statusEls.zoom.textContent = `${Math.round(viewportState.zoom * 100)}%`;
+		}
+		if (statusEls.paletteHint) {
+			statusEls.paletteHint.textContent = IS_MAC ? "Cmd+K" : "Ctrl+K";
+		}
+	}
+
+	function setHealthStatus(level) {
+		if (statusEls.healthLed) {
+			statusEls.healthLed.dataset.level = level;
+		}
+		if (statusEls.healthLabel) {
+			statusEls.healthLabel.textContent = healthLabel(level);
+		}
+	}
+
+	async function refreshStatusHealth() {
+		if (!window.shellApi.diagnosticsHealth) return;
+		try {
+			const result = await window.shellApi.diagnosticsHealth();
+			setHealthStatus(normalizeHealthLevel(result));
+		} catch {
+			setHealthStatus("error");
+		}
+	}
+
+	window.shellApi.appVersion()
+		.then((version) => {
+			if (statusEls.version) statusEls.version.textContent = `v${version}`;
+		})
+		.catch(() => {
+			if (statusEls.version) statusEls.version.textContent = "v?";
+		});
+
+	updateStatusBar();
+	void refreshStatusHealth();
+	setInterval(() => {
+		void refreshStatusHealth();
+	}, 60_000);
+
 	function buildTileListEntry(tile) {
 		let title = tile.id;
 		let description = "";
@@ -845,6 +960,7 @@ async function init() {
 				lastTileSnapshot.delete(id);
 			}
 		}
+		updateStatusBar();
 	}
 
 	// -- Tile manager --
@@ -992,6 +1108,11 @@ async function init() {
 		tileLayer, viewportState, configs,
 		getAllWebviews,
 		isSpaceHeld: () => spaceHeld,
+		onBeforeClose: (tile, options = {}) =>
+			confirmTileClose(tile, {
+				event: options.event,
+				showConfirmDialog: window.shellApi.showConfirmDialog,
+			}),
 		onCableMousedown,
 		onReposition: () => { viewport.redrawGrid(); minimapRef?.update(); updateCables(); },
 		onSaveDebounced(state) {
@@ -1385,11 +1506,13 @@ async function init() {
 
 	// -- Wire viewport updates --
 
+	viewportReady = true;
 	viewport.init(viewportState, () => {
 		tileManager.repositionAllTiles();
 		edgeIndicators.update();
 		minimap.update();
 		updateCables();
+		updateStatusBar();
 		tileManager.saveCanvasDebounced();
 	});
 
@@ -2138,6 +2261,11 @@ async function init() {
 		},
 		onNotify: (message, tone = "info") => toasts.show({ message, tone }),
 	});
+	const shortcutPanel = createShortcutPanel({
+		document,
+		platform: PLATFORM,
+		shortcuts: SHORTCUTS,
+	});
 
 	function buildTileCommandItems() {
 		return tiles.map((tile) => {
@@ -2299,6 +2427,31 @@ async function init() {
 		});
 	}
 
+	function buildShortcutCommandItems() {
+		const runnable = new Set([
+			"toggle-settings",
+			"new-tile",
+			"close-tile",
+			"sidebar-files",
+			"sidebar-tiles",
+			"toggle-agent",
+			"focus-file-search",
+			"add-workspace",
+			"focus-tile-left",
+			"focus-tile-right",
+			"focus-tile-up",
+			"focus-tile-down",
+			"toggle-watchtower",
+			"shortcuts-panel",
+		]);
+		return SHORTCUTS
+			.filter((shortcut) => runnable.has(shortcut.actionId))
+			.map((shortcut) => ({
+				...shortcutToCommand(shortcut, { platform: PLATFORM }),
+				run: () => handleShortcut(shortcut.actionId),
+			}));
+	}
+
 	async function openCommandPalette() {
 		const roles = await window.shellApi.rolesList?.() ?? [];
 		const baseCommands = [
@@ -2360,10 +2513,16 @@ async function init() {
 			...buildRoleCommandItems(Array.isArray(roles) ? roles : []),
 			...buildConnectionCommandItems(),
 			...buildTileCommandItems(),
+			...buildShortcutCommandItems(),
 		]);
 	}
 
 	window.addEventListener("keydown", (e) => {
+		if (shouldOpenShortcutPanel(e)) {
+			e.preventDefault();
+			shortcutPanel.open();
+			return;
+		}
 		if (
 			(e.metaKey || e.ctrlKey) &&
 			!e.altKey &&
@@ -2480,6 +2639,11 @@ async function init() {
 			panelManager.toggleToMode("tiles");
 		} else if (action === "toggle-agent") {
 			agentPanel.toggle();
+		} else if (action === "shortcuts-panel") {
+			shortcutPanel.open();
+		} else if (action === "toggle-watchtower") {
+			if (watchtowerVisible) hideWatchtower();
+			else showWatchtower();
 		} else if (action === "focus-file-search") {
 			panelManager.setMode("files");
 			focusSurface("nav");
@@ -2511,11 +2675,13 @@ async function init() {
 		} else if (action === "close-tile") {
 			const focusedId = tileManager.getFocusedTileId();
 			if (focusedId) {
-				tileManager.closeCanvasTile(focusedId);
-				tileManager.setFocusedTileId(null);
-				canvasEl.focus();
-				noteSurfaceFocus("canvas");
-				minimap.update();
+				tileManager.requestCloseCanvasTile(focusedId).then((closed) => {
+					if (!closed) return;
+					tileManager.setFocusedTileId(null);
+					canvasEl.focus();
+					noteSurfaceFocus("canvas");
+					minimap.update();
+				});
 			}
 		} else if (
 			action === "focus-tile-right" || action === "focus-tile-left" ||
@@ -3071,6 +3237,7 @@ async function init() {
 		viewport.redrawGrid();
 		minimap.update();
 		updateCables();
+		updateStatusBar();
 
 		// Batch-sync metadata for restored terminal tiles
 		const restoredTermTiles = tiles.filter(

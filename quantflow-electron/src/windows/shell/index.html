@@ -45,6 +45,31 @@
 			</svg>
 			<div id="edge-indicators"></div>
 			<div id="zoom-indicator">100%</div>
+			<div id="status-bar" role="status" aria-live="polite">
+				<div class="status-bar-group status-workspace">
+					<span class="status-label">Workspace</span>
+					<span id="status-workspace-name" class="status-value">Workspace</span>
+				</div>
+				<div class="status-bar-group">
+					<span class="status-label">Tiles</span>
+					<span id="status-tile-count" class="status-value">0</span>
+				</div>
+				<div class="status-bar-group">
+					<span id="status-health-led" class="status-led" data-level="unknown"></span>
+					<span id="status-health-label" class="status-value">Health unknown</span>
+				</div>
+				<div class="status-bar-group">
+					<span class="status-label">Zoom</span>
+					<span id="status-zoom" class="status-value">100%</span>
+				</div>
+				<div class="status-bar-spacer"></div>
+				<div class="status-bar-group status-version">
+					<span id="status-version" class="status-value">v...</span>
+				</div>
+				<div class="status-bar-group status-palette-hint">
+					<span id="status-palette-hint" class="status-value">Ctrl+K</span>
+				</div>
+			</div>
 			<div id="minimap-wrapper">
 				<canvas id="minimap-canvas"></canvas>
 			</div>

@@ -1,9 +1,10 @@
 /**
  * Dark mode detection and canvas opacity management.
  */
+import { applyThemeMode } from "./theme-controller.js";
 
 export function initDarkMode(_onThemeChange) {
-	document.documentElement.classList.add("dark");
+	applyThemeMode("dark");
 }
 
 export function applyCanvasOpacity(percent) {

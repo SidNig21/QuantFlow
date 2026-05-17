@@ -73,6 +73,51 @@ function pretty(obj) {
   return JSON.stringify(obj, null, 2);
 }
 
+function doctorExitCode(level) {
+  if (level === "healthy") return 0;
+  if (level === "degraded") return 1;
+  return 2;
+}
+
+function printHealthSummary(health) {
+  const summary = health.summary ?? {};
+  console.log(
+    `QuantFlow doctor: ${health.level ?? "unknown"} `
+    + `(${summary.healthy ?? 0} healthy, `
+    + `${summary.degraded ?? 0} degraded, ${summary.down ?? 0} down)`,
+  );
+  for (const probe of health.probes ?? []) {
+    console.log(`[${probe.level}] ${probe.name} - ${probe.message}`);
+  }
+}
+
+function printProbeSummary(probe) {
+  console.log(`[${probe.level}] ${probe.name} - ${probe.message}`);
+  if (probe.detail) {
+    console.log(pretty(probe.detail));
+  }
+}
+
+function doctorUsage() {
+  console.log(`qf doctor - run QuantFlow diagnostics
+
+USAGE
+  qf doctor [options]
+
+OPTIONS
+  --json                  Print JSON output
+  --probe <name>          Run one probe, for example relay.socket
+  --tail-logs             Print the main log tail
+  --lines <n>             Lines for --tail-logs (default 500)
+  --backup-db             Copy runtime.db files to a local backup directory
+  -h, --help              Show this help
+
+EXIT CODES
+  0   Healthy
+  1   Degraded or warning
+  2   Down, broken, or QuantFlow is not reachable`);
+}
+
 function tilesToGrid(result) {
   for (const t of result.tiles ?? []) {
     if (t.position) {
@@ -121,10 +166,10 @@ function parsePair(s, label) {
   return { x, y };
 }
 
-function parseLimitValue(value) {
+function parseLimitValue(value, label = "--limit") {
   const limit = Number(value);
   if (!Number.isInteger(limit) || limit <= 0) {
-    die("--limit must be a positive integer");
+    die(`${label} must be a positive integer`);
   }
   return limit;
 }
@@ -802,15 +847,95 @@ async function cmdBrowserInfo(args) {
   console.log(pretty(result));
 }
 
+async function cmdDoctor(args) {
+  let json = false;
+  let probe = null;
+  let tailLogs = false;
+  let lines = 500;
+  let backupDb = false;
+
+  for (let i = 0; i < args.length; i += 1) {
+    const flag = args[i];
+    if (flag === "--json") {
+      json = true;
+    } else if (flag === "--probe") {
+      if (!args[i + 1]) die("--probe requires a probe name");
+      probe = args[i + 1];
+      i += 1;
+    } else if (flag === "--tail-logs") {
+      tailLogs = true;
+    } else if (flag === "--lines") {
+      if (!args[i + 1]) die("--lines requires a number");
+      lines = parseLimitValue(args[i + 1], "--lines");
+      i += 1;
+    } else if (flag === "--backup-db") {
+      backupDb = true;
+    } else if (flag === "--help" || flag === "-h") {
+      doctorUsage();
+      process.exit(0);
+    } else {
+      die(`unknown doctor option: ${flag}`);
+    }
+  }
+
+  if (tailLogs && backupDb) {
+    die("--tail-logs and --backup-db cannot be combined");
+  }
+
+  if (tailLogs) {
+    const result = await rpcCall("diagnostics.tailLogs", {
+      file: "main",
+      lines,
+    });
+    if (json) {
+      console.log(pretty(result));
+    } else {
+      console.log(result.text || result.message);
+    }
+    process.exit(result.ok === false ? 1 : 0);
+  }
+
+  if (backupDb) {
+    const result = await rpcCall("diagnostics.backupDb", {});
+    if (json) {
+      console.log(pretty(result));
+    } else {
+      console.log(result.message);
+      console.log(result.backupDir);
+      for (const file of result.copiedFiles ?? []) console.log(`copied ${file}`);
+    }
+    process.exit(result.ok === false ? 2 : 0);
+  }
+
+  if (probe) {
+    const result = await rpcCall("controller.health.runProbe", { name: probe });
+    if (json) {
+      console.log(pretty(result));
+    } else {
+      printProbeSummary(result);
+    }
+    process.exit(doctorExitCode(result.level));
+  }
+
+  const health = await rpcCall("controller.health", {});
+  if (json) {
+    console.log(pretty(health));
+  } else {
+    printHealthSummary(health);
+  }
+  process.exit(doctorExitCode(health.level));
+}
+
 // --- usage ----------------------------------------------------------------
 
 function usage() {
-  console.log(`collab-canvas â€” control the QuantFlow canvas from the command line
+  console.log(`qf - control the QuantFlow canvas from the command line
 
 USAGE
-  collab-canvas <command> [options]
+  qf <command> [options]
 
 COMMANDS
+  doctor [options]                    Run QuantFlow diagnostics
   tile list                          List all tiles on the canvas
   tile create <type> [options]       Create a new tile
   tile rm <id>                       Remove a tile
@@ -906,7 +1031,7 @@ EXIT CODES
   2   Connection failure
 
 VERSION
-  collab-canvas v${VERSION}`);
+  qf v${VERSION}`);
   process.exit(0);
 }
 
@@ -925,7 +1050,10 @@ try {
       break;
     case "--version":
     case "-v":
-      console.log(`collab-canvas v${VERSION}`);
+      console.log(`qf v${VERSION}`);
+      break;
+    case "doctor":
+      await cmdDoctor(argv.slice(1));
       break;
     case "tile": {
       if (argv.length < 2) {
@@ -1010,7 +1138,7 @@ try {
       break;
     }
     default:
-      die(`unknown command: ${cmd} (try: collab-canvas --help)`);
+      die(`unknown command: ${cmd} (try: qf --help)`);
   }
 } catch (err) {
   die(err.message);

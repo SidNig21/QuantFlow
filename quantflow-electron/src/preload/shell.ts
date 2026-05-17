@@ -231,6 +231,18 @@ contextBridge.exposeInMainWorld("shellApi", {
 
   runtimeDiagnostics: (): Promise<unknown[]> =>
     ipcRenderer.invoke("runtime:diagnostics"),
+  diagnosticsHealth: (): Promise<unknown> =>
+    ipcRenderer.invoke("qf:diagnostics:health"),
+  diagnosticsRunProbe: (name: string): Promise<unknown> =>
+    ipcRenderer.invoke("qf:diagnostics:run-probe", name),
+  diagnosticsTailLogs: (request?: unknown): Promise<unknown> =>
+    ipcRenderer.invoke("qf:diagnostics:tail-logs", request ?? {}),
+  diagnosticsBackupDb: (): Promise<unknown> =>
+    ipcRenderer.invoke("qf:diagnostics:backup-db"),
+  diagnosticsListCrashes: (): Promise<unknown> =>
+    ipcRenderer.invoke("qf:diagnostics:list-crashes"),
+  diagnosticsListLaunchTraces: (): Promise<unknown> =>
+    ipcRenderer.invoke("qf:diagnostics:list-launch-traces"),
 
   ptyKillSession: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke("pty:kill", { sessionId }),

@@ -51,6 +51,7 @@ describe("QuantFlow release identity", () => {
     const files = [
       "quantflow-electron/src/windows/shell/index.html",
       "quantflow-electron/src/windows/settings/src/App.tsx",
+      "quantflow-electron/src/main/index.ts",
       "quantflow-electron/packages/collab-canvas-skill/skills/collab-canvas/SKILL.md",
       "quantflow-electron/packages/collab-canvas-skill/collab-canvas-codex.md",
       "quantflow-electron/packages/collab-canvas-skill/collab-canvas-gemini.md",
@@ -64,7 +65,12 @@ describe("QuantFlow release identity", () => {
     expect(text).toContain("Customize how QuantFlow looks.");
     expect(text).toContain("Control QuantFlow's spatial canvas");
     expect(text).toContain("Connection failure (QuantFlow not running)");
+    expect(text).toContain("Could not migrate your legacy settings to QuantFlow.");
+    expect(text).toContain("`qf` CLI");
+    expect(text).toContain("qf tile list");
     expect(text).not.toContain("Collaborator");
+    expect(text).not.toContain("`collab-canvas` CLI");
+    expect(text).not.toContain("collab-canvas tile");
   });
 
   test("root README presents QuantFlow identity and app data path", () => {

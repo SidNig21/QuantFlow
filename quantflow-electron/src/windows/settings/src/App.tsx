@@ -1,18 +1,48 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ArrowClockwise,
+  CheckCircle,
+  CircleNotch,
   GearSix,
   Keyboard,
   Palette,
+  Play,
   PuzzlePiece,
+  Pulse,
   Sun,
   Moon,
   Monitor,
   Terminal,
+  WarningCircle,
+  XCircle,
 } from "@phosphor-icons/react";
+import {
+  HEALTH_GROUPS,
+  aggregateHealthLevel,
+  assertControllerHealth,
+  assertHealthResult,
+  groupHealthProbes,
+  replaceHealthProbe,
+  summarizeHealth,
+  type ControllerHealth,
+  type HealthLevel,
+  type HealthResult,
+} from "./health-model";
+import {
+  assertCrashReports,
+  assertLaunchTraces,
+  assertTailLogs,
+  formatDuration,
+  type CrashReportSummary,
+  type LaunchTraceSummary,
+  type TailLogsResult,
+} from "./diagnostics-panels-model";
 
-type ThemeMode = "light" | "dark" | "system";
+type ThemeMode = "light" | "dark" | "system" | "high-contrast";
+type DensityMode = "comfortable" | "compact";
 
 interface SettingsApi {
+  getPlatform: () => string;
   getPref: (key: string) => Promise<unknown>;
   setPref: (key: string, value: unknown) => Promise<void>;
   listTerminalTargets: () => Promise<Array<{
@@ -22,6 +52,11 @@ interface SettingsApi {
   }>>;
   setTheme: (mode: string) => Promise<void>;
   getAppVersion: () => Promise<string>;
+  diagnosticsHealth: () => Promise<unknown>;
+  diagnosticsRunProbe: (name: string) => Promise<unknown>;
+  diagnosticsTailLogs: (request?: unknown) => Promise<unknown>;
+  diagnosticsListCrashes: () => Promise<unknown>;
+  diagnosticsListLaunchTraces: () => Promise<unknown>;
   getAgents: () => Promise<AgentStatus[]>;
   installSkill: (agentId: string) => Promise<{ ok: boolean }>;
   uninstallSkill: (agentId: string) => Promise<{ ok: boolean }>;
@@ -30,13 +65,55 @@ interface SettingsApi {
 
 const api = (window as unknown as { api: SettingsApi }).api;
 
-const THEME_MODES: ThemeMode[] = ["light", "dark", "system"];
+const THEME_MODES: ThemeMode[] = ["light", "dark", "system", "high-contrast"];
 
 const THEME_ICONS: Record<ThemeMode, typeof Sun> = {
   light: Sun,
   dark: Moon,
   system: Monitor,
+  "high-contrast": WarningCircle,
 };
+
+const DENSITY_MODES: {
+  value: DensityMode;
+  label: string;
+}[] = [
+    { value: "comfortable", label: "Comfortable" },
+    { value: "compact", label: "Compact" },
+  ];
+
+function normalizeThemeMode(value: unknown): ThemeMode {
+  if (
+    value === "light" ||
+    value === "dark" ||
+    value === "system" ||
+    value === "high-contrast"
+  ) {
+    return value;
+  }
+  return "system";
+}
+
+function normalizeDensity(value: unknown): DensityMode {
+  return value === "compact" ? "compact" : "comfortable";
+}
+
+function applySettingsTheme(mode: ThemeMode) {
+  const root = document.documentElement;
+  const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark =
+    mode === "dark" ||
+    mode === "high-contrast" ||
+    (mode === "system" && systemDark);
+  root.classList.toggle("dark", dark);
+  root.classList.toggle("theme-light", mode === "light");
+  root.classList.toggle("theme-high-contrast", mode === "high-contrast");
+  root.dataset.theme = mode;
+}
+
+function applySettingsDensity(density: DensityMode) {
+  document.documentElement.dataset.density = density;
+}
 
 function Slider({
   value,
@@ -177,13 +254,18 @@ function ThemeToggle({
 
 function AppearancePane() {
   const [theme, setTheme] = useState<ThemeMode>("system");
+  const [density, setDensity] = useState<DensityMode>("comfortable");
   const [canvasOpacity, setCanvasOpacity] = useState(0);
 
   useEffect(() => {
     api.getPref("theme")
       .then((v) => {
-        if (v === "light" || v === "dark") setTheme(v);
-        else setTheme("system");
+        setTheme(normalizeThemeMode(v));
+      })
+      .catch(() => { });
+    api.getPref("density")
+      .then((v) => {
+        setDensity(normalizeDensity(v));
       })
       .catch(() => { });
     api.getPref("canvasOpacity")
@@ -193,9 +275,27 @@ function AppearancePane() {
       .catch(() => { });
   }, []);
 
+  useEffect(() => {
+    applySettingsTheme(theme);
+    if (theme !== "system") return undefined;
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => applySettingsTheme("system");
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, [theme]);
+
+  useEffect(() => {
+    applySettingsDensity(density);
+  }, [density]);
+
   async function handleThemeChange(mode: ThemeMode) {
     setTheme(mode);
     await api.setTheme(mode);
+  }
+
+  async function handleDensityChange(value: DensityMode) {
+    setDensity(value);
+    await api.setPref("density", value);
   }
 
   async function handleOpacityChange(value: number) {
@@ -220,6 +320,37 @@ function AppearancePane() {
         />
       </div>
 
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm font-medium">Density</p>
+        <div
+          className="inline-flex rounded-md p-0.5"
+          style={{
+            backgroundColor:
+              "color-mix(in srgb, var(--foreground) 10%, transparent)",
+          }}
+        >
+          {DENSITY_MODES.map(({ value, label }) => {
+            const active = density === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => { void handleDensityChange(value); }}
+                className="rounded px-2.5 py-1 text-xs font-medium transition-colors duration-150"
+                style={{
+                  backgroundColor: active ? "var(--accent)" : "transparent",
+                  color: active
+                    ? "var(--foreground)"
+                    : "var(--muted-foreground)",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">Canvas opacity</p>
@@ -236,7 +367,7 @@ function AppearancePane() {
   );
 }
 
-const IS_MAC = window.api.getPlatform() === "darwin";
+const IS_MAC = api.getPlatform() === "darwin";
 
 const MOD = IS_MAC ? "\u2318" : "Ctrl+";
 const SHIFT = IS_MAC ? "\u21E7" : "Shift+";
@@ -595,7 +726,491 @@ function IntegrationsPane() {
   );
 }
 
-type Pane = "appearance" | "terminal" | "integrations" | "controls";
+function levelLabel(level: HealthLevel): string {
+  if (level === "healthy") return "Healthy";
+  if (level === "degraded") return "Degraded";
+  return "Down";
+}
+
+function formatCheckedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function HealthLevelBadge({ level }: { level: HealthLevel }) {
+  const Icon = level === "healthy"
+    ? CheckCircle
+    : level === "degraded"
+      ? WarningCircle
+      : XCircle;
+
+  return (
+    <span
+      className="inline-flex h-6 items-center gap-1.5 rounded-full px-2 text-xs font-medium"
+      style={{
+        border:
+          "1px solid color-mix(in srgb, var(--foreground) 14%, transparent)",
+        backgroundColor:
+          "color-mix(in srgb, var(--foreground) 6%, transparent)",
+      }}
+    >
+      <Icon
+        className="h-3.5 w-3.5"
+        weight={level === "healthy" ? "fill" : "regular"}
+      />
+      {levelLabel(level)}
+    </span>
+  );
+}
+
+function SummaryChip({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div
+      className="flex min-w-20 items-center justify-between gap-3 rounded-md px-3 py-2"
+      style={{
+        border:
+          "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
+      }}
+    >
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-semibold tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function HealthSummary({ health }: { health: ControllerHealth }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <HealthLevelBadge level={health.level} />
+      <SummaryChip label="Total" value={health.summary.total} />
+      <SummaryChip label="Healthy" value={health.summary.healthy} />
+      <SummaryChip label="Degraded" value={health.summary.degraded} />
+      <SummaryChip label="Down" value={health.summary.down} />
+    </div>
+  );
+}
+
+function ProbeRow({
+  probe,
+  running,
+  onRun,
+}: {
+  probe: HealthResult;
+  running: boolean;
+  onRun: (name: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-2.5">
+      <div className="min-w-0 space-y-0.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-medium">{probe.name}</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+            {probe.durationMs}ms
+          </span>
+        </div>
+        <p className="truncate text-xs text-muted-foreground">
+          {probe.message}
+        </p>
+        <p className="truncate text-[11px] text-muted-foreground">
+          {probe.description}
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <HealthLevelBadge level={probe.level} />
+        <span className="hidden text-[11px] text-muted-foreground tabular-nums sm:inline">
+          {formatCheckedAt(probe.checkedAt)}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        aria-label={`Run ${probe.name}`}
+        title={`Run ${probe.name}`}
+        disabled={running}
+        onClick={() => onRun(probe.name)}
+        className="flex h-8 w-8 items-center justify-center rounded-md border border-border/70 text-foreground/70 transition-colors duration-150 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {running ? (
+          <CircleNotch className="h-4 w-4 animate-spin" />
+        ) : (
+          <Play className="h-4 w-4" weight="fill" />
+        )}
+      </button>
+    </div>
+  );
+}
+
+function HealthPane() {
+  const [health, setHealth] = useState<ControllerHealth | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [runningAll, setRunningAll] = useState(false);
+  const [runningProbes, setRunningProbes] = useState<Set<string>>(new Set());
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadHealth = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setLoading(true);
+    try {
+      const result = assertControllerHealth(await api.diagnosticsHealth());
+      setHealth(result);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (!options?.silent) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHealth();
+  }, [loadHealth]);
+
+  useEffect(() => {
+    if (!autoRefresh) return undefined;
+    const id = window.setInterval(() => {
+      void loadHealth({ silent: true });
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [autoRefresh, loadHealth]);
+
+  async function handleRunAll() {
+    setRunningAll(true);
+    await loadHealth();
+    setRunningAll(false);
+  }
+
+  async function handleRunProbe(name: string) {
+    setRunningProbes((current) => new Set(current).add(name));
+    try {
+      const result = assertHealthResult(await api.diagnosticsRunProbe(name));
+      setHealth((current) => {
+        if (current) return replaceHealthProbe(current, result);
+        const probes = [result];
+        const level = aggregateHealthLevel(probes);
+        return {
+          ok: level === "healthy",
+          level,
+          checkedAt: result.checkedAt,
+          durationMs: result.durationMs,
+          summary: summarizeHealth(probes),
+          probes,
+        };
+      });
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunningProbes((current) => {
+        const next = new Set(current);
+        next.delete(name);
+        return next;
+      });
+    }
+  }
+
+  const grouped = groupHealthProbes(health);
+  const lastChecked = health ? formatCheckedAt(health.checkedAt) : null;
+
+  return (
+    <div className="space-y-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">Health</h2>
+          <p className="text-sm text-muted-foreground">
+            Real local checks for relay, storage, runtime, and integrations.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="flex h-8 items-center gap-2 rounded-md border border-border/70 px-3 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(event) => setAutoRefresh(event.currentTarget.checked)}
+              className="h-3.5 w-3.5"
+            />
+            Auto-refresh
+          </label>
+          <button
+            type="button"
+            onClick={() => { void handleRunAll(); }}
+            disabled={loading || runningAll}
+            className="flex h-8 items-center gap-2 rounded-md bg-foreground px-3 text-xs font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading || runningAll ? (
+              <CircleNotch className="h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowClockwise className="h-4 w-4" />
+            )}
+            Run all
+          </button>
+        </div>
+      </div>
+
+      {health ? (
+        <div className="space-y-2">
+          <HealthSummary health={health} />
+          {lastChecked && (
+            <p className="text-[11px] text-muted-foreground">
+              Last checked {lastChecked}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div
+          className="rounded-md px-3 py-2 text-sm text-muted-foreground"
+          style={{
+            border:
+              "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
+          }}
+        >
+          {loading ? "Loading health checks." : "No health check has run."}
+        </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          className="rounded-md px-3 py-2 text-sm"
+          style={{
+            border:
+              "1px solid color-mix(in srgb, var(--foreground) 18%, transparent)",
+            backgroundColor:
+              "color-mix(in srgb, var(--foreground) 5%, transparent)",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {HEALTH_GROUPS.map((group) => {
+          const probes = grouped[group.id];
+          const groupLevel = probes.length > 0
+            ? aggregateHealthLevel(probes)
+            : null;
+          return (
+            <section key={group.id} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">{group.label}</h3>
+                {groupLevel ? (
+                  <HealthLevelBadge level={groupLevel} />
+                ) : (
+                  <span className="text-xs text-muted-foreground">No probes</span>
+                )}
+              </div>
+              <div
+                className="divide-y divide-border/60 overflow-hidden rounded-md"
+                style={{
+                  border:
+                    "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
+                }}
+              >
+                {probes.length > 0 ? (
+                  probes.map((probe) => (
+                    <ProbeRow
+                      key={probe.name}
+                      probe={probe}
+                      running={runningProbes.has(probe.name)}
+                      onRun={(name) => { void handleRunProbe(name); }}
+                    />
+                  ))
+                ) : (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    No probes reported.
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LogsPane() {
+  const [file, setFile] = useState<"main" | "renderer">("main");
+  const [minLevel, setMinLevel] = useState<"info" | "warn" | "error">("info");
+  const [logs, setLogs] = useState<TailLogsResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadLogs = useCallback(async () => {
+    try {
+      const result = assertTailLogs(await api.diagnosticsTailLogs({
+        file,
+        lines: 500,
+        filter: { minLevel },
+      }));
+      setLogs(result);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [file, minLevel]);
+
+  useEffect(() => {
+    void loadLogs();
+  }, [loadLogs]);
+
+  async function copyLogs() {
+    if (!logs?.text) return;
+    await navigator.clipboard?.writeText(logs.text);
+  }
+
+  return (
+    <div className="space-y-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">Logs</h2>
+          <p className="text-sm text-muted-foreground">
+            Tail real QuantFlow log files.
+          </p>
+        </div>
+        <button type="button" onClick={() => { void loadLogs(); }} className="flex h-8 items-center gap-2 rounded-md bg-foreground px-3 text-xs font-medium text-background">
+          <ArrowClockwise className="h-4 w-4" />
+          Refresh
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {(["main", "renderer"] as const).map((value) => (
+          <button key={value} type="button" onClick={() => setFile(value)} className="rounded-md px-3 py-1.5 text-xs font-medium" style={{ backgroundColor: file === value ? "var(--accent)" : "color-mix(in srgb, var(--foreground) 8%, transparent)" }}>
+            {value}
+          </button>
+        ))}
+        {(["info", "warn", "error"] as const).map((value) => (
+          <button key={value} type="button" onClick={() => setMinLevel(value)} className="rounded-md px-3 py-1.5 text-xs font-medium" style={{ color: minLevel === value ? "var(--foreground)" : "var(--muted-foreground)" }}>
+            {value}
+          </button>
+        ))}
+        <button type="button" onClick={() => { void copyLogs(); }} className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground">
+          Copy
+        </button>
+      </div>
+
+      {error && <div role="alert" className="text-sm text-muted-foreground">{error}</div>}
+      {logs && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">{logs.message}</p>
+          <pre className="max-h-[520px] overflow-auto rounded-md border border-border/70 p-3 text-xs leading-relaxed text-foreground whitespace-pre-wrap">{logs.text || "No log lines."}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CrashesPane() {
+  const [reports, setReports] = useState<CrashReportSummary[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadReports = useCallback(async () => {
+    try {
+      setReports(assertCrashReports(await api.diagnosticsListCrashes()));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadReports();
+  }, [loadReports]);
+
+  return (
+    <div className="space-y-5 p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">Crashes</h2>
+          <p className="text-sm text-muted-foreground">Local crash reports from app error handlers.</p>
+        </div>
+        <button type="button" onClick={() => { void loadReports(); }} className="flex h-8 items-center gap-2 rounded-md bg-foreground px-3 text-xs font-medium text-background">
+          <ArrowClockwise className="h-4 w-4" />
+          Refresh
+        </button>
+      </div>
+      {error && <div role="alert" className="text-sm text-muted-foreground">{error}</div>}
+      <div className="space-y-2">
+        {reports.length === 0 ? (
+          <div className="rounded-md border border-border/70 px-3 py-2 text-sm text-muted-foreground">No crash reports found.</div>
+        ) : reports.map((report) => (
+          <details key={report.id} className="rounded-md border border-border/70 px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium">{report.type}: {report.message}</summary>
+            <pre className="mt-2 overflow-auto text-xs text-muted-foreground whitespace-pre-wrap">{JSON.stringify(report, null, 2)}</pre>
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LaunchTracesPane() {
+  const [traces, setTraces] = useState<LaunchTraceSummary[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadTraces = useCallback(async () => {
+    try {
+      setTraces(assertLaunchTraces(await api.diagnosticsListLaunchTraces()));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTraces();
+  }, [loadTraces]);
+
+  return (
+    <div className="space-y-5 p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">Launch Traces</h2>
+          <p className="text-sm text-muted-foreground">Startup phase timings from local trace files.</p>
+        </div>
+        <button type="button" onClick={() => { void loadTraces(); }} className="flex h-8 items-center gap-2 rounded-md bg-foreground px-3 text-xs font-medium text-background">
+          <ArrowClockwise className="h-4 w-4" />
+          Refresh
+        </button>
+      </div>
+      {error && <div role="alert" className="text-sm text-muted-foreground">{error}</div>}
+      <div className="space-y-3">
+        {traces.length === 0 ? (
+          <div className="rounded-md border border-border/70 px-3 py-2 text-sm text-muted-foreground">No launch traces found.</div>
+        ) : traces.map((trace) => (
+          <div key={trace.id} className="rounded-md border border-border/70 p-3">
+            <div className="flex items-center justify-between gap-3 text-sm font-medium">
+              <span>{new Date(trace.startedAt).toLocaleString()}</span>
+              <span className="font-mono text-xs text-muted-foreground">{formatDuration(trace.durationMs)}</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {trace.phases.map((phase) => (
+                <div key={`${trace.id}-${phase.name}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs">
+                  <span className="truncate text-muted-foreground">{phase.name}</span>
+                  <span className="font-mono">{formatDuration(phase.durationMs)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type Pane = "appearance" | "health" | "logs" | "crashes" | "launches" | "terminal" | "integrations" | "controls";
 
 const NAV_ITEMS: {
   id: Pane;
@@ -603,6 +1218,10 @@ const NAV_ITEMS: {
   icon: typeof Palette;
 }[] = [
     { id: "appearance", label: "Appearance", icon: Palette },
+    { id: "health", label: "Health", icon: Pulse },
+    { id: "logs", label: "Logs", icon: Terminal },
+    { id: "crashes", label: "Crashes", icon: WarningCircle },
+    { id: "launches", label: "Launches", icon: CircleNotch },
     { id: "terminal", label: "Terminal", icon: Terminal },
     { id: "integrations", label: "Integrations", icon: PuzzlePiece },
     { id: "controls", label: "Controls", icon: Keyboard },
@@ -727,6 +1346,10 @@ export default function App() {
       {/* Content */}
       <div className="flex-1 overflow-auto">
         {activePane === "appearance" && <AppearancePane />}
+        {activePane === "health" && <HealthPane />}
+        {activePane === "logs" && <LogsPane />}
+        {activePane === "crashes" && <CrashesPane />}
+        {activePane === "launches" && <LaunchTracesPane />}
         {activePane === "terminal" && <TerminalPane />}
         {activePane === "integrations" && <IntegrationsPane />}
         {activePane === "controls" && <ControlsPane />}

@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 function normalizeWindowsPath(path) {
@@ -12,9 +12,25 @@ function normalizeWindowsPath(path) {
   return path;
 }
 
+function isWSL() {
+  return !!(process.env.WSL_DISTRO_NAME || process.env.WSL_INTEROP);
+}
+
+// Convert a WSL Linux path (/mnt/c/...) to a Windows path (C:\...) using wslpath.
+function wslToWindowsPath(linuxPath) {
+  try {
+    const result = spawnSync("wslpath", ["-w", linuxPath], { encoding: "utf8" });
+    if (result.status === 0) return result.stdout.trim();
+  } catch {}
+  // Fallback: naive /mnt/X/ → X:\ substitution
+  return linuxPath.replace(/^\/mnt\/([a-z])\//, (_, d) => `${d.toUpperCase()}:\\`).replace(/\//g, "\\");
+}
+
 const repoDir = normalizeWindowsPath(process.cwd());
 
-const child = process.platform === "win32"
+const useWindowsPath = process.platform === "win32" || isWSL();
+
+const child = useWindowsPath
   ? spawn(
       "powershell.exe",
       [
@@ -22,14 +38,18 @@ const child = process.platform === "win32"
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        join(repoDir, "scripts", "dev.ps1"),
+        // dev.ps1 uses $PSScriptRoot to compute its own paths; it only needs
+        // to find itself. Convert the script path to a Windows path when in WSL.
+        isWSL()
+          ? wslToWindowsPath(join(repoDir, "scripts", "dev.ps1"))
+          : join(repoDir, "scripts", "dev.ps1"),
       ],
       {
         stdio: "inherit",
-        cwd: repoDir,
+        cwd: isWSL() ? wslToWindowsPath(repoDir) : repoDir,
         env: {
           ...process.env,
-          COLLAB_DEV_WORKTREE_ROOT: repoDir,
+          COLLAB_DEV_WORKTREE_ROOT: isWSL() ? wslToWindowsPath(repoDir) : repoDir,
         },
       },
     )

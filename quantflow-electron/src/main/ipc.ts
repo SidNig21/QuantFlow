@@ -22,6 +22,7 @@ import { registerRoleServiceHandlers } from "./ipc-role-service";
 import { registerVaultHandlers } from "./ipc-vault";
 import { registerContextServiceHandlers } from "./ipc-context-service";
 import { registerRuntimeDiagnosticsHandlers } from "./ipc-runtime-diagnostics";
+import { registerDiagnosticsHandlers } from "./ipc-diagnostics";
 import { registerRuntimeStateHandlers } from "./ipc-runtime-state";
 import { registerHerdrHandlers } from "./ipc-herdr";
 import { registerOrchestrationHandlers } from "./ipc-orchestration";
@@ -145,6 +146,7 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerVaultHandlers(() => mainWindow);
   registerContextServiceHandlers();
   registerRuntimeDiagnosticsHandlers();
+  registerDiagnosticsHandlers();
   registerRuntimeStateHandlers();
   registerHerdrHandlers();
   registerOrchestrationHandlers();

@@ -345,7 +345,7 @@ export function createTileDOM(tile, callbacks) {
   });
   closeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    callbacks.onClose(tile.id);
+    callbacks.onClose(tile.id, e);
   });
   btnGroup.appendChild(closeBtn);
   titleBar.appendChild(btnGroup);

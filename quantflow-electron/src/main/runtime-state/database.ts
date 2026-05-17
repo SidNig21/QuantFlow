@@ -18,12 +18,18 @@ import migration005 from "./migrations/005-backpressure.sql?raw";
 
 let _db: Database.Database | null = null;
 
+export const EXPECTED_MIGRATION_VERSIONS = [1, 2, 3, 4, 5] as const;
+
+export function getRuntimeDbPath(): string {
+  return join(QUANTFLOW_DIR, "runtime.db");
+}
+
 /** Returns the singleton, initialising it on first call. */
 export function getDb(): Database.Database {
   if (_db) return _db;
 
   mkdirSync(QUANTFLOW_DIR, { recursive: true });
-  const dbPath = join(QUANTFLOW_DIR, "runtime.db");
+  const dbPath = getRuntimeDbPath();
 
   _db = new Database(dbPath);
   _db.pragma("journal_mode = WAL");

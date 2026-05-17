@@ -35,6 +35,7 @@ export function createTileManager({
 	onTerminalTileResized,
 	onTileFocused,
 	onTileDblClick,
+	onBeforeClose,
 	onReposition,
 	onCableMousedown,
 	onCablePortMouseDown,
@@ -551,7 +552,9 @@ export function createTileManager({
 		window.shellApi.trackEvent("tile_created", { type });
 
 		const dom = createTileDOM(tile, {
-			onClose: (id) => closeCanvasTile(id),
+			onClose: (id, event) => {
+				void requestCloseCanvasTile(id, { event });
+			},
 			onFocus: (id, e) => {
 				if (e && e.shiftKey) {
 					toggleTileSelection(id);
@@ -711,6 +714,16 @@ export function createTileManager({
 		removeTile(id);
 		onReposition?.();
 		saveCanvasImmediate();
+		return true;
+	}
+
+	async function requestCloseCanvasTile(id, options = {}) {
+		const tile = getTile(id);
+		if (tile && onBeforeClose) {
+			const allowed = await onBeforeClose(tile, options);
+			if (!allowed) return false;
+		}
+		return closeCanvasTile(id);
 	}
 
 	function createFileTile(type, cx, cy, filePath, extra = {}) {
@@ -932,6 +945,7 @@ export function createTileManager({
 	return {
 		createCanvasTile,
 		closeCanvasTile,
+		requestCloseCanvasTile,
 		focusCanvasTile,
 		blurCanvasTileGuest,
 		clearTileFocusRing,

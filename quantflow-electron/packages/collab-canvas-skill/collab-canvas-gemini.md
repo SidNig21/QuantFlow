@@ -1,6 +1,6 @@
 # QuantFlow Canvas - Gemini CLI Instructions
 
-You have access to the `collab-canvas` CLI for controlling QuantFlow's spatial canvas.
+You have access to the `qf` CLI for controlling QuantFlow's spatial canvas.
 The canvas is a pannable, zoomable surface where tiles display terminals, files, images, and graphs.
 
 ## Coordinate System
@@ -24,92 +24,92 @@ Type is inferred from file extension when `--file` is used.
 
 ```bash
 # List all tiles
-collab-canvas tile list
+qf tile list
 # Includes routeHandle, relaySyntax, role/status identity, and connectionIds.
 
 # Add a tile (returns tile ID)
-collab-canvas tile create <type> [--file <path>] [--pos x,y] [--size w,h]
+qf tile create <type> [--file <path>] [--pos x,y] [--size w,h]
 
 # Remove a tile
-collab-canvas tile rm <id>
+qf tile rm <id>
 
 # Move a tile
-collab-canvas tile move <id> --pos x,y
+qf tile move <id> --pos x,y
 
 # Resize a tile
-collab-canvas tile resize <id> --size w,h
+qf tile resize <id> --size w,h
 
 # Focus one or more tiles
-collab-canvas tile focus <id> [<id>...]
+qf tile focus <id> [<id>...]
 
 # List and spawn configured terminal roles
-collab-canvas role list
-collab-canvas role spawn <role-id> [--cwd <path>] [--pos x,y] [--size w,h]
+qf role list
+qf role spawn <role-id> [--cwd <path>] [--pos x,y] [--size w,h]
 
 # Inspect and inject shared Obsidian-vault context
-collab-canvas context get
-collab-canvas context preview [--max-chars N] [--text]
-collab-canvas context pin <file> [--mode full|summary-header|excerpt] [--excerpt <text>]
-collab-canvas context unpin <file>
-collab-canvas context mode <file> <mode> [--excerpt <text>]
-collab-canvas context decision [--author <name>] [--source <name>] [--file <path>] [--cable <id>] <text>
-collab-canvas context inject <tileId> [--max-chars N]
+qf context get
+qf context preview [--max-chars N] [--text]
+qf context pin <file> [--mode full|summary-header|excerpt] [--excerpt <text>]
+qf context unpin <file>
+qf context mode <file> <mode> [--excerpt <text>]
+qf context decision [--author <name>] [--source <name>] [--file <path>] [--cable <id>] <text>
+qf context inject <tileId> [--max-chars N]
 
 # List cables
-collab-canvas connection list
+qf connection list
 
 # Connect two tiles with a visible cable
-collab-canvas connection create <tileA> <tileB> [--label <text>]
+qf connection create <tileA> <tileB> [--label <text>]
 
 # Remove or relabel a cable
-collab-canvas connection rm <id>
-collab-canvas connection label <id> <label>
+qf connection rm <id>
+qf connection label <id> <label>
 
 # Send a cable-bounded message
-collab-canvas connection send <id> --from <tileId> <message>
+qf connection send <id> --from <tileId> <message>
 
 # Inspect relay history and agent status
-collab-canvas connection log <id> [--limit N]
-collab-canvas relay log [--limit N]
-collab-canvas watchtower snapshot
+qf connection log <id> [--limit N]
+qf relay log [--limit N]
+qf watchtower snapshot
 
 # Get viewport state
-collab-canvas viewport
+qf viewport
 
 # Set viewport pan/zoom
-collab-canvas viewport set [--pan x,y] [--zoom level]
+qf viewport set [--pan x,y] [--zoom level]
 ```
 
 ## Examples
 
 ```bash
 # Side-by-side code comparison
-collab-canvas tile create code --file ./old.ts --pos 0,0
-collab-canvas tile create code --file ./new.ts --pos 23,0
+qf tile create code --file ./old.ts --pos 0,0
+qf tile create code --file ./new.ts --pos 23,0
 
 # Research workspace: graph left, notes right, terminal below
-collab-canvas tile create graph --file ./research.graph.json --pos 0,0 --size 30,25
-collab-canvas tile create note --file ./notes.md --pos 31,0
-collab-canvas role spawn codex --cwd . --pos 0,26
-collab-canvas role spawn claude-reviewer --cwd . --pos 21,26
-collab-canvas connection create <worker-id> <reviewer-id> --label review
-collab-canvas context preview --max-chars 12000
-collab-canvas context inject <worker-id> --max-chars 12000
-collab-canvas connection send <connection-id> --from <worker-id> "Please review the pinned notes."
-collab-canvas connection log <connection-id> --limit 10
+qf tile create graph --file ./research.graph.json --pos 0,0 --size 30,25
+qf tile create note --file ./notes.md --pos 31,0
+qf role spawn codex --cwd . --pos 0,26
+qf role spawn claude-reviewer --cwd . --pos 21,26
+qf connection create <worker-id> <reviewer-id> --label review
+qf context preview --max-chars 12000
+qf context inject <worker-id> --max-chars 12000
+qf connection send <connection-id> --from <worker-id> "Please review the pinned notes."
+qf connection log <connection-id> --limit 10
 
 # Frame the viewport after arranging
-collab-canvas viewport set --pan 0,0 --zoom 0.8
+qf viewport set --pan 0,0 --zoom 0.8
 ```
 
 ## Conventions
 
-1. Always `collab-canvas tile list` first to see existing tiles before creating new ones.
-2. Use `collab-canvas role list` and `collab-canvas role spawn` for agent terminals when possible so role/status metadata stays visible.
-3. Use `collab-canvas context preview` before injecting shared context so missing files and truncation are visible.
-4. Create visible connections with `collab-canvas connection create` before coordinating agents across tiles.
+1. Always `qf tile list` first to see existing tiles before creating new ones.
+2. Use `qf role list` and `qf role spawn` for agent terminals when possible so role/status metadata stays visible.
+3. Use `qf context preview` before injecting shared context so missing files and truncation are visible.
+4. Create visible connections with `qf connection create` before coordinating agents across tiles.
 5. Inspect `connection log`, `relay log`, or `watchtower snapshot` before assuming a relay arrived.
-6. Use `collab-canvas viewport set` or `collab-canvas tile focus` to frame the view after arranging tiles.
+6. Use `qf viewport set` or `qf tile focus` to frame the view after arranging tiles.
 7. Remove tiles and connections when no longer needed.
 8. Leave 1 grid unit gap between adjacent tiles.
 9. File tiles auto-refresh when you write to the underlying file.

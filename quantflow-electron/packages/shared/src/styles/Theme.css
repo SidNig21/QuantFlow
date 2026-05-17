@@ -161,6 +161,89 @@
 	--scrollbar-thumb-hover: #2a3340;
 }
 
+.theme-light {
+	--bg: oklch(0.96 0.012 145);
+	--bg-rgb: 242, 247, 244;
+	--canvas-bg: oklch(0.93 0.014 145);
+	--canvas-bg-hi: oklch(0.98 0.01 145);
+	--canvas-bg-rgb: 235, 242, 238;
+	--canvas-gradient: linear-gradient(
+		to top,
+		oklch(0.88 0.045 145) 0%,
+		oklch(0.93 0.024 180) 34%,
+		oklch(0.97 0.012 145) 100%
+	);
+	--tile-bg: oklch(0.985 0.006 145);
+	--tile-bg-hi: oklch(0.95 0.012 145);
+	--tile-border: oklch(0.82 0.018 145);
+	--tile-border-hi: oklch(0.72 0.035 145);
+	--fg: oklch(0.22 0.018 245);
+	--muted: oklch(0.48 0.02 245);
+	--muted-2: oklch(0.62 0.018 245);
+	--border: var(--tile-border);
+	--background: var(--bg);
+	--background-rgb: var(--bg-rgb);
+	--foreground: var(--fg);
+	--card: var(--tile-bg);
+	--card-foreground: var(--fg);
+	--input: oklch(0.94 0.01 145);
+	--popover: var(--tile-bg);
+	--popover-foreground: var(--fg);
+	--secondary: oklch(0.93 0.012 145);
+	--secondary-foreground: var(--fg);
+	--primary-foreground: var(--bg);
+	--accent-foreground: var(--bg);
+	--scrollbar-thumb: var(--tile-border);
+	--scrollbar-thumb-hover: var(--tile-border-hi);
+}
+
+.theme-high-contrast {
+	--bg: oklch(0.12 0.015 250);
+	--bg-rgb: 8, 11, 18;
+	--canvas-bg: oklch(0.10 0.015 250);
+	--canvas-bg-hi: oklch(0.16 0.02 250);
+	--canvas-bg-rgb: 7, 9, 15;
+	--tile-bg: oklch(0.16 0.018 250);
+	--tile-bg-hi: oklch(0.20 0.024 250);
+	--tile-border: oklch(0.72 0.055 145);
+	--tile-border-hi: oklch(0.88 0.14 145);
+	--fg: oklch(0.96 0.018 120);
+	--muted: oklch(0.82 0.035 145);
+	--muted-2: oklch(0.70 0.035 145);
+	--border: var(--tile-border);
+	--accent: oklch(0.88 0.14 145);
+	--accent-dim: oklch(0.78 0.12 145);
+	--accent-glow: oklch(0.88 0.14 145 / 0.26);
+	--selected: oklch(0.94 0.15 145);
+	--failed: oklch(0.75 0.18 28);
+	--armed: oklch(0.84 0.14 82);
+	--background: var(--bg);
+	--background-rgb: var(--bg-rgb);
+	--foreground: var(--fg);
+	--muted-foreground: var(--muted);
+	--card: var(--tile-bg);
+	--card-foreground: var(--fg);
+	--input: var(--tile-bg-hi);
+	--ring: var(--accent);
+	--popover: var(--tile-bg);
+	--popover-foreground: var(--fg);
+	--secondary: var(--tile-bg-hi);
+	--secondary-foreground: var(--fg);
+	--primary: var(--accent);
+	--primary-foreground: var(--bg);
+	--accent-foreground: var(--bg);
+	--scrollbar-thumb: var(--tile-border);
+	--scrollbar-thumb-hover: var(--tile-border-hi);
+}
+
+:root[data-density="compact"] {
+	--tile-pad-y: var(--space-2);
+	--tile-pad-x: var(--space-4);
+	--tile-title-pad-y: var(--space-2);
+	--tile-title-pad-x: var(--space-3);
+	--toolbar-height: calc(var(--space-8) + var(--space-4));
+}
+
 body {
 	margin: 0;
 	background-color: transparent;

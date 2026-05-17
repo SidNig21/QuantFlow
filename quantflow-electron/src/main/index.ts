@@ -54,8 +54,24 @@ import { registerBrowserIpc } from "./ipc-browser";
 import { registerAgentIpc } from "./acp-agent";
 import { runMigrationIfNeeded } from "./migration/migrate-from-collaborator";
 import { closeDb } from "./runtime-state/database";
+import { recordCrashReport } from "./diagnostics/crash-reports";
+import { writeLaunchTrace } from "./diagnostics/launch-traces";
 
 const APP_NAME = "QuantFlow";
+const launchStartedAtMs = Date.now();
+const launchPhases: Array<{
+  name: string;
+  startedAtMs: number;
+  endedAtMs: number;
+}> = [];
+
+function recordLaunchPhase(
+  name: string,
+  startedAtMs: number,
+  endedAtMs = Date.now(),
+): void {
+  launchPhases.push({ name, startedAtMs, endedAtMs });
+}
 
 // macOS apps launched from Finder don't inherit the user's shell
 // LANG, so child processes (tmux, shells) default to ASCII.
@@ -66,6 +82,11 @@ if (!process.env.LANG || !process.env.LANG.includes("UTF-8")) {
 app.setName(APP_NAME);
 
 process.on("uncaughtException", (error) => {
+  recordCrashReport({
+    type: "uncaughtException",
+    message: error.message,
+    stack: error.stack,
+  });
   trackEvent("app_crash", {
     type: "uncaughtException",
     message: error.message,
@@ -77,6 +98,11 @@ process.on("uncaughtException", (error) => {
 process.on("unhandledRejection", (reason) => {
   const error =
     reason instanceof Error ? reason : new Error(String(reason));
+  recordCrashReport({
+    type: "unhandledRejection",
+    message: error.message,
+    stack: error.stack,
+  });
   trackEvent("app_crash", {
     type: "unhandledRejection",
     message: error.message,
@@ -97,13 +123,27 @@ let pendingFilePath: string | null = null;
 let config = loadConfig();
 let shuttingDown = false;
 
-// Apply saved theme preference (light/dark/system)
-const savedTheme = config.ui.theme;
-if (savedTheme === "light" || savedTheme === "dark") {
-  nativeTheme.themeSource = savedTheme;
-} else {
-  nativeTheme.themeSource = "system";
+function resolveNativeThemeSource(mode: unknown): "light" | "dark" | "system" {
+  if (mode === "light" || mode === "dark") return mode;
+  if (mode === "high-contrast") return "dark";
+  return "system";
 }
+
+function normalizeThemePreference(mode: unknown): "light" | "dark" | "system" | "high-contrast" {
+  if (
+    mode === "light" ||
+    mode === "dark" ||
+    mode === "system" ||
+    mode === "high-contrast"
+  ) {
+    return mode;
+  }
+  return "system";
+}
+
+// Apply saved theme preference (light/dark/system/high-contrast)
+const savedTheme = config.ui.theme;
+nativeTheme.themeSource = resolveNativeThemeSource(savedTheme);
 let globalZoomLevel = 0;
 
 if (!app.isPackaged) {
@@ -577,9 +617,12 @@ ipcMain.handle(
 ipcMain.handle(
   "theme:set",
   (_event, mode: string) => {
-    const valid = mode === "light" || mode === "dark" ? mode : "system";
-    nativeTheme.themeSource = valid;
+    const valid = normalizeThemePreference(mode);
+    nativeTheme.themeSource = resolveNativeThemeSource(valid);
     setPref(config, "theme", valid);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("pref:changed", "theme", valid);
+    }
   },
 );
 
@@ -811,6 +854,7 @@ app.on("web-contents-created", (_event, contents) => {
 });
 
 app.whenReady().then(async () => {
+  recordLaunchPhase("app.whenReady", launchStartedAtMs);
   // Run ~/.collaborator → ~/.quantflow migration before anything else.
   // The sentinel check makes this a no-op on subsequent launches.
   try {
@@ -830,7 +874,7 @@ app.whenReady().then(async () => {
     await dialog.showMessageBox({
       type: "error",
       title: "QuantFlow — Migration Failed",
-      message: "Could not migrate your settings from the previous Collaborator install.",
+      message: "Could not migrate your legacy settings to QuantFlow.",
       detail:
         message +
         "\n\nYour original data is still intact in ~/.collaborator. " +
@@ -857,6 +901,7 @@ app.whenReady().then(async () => {
   shuttingDown = false;
 
   config = loadConfig();
+  const servicesStartedAt = Date.now();
   installCli();
   watcher.startWorker();
   registerIpcHandlers(config);
@@ -866,13 +911,17 @@ app.whenReady().then(async () => {
   updateManager.init({
     onBeforeQuit: () => shutdownBackgroundServices(),
   });
+  recordLaunchPhase("services.registered", servicesStartedAt);
 
+  const sidecarStartedAt = Date.now();
   try {
     await pty.ensureSidecar();
   } catch (err) {
     console.error("Sidecar failed to start:", err);
   }
+  recordLaunchPhase("pty.sidecar", sidecarStartedAt);
 
+  const windowStartedAt = Date.now();
   buildAppMenu();
   createWindow();
   registerAgentIpc(mainWindow!, config);
@@ -883,6 +932,12 @@ app.whenReady().then(async () => {
 
   mainWindow!.webContents.on("did-finish-load", () => {
     sendLoadingDone();
+    recordLaunchPhase("window.did-finish-load", windowStartedAt);
+    writeLaunchTrace({
+      startedAtMs: launchStartedAtMs,
+      endedAtMs: Date.now(),
+      phases: launchPhases,
+    });
     if (pendingFilePath) {
       mainWindow!.webContents.send(
         "shell:forward", "viewer", "file-selected", pendingFilePath,

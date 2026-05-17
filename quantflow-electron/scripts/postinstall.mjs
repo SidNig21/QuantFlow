@@ -288,4 +288,4 @@ if (process.platform === "win32") {
   }
 }
 
-execSync("bun x electron-rebuild -f -w node-pty", { stdio: "inherit" });
+execSync("bun x electron-rebuild -f -w node-pty -w better-sqlite3", { stdio: "inherit" });
