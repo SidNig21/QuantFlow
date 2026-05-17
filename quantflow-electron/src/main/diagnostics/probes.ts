@@ -291,12 +291,14 @@ async function schemaVersions(): Promise<ProbeCheckResult> {
 
 async function ptyForegroundPoller(): Promise<ProbeCheckResult> {
   if (process.platform === "win32") {
-    return degraded("Foreground polling is skipped for Windows sidecar sessions.", {
+    return healthy("Foreground polling is intentionally skipped for Windows sidecar sessions.", {
       platform: process.platform,
+      skipped: true,
     });
   }
   return healthy("Foreground polling is enabled for this platform.", {
     platform: process.platform,
+    skipped: false,
   });
 }
 
