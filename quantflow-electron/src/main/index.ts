@@ -956,7 +956,21 @@ app.whenReady().then(async () => {
   try {
     await startJsonRpcServer();
   } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
     console.error("Failed to start JSON-RPC server:", err);
+    await dialog.showMessageBox({
+      type: "error",
+      title: "QuantFlow — Relay Failed to Start",
+      message: "QuantFlow could not bind its relay on port 9811.",
+      detail:
+        detail +
+        "\n\nWithout the relay, qf doctor, MCP, and terminal tiles will not work. " +
+        "Close any other QuantFlow instances and relaunch.\n\n" +
+        "Logs: " + app.getPath("logs"),
+      buttons: ["Quit"],
+    });
+    app.quit();
+    return;
   }
 });
 

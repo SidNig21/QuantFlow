@@ -16,6 +16,8 @@
 		"clean:deep": "bun ./scripts/clean.mjs --deep",
 		"package": "bun ./scripts/package.mjs",
 		"package:unsigned": "bun ./scripts/package.mjs --no-sign",
+		"preflight": "powershell -ExecutionPolicy Bypass -File scripts\\check-native-locks.ps1",
+		"preflight:stop": "powershell -ExecutionPolicy Bypass -File scripts\\stop-quantflow-dev.ps1",
 		"release": "bun ./scripts/package.mjs --publish",
 		"test": "bun test",
 		"test:updater": "bun test src/main/updater/github-release-fetcher.test.ts && bun test src/main/updater/downloader.test.ts && bun test src/main/updater/update-manager.test.ts",
@@ -46,8 +48,6 @@
 			"NOTICE"
 		],
 		"asarUnpack": [
-			"node_modules/@img/sharp-libvips-linux-x64/**/*",
-			"node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
 			"node_modules/better-sqlite3/**/*",
 			"node_modules/node-pty/**/*",
 			"node_modules/@parcel/watcher-win32-x64/**/*",

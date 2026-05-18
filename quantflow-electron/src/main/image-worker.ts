@@ -10,7 +10,19 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { toCollabFileUrl } from "@collab/shared/collab-file-url";
-import sharp from "sharp";
+import type sharpType from "sharp";
+
+// Dynamic import so the worker thread survives on platforms where the sharp
+// native binary is absent (e.g. Windows without @img/sharp-win32-x64).
+// Individual operations that need sharp will throw "sharp not available"
+// rather than crashing the whole worker at load time.
+let sharp: typeof sharpType | null = null;
+try {
+  const mod = await import("sharp");
+  sharp = ((mod as { default?: typeof sharpType }).default ?? mod) as typeof sharpType;
+} catch {
+  // sharp native binary unavailable on this platform
+}
 
 interface Request {
   id: number;
@@ -28,6 +40,11 @@ interface Response {
 
 const NATIVE_FORMATS = new Set(["png", "jpeg", "gif", "webp"]);
 const MAX_CACHE = 500;
+
+function requireSharp(): typeof sharpType {
+  if (!sharp) throw new Error("sharp not available on this platform");
+  return sharp;
+}
 
 const cacheDir: string | null = workerData?.cacheDir ?? null;
 const memCache = new Map<string, string>();
@@ -119,7 +136,7 @@ async function thumbnail(
     return diskHit;
   }
 
-  const buf = await sharp(path)
+  const buf = await requireSharp()(path)
     .resize(size, size, { fit: "cover" })
     .png()
     .toBuffer();
@@ -136,7 +153,7 @@ async function thumbnail(
 async function full(
   path: string,
 ): Promise<{ url: string; width: number; height: number }> {
-  const meta = await sharp(path).metadata();
+  const meta = await requireSharp()(path).metadata();
   const width = meta.width ?? 0;
   const height = meta.height ?? 0;
   const format = meta.format ?? "";
@@ -149,7 +166,7 @@ async function full(
     };
   }
 
-  const buf = await sharp(path).png().toBuffer();
+  const buf = await requireSharp()(path).png().toBuffer();
   return {
     url: `data:image/png;base64,${buf.toString("base64")}`,
     width,
@@ -172,7 +189,7 @@ function invalidate(paths: string[]): void {
   if (!cacheDir || hashes.size === 0) return;
   try {
     for (const entry of readdirSync(cacheDir)) {
-      const prefix = entry.split("_")[0];
+      const prefix = entry.split("_")[0]!;
       if (hashes.has(prefix)) {
         unlinkSync(join(cacheDir, entry));
       }
