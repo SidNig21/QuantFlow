@@ -12,6 +12,7 @@ import {
   decrementQueueDepth,
   QUEUE_DEPTH_MAX,
 } from "./runtime-state/connections-repo";
+import { runSmartStringPipeline } from "./smart-string-pipeline";
 
 const RELAY_LOG_PATH = join(QUANTFLOW_DIR, "string-relay-log.ndjson");
 const LOG_RING_CAP = 100;
@@ -478,12 +479,26 @@ export function onPtyData(sessionId: string, chunk: string): void {
   for (let i = 0; i < lines.length - 1; i++) {
     const line = lines[i]!.trim();
     const match = RELAY_PREFIX_RE.exec(line);
-    if (!match) continue;
-
-    const targetLabel = match[1]!.trim();
-    const message = match[2]!.trim();
-    routeAgentRelay(fromTileId, targetLabel, message);
+    if (match) {
+      const targetLabel = match[1]!.trim();
+      const message = match[2]!.trim();
+      routeAgentRelay(fromTileId, targetLabel, message);
+    }
+    if (line) {
+      runSmartStringPipeline(
+        { tileId: fromTileId, sessionId },
+        line,
+        {
+          getSessionForTile: (tileId) => tileRegistry.get(tileId)?.sessionId ?? null,
+          relayFn: relayConnectionMessage,
+        },
+      );
+    }
   }
+}
+
+export function getSessionForTile(tileId: string): string | null {
+  return tileRegistry.get(tileId)?.sessionId ?? null;
 }
 
 export function resetStringRelayForTests(): void {

@@ -264,3 +264,61 @@ export interface SchemaViolation {
   path: string;
   message: string;
 }
+
+// ─── Smart Strings (Goal 5.5) ─────────────────────────────────────────────────
+
+/**
+ * String modes supported in v1.
+ * `handoff`, `trigger`, `gate`, `pipe` are deferred per CLAUDE.md.
+ */
+export type SmartStringMode =
+  | "message"
+  | "watch"
+  | "reply"
+  | "artifact"
+  | "receipt";
+
+export type SmartStringSourceAdapter =
+  | "terminal-pty"
+  | "runtime-event"
+  | "agent-tile";
+
+export type SmartStringTargetAdapter =
+  | "terminal-pty"
+  | "agent-tile"
+  | "runtime-event"
+  | "envoy-shared-space"
+  | "mcp-send";
+
+export interface SmartStringMatchRule {
+  /** "contains" checks substring; "regex" compiles pattern as RegExp */
+  type: "contains" | "regex";
+  pattern: string;
+}
+
+export interface SmartStringTransform {
+  /** "passthrough" delivers the matched line as-is; "structured-message" wraps in a typed envelope */
+  type: "passthrough" | "structured-message";
+  /** Handlebars-style template for structured-message: {{line}}, {{connectionId}}, {{tileId}}, {{ts}} */
+  template?: string;
+}
+
+export type SmartStringDeliveryPolicy = "fire-and-forget" | "await-ack";
+
+export interface SmartStringConfig {
+  mode: SmartStringMode;
+  enabled: boolean;
+  source_adapter?: SmartStringSourceAdapter;
+  target_adapter?: SmartStringTargetAdapter;
+  match_rule?: SmartStringMatchRule;
+  transform?: SmartStringTransform;
+  delivery_policy?: SmartStringDeliveryPolicy;
+  schema_id?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+/** Parsed connection config including optional smart string config. */
+export interface ConnectionConfig {
+  smartString?: SmartStringConfig;
+  [key: string]: unknown;
+}
