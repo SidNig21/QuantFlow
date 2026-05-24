@@ -1,0 +1,16 @@
+---
+description: QuantFlow project front door and documentation routing
+alwaysApply: true
+---
+
+# QuantFlow project routing
+
+Vault entry: `Obsidian/Cursor Collab/Projects/QuantFlow/Start Here.md`
+
+Execute only from: `Projects/QuantFlow/Build Plan.md`
+
+Architecture: `Projects/QuantFlow/How the pieces fit.md`
+
+Do not implement from `Projects/QuantFlow/reference/` or vault root QuantFlow stubs.
+
+Guardrails (2026-05-24): herdr = WSL session authority; node-pty sidecar = Windows shell fallback only; strings = visual + event pings; Envoy = one canvas-scoped space; templates + manual Commence.

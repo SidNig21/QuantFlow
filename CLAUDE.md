@@ -6,38 +6,52 @@ Collaborator codebase is the canvas platform lineage, but current naming,
 paths, commits, and docs should say QuantFlow.
 
 Current shipped state:
-- Branch `QuantFlow` is current through `4649a75`:
-  `feat(goal-3): add profiles and MCP routing tools`.
+- Branch `QuantFlow` was verified for this cleanup at `c15d968`:
+  `feat(goal-5.5a): smart string registry, adapters, and pipeline`.
 - Unification phases 0-7 are done: QuantFlow identity, SQLite `runtime.db`,
   herdr bridge, MCP verification, cable UX, and the PTY decision.
-- Phase 7.5, Goal 1, Goal 2, redesign, and Goal 3 are done.
-- Next implementation target is Goal 4: Section 6 inspector/Watchtower plus
-  Section 8 reliability foundation.
+- Phase 7.5, redesign, Goals 1-5, Goal 8, and Goal 5.5a are done.
+- Next implementation target is the herdr/Envoy architecture refresh (vault
+  Build Plan slices 0a→4): herdr attach spike, legend/templates, event-ping
+  strings, canvas-scoped Envoy space, real Envoy bridge (Goal 5.5b).
 
 Canonical planning docs live in the Obsidian vault:
-- `C:\Users\rybow\Obsidian\Cursor Collab\Specs\Cursor Opus QuantFlow Plan - INDEX.md`
-  or the same file using the em dash in its filename.
-- `C:\Users\rybow\Obsidian\Cursor Collab\quantflow-goalbuddy-goals3.md`.
+- Start: `C:\Users\rybow\Obsidian\Cursor Collab\Projects\QuantFlow\Start Here.md`
+- Execute: `C:\Users\rybow\Obsidian\Cursor Collab\Projects\QuantFlow\Build Plan.md`
+- Architecture: `C:\Users\rybow\Obsidian\Cursor Collab\Projects\QuantFlow\How the pieces fit.md`
+- Opus specs (when Build Plan requires): `Projects\QuantFlow\specs\opus\`
+- Do not implement from `Projects\QuantFlow\reference\`
 
-Architecture facts that must not drift:
-- `node-pty` is the terminal backend. Do not replace it with herdr.
-- herdr is orchestration-only: read panes, send text, wait on output/status,
-  and link QuantFlow tiles via `herdrPaneId`. herdr is not a raw PTY renderer.
-- herdr has no MCP server. Use herdr CLI commands or QuantFlow MCP tools.
+Architecture facts that must not drift (refresh 2026-05-24 — see vault Build Plan):
+- herdr is WSL session authority: spawn, attach (`herdr-client.sock`),
+  lifecycle/output subscriptions. Spike attach (slice 0a) before spawn rewire.
+- node-pty sidecar is fallback for native Windows shell only — not the
+  long-term backend for WSL agent/dumb worker tiles.
+- herdr lifecycle: bootstrap on need; never teardown on QuantFlow quit.
+- herdr has no MCP server. Use herdr socket/CLI or QuantFlow MCP tools.
 - QuantFlow MCP is configured by `.mcp.json` and talks to the app relay on
   port `9811`. The app must be running for live tile tools.
 - Canonical cable persistence uses `connections[]`, never top-level `cables[]`.
-- Runtime cable/message types are `message` now, with `handoff` and `trigger`
-  deferred. Do not implement `pipe`.
+- Strings are visual topology plus event-driven pings (pattern/exit triggers),
+  not stdout firehose. Manual cable popover chat is deprecated for orchestration.
+- Envoy: one canvas-scoped space; shared memory, tasks, evidence, receipts.
+- Dumb processes never call Envoy; QuantFlow registers proxies and watchers
+  post on their behalf. Watchtower/Envoy proof must share `connection_id` and
+  `correlation_id`.
+- Legend/templates build canvas layout natively; Hermes orchestrates run after
+  Commence — not boilerplate tile assembly via MCP.
+- Template Commence is manual (locked): spawn layout → inspect → Commence →
+  workers start and strings arm.
 
-Recent Goal 3 MCP tools:
+Recent MCP/runtime surfaces:
 - `quantflow_route_task`
 - `quantflow_tile_read`
 - `quantflow_pty_write`
 - `quantflow_pty_expect`
+- Goal 5.5a smart string registry/adapters/pipeline.
 
 Before substantial work:
-1. Read this file, then read the INDEX and `quantflow-goalbuddy-goals3.md`.
+1. Read this file, then read `Projects/QuantFlow/Build Plan.md` in the vault.
 2. Check `git status --short --branch` in `C:\Users\rybow\QuantFlow`.
 3. Keep Hermes-specific memory separate from Claude Code project memory.
 4. Do not touch `Agents/Hermes/hermes-home` unless the user explicitly asks.
