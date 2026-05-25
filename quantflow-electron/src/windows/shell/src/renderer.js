@@ -1,4 +1,5 @@
 import "./shell.css";
+import "./legend-v1.css";
 import "./tooltip.js";
 import {
 	tiles, connections, getTile, defaultSize, inferTileType, tileAtPoint,
@@ -90,6 +91,7 @@ import {
 	renderLaunchDiagnostics,
 } from "./launch-diagnostics-view.js";
 import { formatRoleStartupEvent } from "./role-startup.js";
+import { createLegendDock } from "./legend-dock.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
 const PLATFORM = window.shellApi.getPlatform();
@@ -363,6 +365,12 @@ async function init() {
 	const loadingStatusEl =
 		document.getElementById("loading-status");
 	const tileLayer = document.getElementById("tile-layer");
+	const legendDock = createLegendDock({
+		document,
+		container: panelViewer,
+		storage: window.localStorage,
+		getTileCount: () => tiles.length,
+	});
 	const panelAgent = document.getElementById("panel-agent");
 	const agentResizeHandle = document.getElementById("agent-resize");
 	const agentToggle = document.getElementById("agent-toggle");
@@ -773,6 +781,7 @@ async function init() {
 		if (statusEls.paletteHint) {
 			statusEls.paletteHint.textContent = IS_MAC ? "Cmd+K" : "Ctrl+K";
 		}
+		legendDock.updateEmptyHint();
 	}
 
 	function setHealthStatus(level) {
