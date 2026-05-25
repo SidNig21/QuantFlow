@@ -31,6 +31,16 @@ export interface RoleStatusParser {
 
 const BUILT_IN_ROLES: Role[] = [
   {
+    id: "hermes",
+    name: "Hermes",
+    description: "Sync · gossip rooms",
+    color: "#06b6d4",
+    icon: "send",
+    cwdPolicy: "workspace",
+    defaultShell: "auto",
+    startupPrompt: "Act as Hermes, the run orchestrator for this QuantFlow canvas.",
+  },
+  {
     id: "shell",
     name: "Shell",
     description: "General-purpose terminal for project commands",
@@ -41,8 +51,8 @@ const BUILT_IN_ROLES: Role[] = [
   },
   {
     id: "codex",
-    name: "Codex",
-    description: "Local Codex coding agent",
+    name: "Codex CLI",
+    description: "Local Codex agent",
     color: "#38bdf8",
     icon: "bot",
     commandTemplate: "codex",
@@ -56,8 +66,8 @@ const BUILT_IN_ROLES: Role[] = [
   },
   {
     id: "claude-worker",
-    name: "Claude Worker",
-    description: "Claude Code implementation agent",
+    name: "Claude Code",
+    description: "Implementation agent",
     color: "#f97316",
     icon: "hammer",
     commandTemplate: "claude",
@@ -106,6 +116,26 @@ const BUILT_IN_ROLES: Role[] = [
     color: "#6366f1",
   },
   {
+    id: "python",
+    name: "Python script",
+    description: "One-shot script",
+    color: "#6366f1",
+    icon: "code",
+    cwdPolicy: "workspace",
+    defaultShell: "auto",
+    startupPrompt: "Open a Python worker shell and wait for a script command.",
+  },
+  {
+    id: "puffer",
+    name: "PufferLib worker",
+    description: "RL training · dumb",
+    color: "#f59e0b",
+    icon: "zap",
+    cwdPolicy: "workspace",
+    defaultShell: "auto",
+    startupPrompt: "Open a PufferLib worker shell. Do not start training until Commence.",
+  },
+  {
     id: "reviewer",
     name: "Reviewer",
     description: "Reviews code and gives feedback",
@@ -138,6 +168,24 @@ export function getRoleCommandName(role: Pick<Role, "commandTemplate">): string 
   return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
 }
 
+function commandExistsInWsl(command: string): boolean {
+  if (process.platform !== "win32") return false;
+  try {
+    execFileSync(
+      "wsl.exe",
+      ["-e", "bash", "-i", "-c", `command -v ${JSON.stringify(command)} >/dev/null 2>&1`],
+      {
+        stdio: "ignore",
+        timeout: 10000,
+        windowsHide: true,
+      },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function commandExists(command: string): boolean {
   try {
     execFileSync(
@@ -152,7 +200,7 @@ function commandExists(command: string): boolean {
     );
     return true;
   } catch {
-    return false;
+    return commandExistsInWsl(command);
   }
 }
 

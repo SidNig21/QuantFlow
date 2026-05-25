@@ -91,7 +91,13 @@ import {
 	renderLaunchDiagnostics,
 } from "./launch-diagnostics-view.js";
 import { formatRoleStartupEvent } from "./role-startup.js";
-import { createLegendDock } from "./legend-dock.js";
+import { createLegendDock, LEGEND_RECIPES } from "./legend-dock.js";
+import {
+	LEGEND_TILE_SIZE,
+	getLegendClickPlacement,
+	getLegendViewportCenterPlacement,
+	resolveLegendRecipeRole,
+} from "./legend-spawn.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
 const PLATFORM = window.shellApi.getPlatform();
@@ -365,11 +371,18 @@ async function init() {
 	const loadingStatusEl =
 		document.getElementById("loading-status");
 	const tileLayer = document.getElementById("tile-layer");
+	const legendSpawnGhost = document.createElement("div");
+	legendSpawnGhost.className = "lv1-spawn-ghost";
+	legendSpawnGhost.hidden = true;
+	panelViewer.appendChild(legendSpawnGhost);
 	const legendDock = createLegendDock({
 		document,
 		container: panelViewer,
 		storage: window.localStorage,
 		getTileCount: () => tiles.length,
+		onRecipeActivate: ({ recipeId, spawnMode, event }) => {
+			handleLegendRecipeActivate(recipeId, spawnMode, event);
+		},
 	});
 	const panelAgent = document.getElementById("panel-agent");
 	const agentResizeHandle = document.getElementById("agent-resize");
@@ -385,6 +398,7 @@ async function init() {
 	let spaceHeld = false;
 	let cableHeld = false;
 	let isPanning = false;
+	let pendingLegendRecipeId = null;
 	let suppressCanvasDblClickUntil = 0;
 
 	// -- Drag-and-drop handler (shared with webviews) --
@@ -1456,6 +1470,71 @@ async function init() {
 		};
 	}
 
+	function getLegendPlacementOptions() {
+		return {
+			tileSize: LEGEND_TILE_SIZE,
+			viewportWidth: panelViewer.clientWidth,
+			viewportHeight: panelViewer.clientHeight,
+			panX: viewportState.panX,
+			panY: viewportState.panY,
+			zoom: viewportState.zoom,
+			dockWidth: legendDock.root.offsetWidth || 56,
+		};
+	}
+
+	function moveLegendSpawnGhost(clientX, clientY) {
+		const rect = panelViewer.getBoundingClientRect();
+		legendSpawnGhost.style.left = `${clientX - rect.left}px`;
+		legendSpawnGhost.style.top = `${clientY - rect.top}px`;
+	}
+
+	function clearPendingLegendRecipe() {
+		pendingLegendRecipeId = null;
+		legendSpawnGhost.hidden = true;
+		legendDock.state.clearPendingRecipe();
+	}
+
+	function beginLegendClickToPlace(recipeId, event = null) {
+		pendingLegendRecipeId = recipeId;
+		legendSpawnGhost.hidden = false;
+		if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+			moveLegendSpawnGhost(event.clientX, event.clientY);
+		}
+	}
+
+	async function spawnLegendRecipeAt(recipeId, position) {
+		const roles = await window.shellApi.rolesList?.() ?? [];
+		const role = resolveLegendRecipeRole(recipeId, roles);
+		const recipe = LEGEND_RECIPES.find((entry) => entry.id === recipeId);
+		if (!role) {
+			const message = `Legend recipe role not found: ${recipeId}`;
+			operationalEvents.record({
+				type: "legend.spawn_failed",
+				severity: "warn",
+				summary: message,
+				meta: { recipeId },
+			});
+			toasts.show({ message, tone: "error" });
+			return null;
+		}
+		const tile = spawnRoleTileAt(role, position.x, position.y, {
+			size: LEGEND_TILE_SIZE,
+			displayName: recipe?.name ?? role.name,
+		});
+		legendDock.updateEmptyHint();
+		return tile;
+	}
+
+	function handleLegendRecipeActivate(recipeId, spawnMode, event = null) {
+		if (spawnMode === "click") {
+			beginLegendClickToPlace(recipeId, event);
+			return;
+		}
+		clearPendingLegendRecipe();
+		const position = getLegendViewportCenterPlacement(getLegendPlacementOptions());
+		void spawnLegendRecipeAt(recipeId, position);
+	}
+
 	function spawnTerminalTileAt(x, y) {
 		const cwd = getTerminalCwd();
 		const size = getTerminalSize();
@@ -1476,19 +1555,20 @@ async function init() {
 		return tile;
 	}
 
-	function spawnRoleTileAt(role, x, y) {
+	function spawnRoleTileAt(role, x, y, options = {}) {
 		if (!role) return null;
+		const displayName = String(options.displayName ?? role.name ?? "").trim() || role.name;
 		if (isMissingRoleCommand(role)) {
-			const message = `${role.name} is missing command: ${getRoleCommandName(role)}`;
+			const message = `${displayName} is missing command: ${getRoleCommandName(role)}`;
 			operationalEvents.record(createRoleSpawnFailureEvent(role, message));
 			toasts.show({ message, tone: "error" });
 			return null;
 		}
 		const cwd = getTerminalCwd();
-		const size = getTerminalSize();
+		const size = options.size ?? getTerminalSize();
 		const tile = tileManager.createCanvasTile(
 			"term", x, y, {
-				...buildRoleTileOptions(role, { cwd, size }),
+				...buildRoleTileOptions(role, { cwd, size, displayName }),
 			},
 		);
 		operationalEvents.record(createRoleSpawnedEvent(tile, role));
@@ -1750,6 +1830,30 @@ async function init() {
 		}
 	});
 
+	panelViewer.addEventListener("mousemove", (event) => {
+		if (!pendingLegendRecipeId) return;
+		moveLegendSpawnGhost(event.clientX, event.clientY);
+	});
+
+	panelViewer.addEventListener("click", (event) => {
+		if (!pendingLegendRecipeId) return;
+		if (legendDock.root.contains(event.target)) return;
+		if (newTileBtn?.contains(event.target)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const rect = panelViewer.getBoundingClientRect();
+		const position = getLegendClickPlacement({
+			...getLegendPlacementOptions(),
+			clientX: event.clientX,
+			clientY: event.clientY,
+			rectLeft: rect.left,
+			rectTop: rect.top,
+		});
+		const recipeId = pendingLegendRecipeId;
+		clearPendingLegendRecipe();
+		void spawnLegendRecipeAt(recipeId, position);
+	}, true);
+
 	document.addEventListener("focusin", (event) => {
 		if (!settingsModalOpen) return;
 		if (settingsOverlay.contains(event.target)) return;
@@ -1787,6 +1891,11 @@ async function init() {
 	// -- Selection keyboard handlers --
 
 	window.addEventListener("keydown", (e) => {
+		if (e.key === "Escape" && pendingLegendRecipeId) {
+			clearPendingLegendRecipe();
+			return;
+		}
+
 		if (e.key === "Escape" && getSelectedTiles().length > 0) {
 			clearSelection();
 			tileManager.syncSelectionVisuals();

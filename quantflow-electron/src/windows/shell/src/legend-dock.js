@@ -6,6 +6,7 @@ export const LEGEND_PREF_KEYS = {
 export const LEGEND_RECIPES = [
 	{
 		id: "hermes",
+		roleId: "hermes",
 		group: "agents",
 		name: "Hermes",
 		description: "Sync · gossip rooms",
@@ -14,6 +15,7 @@ export const LEGEND_RECIPES = [
 	},
 	{
 		id: "codex",
+		roleId: "codex",
 		group: "agents",
 		name: "Codex CLI",
 		description: "Local Codex agent",
@@ -22,6 +24,7 @@ export const LEGEND_RECIPES = [
 	},
 	{
 		id: "claude",
+		roleId: "claude-worker",
 		group: "agents",
 		name: "Claude Code",
 		description: "Implementation agent",
@@ -30,6 +33,7 @@ export const LEGEND_RECIPES = [
 	},
 	{
 		id: "puffer",
+		roleId: "puffer",
 		group: "workers",
 		name: "PufferLib worker",
 		description: "RL training · dumb",
@@ -38,6 +42,7 @@ export const LEGEND_RECIPES = [
 	},
 	{
 		id: "python",
+		roleId: "python",
 		group: "workers",
 		name: "Python script",
 		description: "One-shot script",
@@ -46,6 +51,7 @@ export const LEGEND_RECIPES = [
 	},
 	{
 		id: "shell",
+		roleId: "shell",
 		group: "shell",
 		name: "Generic CLI",
 		description: "Plain shell terminal",
@@ -242,10 +248,16 @@ export function createLegendState(options = {}) {
 		},
 		activateRecipe(recipeId) {
 			if (getDisabledRecipeIds(state).has(recipeId)) return false;
-			update({
-				pendingRecipe: state.spawnMode === "click" ? recipeId : null,
-			});
-			return true;
+			const pendingRecipe = state.spawnMode === "click" ? recipeId : null;
+			state.pendingRecipe = pendingRecipe;
+			return {
+				recipeId,
+				spawnMode: state.spawnMode,
+				pendingRecipe,
+			};
+		},
+		clearPendingRecipe() {
+			state.pendingRecipe = null;
 		},
 	};
 
@@ -380,17 +392,26 @@ function applyRootAttributes(root, state) {
 	}
 }
 
-function bindDockEvents(root, stateStore, render) {
+function bindDockEvents(root, stateStore, options = {}) {
 	for (const button of root.querySelectorAll(".lv1-recipe")) {
-		button.addEventListener("click", () => {
+		button.addEventListener("click", (event) => {
 			const recipeId = button.getAttribute("data-recipe");
-			if (!recipeId || !stateStore.activateRecipe(recipeId)) return;
+			if (!recipeId) return;
+			const result = stateStore.activateRecipe(recipeId);
+			if (!result) return;
 			button.dataset.state = "active";
 			window.setTimeout?.(() => {
 				if (button.isConnected && button.dataset.state === "active") {
 					button.dataset.state = "idle";
 				}
 			}, 600);
+			options.onRecipeActivate?.({
+				recipeId,
+				recipe: LEGEND_RECIPES.find((recipe) => recipe.id === recipeId) ?? null,
+				state: stateStore.getSnapshot(),
+				spawnMode: result.spawnMode,
+				event,
+			});
 		});
 	}
 
@@ -417,6 +438,7 @@ export function createLegendDock(options) {
 		container,
 		storage = globalThis.localStorage,
 		getTileCount = () => 0,
+		onRecipeActivate = null,
 	} = options;
 	if (!document || !container) {
 		throw new Error("createLegendDock requires document and container");
@@ -446,7 +468,7 @@ export function createLegendDock(options) {
 		applyRootAttributes(root, snapshot);
 		root.innerHTML = renderDockHtml(snapshot);
 		chip.textContent = getSpawnModeChipText(snapshot.spawnMode);
-		bindDockEvents(root, stateStore, render);
+		bindDockEvents(root, stateStore, { onRecipeActivate });
 		updateEmptyHint();
 	}
 
@@ -463,4 +485,3 @@ export function createLegendDock(options) {
 		updateEmptyHint,
 	};
 }
-

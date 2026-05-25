@@ -305,12 +305,13 @@ export function createRoleSpawnFailureEvent(role, message) {
 
 export function buildRoleTileOptions(role, params = {}) {
 	const size = params.size ?? {};
+	const displayName = String(params.displayName ?? role.name ?? "").trim() || role.name;
 	const options = {
 		cwd: params.cwd,
-		userTitle: role.name,
+		userTitle: displayName,
 		terminalTarget: normalizeRpcRoleTerminalTarget(role.defaultShell),
 		roleId: role.id,
-		roleName: role.name,
+		roleName: displayName,
 		roleColor: role.color,
 		roleShellKind:
 			getRpcRoleCommandName(role) || role.defaultShell || "shell",

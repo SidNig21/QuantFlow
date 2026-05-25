@@ -22,11 +22,56 @@ describe("listRoles", () => {
   test("includes practical orchestration roles", async () => {
     const roles = await listRoles();
     const ids = roles.map((r) => r.id);
+    expect(ids).toContain("hermes");
     expect(ids).toContain("shell");
     expect(ids).toContain("codex");
     expect(ids).toContain("claude-worker");
     expect(ids).toContain("claude-reviewer");
     expect(ids).toContain("opencode");
+    expect(ids).toContain("puffer");
+    expect(ids).toContain("python");
+  });
+
+  test("agent roles use legend-canonical display names", async () => {
+    const roles = await listRoles();
+    expect(roles.find((role) => role.id === "codex")?.name).toBe("Codex CLI");
+    expect(roles.find((role) => role.id === "claude-worker")?.name)
+      .toBe("Claude Code");
+  });
+
+  test("codex is available when installed in WSL on Windows", async () => {
+    if (process.platform !== "win32") return;
+    const roles = await listRoles();
+    expect(roles.find((role) => role.id === "codex")?.commandAvailable).toBe(true);
+  });
+
+  test("includes Legend v1 recipe roles", async () => {
+    const roles = await listRoles();
+    expect(Object.fromEntries(
+      roles
+        .filter((role) => ["hermes", "puffer", "python"].includes(role.id))
+        .map((role) => [role.id, {
+          name: role.name,
+          description: role.description,
+          color: role.color,
+        }]),
+    )).toEqual({
+      hermes: {
+        name: "Hermes",
+        description: "Sync · gossip rooms",
+        color: "#06b6d4",
+      },
+      puffer: {
+        name: "PufferLib worker",
+        description: "RL training · dumb",
+        color: "#f59e0b",
+      },
+      python: {
+        name: "Python script",
+        description: "One-shot script",
+        color: "#6366f1",
+      },
+    });
   });
 
   test("each role has identity and launch metadata", async () => {

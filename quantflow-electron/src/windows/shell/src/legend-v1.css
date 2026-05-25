@@ -613,6 +613,23 @@
 	font-size: 11px;
 }
 
+.lv1-spawn-ghost {
+	position: absolute;
+	z-index: 102;
+	width: 120px;
+	height: 72px;
+	border: 1.5px dashed var(--accent);
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--accent) 8%, transparent);
+	box-shadow: 0 0 0 1px var(--accent-glow);
+	pointer-events: none;
+	transform: translate(-50%, -50%);
+}
+
+.lv1-spawn-ghost[hidden] {
+	display: none;
+}
+
 @keyframes lv1-spawn-pulse {
 	0% {
 		transform: scale(1);
@@ -634,4 +651,3 @@
 		box-shadow: 0 0 0 1px var(--accent), 0 0 34px var(--accent-glow), 0 8px 22px rgba(0, 0, 0, 0.5);
 	}
 }
-

@@ -42,6 +42,14 @@ describe("Legend v1 recipes", () => {
 			"Python script",
 			"Generic CLI",
 		]);
+		expect(LEGEND_RECIPES.map((recipe) => recipe.roleId)).toEqual([
+			"hermes",
+			"codex",
+			"claude-worker",
+			"puffer",
+			"python",
+			"shell",
+		]);
 		expect(LEGEND_RECIPES.find((recipe) => recipe.id === "puffer")?.description)
 			.toBe("RL training · dumb");
 	});
@@ -139,5 +147,21 @@ describe("LegendState", () => {
 		expect(getToggleContent(state.getSnapshot()).spawnMode.label)
 			.toBe("Spawn · click-to-place");
 	});
-});
 
+	test("tracks click-to-place pending recipe without changing persisted preferences", () => {
+		const storage = createStorage();
+		const state = createLegendState({ storage });
+		state.setSpawnMode("click");
+		expect(state.activateRecipe("python")).toMatchObject({
+			recipeId: "python",
+			spawnMode: "click",
+			pendingRecipe: "python",
+		});
+		expect(state.getSnapshot().pendingRecipe).toBe("python");
+
+		state.clearPendingRecipe();
+
+		expect(state.getSnapshot().pendingRecipe).toBeNull();
+		expect(storage.values.get("legendV1.spawnMode")).toBe("click");
+	});
+});
