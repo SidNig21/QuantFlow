@@ -1,3 +1,15 @@
+## Canonical read order (every session)
+
+1. Vault **Start Here** — `C:\Users\rybow\Obsidian\Cursor Collab\Projects\QuantFlow\Start Here.md`
+2. Vault **Build Plan** — only execution doc (`Projects/QuantFlow/Build Plan.md`)
+3. Vault **How the pieces fit** — architecture guardrails
+
+**Code:** this repo (`C:\Users\rybow\QuantFlow`), branch `QuantFlow`  
+**Repo memory:** this file and `AGENTS.md`  
+**Never implement from** vault `Projects/QuantFlow/reference/` or `reference/archive/`
+
+---
+
 ## QuantFlow Project Memory
 
 QuantFlow is the active project in this repo. Treat `C:\Users\rybow\QuantFlow`
