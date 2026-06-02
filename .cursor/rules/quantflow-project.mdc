@@ -5,12 +5,16 @@ alwaysApply: true
 
 # QuantFlow project routing
 
-Vault entry: `Obsidian/Cursor Collab/Projects/QuantFlow/Start Here.md`
+**Active branch:** `quantflow-v2`
 
-Execute only from: `Projects/QuantFlow/Build Plan.md`
+**Authority docs (repo root):** `ARCHITECTURE.md` + `BUILD_PLAN_V2.md`
 
-Architecture: `Projects/QuantFlow/How the pieces fit.md`
+Execute only from `BUILD_PLAN_V2.md`. Read `ARCHITECTURE.md` for layer boundaries.
 
-Do not implement from `Projects/QuantFlow/reference/` or vault root QuantFlow stubs.
+Do not implement from `QuantFlow` branch assumptions, `Projects/QuantFlow/reference/`, or `reference/archive/`.
 
-Guardrails (2026-05-24): herdr = WSL session; node-pty = PTY bridge display (herdr attach in WSL); direct socket→xterm blocked (0a); strings = event pings; Envoy = canvas space; templates + manual Commence.
+**v1 (frozen on branch `QuantFlow`):** vault `Projects/QuantFlow/Build Plan.md` — not execution authority on this branch.
+
+**Supplementary guardrails (still in force):** herdr = WSL session authority; node-pty = PTY bridge display (herdr attach in WSL) + Windows shell fallback; direct socket→xterm blocked (0a); Envoy = one canvas space; dumb tiles never call Envoy directly.
+
+Vault context (optional): `Obsidian/Cursor Collab/Projects/QuantFlow/How the pieces fit.md`
