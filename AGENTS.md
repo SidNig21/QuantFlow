@@ -22,15 +22,18 @@ Never implement from vault `Projects/QuantFlow/reference/` or `reference/archive
 
 ## Current slice (see Build Plan)
 
-**0a next** — herdr install in WSL + `herdr-client.sock` attach spike.
+**0b next** — operator-led Envoy spike in WSL.
 
-Do not rewire spawn or strings until **0a** and **0b** pass.
+Then **2a** PTY bridge proof → **1** legend → **2** spawn rewire. Do not legend-rewire until **2a** passes.
+
+- herdr = WSL **session**; node-pty = **display** (herdr attach in PTY)
+- Direct socket→xterm: **blocked** (0a)
 
 ## Guardrails (summary)
 
 Details in vault **How the pieces fit** and **Build Plan** settled decisions.
 
-- herdr → WSL session authority (after spike); node-pty sidecar → Windows shell fallback only
+- herdr → WSL session authority; node-pty → display via herdr attach in PTY (PTY bridge)
 - Strings → event pings, not stdout firehose
 - Envoy → one canvas-scoped space; dumb processes never call Envoy directly
 - `connections[]` canonical; `connection_id` + `correlation_id` for Watchtower/Envoy proof

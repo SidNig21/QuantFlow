@@ -13,4 +13,4 @@ Architecture: `Projects/QuantFlow/How the pieces fit.md`
 
 Do not implement from `Projects/QuantFlow/reference/` or vault root QuantFlow stubs.
 
-Guardrails (2026-05-24): herdr = WSL session authority; node-pty sidecar = Windows shell fallback only; strings = visual + event pings; Envoy = one canvas-scoped space; templates + manual Commence.
+Guardrails (2026-05-24): herdr = WSL session; node-pty = PTY bridge display (herdr attach in WSL); direct socket→xterm blocked (0a); strings = event pings; Envoy = canvas space; templates + manual Commence.
