@@ -1,6 +1,8 @@
 # QuantFlow V2 — Build Plan
 
-**Slice 1 — Herdr socket bridge.** Connect Electron main process to herdr Unix socket in WSL2. Send ping, receive pong. Done when pong is confirmed. Nothing else.
+**Slice 1 — DONE (f72c0b4)** — Herdr socket bridge. Connect Electron main process to herdr Unix socket in WSL2. Send ping, receive pong.
+
+Proof: `{"type":"pong","version":"0.5.5","protocol":2}`
 
 **Slice 2 — One tile end to end.** Hermes tile spawns from legend via herdr agent.start. xterm.js renders output. Tile shows live state from herdr events. No polling.
 
