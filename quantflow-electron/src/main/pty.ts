@@ -5,7 +5,6 @@ import * as net from "node:net";
 import * as crypto from "crypto";
 import type { IDisposable, IPty } from "node-pty";
 import { displayBasename } from "@collab/shared/path-utils";
-import { onPtyData as notifyStringRelay } from "./string-relay";
 import {
   getTmuxBin,
   getTerminfoDir,
@@ -155,7 +154,6 @@ function forwardPtyData(
   senderWebContentsId: number | undefined,
   data: Buffer,
 ): void {
-  notifyStringRelay(sessionId, data.toString());
   if (!shouldBatchWindowsPowerShellOutput(sessionId)) {
     sendToSender(senderWebContentsId, "pty:data", {
       sessionId,
@@ -370,7 +368,6 @@ function attachClient(
 
   disposables.push(
     ptyProcess.onData((data: string) => {
-      notifyStringRelay(sessionId, data);
       sendToSender(
         senderWebContentsId,
         "pty:data",

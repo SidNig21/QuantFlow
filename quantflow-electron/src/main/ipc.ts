@@ -17,7 +17,7 @@ import {
 import { registerKnowledgeHandlers } from "./ipc-knowledge";
 import { registerCanvasHandlers } from "./ipc-canvas";
 import { registerMiscHandlers } from "./ipc-misc";
-import { registerStringRelayHandlers } from "./ipc-string-relay";
+import { registerTileRegistryHandlers } from "./ipc-tile-registry";
 import { registerRoleServiceHandlers } from "./ipc-role-service";
 import { registerVaultHandlers } from "./ipc-vault";
 import { registerContextServiceHandlers } from "./ipc-context-service";
@@ -142,7 +142,7 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerKnowledgeHandlers(knowledgeCtx);
   registerCanvasHandlers(canvasCtx);
   registerMiscHandlers(miscCtx);
-  registerStringRelayHandlers();
+  registerTileRegistryHandlers();
   registerRoleServiceHandlers();
   registerVaultHandlers(() => mainWindow);
   registerContextServiceHandlers();
