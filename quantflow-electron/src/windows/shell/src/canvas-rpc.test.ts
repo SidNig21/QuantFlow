@@ -215,7 +215,7 @@ describe("buildRoleTileOptions", () => {
     });
   });
 
-  test("copies herdr spawn identity and disables legacy startup writes", () => {
+  test("copies herdr spawn identity and keeps startup writes for the attached PTY", () => {
     expect(buildRoleTileOptions(
       {
         id: "hermes",
@@ -245,8 +245,8 @@ describe("buildRoleTileOptions", () => {
       herdrAgentName: "qf.canvas.hermes.tile-hermes",
       herdrWorkspaceId: "workspace-1",
       herdrTerminalId: "terminal-1",
-      roleCommandTemplate: undefined,
-      roleStartupPrompt: undefined,
+      roleCommandTemplate: "hermes",
+      roleStartupPrompt: "Coordinate the canvas.",
     });
   });
 });
@@ -453,7 +453,7 @@ describe("createCanvasRpc roleSpawn", () => {
     ]);
   });
 
-  test("does not create a Hermes tile when herdr spawn fails", async () => {
+  test("keeps a pending Hermes tile when herdr spawn fails in the background", async () => {
     const herdrRequests = [];
     const harness = createRoleSpawnHarness({
       shellApi: {
@@ -481,6 +481,7 @@ describe("createCanvasRpc roleSpawn", () => {
           workspaceId: "QuantFlow V2",
         },
       });
+      await Promise.resolve();
     } finally {
       harness.restoreWindow();
     }
@@ -497,25 +498,34 @@ describe("createCanvasRpc roleSpawn", () => {
         workspaceId: "QuantFlow V2",
       },
     ]);
-    expect(harness.createdTiles).toHaveLength(0);
-    expect(tiles).toHaveLength(0);
-    expect(harness.terminalSpawns).toHaveLength(0);
-    expect(harness.saves).toHaveLength(0);
+    expect(harness.createdTiles).toHaveLength(1);
+    expect(tiles).toHaveLength(1);
+    expect(harness.createdTiles[0]).toMatchObject({
+      id: "tile-hermes",
+      runtimeTarget: "herdr-wsl",
+      terminalTarget: undefined,
+      terminalPending: false,
+      ptyStatus: "error",
+      ptyError: "herdr socket unavailable",
+      roleCommandTemplate: "hermes",
+    });
+    expect(harness.terminalSpawns).toHaveLength(1);
+    expect(harness.saves).toEqual(["immediate", "immediate"]);
     expect(harness.failures).toHaveLength(1);
     expect(harness.failures[0]).toMatchObject({
       type: "role.failed",
       summary: "herdr socket unavailable",
       meta: { roleId: "hermes", command: "hermes" },
     });
-    expect(harness.responses).toEqual([
-      {
-        requestId: "req-hermes",
-        error: { code: 4, message: "herdr socket unavailable" },
-      },
-    ]);
+    expect(harness.responses[0]?.result).toMatchObject({
+      id: "tile-hermes",
+      runtimeTarget: "herdr-wsl",
+      terminalPending: true,
+      terminalTarget: undefined,
+    });
   });
 
-  test("creates a Hermes tile only after herdr identity resolves", async () => {
+  test("creates a pending Hermes tile immediately and attaches after herdr identity resolves", async () => {
     const herdrRequests = [];
     let resolveHerdrSpawn;
     const herdrSpawnPromise = new Promise((resolve) => {
@@ -550,10 +560,26 @@ describe("createCanvasRpc roleSpawn", () => {
         },
       });
 
-      await Promise.resolve();
+      await result;
       expect(herdrRequests).toHaveLength(1);
-      expect(harness.createdTiles).toHaveLength(0);
-      expect(tiles).toHaveLength(0);
+      expect(harness.createdTiles).toHaveLength(1);
+      expect(tiles).toHaveLength(1);
+      expect(harness.createdTiles[0]).toMatchObject({
+        id: "tile-hermes",
+        runtimeTarget: "herdr-wsl",
+        terminalTarget: undefined,
+        terminalPending: true,
+        ptyStatus: "connecting",
+        roleCommandTemplate: "hermes",
+        roleStartupPrompt: "Coordinate the canvas.",
+      });
+      expect(harness.terminalSpawns).toHaveLength(1);
+      expect(harness.responses[0]?.result).toMatchObject({
+        id: "tile-hermes",
+        terminalTarget: undefined,
+        runtimeTarget: "herdr-wsl",
+        terminalPending: true,
+      });
 
       resolveHerdrSpawn({
         runtimeTarget: "herdr-wsl",
@@ -563,7 +589,8 @@ describe("createCanvasRpc roleSpawn", () => {
         herdrTerminalId: "terminal-1",
         terminalTarget: "herdr-wsl:terminal-1",
       });
-      await result;
+      await Promise.resolve();
+      await Promise.resolve();
     } finally {
       harness.restoreWindow();
     }
@@ -579,23 +606,15 @@ describe("createCanvasRpc roleSpawn", () => {
       herdrAgentName: "qf.quantflow-v2.hermes.tile-hermes",
       herdrWorkspaceId: "workspace-1",
       herdrTerminalId: "terminal-1",
-      roleCommandTemplate: undefined,
-      roleStartupPrompt: undefined,
+      terminalPending: false,
+      roleCommandTemplate: "hermes",
+      roleStartupPrompt: "Coordinate the canvas.",
     });
-    expect(harness.terminalSpawns).toHaveLength(1);
-    expect(harness.saves).toEqual(["immediate"]);
-    expect(harness.responses[0]?.result).toMatchObject({
-      id: "tile-hermes",
-      terminalTarget: "herdr-wsl:terminal-1",
-      runtimeTarget: "herdr-wsl",
-      herdrPaneId: "pane-1",
-      herdrAgentName: "qf.quantflow-v2.hermes.tile-hermes",
-      herdrWorkspaceId: "workspace-1",
-      herdrTerminalId: "terminal-1",
-    });
+    expect(harness.terminalSpawns).toHaveLength(2);
+    expect(harness.saves).toEqual(["immediate", "immediate"]);
   });
 
-  test("does not create a Hermes tile when herdr returns incomplete identity", async () => {
+  test("marks the pending Hermes tile failed when herdr returns incomplete identity", async () => {
     const harness = createRoleSpawnHarness({
       shellApi: {
         herdrSpawnRole: async () => ({
@@ -624,28 +643,30 @@ describe("createCanvasRpc roleSpawn", () => {
           tileId: "tile-hermes",
         },
       });
+      await Promise.resolve();
     } finally {
       harness.restoreWindow();
     }
 
-    expect(harness.createdTiles).toHaveLength(0);
-    expect(tiles).toHaveLength(0);
-    expect(harness.terminalSpawns).toHaveLength(0);
-    expect(harness.saves).toHaveLength(0);
+    expect(harness.createdTiles).toHaveLength(1);
+    expect(tiles).toHaveLength(1);
+    expect(harness.createdTiles[0]).toMatchObject({
+      id: "tile-hermes",
+      terminalPending: false,
+      ptyStatus: "error",
+      ptyError: "Herdr spawn response missing herdrTerminalId",
+    });
+    expect(harness.terminalSpawns).toHaveLength(1);
+    expect(harness.saves).toEqual(["immediate", "immediate"]);
     expect(harness.failures[0]).toMatchObject({
       type: "role.failed",
       summary: "Herdr spawn response missing herdrTerminalId",
       meta: { roleId: "hermes", command: "hermes" },
     });
-    expect(harness.responses).toEqual([
-      {
-        requestId: "req-hermes",
-        error: {
-          code: 4,
-          message: "Herdr spawn response missing herdrTerminalId",
-        },
-      },
-    ]);
+    expect(harness.responses[0]?.result).toMatchObject({
+      id: "tile-hermes",
+      terminalPending: true,
+    });
   });
 
   test("keeps non-Hermes WSL roles on the existing terminal fallback", async () => {

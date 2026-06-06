@@ -21,6 +21,7 @@ export interface HerdrRoleSpawnResult {
   terminalTarget: string;
   workspaceCreateResult: Record<string, unknown>;
   paneSplitResult: Record<string, unknown>;
+  paneGetResult: Record<string, unknown>;
 }
 
 export type HerdrRpc = <T = Record<string, unknown>>(
@@ -103,17 +104,16 @@ export function extractHerdrWorkspaceId(
 }
 
 export function extractHerdrTerminalId(
-  paneSplitResult: unknown,
-  paneId: string,
-): string {
+  paneResult: unknown,
+): string | null {
   const candidates = [
-    stringAt(paneSplitResult, ["terminal_id"]),
-    stringAt(paneSplitResult, ["terminalId"]),
-    stringAt(paneSplitResult, ["terminal", "id"]),
-    stringAt(paneSplitResult, ["pane", "terminal_id"]),
-    stringAt(paneSplitResult, ["pane", "terminalId"]),
+    stringAt(paneResult, ["terminal_id"]),
+    stringAt(paneResult, ["terminalId"]),
+    stringAt(paneResult, ["terminal", "id"]),
+    stringAt(paneResult, ["pane", "terminal_id"]),
+    stringAt(paneResult, ["pane", "terminalId"]),
   ];
-  return candidates.find(Boolean) ?? paneId;
+  return candidates.find(Boolean) ?? null;
 }
 
 export async function spawnHerdrRoleSession(
@@ -140,35 +140,17 @@ export async function spawnHerdrRoleSession(
     tile_id: request.tileId,
   });
 
-  const herdrPaneId = extractHerdrPaneId(
-    workspaceCreateResult,
-    paneSplitResult,
-  );
+  const herdrPaneId = extractHerdrPaneId({}, paneSplitResult);
   if (!herdrPaneId) {
-    throw new Error("herdr spawn did not return a pane id");
+    throw new Error("herdr pane split did not return an agent pane id");
   }
 
-  const commandTemplate = request.commandTemplate?.trim();
-  const startupPrompt = request.startupPrompt?.trim();
-  if (commandTemplate) {
-    await rpc("pane.send_text", {
-      pane_id: herdrPaneId,
-      text: commandTemplate,
-    });
-    await rpc("pane.send_keys", {
-      pane_id: herdrPaneId,
-      keys: ["Enter"],
-    });
-    if (startupPrompt) {
-      await rpc("pane.send_text", {
-        pane_id: herdrPaneId,
-        text: startupPrompt,
-      });
-      await rpc("pane.send_keys", {
-        pane_id: herdrPaneId,
-        keys: ["Enter"],
-      });
-    }
+  const paneGetResult = await rpc("pane.get", {
+    pane_id: herdrPaneId,
+  });
+  const paneGetPaneId = extractHerdrPaneId({}, paneGetResult);
+  if (paneGetPaneId && paneGetPaneId !== herdrPaneId) {
+    throw new Error("herdr pane get returned a different pane id");
   }
 
   const herdrWorkspaceId = extractHerdrWorkspaceId(workspaceCreateResult);
@@ -176,10 +158,11 @@ export async function spawnHerdrRoleSession(
     throw new Error("herdr spawn did not return a workspace id");
   }
 
-  const herdrTerminalId = extractHerdrTerminalId(
-    paneSplitResult,
-    herdrPaneId,
-  );
+  const herdrTerminalId = extractHerdrTerminalId(paneGetResult);
+  if (!herdrTerminalId) {
+    throw new Error("herdr pane get did not return an agent terminal id");
+  }
+
   return {
     runtimeTarget: "herdr-wsl",
     herdrAgentName,
@@ -189,5 +172,6 @@ export async function spawnHerdrRoleSession(
     terminalTarget: buildHerdrDisplayTarget(herdrTerminalId),
     workspaceCreateResult: asRecord(workspaceCreateResult) ?? {},
     paneSplitResult: asRecord(paneSplitResult) ?? {},
+    paneGetResult: asRecord(paneGetResult) ?? {},
   };
 }

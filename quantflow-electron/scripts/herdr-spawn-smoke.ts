@@ -13,6 +13,17 @@ async function readPane(paneId: string): Promise<Record<string, unknown>> {
   });
 }
 
+async function sendStartupCommand(paneId: string, command: string): Promise<void> {
+  await callHerdrSocket("pane.send_text", {
+    pane_id: paneId,
+    text: command,
+  });
+  await callHerdrSocket("pane.send_keys", {
+    pane_id: paneId,
+    keys: ["Enter"],
+  });
+}
+
 async function closeWorkspace(workspaceId: string): Promise<void> {
   try {
     await callHerdrSocket("workspace.close", {
@@ -33,6 +44,7 @@ async function main(): Promise<void> {
     commandTemplate: `printf '${token}\\n'`,
     workspaceId: "quantflow-v2-smoke",
   });
+  await sendStartupCommand(result.herdrPaneId, `printf '${token}\\n'`);
 
   let paneRead: Record<string, unknown> = {};
   let sawToken = false;

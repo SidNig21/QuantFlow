@@ -14,6 +14,7 @@
  * @property {string} [cwd] - Working directory for terminal tiles
  * @property {string} [ptySessionId] - PTY session ID for terminal tiles
  * @property {string} [terminalTarget] - Requested terminal backend target
+ * @property {boolean} [terminalPending] - Terminal webview is mounted while backend target is still resolving
  * @property {string} [runtimeTarget] - Runtime owner, e.g. herdr-wsl or windows-pty
  * @property {string} [ptyStatus] - Runtime status for terminal tiles
  * @property {string} [ptyError] - Last PTY startup/runtime error

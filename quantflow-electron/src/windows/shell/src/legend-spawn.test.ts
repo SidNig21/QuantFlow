@@ -11,7 +11,7 @@ import {
 } from "./legend-spawn.js";
 
 describe("legend recipe role mapping", () => {
-	test("renderer Legend role spawn waits for herdr identity before tile creation", () => {
+	test("renderer Legend role spawn creates a pending tile before herdr identity resolves", () => {
 		const source = readFileSync(
 			path.join(import.meta.dir, "renderer.js"),
 			"utf8",
@@ -28,12 +28,14 @@ describe("legend recipe role mapping", () => {
 		expect(legendSpawn).toContain("await spawnRoleTileAt");
 		expect(roleSpawn).toContain("shouldSpawnRoleViaHerdr(role)");
 		expect(roleSpawn).toContain("window.shellApi.herdrSpawnRole");
+		expect(roleSpawn).toContain("connectHerdrRoleTile(tile, role, cwd, displayName)");
+		expect(roleSpawn).toContain("tile.terminalPending = true");
 		expect(roleSpawn).toContain("Herdr spawn API is unavailable");
 		expect(roleSpawn.indexOf("Herdr spawn API is unavailable"))
 			.toBeLessThan(roleSpawn.indexOf("tileManager.createCanvasTile"));
-		expect(roleSpawn.indexOf("window.shellApi.herdrSpawnRole"))
-			.toBeLessThan(roleSpawn.indexOf("tileManager.createCanvasTile"));
-		expect(roleSpawn).toContain("herdrSpawn");
+		expect(roleSpawn.indexOf("connectHerdrRoleTile(tile, role, cwd, displayName)"))
+			.toBeGreaterThan(roleSpawn.indexOf("tileManager.createCanvasTile"));
+		expect(roleSpawn).not.toContain("await window.shellApi.herdrSpawnRole");
 	});
 
 	test("maps all six legend recipes to role ids", () => {

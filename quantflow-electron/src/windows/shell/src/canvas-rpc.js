@@ -256,6 +256,7 @@ export function buildRpcTileSummary(tile, existingConnections = []) {
 		cwd: tile.cwd,
 		ptySessionId: tile.ptySessionId,
 		terminalTarget: tile.terminalTarget,
+		terminalPending: tile.terminalPending,
 		runtimeTarget: tile.runtimeTarget,
 		ptyStatus: tile.ptyStatus,
 		ptyError: tile.ptyError,
@@ -343,6 +344,20 @@ export function normalizeHerdrSpawnIdentity(spawn) {
 	};
 }
 
+export function applyHerdrSpawnIdentityToTile(tile, spawn) {
+	const herdrSpawn = normalizeHerdrSpawnIdentity(spawn);
+	tile.runtimeTarget = herdrSpawn.runtimeTarget;
+	tile.terminalTarget = herdrSpawn.terminalTarget;
+	tile.herdrPaneId = herdrSpawn.herdrPaneId;
+	tile.herdrAgentName = herdrSpawn.herdrAgentName;
+	tile.herdrWorkspaceId = herdrSpawn.herdrWorkspaceId;
+	tile.herdrTerminalId = herdrSpawn.herdrTerminalId;
+	tile.terminalPending = false;
+	tile.ptyStatus = undefined;
+	tile.ptyError = undefined;
+	return herdrSpawn;
+}
+
 export function buildRoleTileOptions(role, params = {}) {
 	const size = params.size ?? {};
 	const displayName = String(params.displayName ?? role.name ?? "").trim() || role.name;
@@ -360,8 +375,8 @@ export function buildRoleTileOptions(role, params = {}) {
 		roleColor: role.color,
 		roleShellKind:
 			getRpcRoleCommandName(role) || role.defaultShell || "shell",
-		roleCommandTemplate: herdrSpawn ? undefined : role.commandTemplate,
-		roleStartupPrompt: herdrSpawn ? undefined : role.startupPrompt,
+		roleCommandTemplate: role.commandTemplate,
+		roleStartupPrompt: role.startupPrompt,
 		roleStatusParser: role.statusParser,
 	};
 	if (params.id) options.id = params.id;
@@ -526,33 +541,10 @@ export function createCanvasRpc({
 					const defaultTermSize = defaultSize("term");
 					const requestedSize = params.size ?? defaultTermSize;
 					const tileId = params.tileId || generateId();
-					let herdrSpawn = null;
-					if (shouldSpawnRoleViaHerdr(role)) {
+					const shouldUseHerdr = shouldSpawnRoleViaHerdr(role);
+					if (shouldUseHerdr) {
 						if (!window.shellApi.herdrSpawnRole) {
 							const message = "Herdr spawn API is unavailable";
-							onRoleSpawnFailed?.(
-								createRoleSpawnFailureEvent(role, message),
-							);
-							respondError(requestId, 4, message);
-							return;
-						}
-						try {
-							herdrSpawn = normalizeHerdrSpawnIdentity(
-								await window.shellApi.herdrSpawnRole({
-									tileId,
-									roleId: role.id,
-									roleName: role.name,
-									cwd: params.cwd,
-									commandTemplate: role.commandTemplate,
-									startupPrompt: role.startupPrompt,
-									canvasId: params.canvasId,
-									workspaceId: params.workspaceId,
-								}),
-							);
-						} catch (err) {
-							const message = err instanceof Error
-								? err.message
-								: `Herdr spawn failed for ${role.name}`;
 							onRoleSpawnFailed?.(
 								createRoleSpawnFailureEvent(role, message),
 							);
@@ -574,13 +566,46 @@ export function createCanvasRpc({
 						buildRoleTileOptions(role, {
 							...params,
 							id: tileId,
-							herdrSpawn,
+							herdrSpawn: null,
 						}),
 					);
+					if (shouldUseHerdr) {
+						tile.runtimeTarget = "herdr-wsl";
+						tile.terminalTarget = undefined;
+						tile.terminalPending = true;
+						tile.ptyStatus = "connecting";
+					}
 					onRoleSpawned?.(createRoleSpawnedEvent(tile, role));
 					tileManager.spawnTerminalWebview(tile, true);
 					tileManager.saveCanvasImmediate();
 					result = buildRpcTileSummary(tile, connections);
+					if (shouldUseHerdr) {
+						void window.shellApi.herdrSpawnRole({
+							tileId,
+							roleId: role.id,
+							roleName: role.name,
+							cwd: params.cwd,
+							commandTemplate: role.commandTemplate,
+							startupPrompt: role.startupPrompt,
+							canvasId: params.canvasId,
+							workspaceId: params.workspaceId,
+						}).then((spawn) => {
+							applyHerdrSpawnIdentityToTile(tile, spawn);
+							tileManager.spawnTerminalWebview(tile, true);
+							tileManager.saveCanvasImmediate();
+						}).catch((err) => {
+							const message = err instanceof Error
+								? err.message
+								: `Herdr spawn failed for ${role.name}`;
+							tile.terminalPending = false;
+							tile.ptyStatus = "error";
+							tile.ptyError = message;
+							tileManager.saveCanvasImmediate();
+							onRoleSpawnFailed?.(
+								createRoleSpawnFailureEvent(role, message),
+							);
+						});
+					}
 					break;
 				}
 				case "tileRemove": {

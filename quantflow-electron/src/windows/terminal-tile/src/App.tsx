@@ -30,6 +30,7 @@ function App() {
     const {
       existingSessionId,
       isRestored,
+      isPending,
       cwd,
       target,
       tileId,
@@ -80,6 +81,10 @@ function App() {
           setExited(true);
         });
     };
+
+    if (isPending && !existingSessionId) {
+      return;
+    }
 
     if (isRestored && existingSessionId) {
       setRestored(true);
@@ -180,9 +185,7 @@ function App() {
 
   if (!sessionId) {
     return (
-      <div className="terminal-tile-loading">
-        Connecting...
-      </div>
+      <div className="terminal-tile-pending" aria-label="Terminal pending" />
     );
   }
 

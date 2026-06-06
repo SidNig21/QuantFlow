@@ -8,6 +8,7 @@ describe("parseTerminalTileLaunchParams", () => {
     )).toEqual({
       existingSessionId: undefined,
       isRestored: false,
+      isPending: false,
       cwd: "/repo",
       target: "herdr-wsl:terminal-1",
       tileId: "tile-hermes",
@@ -20,7 +21,21 @@ describe("parseTerminalTileLaunchParams", () => {
     )).toEqual({
       existingSessionId: "session-1",
       isRestored: true,
+      isPending: false,
       cwd: undefined,
+      target: undefined,
+      tileId: "tile-hermes",
+    });
+  });
+
+  test("parses pending terminal launches without inventing a target", () => {
+    expect(parseTerminalTileLaunchParams(
+      "?tileId=tile-hermes&cwd=%2Frepo&pending=1",
+    )).toEqual({
+      existingSessionId: undefined,
+      isRestored: false,
+      isPending: true,
+      cwd: "/repo",
       target: undefined,
       tileId: "tile-hermes",
     });

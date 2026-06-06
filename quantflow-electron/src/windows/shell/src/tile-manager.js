@@ -90,6 +90,7 @@ export function createTileManager({
 				cwd: t.cwd,
 				ptySessionId: t.ptySessionId,
 				terminalTarget: t.terminalTarget,
+				terminalPending: t.terminalPending,
 				runtimeTarget: t.runtimeTarget,
 				ptyStatus: t.ptyStatus,
 				ptyError: t.ptyError,
@@ -243,6 +244,10 @@ export function createTileManager({
 		const dom = tileDOMs.get(tile.id);
 		if (!dom) return;
 
+		if (dom.webview?.parentElement) {
+			dom.webview.remove();
+		}
+
 		const wv = document.createElement("webview");
 		const termConfig = configs.terminalTile;
 		const params = new URLSearchParams();
@@ -255,6 +260,9 @@ export function createTileManager({
 		}
 		if (tile.terminalTarget) {
 			params.set("target", tile.terminalTarget);
+		}
+		if (tile.terminalPending) {
+			params.set("pending", "1");
 		}
 		const qs = params.toString();
 		wv.setAttribute(
@@ -826,6 +834,7 @@ export function createTileManager({
 						cwd: saved.cwd,
 						ptySessionId: saved.ptySessionId,
 						terminalTarget: saved.terminalTarget,
+						terminalPending: saved.terminalPending,
 						runtimeTarget: saved.runtimeTarget,
 						ptyStatus: saved.ptyStatus,
 						ptyError: saved.ptyError,

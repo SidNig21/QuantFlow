@@ -57,11 +57,11 @@ describe("herdr role spawn planning", () => {
     })).toBe("workspace-1");
     expect(extractHerdrTerminalId({
       pane: { terminal_id: "terminal-1" },
-    }, "pane-1")).toBe("terminal-1");
-    expect(extractHerdrTerminalId({}, "pane-1")).toBe("pane-1");
+    })).toBe("terminal-1");
+    expect(extractHerdrTerminalId({})).toBeNull();
   });
 
-  test("creates a workspace, splits a pane, starts the role, and returns identity", async () => {
+  test("creates a workspace, splits an agent pane, verifies pane.get terminal id, and returns identity", async () => {
     const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
     const result = await spawnHerdrRoleSession({
       tileId: "tile-1",
@@ -83,12 +83,17 @@ describe("herdr role spawn planning", () => {
         return {
           pane: {
             pane_id: "pane-1",
-            terminal_id: "terminal-1",
+            terminal_id: "management-terminal",
           },
         };
       }
-      if (method === "pane.send_text" || method === "pane.send_keys") {
-        return { type: "ok" };
+      if (method === "pane.get") {
+        return {
+          pane: {
+            pane_id: "pane-1",
+            terminal_id: "agent-terminal-1",
+          },
+        };
       }
       throw new Error(`unexpected method ${method}`);
     });
@@ -96,10 +101,7 @@ describe("herdr role spawn planning", () => {
     expect(calls.map((call) => call.method)).toEqual([
       "workspace.create",
       "pane.split",
-      "pane.send_text",
-      "pane.send_keys",
-      "pane.send_text",
-      "pane.send_keys",
+      "pane.get",
     ]);
     expect(calls[0]?.params).toMatchObject({
       label: "qf.quantflow-v2.hermes.tile-1",
@@ -115,23 +117,14 @@ describe("herdr role spawn planning", () => {
     });
     expect(calls[2]?.params).toEqual({
       pane_id: "pane-1",
-      text: "hermes",
-    });
-    expect(calls[3]?.params).toEqual({
-      pane_id: "pane-1",
-      keys: ["Enter"],
-    });
-    expect(calls[4]?.params).toEqual({
-      pane_id: "pane-1",
-      text: "Coordinate this canvas.",
     });
     expect(result).toMatchObject({
       runtimeTarget: "herdr-wsl",
       herdrAgentName: "qf.quantflow-v2.hermes.tile-1",
       herdrWorkspaceId: "workspace-1",
       herdrPaneId: "pane-1",
-      herdrTerminalId: "terminal-1",
-      terminalTarget: "herdr-wsl:terminal-1",
+      herdrTerminalId: "agent-terminal-1",
+      terminalTarget: "herdr-wsl:agent-terminal-1",
     });
   });
 
@@ -160,12 +153,21 @@ describe("herdr role spawn planning", () => {
           },
         };
       }
+      if (method === "pane.get") {
+        return {
+          pane: {
+            pane_id: "pane-1",
+            terminal_id: "terminal-1",
+          },
+        };
+      }
       throw new Error(`unexpected method ${method}`);
     });
 
     expect(calls.map((call) => call.method)).toEqual([
       "workspace.create",
       "pane.split",
+      "pane.get",
     ]);
     expect(result).toMatchObject({
       runtimeTarget: "herdr-wsl",
@@ -173,6 +175,47 @@ describe("herdr role spawn planning", () => {
       herdrTerminalId: "terminal-1",
       terminalTarget: "herdr-wsl:terminal-1",
     });
+  });
+
+  test("does not use the workspace root pane as the agent pane", async () => {
+    await expect(spawnHerdrRoleSession({
+      tileId: "tile-1",
+      roleId: "hermes",
+      roleName: "Hermes",
+    }, async (method) => {
+      if (method === "workspace.create") {
+        return {
+          workspace: { workspace_id: "workspace-1" },
+          root_pane: { pane_id: "root-pane" },
+        };
+      }
+      if (method === "pane.split") {
+        return {};
+      }
+      throw new Error(`unexpected method ${method}`);
+    })).rejects.toThrow("agent pane id");
+  });
+
+  test("fails if pane.get does not return the split agent terminal id", async () => {
+    await expect(spawnHerdrRoleSession({
+      tileId: "tile-1",
+      roleId: "hermes",
+      roleName: "Hermes",
+    }, async (method) => {
+      if (method === "workspace.create") {
+        return {
+          workspace: { workspace_id: "workspace-1" },
+          root_pane: { pane_id: "root-pane" },
+        };
+      }
+      if (method === "pane.split") {
+        return { pane: { pane_id: "pane-1", terminal_id: "terminal-from-split" } };
+      }
+      if (method === "pane.get") {
+        return { pane: { pane_id: "pane-1" } };
+      }
+      throw new Error(`unexpected method ${method}`);
+    })).rejects.toThrow("agent terminal id");
   });
 
   test("fails when herdr spawn returns no pane identity", async () => {
