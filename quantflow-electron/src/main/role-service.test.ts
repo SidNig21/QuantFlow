@@ -74,6 +74,14 @@ describe("listRoles", () => {
     });
   });
 
+  test("Hermes launches by running hermes, not by typing a startup prompt", async () => {
+    const role = await getRole("hermes");
+
+    expect(role?.commandTemplate).toBe("hermes");
+    expect(role?.startupPrompt).toBeUndefined();
+    expect(role?.systemPrompt).toContain("Act as Hermes");
+  });
+
   test("each role has identity and launch metadata", async () => {
     const roles = await listRoles();
     for (const role of roles) {

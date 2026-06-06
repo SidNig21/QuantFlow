@@ -5,6 +5,7 @@ import {
 	tiles, connections, getTile, defaultSize, inferTileType, tileAtPoint,
 	selectTile, clearSelection, getSelectedTiles, getNearestTileInDirection,
 	addConnection, removeConnection, updateConnectionLabel, clearConnections,
+	generateId,
 } from "./canvas-state.js";
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
@@ -40,6 +41,7 @@ import {
 	buildRoleTileOptions,
 	createRoleSpawnedEvent,
 	createRoleSpawnFailureEvent,
+	normalizeHerdrSpawnIdentity,
 	createTerminalReadFailureEvent,
 	createTerminalWriteFailureEvent,
 } from "./canvas-rpc.js";
@@ -92,6 +94,7 @@ import {
 } from "./launch-diagnostics-view.js";
 import { formatRoleStartupEvent } from "./role-startup.js";
 import { createLegendDock, LEGEND_RECIPES } from "./legend-dock.js";
+import { shouldSpawnRoleViaHerdr } from "./role-herdr-spawn.js";
 import {
 	LEGEND_TILE_SIZE,
 	getLegendClickPlacement,
@@ -1517,7 +1520,7 @@ async function init() {
 			toasts.show({ message, tone: "error" });
 			return null;
 		}
-		const tile = spawnRoleTileAt(role, position.x, position.y, {
+		const tile = await spawnRoleTileAt(role, position.x, position.y, {
 			size: LEGEND_TILE_SIZE,
 			displayName: recipe?.name ?? role.name,
 		});
@@ -1555,7 +1558,7 @@ async function init() {
 		return tile;
 	}
 
-	function spawnRoleTileAt(role, x, y, options = {}) {
+	async function spawnRoleTileAt(role, x, y, options = {}) {
 		if (!role) return null;
 		const displayName = String(options.displayName ?? role.name ?? "").trim() || role.name;
 		if (isMissingRoleCommand(role)) {
@@ -1566,9 +1569,46 @@ async function init() {
 		}
 		const cwd = getTerminalCwd();
 		const size = options.size ?? getTerminalSize();
+		const tileId = options.id || generateId();
+		let herdrSpawn = null;
+		if (shouldSpawnRoleViaHerdr(role)) {
+			if (!window.shellApi.herdrSpawnRole) {
+				const message = "Herdr spawn API is unavailable";
+				operationalEvents.record(createRoleSpawnFailureEvent(role, message));
+				toasts.show({ message, tone: "error" });
+				return null;
+			}
+			try {
+				herdrSpawn = normalizeHerdrSpawnIdentity(
+					await window.shellApi.herdrSpawnRole({
+						tileId,
+						roleId: role.id,
+						roleName: role.name,
+						cwd,
+						commandTemplate: role.commandTemplate,
+						startupPrompt: role.startupPrompt,
+						canvasId: workspaceData.workspaces?.[0] ?? "canvas",
+						workspaceId: workspaceData.workspaces?.[0],
+					}),
+				);
+			} catch (err) {
+				const message = err instanceof Error
+					? err.message
+					: `Herdr spawn failed for ${displayName}`;
+				operationalEvents.record(createRoleSpawnFailureEvent(role, message));
+				toasts.show({ message, tone: "error" });
+				return null;
+			}
+		}
 		const tile = tileManager.createCanvasTile(
 			"term", x, y, {
-				...buildRoleTileOptions(role, { cwd, size, displayName }),
+				...buildRoleTileOptions(role, {
+					cwd,
+					size,
+					displayName,
+					id: tileId,
+					herdrSpawn,
+				}),
 			},
 		);
 		operationalEvents.record(createRoleSpawnedEvent(tile, role));
@@ -1826,7 +1866,7 @@ async function init() {
 			if (!roleSelected?.startsWith("role:")) return;
 			const roleId = roleSelected.slice(5);
 			const role = roles.find((r) => r.id === roleId);
-			spawnRoleTileAt(role, cx, cy);
+			void spawnRoleTileAt(role, cx, cy);
 		}
 	});
 
@@ -2477,7 +2517,7 @@ async function init() {
 			keywords: [role.id, role.description, role.commandTemplate, "agent"],
 			run: () => {
 				const pos = getViewportCenterForSize(size);
-				spawnRoleTileAt(role, pos.x, pos.y);
+				void spawnRoleTileAt(role, pos.x, pos.y);
 			},
 		}));
 	}

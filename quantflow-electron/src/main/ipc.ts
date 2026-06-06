@@ -25,6 +25,7 @@ import { registerRuntimeDiagnosticsHandlers } from "./ipc-runtime-diagnostics";
 import { registerDiagnosticsHandlers } from "./ipc-diagnostics";
 import { registerRuntimeStateHandlers } from "./ipc-runtime-state";
 import { registerHerdrHandlers } from "./ipc-herdr";
+import { registerHerdrSpawnHandlers } from "./ipc-herdr-spawn";
 import { registerOrchestrationHandlers } from "./ipc-orchestration";
 
 const FS_CHANGE_DELETED = 3;
@@ -149,5 +150,6 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerDiagnosticsHandlers();
   registerRuntimeStateHandlers();
   registerHerdrHandlers();
+  registerHerdrSpawnHandlers();
   registerOrchestrationHandlers();
 }

@@ -36,9 +36,10 @@ const BUILT_IN_ROLES: Role[] = [
     description: "Sync · gossip rooms",
     color: "#06b6d4",
     icon: "send",
+    commandTemplate: "hermes",
     cwdPolicy: "workspace",
     defaultShell: "auto",
-    startupPrompt: "Act as Hermes, the run orchestrator for this QuantFlow canvas.",
+    systemPrompt: "Act as Hermes, the run orchestrator for this QuantFlow canvas.",
   },
   {
     id: "shell",

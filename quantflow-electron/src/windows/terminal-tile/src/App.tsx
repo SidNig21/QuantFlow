@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { TerminalTab } from "@collab/components/Terminal";
+import { parseTerminalTileLaunchParams } from "./session-start";
 
 /** Approximate terminal dimensions from the viewport before xterm mounts. */
 function estimateTermSize(): { cols: number; rows: number } {
@@ -26,14 +27,13 @@ function App() {
   const [startError, setStartError] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(
-      window.location.search,
-    );
-    const existingSessionId = params.get("sessionId");
-    const isRestored = params.get("restored") === "1";
-    const cwd = params.get("cwd") || undefined;
-    const target = params.get("target") || undefined;
-    const tileId = params.get("tileId") || undefined;
+    const {
+      existingSessionId,
+      isRestored,
+      cwd,
+      target,
+      tileId,
+    } = parseTerminalTileLaunchParams(window.location.search);
 
     let sessionRestoreAttempted = false;
 

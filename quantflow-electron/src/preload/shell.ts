@@ -474,6 +474,17 @@ contextBridge.exposeInMainWorld("shellApi", {
     ipcRenderer.invoke("herdr:link-pane", tileId, paneId),
   herdrUnlinkPane: (tileId: string): Promise<void> =>
     ipcRenderer.invoke("herdr:unlink-pane", tileId),
+  herdrSpawnRole: (params: {
+    tileId: string;
+    roleId: string;
+    roleName: string;
+    cwd?: string;
+    commandTemplate?: string;
+    startupPrompt?: string;
+    canvasId?: string;
+    workspaceId?: string;
+  }): Promise<unknown> =>
+    ipcRenderer.invoke("herdr:spawn-role", params),
 
   // ── Shared context ──
   contextGet: (): Promise<unknown> =>

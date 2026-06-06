@@ -23,6 +23,7 @@ import { cleanupEndpoint } from "./ipc-endpoint";
 import {
   getTerminalMode,
   getTerminalTarget,
+  isTerminalTarget,
   type TerminalMode,
   type TerminalTarget,
 } from "./config";
@@ -37,7 +38,11 @@ import {
   createPtySession,
   endPtySession,
 } from "./runtime-state/pty-sessions-repo";
-import { buildSidecarSessionCreateParams } from "./pty-spawn-params";
+import {
+  buildHerdrAttachSessionCreateParams,
+  buildSidecarSessionCreateParams,
+  parseHerdrAttachTarget,
+} from "./pty-spawn-params";
 
 interface PtySession {
   pty: IPty;
@@ -488,7 +493,7 @@ export async function createSession(
   senderWebContentsId?: number,
   cols?: number,
   rows?: number,
-  preferredTarget?: TerminalTarget,
+  preferredTarget?: TerminalTarget | string,
   tileId?: string,
 ): Promise<{
   sessionId: string;
@@ -506,6 +511,62 @@ export async function createSession(
   const r = rows || 24;
 
   const mode = getTerminalMode();
+
+  const herdrAttach = parseHerdrAttachTarget(preferredTarget);
+  if (herdrAttach) {
+    await ensureSidecar();
+    const client = getSidecarClient();
+    const sidecarEnv = utf8Env();
+    if (tileId) sidecarEnv.COLLAB_TILE_ID = tileId;
+
+    const createParams = buildHerdrAttachSessionCreateParams(
+      herdrAttach.terminalId,
+      resolvedCwd,
+      c,
+      r,
+      sidecarEnv,
+    );
+    const { sessionId, socketPath } = await client.createSession(createParams);
+    const dataSock = await client.attachDataSocket(
+      socketPath,
+      (data) => {
+        forwardPtyData(sessionId, senderWebContentsId, data);
+      },
+    );
+    dataSockets.set(sessionId, dataSock);
+
+    writeSessionMeta(sessionId, {
+      shell: createParams.command,
+      cwd: resolvedCwd,
+      createdAt: new Date().toISOString(),
+      target: createParams.target,
+      displayName: createParams.displayName,
+      command: createParams.command,
+      args: createParams.args,
+      cwdHostPath: resolvedCwd,
+      backend: "sidecar",
+    });
+
+    sidecarSessionIds.add(sessionId);
+
+    createPtySession({
+      sessionId,
+      tileId: tileId ?? "",
+      shell: createParams.command,
+      target: createParams.target,
+      cwd: resolvedCwd,
+    });
+
+    return {
+      sessionId,
+      shell: createParams.command,
+      displayName: createParams.displayName,
+      target: createParams.target,
+      command: createParams.command,
+      args: createParams.args,
+      cwdHostPath: resolvedCwd,
+    };
+  }
 
   if (mode === "tmux") {
     const sessionId = crypto.randomBytes(8).toString("hex");
@@ -589,7 +650,9 @@ export async function createSession(
   }
 
   const resolvedTarget = resolveTerminalTarget(
-    preferredTarget ?? getTerminalTarget(),
+    isTerminalTarget(preferredTarget)
+      ? preferredTarget
+      : getTerminalTarget(),
     resolvedCwd,
   );
 

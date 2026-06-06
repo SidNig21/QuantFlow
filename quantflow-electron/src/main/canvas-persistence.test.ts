@@ -48,6 +48,56 @@ afterEach(() => {
 });
 
 describe("canvas-persistence connections", () => {
+  test("saveState + loadState preserves herdr runtime tile identity", async () => {
+    const tile = {
+      id: "tile-hermes",
+      type: "term" as const,
+      x: 20,
+      y: 40,
+      width: 520,
+      height: 420,
+      cwd: "/repo",
+      ptySessionId: "session-display",
+      terminalTarget: "herdr-wsl:terminal-1",
+      runtimeTarget: "herdr-wsl",
+      userTitle: "Hermes",
+      autoTitle: "herdr attach",
+      routeHandle: "hermes",
+      herdrPaneId: "pane-1",
+      herdrAgentName: "qf.quantflow-v2.hermes.tile-hermes",
+      herdrWorkspaceId: "workspace-1",
+      herdrTerminalId: "terminal-1",
+      zIndex: 4,
+    };
+
+    await saveState({
+      version: 1,
+      tiles: [tile],
+      connections: [],
+      viewport: { centerX: 100, centerY: 200, zoom: 1.5 },
+    });
+
+    expect((await readSavedState()).tiles[0]).toMatchObject({
+      terminalTarget: "herdr-wsl:terminal-1",
+      runtimeTarget: "herdr-wsl",
+      herdrPaneId: "pane-1",
+      herdrAgentName: "qf.quantflow-v2.hermes.tile-hermes",
+      herdrWorkspaceId: "workspace-1",
+      herdrTerminalId: "terminal-1",
+    });
+
+    const loaded = await loadState();
+    expect(loaded?.tiles[0]).toMatchObject({
+      id: "tile-hermes",
+      terminalTarget: "herdr-wsl:terminal-1",
+      runtimeTarget: "herdr-wsl",
+      herdrPaneId: "pane-1",
+      herdrAgentName: "qf.quantflow-v2.hermes.tile-hermes",
+      herdrWorkspaceId: "workspace-1",
+      herdrTerminalId: "terminal-1",
+    });
+  });
+
   test("loadState with no connections field returns connections: []", async () => {
     await Bun.write(
       STATE_FILE,

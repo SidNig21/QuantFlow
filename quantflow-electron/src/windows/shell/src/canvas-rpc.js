@@ -1,11 +1,12 @@
 import {
 	tiles, connections, getTile, defaultSize, snapToGrid,
 	addConnection, removeConnection, updateConnectionLabel,
-	getConnection,
+	getConnection, generateId,
 } from "./canvas-state.js";
 import { normalizeCableSide, resolveCableDrop } from "./cable-drop.js";
 import { MIN_SIZES } from "./tile-interactions.js";
 import { ZOOM_MAX, ZOOM_MIN } from "./canvas-viewport.js";
+import { shouldSpawnRoleViaHerdr } from "./role-herdr-spawn.js";
 
 function generateConnectionId() {
 	return "conn-" + Date.now() + "-" + Math.random().toString(36).slice(2, 9);
@@ -255,8 +256,13 @@ export function buildRpcTileSummary(tile, existingConnections = []) {
 		cwd: tile.cwd,
 		ptySessionId: tile.ptySessionId,
 		terminalTarget: tile.terminalTarget,
+		runtimeTarget: tile.runtimeTarget,
 		ptyStatus: tile.ptyStatus,
 		ptyError: tile.ptyError,
+		herdrPaneId: tile.herdrPaneId,
+		herdrAgentName: tile.herdrAgentName,
+		herdrWorkspaceId: tile.herdrWorkspaceId,
+		herdrTerminalId: tile.herdrTerminalId,
 		userTitle: tile.userTitle,
 		autoTitle: tile.autoTitle,
 		routeHandle: tile.routeHandle,
@@ -303,22 +309,69 @@ export function createRoleSpawnFailureEvent(role, message) {
 	};
 }
 
+function requiredHerdrIdentityString(spawn, field) {
+	const value = spawn?.[field];
+	if (typeof value !== "string" || !value.trim()) {
+		throw new Error(`Herdr spawn response missing ${field}`);
+	}
+	return value.trim();
+}
+
+export function normalizeHerdrSpawnIdentity(spawn) {
+	if (!spawn || typeof spawn !== "object") {
+		throw new Error("Herdr spawn response missing identity");
+	}
+	const runtimeTarget = requiredHerdrIdentityString(spawn, "runtimeTarget");
+	if (runtimeTarget !== "herdr-wsl") {
+		throw new Error("Herdr spawn response has invalid runtimeTarget");
+	}
+	const terminalTarget = requiredHerdrIdentityString(spawn, "terminalTarget");
+	const targetPrefix = "herdr-wsl:";
+	if (
+		!terminalTarget.startsWith(targetPrefix) ||
+		!terminalTarget.slice(targetPrefix.length).trim()
+	) {
+		throw new Error("Herdr spawn response has invalid terminalTarget");
+	}
+	return {
+		runtimeTarget,
+		terminalTarget,
+		herdrPaneId: requiredHerdrIdentityString(spawn, "herdrPaneId"),
+		herdrAgentName: requiredHerdrIdentityString(spawn, "herdrAgentName"),
+		herdrWorkspaceId: requiredHerdrIdentityString(spawn, "herdrWorkspaceId"),
+		herdrTerminalId: requiredHerdrIdentityString(spawn, "herdrTerminalId"),
+	};
+}
+
 export function buildRoleTileOptions(role, params = {}) {
 	const size = params.size ?? {};
 	const displayName = String(params.displayName ?? role.name ?? "").trim() || role.name;
+	const herdrSpawn = params.herdrSpawn
+		? normalizeHerdrSpawnIdentity(params.herdrSpawn)
+		: null;
 	const options = {
 		cwd: params.cwd,
 		userTitle: displayName,
-		terminalTarget: normalizeRpcRoleTerminalTarget(role.defaultShell),
+		terminalTarget:
+			herdrSpawn?.terminalTarget ??
+			normalizeRpcRoleTerminalTarget(role.defaultShell),
 		roleId: role.id,
 		roleName: displayName,
 		roleColor: role.color,
 		roleShellKind:
 			getRpcRoleCommandName(role) || role.defaultShell || "shell",
-		roleCommandTemplate: role.commandTemplate,
-		roleStartupPrompt: role.startupPrompt,
+		roleCommandTemplate: herdrSpawn ? undefined : role.commandTemplate,
+		roleStartupPrompt: herdrSpawn ? undefined : role.startupPrompt,
 		roleStatusParser: role.statusParser,
 	};
+	if (params.id) options.id = params.id;
+	if (herdrSpawn) {
+		options.runtimeTarget = herdrSpawn.runtimeTarget;
+		options.herdrPaneId = herdrSpawn.herdrPaneId;
+		options.herdrAgentName = herdrSpawn.herdrAgentName;
+		options.herdrWorkspaceId = herdrSpawn.herdrWorkspaceId;
+		options.herdrTerminalId = herdrSpawn.herdrTerminalId;
+	}
 	if (Number.isFinite(size.width)) options.width = size.width;
 	if (Number.isFinite(size.height)) options.height = size.height;
 	return options;
@@ -472,6 +525,41 @@ export function createCanvasRpc({
 					}
 					const defaultTermSize = defaultSize("term");
 					const requestedSize = params.size ?? defaultTermSize;
+					const tileId = params.tileId || generateId();
+					let herdrSpawn = null;
+					if (shouldSpawnRoleViaHerdr(role)) {
+						if (!window.shellApi.herdrSpawnRole) {
+							const message = "Herdr spawn API is unavailable";
+							onRoleSpawnFailed?.(
+								createRoleSpawnFailureEvent(role, message),
+							);
+							respondError(requestId, 4, message);
+							return;
+						}
+						try {
+							herdrSpawn = normalizeHerdrSpawnIdentity(
+								await window.shellApi.herdrSpawnRole({
+									tileId,
+									roleId: role.id,
+									roleName: role.name,
+									cwd: params.cwd,
+									commandTemplate: role.commandTemplate,
+									startupPrompt: role.startupPrompt,
+									canvasId: params.canvasId,
+									workspaceId: params.workspaceId,
+								}),
+							);
+						} catch (err) {
+							const message = err instanceof Error
+								? err.message
+								: `Herdr spawn failed for ${role.name}`;
+							onRoleSpawnFailed?.(
+								createRoleSpawnFailureEvent(role, message),
+							);
+							respondError(requestId, 4, message);
+							return;
+						}
+					}
 					const pos = params.position
 						? { x: params.position.x, y: params.position.y }
 						: findAutoPlacement(
@@ -483,7 +571,11 @@ export function createCanvasRpc({
 						"term",
 						pos.x,
 						pos.y,
-						buildRoleTileOptions(role, params),
+						buildRoleTileOptions(role, {
+							...params,
+							id: tileId,
+							herdrSpawn,
+						}),
 					);
 					onRoleSpawned?.(createRoleSpawnedEvent(tile, role));
 					tileManager.spawnTerminalWebview(tile, true);

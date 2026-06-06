@@ -635,7 +635,7 @@ ipcMain.handle(
       cols?: number;
       rows?: number;
       tileId?: string;
-      target?: TerminalTarget;
+      target?: TerminalTarget | string;
     },
   ) =>
     pty.createSession(

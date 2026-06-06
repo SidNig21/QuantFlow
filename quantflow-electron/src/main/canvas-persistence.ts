@@ -34,11 +34,16 @@ interface TileState {
   url?: string | null;
   workspacePath?: string;
   ptySessionId?: string;
+  terminalTarget?: string;
+  runtimeTarget?: string;
   userTitle?: string;
   autoTitle?: string;
   routeHandle?: string;
   /** herdr pane_id linked to this tile, e.g. "w65190c26215c41-1" */
   herdrPaneId?: string;
+  herdrAgentName?: string;
+  herdrWorkspaceId?: string;
+  herdrTerminalId?: string;
   zIndex: number;
 }
 

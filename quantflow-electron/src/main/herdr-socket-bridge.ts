@@ -1,8 +1,8 @@
 /**
  * herdr-socket-bridge.ts
  *
- * v2 Slice 1: Electron main → herdr Unix socket API (newline-delimited JSON).
- * Scope: ping → pong only. CLI wrapper remains in herdr-bridge.ts until later slices.
+ * v2: Electron main → herdr Unix socket API (newline-delimited JSON).
+ * Scope: typed RPC helper for ping plus v2 spawn operations.
  *
  * @see https://herdr.dev/docs/socket-api/
  */
@@ -22,9 +22,9 @@ export interface HerdrPong {
   protocol?: number;
 }
 
-interface HerdrSocketEnvelope {
+interface HerdrSocketEnvelope<T = Record<string, unknown>> {
   id?: string;
-  result?: HerdrPong & Record<string, unknown>;
+  result?: T;
   error?: { message?: string; code?: string };
 }
 
@@ -38,34 +38,114 @@ export class HerdrSocketError extends Error {
   }
 }
 
-function parseEnvelope(line: string): HerdrSocketEnvelope {
+function parseEnvelope<T = Record<string, unknown>>(
+  line: string,
+): HerdrSocketEnvelope<T> {
   try {
-    return JSON.parse(line) as HerdrSocketEnvelope;
+    return JSON.parse(line) as HerdrSocketEnvelope<T>;
   } catch {
     throw new HerdrSocketError("Invalid JSON from herdr socket", "protocol");
   }
 }
 
-function assertPong(envelope: HerdrSocketEnvelope): HerdrPong {
+function assertResult<T>(envelope: HerdrSocketEnvelope<T>): T {
   if (envelope.error) {
     throw new HerdrSocketError(
       envelope.error.message ?? "herdr socket error",
       "protocol",
     );
   }
-  const result = envelope.result;
-  if (!result || result.type !== "pong") {
+  if (envelope.result === undefined || envelope.result === null) {
+    throw new HerdrSocketError("herdr socket response had no result", "protocol");
+  }
+  return envelope.result;
+}
+
+function assertPong(result: unknown): HerdrPong {
+  if (!result || typeof result !== "object") {
+    throw new HerdrSocketError("Expected pong, got no result", "protocol");
+  }
+  const record = result as HerdrPong & Record<string, unknown>;
+  if (record.type !== "pong") {
     throw new HerdrSocketError(
-      `Expected pong, got ${result?.type ?? "no result"}`,
+      `Expected pong, got ${record.type ?? "no result"}`,
       "protocol",
     );
   }
   return {
     type: "pong",
-    version: typeof result.version === "string" ? result.version : undefined,
+    version: typeof record.version === "string" ? record.version : undefined,
     protocol:
-      typeof result.protocol === "number" ? result.protocol : undefined,
+      typeof record.protocol === "number" ? record.protocol : undefined,
   };
+}
+
+function makeRpcRequest(
+  method: string,
+  params: Record<string, unknown> | undefined,
+): { id: string; request: string } {
+  const id = `qf-${method.replace(/[^a-z0-9_.:-]/gi, "-")}-${Date.now()}`;
+  const request = JSON.stringify({ id, method, params: params ?? {} }) + "\n";
+  return { id, request };
+}
+
+function rpcOnce<T>(
+  socketPath: string,
+  method: string,
+  params: Record<string, unknown> | undefined,
+  timeoutMs: number,
+): Promise<T> {
+  const { id, request } = makeRpcRequest(method, params);
+
+  return new Promise((resolve, reject) => {
+    let buf = "";
+    const socket = net.createConnection(socketPath, () => {
+      socket.write(request);
+    });
+
+    const timer = setTimeout(() => {
+      socket.destroy();
+      reject(new HerdrSocketError(`herdr ${method} timed out (${timeoutMs}ms)`, "timeout"));
+    }, timeoutMs);
+
+    const finish = (err: Error | null, result?: T) => {
+      clearTimeout(timer);
+      socket.destroy();
+      if (err) reject(err);
+      else resolve(result!);
+    };
+
+    socket.on("data", (chunk) => {
+      buf += chunk.toString();
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        try {
+          const envelope = parseEnvelope<T>(line);
+          if (envelope.id && envelope.id !== id) continue;
+          finish(null, assertResult(envelope));
+        } catch (e) {
+          finish(e instanceof Error ? e : new HerdrSocketError(String(e)));
+        }
+        return;
+      }
+    });
+
+    socket.on("error", (err) => {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ECONNREFUSED") {
+        finish(
+          new HerdrSocketError(
+            `Cannot connect to herdr socket at ${socketPath} (${code}). Is herdr server running?`,
+            "server_down",
+          ),
+        );
+        return;
+      }
+      finish(new HerdrSocketError(err.message, "transport"));
+    });
+  });
 }
 
 async function resolveSocketPath(): Promise<string> {
@@ -96,66 +176,17 @@ async function resolveSocketPath(): Promise<string> {
   return `${home}/.config/herdr/herdr.sock`;
 }
 
-function rpcPingOnce(
-  socketPath: string,
-  timeoutMs: number,
-): Promise<HerdrPong> {
-  const id = `qf-ping-${Date.now()}`;
-  const request = JSON.stringify({ id, method: "ping", params: {} }) + "\n";
-
-  return new Promise((resolve, reject) => {
-    let buf = "";
-    const socket = net.createConnection(socketPath, () => {
-      socket.write(request);
-    });
-
-    const timer = setTimeout(() => {
-      socket.destroy();
-      reject(new HerdrSocketError(`herdr ping timed out (${timeoutMs}ms)`, "timeout"));
-    }, timeoutMs);
-
-    const finish = (err: Error | null, pong?: HerdrPong) => {
-      clearTimeout(timer);
-      socket.destroy();
-      if (err) reject(err);
-      else resolve(pong!);
-    };
-
-    socket.on("data", (chunk) => {
-      buf += chunk.toString();
-      const nl = buf.indexOf("\n");
-      if (nl === -1) return;
-      try {
-        finish(null, assertPong(parseEnvelope(buf.slice(0, nl))));
-      } catch (e) {
-        finish(e instanceof Error ? e : new HerdrSocketError(String(e)));
-      }
-    });
-
-    socket.on("error", (err) => {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code === "ENOENT" || code === "ECONNREFUSED") {
-        finish(
-          new HerdrSocketError(
-            `Cannot connect to herdr socket at ${socketPath} (${code}). Is herdr server running?`,
-            "server_down",
-          ),
-        );
-        return;
-      }
-      finish(new HerdrSocketError(err.message, "transport"));
-    });
-  });
-}
-
 /** Python one-liner in WSL (node may not be on non-login PATH). */
-function wslPingScript(socketPath: string, timeoutMs: number): string {
-  const escapedPath = socketPath.replace(/'/g, "'\\''");
+function wslRpcScript(
+  socketPath: string,
+  request: string,
+  timeoutMs: number,
+): string {
   return `
 import json, os, socket, sys
-path = os.environ.get("HERDR_SOCKET_PATH") or "${escapedPath}"
+path = os.environ.get("HERDR_SOCKET_PATH") or ${JSON.stringify(socketPath)}
 timeout = ${timeoutMs} / 1000.0
-req = (json.dumps({"id": "qf-ping-wsl", "method": "ping", "params": {}}) + "\\n").encode()
+req = ${JSON.stringify(request)}.encode()
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 s.settimeout(timeout)
 try:
@@ -177,11 +208,14 @@ finally:
 `.trim();
 }
 
-async function pingViaWsl(
+async function rpcViaWsl<T>(
   socketPath: string,
+  method: string,
+  params: Record<string, unknown> | undefined,
   timeoutMs: number,
-): Promise<HerdrPong> {
-  const script = wslPingScript(socketPath, timeoutMs);
+): Promise<T> {
+  const { request } = makeRpcRequest(method, params);
+  const script = wslRpcScript(socketPath, request, timeoutMs);
   try {
     const { stdout, stderr } = await execFileAsync(
       "wsl.exe",
@@ -195,11 +229,11 @@ async function pingViaWsl(
     );
     if (!stdout.trim()) {
       throw new HerdrSocketError(
-        stderr.trim() || "Empty response from WSL herdr ping",
+        stderr.trim() || "Empty response from WSL herdr RPC",
         "transport",
       );
     }
-    return assertPong(parseEnvelope(stdout.trim()));
+    return assertResult(parseEnvelope<T>(stdout.trim()));
   } catch (err) {
     if (err instanceof HerdrSocketError) throw err;
     const exit = err as { code?: number; stderr?: string; message?: string };
@@ -218,6 +252,23 @@ async function pingViaWsl(
   }
 }
 
+export async function callHerdrSocket<T = Record<string, unknown>>(
+  method: string,
+  params?: Record<string, unknown>,
+  options?: {
+    socketPath?: string;
+    timeoutMs?: number;
+  },
+): Promise<T> {
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const socketPath = options?.socketPath ?? (await resolveSocketPath());
+
+  if (process.platform === "win32") {
+    return rpcViaWsl<T>(socketPath, method, params, timeoutMs);
+  }
+  return rpcOnce<T>(socketPath, method, params, timeoutMs);
+}
+
 /**
  * Sends herdr socket API `ping` and returns `pong`.
  * Windows: RPC runs inside WSL against the Unix socket.
@@ -227,11 +278,5 @@ export async function pingHerdrSocket(options?: {
   socketPath?: string;
   timeoutMs?: number;
 }): Promise<HerdrPong> {
-  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const socketPath = options?.socketPath ?? (await resolveSocketPath());
-
-  if (process.platform === "win32") {
-    return pingViaWsl(socketPath, timeoutMs);
-  }
-  return rpcPingOnce(socketPath, timeoutMs);
+  return assertPong(await callHerdrSocket("ping", {}, options));
 }

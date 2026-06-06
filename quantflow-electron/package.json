@@ -21,6 +21,8 @@
 		"release": "bun ./scripts/package.mjs --publish",
 		"test": "bun test",
 		"test:updater": "bun test src/main/updater/github-release-fetcher.test.ts && bun test src/main/updater/downloader.test.ts && bun test src/main/updater/update-manager.test.ts",
+		"smoke:herdr-spawn": "bun scripts/herdr-spawn-smoke.ts",
+		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",
 		"postinstall": "node scripts/postinstall.mjs"
 	},
 	"build": {

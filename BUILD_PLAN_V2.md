@@ -1,15 +1,30 @@
-# QuantFlow V2 — Build Plan
+# QuantFlow v2 — build plan
 
-**Slice 1 — DONE (f72c0b4)** — Herdr socket bridge. Connect Electron main process to herdr Unix socket in WSL2. Send ping, receive pong.
+Read `CONCEPT.md` first. Boundaries in `SCOPE.md`.
+
+**Rule:** Next slice only after current gate passes operator acceptance in `SCOPE.md`.
+
+---
+
+**Gate 1 — DONE (`f72c0b4`)** — herdr socket ping → pong from Electron main.
 
 Proof: `{"type":"pong","version":"0.5.5","protocol":2}`
 
-**Slice 2 — One tile end to end.** Hermes tile spawns from legend via herdr agent.start. xterm.js renders output. Tile shows live state from herdr events. No polling.
+---
 
-**Slice 3 — A2A strings.** One string between two tiles creates an A2A connection. Source tile has Agent Card. Target receives delegated task. Result flows back.
+**Gate 2 — ACTIVE** — one Hermes tile, end to end.
 
-**Slice 4 — Full legend palette.** All built-in tiles spawn correctly. Custom tile registration form uses identical config format to built-ins.
+- Legend spawn → herdr socket creates pane, starts agent (`hermes` command).
+- Tile persists `herdrPaneId`, `herdrAgentName`.
+- Display: **PTY bridge** to that pane (v1 slice 2a model). Interactive xterm.
+- Windows Generic CLI unchanged (node-pty only).
 
-**Slice 5 — Envoy bridge.** Canvas loads one Envoy space. Dumb tile output posted by watcher. Hermes reads with matching connection and correlation IDs.
+**Not gate 2:** A2A, Envoy, full legend, events.subscribe (that's gate 3).
 
-**Rule:** Do not start a slice until the previous slice passes its acceptance criteria.
+---
+
+**Gate 3** — live tile state via herdr `events.subscribe` (no WSL polling).
+
+---
+
+**Later** — A2A strings → legend palette → Envoy bridge (see `SCOPE.md` frozen list).

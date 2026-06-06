@@ -14,8 +14,13 @@
  * @property {string} [cwd] - Working directory for terminal tiles
  * @property {string} [ptySessionId] - PTY session ID for terminal tiles
  * @property {string} [terminalTarget] - Requested terminal backend target
+ * @property {string} [runtimeTarget] - Runtime owner, e.g. herdr-wsl or windows-pty
  * @property {string} [ptyStatus] - Runtime status for terminal tiles
  * @property {string} [ptyError] - Last PTY startup/runtime error
+ * @property {string} [herdrPaneId] - Herdr pane identity for WSL/herdr tiles
+ * @property {string} [herdrAgentName] - Herdr agent identity for WSL/herdr tiles
+ * @property {string} [herdrWorkspaceId] - Herdr workspace/session identity for WSL/herdr tiles
+ * @property {string} [herdrTerminalId] - Herdr terminal attach identity for display
  * @property {string} [userTitle] - Manual title override set by user
  * @property {string} [autoTitle] - Auto-computed title from terminal session
  * @property {string} [routeHandle] - Stable relay handle without the @ prefix
