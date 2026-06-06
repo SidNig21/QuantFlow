@@ -425,6 +425,7 @@ describe("createCanvasRpc roleSpawn", () => {
             name: "Hermes",
             color: "#06b6d4",
             defaultShell: "wsl",
+            runtimeTarget: "herdr-wsl",
             commandTemplate: "hermes",
           },
           cwd: "/repo",
@@ -453,7 +454,7 @@ describe("createCanvasRpc roleSpawn", () => {
     ]);
   });
 
-  test("keeps a pending Hermes tile when herdr spawn fails in the background", async () => {
+  test("keeps a Hermes tile in error state when herdr spawn fails", async () => {
     const herdrRequests = [];
     const harness = createRoleSpawnHarness({
       shellApi: {
@@ -474,6 +475,7 @@ describe("createCanvasRpc roleSpawn", () => {
             name: "Hermes",
             color: "#06b6d4",
             defaultShell: "wsl",
+            runtimeTarget: "herdr-wsl",
             commandTemplate: "hermes",
           },
           cwd: "/repo",
@@ -481,7 +483,6 @@ describe("createCanvasRpc roleSpawn", () => {
           workspaceId: "QuantFlow V2",
         },
       });
-      await Promise.resolve();
     } finally {
       harness.restoreWindow();
     }
@@ -509,8 +510,8 @@ describe("createCanvasRpc roleSpawn", () => {
       ptyError: "herdr socket unavailable",
       roleCommandTemplate: "hermes",
     });
-    expect(harness.terminalSpawns).toHaveLength(1);
-    expect(harness.saves).toEqual(["immediate", "immediate"]);
+    expect(harness.terminalSpawns).toHaveLength(0);
+    expect(harness.saves).toEqual(["immediate", "immediate", "immediate"]);
     expect(harness.failures).toHaveLength(1);
     expect(harness.failures[0]).toMatchObject({
       type: "role.failed",
@@ -520,28 +521,32 @@ describe("createCanvasRpc roleSpawn", () => {
     expect(harness.responses[0]?.result).toMatchObject({
       id: "tile-hermes",
       runtimeTarget: "herdr-wsl",
-      terminalPending: true,
+      terminalPending: false,
       terminalTarget: undefined,
+      ptyStatus: "error",
     });
   });
 
-  test("creates a pending Hermes tile immediately and attaches after herdr identity resolves", async () => {
+  test("opens one terminal webview after herdr identity resolves", async () => {
     const herdrRequests = [];
-    let resolveHerdrSpawn;
-    const herdrSpawnPromise = new Promise((resolve) => {
-      resolveHerdrSpawn = resolve;
-    });
     const harness = createRoleSpawnHarness({
       shellApi: {
         herdrSpawnRole: async (payload) => {
           herdrRequests.push(payload);
-          return herdrSpawnPromise;
+          return {
+            runtimeTarget: "herdr-wsl",
+            herdrPaneId: "pane-1",
+            herdrAgentName: "qf.quantflow-v2.hermes.tile-hermes",
+            herdrWorkspaceId: "workspace-1",
+            herdrTerminalId: "terminal-1",
+            terminalTarget: "herdr-wsl:terminal-1",
+          };
         },
       },
     });
 
     try {
-      const result = harness.handler({
+      await harness.handler({
         requestId: "req-hermes",
         method: "roleSpawn",
         params: {
@@ -550,6 +555,7 @@ describe("createCanvasRpc roleSpawn", () => {
             name: "Hermes",
             color: "#06b6d4",
             defaultShell: "wsl",
+            runtimeTarget: "herdr-wsl",
             commandTemplate: "hermes",
             startupPrompt: "Coordinate the canvas.",
           },
@@ -559,59 +565,23 @@ describe("createCanvasRpc roleSpawn", () => {
           workspaceId: "QuantFlow V2",
         },
       });
-
-      await result;
-      expect(herdrRequests).toHaveLength(1);
-      expect(harness.createdTiles).toHaveLength(1);
-      expect(tiles).toHaveLength(1);
-      expect(harness.createdTiles[0]).toMatchObject({
-        id: "tile-hermes",
-        runtimeTarget: "herdr-wsl",
-        terminalTarget: undefined,
-        terminalPending: true,
-        ptyStatus: "connecting",
-        roleCommandTemplate: "hermes",
-        roleStartupPrompt: "Coordinate the canvas.",
-      });
-      expect(harness.terminalSpawns).toHaveLength(1);
-      expect(harness.responses[0]?.result).toMatchObject({
-        id: "tile-hermes",
-        terminalTarget: undefined,
-        runtimeTarget: "herdr-wsl",
-        terminalPending: true,
-      });
-
-      resolveHerdrSpawn({
-        runtimeTarget: "herdr-wsl",
-        herdrPaneId: "pane-1",
-        herdrAgentName: "qf.quantflow-v2.hermes.tile-hermes",
-        herdrWorkspaceId: "workspace-1",
-        herdrTerminalId: "terminal-1",
-        terminalTarget: "herdr-wsl:terminal-1",
-      });
-      await Promise.resolve();
-      await Promise.resolve();
     } finally {
       harness.restoreWindow();
     }
 
+    expect(herdrRequests).toHaveLength(1);
     expect(harness.createdTiles).toHaveLength(1);
     expect(harness.createdTiles[0]).toMatchObject({
       id: "tile-hermes",
-      type: "term",
-      cwd: "/repo",
       terminalTarget: "herdr-wsl:terminal-1",
       runtimeTarget: "herdr-wsl",
       herdrPaneId: "pane-1",
-      herdrAgentName: "qf.quantflow-v2.hermes.tile-hermes",
-      herdrWorkspaceId: "workspace-1",
-      herdrTerminalId: "terminal-1",
       terminalPending: false,
       roleCommandTemplate: "hermes",
       roleStartupPrompt: "Coordinate the canvas.",
     });
-    expect(harness.terminalSpawns).toHaveLength(2);
-    expect(harness.saves).toEqual(["immediate", "immediate"]);
+    expect(harness.terminalSpawns).toHaveLength(1);
+    expect(harness.saves).toEqual(["immediate", "immediate", "immediate"]);
   });
 
   test("marks the pending Hermes tile failed when herdr returns incomplete identity", async () => {
@@ -637,13 +607,13 @@ describe("createCanvasRpc roleSpawn", () => {
             name: "Hermes",
             color: "#06b6d4",
             defaultShell: "wsl",
+            runtimeTarget: "herdr-wsl",
             commandTemplate: "hermes",
           },
           cwd: "/repo",
           tileId: "tile-hermes",
         },
       });
-      await Promise.resolve();
     } finally {
       harness.restoreWindow();
     }
@@ -656,8 +626,8 @@ describe("createCanvasRpc roleSpawn", () => {
       ptyStatus: "error",
       ptyError: "Herdr spawn response missing herdrTerminalId",
     });
-    expect(harness.terminalSpawns).toHaveLength(1);
-    expect(harness.saves).toEqual(["immediate", "immediate"]);
+    expect(harness.terminalSpawns).toHaveLength(0);
+    expect(harness.saves).toEqual(["immediate", "immediate", "immediate"]);
     expect(harness.failures[0]).toMatchObject({
       type: "role.failed",
       summary: "Herdr spawn response missing herdrTerminalId",
@@ -665,17 +635,25 @@ describe("createCanvasRpc roleSpawn", () => {
     });
     expect(harness.responses[0]?.result).toMatchObject({
       id: "tile-hermes",
-      terminalPending: true,
+      terminalPending: false,
+      ptyStatus: "error",
     });
   });
 
-  test("keeps non-Hermes WSL roles on the existing terminal fallback", async () => {
+  test("routes herdr-wsl roles like Codex through herdr spawn", async () => {
     const herdrRequests = [];
     const harness = createRoleSpawnHarness({
       shellApi: {
         herdrSpawnRole: async (payload) => {
           herdrRequests.push(payload);
-          throw new Error("should not call herdr for non-Hermes in 2B");
+          return {
+            runtimeTarget: "herdr-wsl",
+            herdrPaneId: "pane-codex",
+            herdrAgentName: "qf.canvas.codex.tile-codex",
+            herdrWorkspaceId: "workspace-1",
+            herdrTerminalId: "terminal-codex",
+            terminalTarget: "herdr-wsl:terminal-codex",
+          };
         },
       },
     });
@@ -690,6 +668,7 @@ describe("createCanvasRpc roleSpawn", () => {
             name: "Codex",
             color: "#38bdf8",
             defaultShell: "wsl",
+            runtimeTarget: "herdr-wsl",
             commandTemplate: "codex --full-auto",
           },
           cwd: "/repo",
@@ -700,21 +679,66 @@ describe("createCanvasRpc roleSpawn", () => {
       harness.restoreWindow();
     }
 
-    expect(herdrRequests).toHaveLength(0);
+    expect(herdrRequests).toHaveLength(1);
     expect(harness.createdTiles).toHaveLength(1);
     expect(harness.createdTiles[0]).toMatchObject({
       id: "tile-codex",
-      terminalTarget: "wsl",
+      terminalTarget: "herdr-wsl:terminal-codex",
+      runtimeTarget: "herdr-wsl",
+      herdrPaneId: "pane-codex",
       roleCommandTemplate: "codex --full-auto",
     });
-    expect(harness.createdTiles[0].runtimeTarget).toBeUndefined();
-    expect(harness.createdTiles[0].herdrPaneId).toBeUndefined();
     expect(harness.terminalSpawns).toHaveLength(1);
-    expect(harness.saves).toEqual(["immediate"]);
     expect(harness.responses[0]?.result).toMatchObject({
       id: "tile-codex",
-      terminalTarget: "wsl",
+      terminalTarget: "herdr-wsl:terminal-codex",
+      runtimeTarget: "herdr-wsl",
       roleCommandTemplate: "codex --full-auto",
+    });
+  });
+
+  test("keeps windows-pty roles on the node-pty fallback", async () => {
+    const herdrRequests = [];
+    const harness = createRoleSpawnHarness({
+      shellApi: {
+        herdrSpawnRole: async (payload) => {
+          herdrRequests.push(payload);
+          throw new Error("should not call herdr for windows-pty roles");
+        },
+      },
+    });
+
+    try {
+      await harness.handler({
+        requestId: "req-shell",
+        method: "roleSpawn",
+        params: {
+          role: {
+            id: "shell",
+            name: "Shell",
+            color: "#64748b",
+            defaultShell: "auto",
+            runtimeTarget: "windows-pty",
+          },
+          cwd: "/repo",
+          tileId: "tile-shell",
+        },
+      });
+    } finally {
+      harness.restoreWindow();
+    }
+
+    expect(herdrRequests).toHaveLength(0);
+    expect(harness.createdTiles).toHaveLength(1);
+    expect(harness.createdTiles[0]).toMatchObject({
+      id: "tile-shell",
+      runtimeTarget: "windows-pty",
+    });
+    expect(harness.createdTiles[0].herdrPaneId).toBeUndefined();
+    expect(harness.terminalSpawns).toHaveLength(1);
+    expect(harness.responses[0]?.result).toMatchObject({
+      id: "tile-shell",
+      runtimeTarget: "windows-pty",
     });
   });
 });

@@ -1,5 +1,8 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { callHerdrSocket } from "./herdr-socket-bridge";
 import { buildHerdrDisplayTarget } from "./pty-spawn-params";
+
+const ROLE_STARTUP_PROMPT_DELAY_MS = 1800;
 
 export interface HerdrRoleSpawnRequest {
   tileId: string;
@@ -28,12 +31,6 @@ export type HerdrRpc = <T = Record<string, unknown>>(
   method: string,
   params?: Record<string, unknown>,
 ) => Promise<T>;
-
-export function shouldSpawnRoleViaHerdr(role: {
-  id?: string;
-} | null | undefined): boolean {
-  return role?.id === "hermes";
-}
 
 function slugPart(value: string | undefined, fallback: string): string {
   const slug = String(value ?? "")
@@ -116,6 +113,17 @@ export function extractHerdrTerminalId(
   return candidates.find(Boolean) ?? null;
 }
 
+async function sendHerdrPaneLine(
+  rpc: HerdrRpc,
+  paneId: string,
+  text: string,
+): Promise<void> {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  await rpc("pane.send_text", { pane_id: paneId, text: trimmed });
+  await rpc("pane.send_keys", { pane_id: paneId, keys: ["Enter"] });
+}
+
 export async function spawnHerdrRoleSession(
   request: HerdrRoleSpawnRequest,
   rpc: HerdrRpc = callHerdrSocket,
@@ -161,6 +169,19 @@ export async function spawnHerdrRoleSession(
   const herdrTerminalId = extractHerdrTerminalId(paneGetResult);
   if (!herdrTerminalId) {
     throw new Error("herdr pane get did not return an agent terminal id");
+  }
+
+  const commandTemplate = request.commandTemplate?.trim() ?? "";
+  const startupPrompt = request.startupPrompt?.trim() ?? "";
+
+  if (commandTemplate) {
+    await sendHerdrPaneLine(rpc, herdrPaneId, commandTemplate);
+  }
+  if (startupPrompt) {
+    if (commandTemplate) {
+      await delay(ROLE_STARTUP_PROMPT_DELAY_MS);
+    }
+    await sendHerdrPaneLine(rpc, herdrPaneId, startupPrompt);
   }
 
   return {

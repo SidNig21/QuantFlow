@@ -6,7 +6,6 @@ import {
   extractHerdrPaneId,
   extractHerdrTerminalId,
   extractHerdrWorkspaceId,
-  shouldSpawnRoleViaHerdr,
   spawnHerdrRoleSession,
 } from "./herdr-session-spawn";
 
@@ -37,12 +36,6 @@ describe("herdr role spawn planning", () => {
     })).toBe("qf.quantflow-v2.hermes.tile-123");
   });
 
-  test("routes only Hermes through 2B herdr spawn initially", () => {
-    expect(shouldSpawnRoleViaHerdr({ id: "hermes" })).toBe(true);
-    expect(shouldSpawnRoleViaHerdr({ id: "codex" })).toBe(false);
-    expect(shouldSpawnRoleViaHerdr(null)).toBe(false);
-  });
-
   test("extracts pane and terminal identity from permissive response shapes", () => {
     expect(extractHerdrPaneId(
       { root_pane: { pane_id: "root-pane" } },
@@ -69,7 +62,6 @@ describe("herdr role spawn planning", () => {
       roleName: "Hermes",
       cwd: "/repo",
       commandTemplate: "hermes",
-      startupPrompt: "Coordinate this canvas.",
       workspaceId: "QuantFlow V2",
     }, async (method, params) => {
       calls.push({ method, params });
@@ -95,6 +87,9 @@ describe("herdr role spawn planning", () => {
           },
         };
       }
+      if (method === "pane.send_text" || method === "pane.send_keys") {
+        return {};
+      }
       throw new Error(`unexpected method ${method}`);
     });
 
@@ -102,7 +97,13 @@ describe("herdr role spawn planning", () => {
       "workspace.create",
       "pane.split",
       "pane.get",
+      "pane.send_text",
+      "pane.send_keys",
     ]);
+    expect(calls[3]?.params).toMatchObject({
+      pane_id: "pane-1",
+      text: "hermes",
+    });
     expect(calls[0]?.params).toMatchObject({
       label: "qf.quantflow-v2.hermes.tile-1",
       cwd: "/repo",
@@ -128,14 +129,14 @@ describe("herdr role spawn planning", () => {
     });
   });
 
-  test("does not type startup prompts into a blank herdr pane", async () => {
+  test("sends startup prompts into the herdr pane when no command template exists", async () => {
     const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
     const result = await spawnHerdrRoleSession({
-      tileId: "tile-hermes",
-      roleId: "hermes",
-      roleName: "Hermes",
+      tileId: "tile-python",
+      roleId: "python",
+      roleName: "Python script",
       cwd: "/repo",
-      startupPrompt: "Act as Hermes, the run orchestrator.",
+      startupPrompt: "Open a Python worker shell.",
       workspaceId: "QuantFlow V2",
     }, async (method, params) => {
       calls.push({ method, params });
@@ -161,6 +162,9 @@ describe("herdr role spawn planning", () => {
           },
         };
       }
+      if (method === "pane.send_text" || method === "pane.send_keys") {
+        return {};
+      }
       throw new Error(`unexpected method ${method}`);
     });
 
@@ -168,7 +172,13 @@ describe("herdr role spawn planning", () => {
       "workspace.create",
       "pane.split",
       "pane.get",
+      "pane.send_text",
+      "pane.send_keys",
     ]);
+    expect(calls[3]?.params).toMatchObject({
+      pane_id: "pane-1",
+      text: "Open a Python worker shell.",
+    });
     expect(result).toMatchObject({
       runtimeTarget: "herdr-wsl",
       herdrPaneId: "pane-1",

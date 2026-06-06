@@ -333,6 +333,7 @@ export function createTileManager({
 	}
 
 	function maybeRunRoleStartup(tile) {
+		if (tile?.runtimeTarget === "herdr-wsl") return;
 		const writes = getRoleStartupWrites(tile);
 		if (!writes.length) return;
 		const sessionId = tile.ptySessionId;

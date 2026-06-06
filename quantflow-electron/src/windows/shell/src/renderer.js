@@ -38,10 +38,8 @@ import {
 	createCanvasRpc,
 	createConnectionLabelEvent,
 	createConnectionMutationEvent,
-	buildRoleTileOptions,
 	createRoleSpawnedEvent,
 	createRoleSpawnFailureEvent,
-	applyHerdrSpawnIdentityToTile,
 	createTerminalReadFailureEvent,
 	createTerminalWriteFailureEvent,
 } from "./canvas-rpc.js";
@@ -94,7 +92,7 @@ import {
 } from "./launch-diagnostics-view.js";
 import { formatRoleStartupEvent } from "./role-startup.js";
 import { createLegendDock, LEGEND_RECIPES } from "./legend-dock.js";
-import { shouldSpawnRoleViaHerdr } from "./role-herdr-spawn.js";
+import { spawnRoleTileAt as spawnRoleTileAtShared } from "./role-tile-spawn.js";
 import {
 	LEGEND_TILE_SIZE,
 	getLegendClickPlacement,
@@ -1563,82 +1561,25 @@ async function init() {
 		if (dom) updateTileTitle(dom, tile);
 	}
 
-	function connectHerdrRoleTile(tile, role, cwd, displayName) {
-		void window.shellApi.herdrSpawnRole({
-			tileId: tile.id,
-			roleId: role.id,
-			roleName: role.name,
-			cwd,
-			commandTemplate: role.commandTemplate,
-			startupPrompt: role.startupPrompt,
-			canvasId: workspaceData.workspaces?.[0] ?? "canvas",
-			workspaceId: workspaceData.workspaces?.[0],
-		}).then((spawn) => {
-			applyHerdrSpawnIdentityToTile(tile, spawn);
-			tileManager.spawnTerminalWebview(tile, true);
-			updateRoleTileChrome(tile);
-			tileManager.saveCanvasImmediate();
-			minimap.update();
-		}).catch((err) => {
-			const message = err instanceof Error
-				? err.message
-				: `Herdr spawn failed for ${displayName}`;
-			tile.terminalPending = false;
-			tile.ptyStatus = "error";
-			tile.ptyError = message;
-			updateRoleTileChrome(tile);
-			tileManager.saveCanvasImmediate();
-			operationalEvents.record(createRoleSpawnFailureEvent(role, message));
-			toasts.show({ message, tone: "error" });
-		});
-	}
-
 	async function spawnRoleTileAt(role, x, y, options = {}) {
-		if (!role) return null;
-		const displayName = String(options.displayName ?? role.name ?? "").trim() || role.name;
-		if (isMissingRoleCommand(role)) {
-			const message = `${displayName} is missing command: ${getRoleCommandName(role)}`;
-			operationalEvents.record(createRoleSpawnFailureEvent(role, message));
-			toasts.show({ message, tone: "error" });
-			return null;
-		}
-		const cwd = getTerminalCwd();
-		const size = options.size ?? getTerminalSize();
-		const tileId = options.id || generateId();
-		const shouldUseHerdr = shouldSpawnRoleViaHerdr(role);
-		if (shouldUseHerdr) {
-			if (!window.shellApi.herdrSpawnRole) {
-				const message = "Herdr spawn API is unavailable";
-				operationalEvents.record(createRoleSpawnFailureEvent(role, message));
-				toasts.show({ message, tone: "error" });
-				return null;
-			}
-		}
-		const tile = tileManager.createCanvasTile(
-			"term", x, y, {
-				...buildRoleTileOptions(role, {
-					cwd,
-					size,
-					displayName,
-					id: tileId,
-					herdrSpawn: null,
-				}),
-			},
-		);
-		if (shouldUseHerdr) {
-			tile.runtimeTarget = "herdr-wsl";
-			tile.terminalTarget = undefined;
-			tile.terminalPending = true;
-			tile.ptyStatus = "connecting";
-		}
-		operationalEvents.record(createRoleSpawnedEvent(tile, role));
-		tileManager.spawnTerminalWebview(tile, true);
-		tileManager.saveCanvasImmediate();
-		minimap.update();
-		if (shouldUseHerdr) {
-			connectHerdrRoleTile(tile, role, cwd, displayName);
-		}
-		return tile;
+		return spawnRoleTileAtShared({
+			tileManager,
+			generateId,
+			getTerminalCwd,
+			getTerminalSize,
+			shellApi: window.shellApi,
+			workspaceId: workspaceData.workspaces?.[0],
+			canvasId: workspaceData.workspaces?.[0],
+			onRoleSpawned: (event) => operationalEvents.record(event),
+			onRoleSpawnFailed: (event) => operationalEvents.record(event),
+			isMissingRoleCommand,
+			getRoleCommandName,
+			createRoleSpawnFailureEvent,
+			createRoleSpawnedEvent,
+			updateRoleTileChrome,
+			minimap,
+			toasts,
+		}, role, x, y, options);
 	}
 
 	Promise.resolve(window.shellApi.runtimeDiagnostics?.() ?? [])

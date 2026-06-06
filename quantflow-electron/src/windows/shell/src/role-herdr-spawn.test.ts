@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { shouldSpawnRoleViaHerdr } from "./role-herdr-spawn.js";
+import { requiresHerdrSpawn } from "./role-herdr-spawn.js";
 
-describe("shouldSpawnRoleViaHerdr", () => {
-	test("routes only Hermes through herdr for 2B", () => {
-		expect(shouldSpawnRoleViaHerdr({ id: "hermes" })).toBe(true);
-		expect(shouldSpawnRoleViaHerdr({ id: "codex" })).toBe(false);
-		expect(shouldSpawnRoleViaHerdr({ id: "shell" })).toBe(false);
-		expect(shouldSpawnRoleViaHerdr(null)).toBe(false);
+describe("requiresHerdrSpawn", () => {
+	test("routes WSL agent roles through herdr via runtimeTarget", () => {
+		expect(requiresHerdrSpawn({ runtimeTarget: "herdr-wsl" })).toBe(true);
+		expect(requiresHerdrSpawn({ runtimeTarget: "windows-pty" })).toBe(false);
+		expect(requiresHerdrSpawn({ id: "hermes" })).toBe(false);
+		expect(requiresHerdrSpawn(null)).toBe(false);
 	});
 });

@@ -3,7 +3,13 @@ import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { getRoleCommandName, listRoles, getRole, _setRolesDir } from "./role-service";
+import {
+  getRoleCommandName,
+  listRoles,
+  getRole,
+  requiresHerdrSpawn,
+  _setRolesDir,
+} from "./role-service";
 
 const TEST_ROOT = join(tmpdir(), `quantflow-roles-${Date.now()}`);
 
@@ -96,6 +102,19 @@ describe("listRoles", () => {
       expect(role.statusParser === undefined || typeof role.statusParser === "object")
         .toBe(true);
     }
+  });
+
+  test("WSL legend agents use herdr-wsl runtimeTarget", async () => {
+    const roles = await listRoles();
+    const herdrIds = ["hermes", "codex", "claude-worker", "opencode", "python", "puffer"];
+    for (const id of herdrIds) {
+      const role = roles.find((entry) => entry.id === id);
+      expect(role?.runtimeTarget).toBe("herdr-wsl");
+      expect(requiresHerdrSpawn(role)).toBe(true);
+    }
+    expect(roles.find((role) => role.id === "shell")?.runtimeTarget)
+      .toBe("windows-pty");
+    expect(requiresHerdrSpawn(roles.find((role) => role.id === "shell"))).toBe(false);
   });
 
   test("agent roles include status parser hints", async () => {

@@ -9,6 +9,8 @@ export function _setRolesDir(dir: string): void {
   rolesDir = dir;
 }
 
+export type RoleRuntimeTarget = "herdr-wsl" | "windows-pty";
+
 export interface Role {
   id: string;
   name: string;
@@ -19,9 +21,16 @@ export interface Role {
   commandAvailable?: boolean;
   cwdPolicy?: "workspace" | "home" | "inherit";
   defaultShell?: "auto" | "powershell" | "wsl" | "shell";
+  runtimeTarget?: RoleRuntimeTarget;
   startupPrompt?: string;
   systemPrompt?: string;
   statusParser?: RoleStatusParser;
+}
+
+export function requiresHerdrSpawn(
+  role: Pick<Role, "runtimeTarget"> | null | undefined,
+): boolean {
+  return role?.runtimeTarget === "herdr-wsl";
 }
 
 export interface RoleStatusParser {
@@ -39,6 +48,7 @@ const BUILT_IN_ROLES: Role[] = [
     commandTemplate: "hermes",
     cwdPolicy: "workspace",
     defaultShell: "auto",
+    runtimeTarget: "herdr-wsl",
     systemPrompt: "Act as Hermes, the run orchestrator for this QuantFlow canvas.",
   },
   {
@@ -49,6 +59,7 @@ const BUILT_IN_ROLES: Role[] = [
     icon: "terminal",
     cwdPolicy: "workspace",
     defaultShell: "auto",
+    runtimeTarget: "windows-pty",
   },
   {
     id: "codex",
@@ -59,6 +70,7 @@ const BUILT_IN_ROLES: Role[] = [
     commandTemplate: "codex",
     cwdPolicy: "workspace",
     defaultShell: "auto",
+    runtimeTarget: "herdr-wsl",
     startupPrompt: "Review the current task context and wait for instructions.",
     statusParser: {
       waiting: ["approval required", "continue?", "waiting for", "confirm"],
@@ -74,6 +86,7 @@ const BUILT_IN_ROLES: Role[] = [
     commandTemplate: "claude",
     cwdPolicy: "workspace",
     defaultShell: "auto",
+    runtimeTarget: "herdr-wsl",
     startupPrompt: "Act as the implementation worker for this workspace.",
     statusParser: {
       waiting: ["do you want", "proceed?", "continue?", "yes/no"],
@@ -89,6 +102,7 @@ const BUILT_IN_ROLES: Role[] = [
     commandTemplate: "claude",
     cwdPolicy: "workspace",
     defaultShell: "auto",
+    runtimeTarget: "herdr-wsl",
     startupPrompt: "Act as the reviewer. Focus on defects, risks, and missing tests.",
     statusParser: {
       waiting: ["do you want", "proceed?", "continue?", "yes/no"],
@@ -104,6 +118,7 @@ const BUILT_IN_ROLES: Role[] = [
     commandTemplate: "opencode",
     cwdPolicy: "workspace",
     defaultShell: "auto",
+    runtimeTarget: "herdr-wsl",
     startupPrompt: "Open this workspace and wait for orchestration instructions.",
     statusParser: {
       waiting: ["approval required", "confirm", "continue?"],
@@ -124,6 +139,7 @@ const BUILT_IN_ROLES: Role[] = [
     icon: "code",
     cwdPolicy: "workspace",
     defaultShell: "auto",
+    runtimeTarget: "herdr-wsl",
     startupPrompt: "Open a Python worker shell and wait for a script command.",
   },
   {
@@ -134,6 +150,7 @@ const BUILT_IN_ROLES: Role[] = [
     icon: "zap",
     cwdPolicy: "workspace",
     defaultShell: "auto",
+    runtimeTarget: "herdr-wsl",
     startupPrompt: "Open a PufferLib worker shell. Do not start training until Commence.",
   },
   {
