@@ -27,6 +27,16 @@ const REQUIRED_TOOLS = [
   "quantflow_cable_remove",
   "quantflow_cable_remove_between_tiles",
   "quantflow_cable_send",
+  "qf_envoy_space_status",
+  "qf_task_list",
+  "qf_task_create",
+  "qf_task_claim",
+  "qf_task_update",
+  "qf_task_complete",
+  "qf_task_block",
+  "qf_task_fail",
+  "qf_receipt_list",
+  "qf_envoy_watch",
   "quantflow_role_list",
   "quantflow_role_spawn",
   "quantflow_orchestration_run_create",
@@ -110,6 +120,92 @@ test("maps cable send to one-shot relay.connectionSend", async () => {
         text: "run tests",
       },
     },
+  ]);
+});
+
+test("maps Envoy task create to JSON-RPC with operator override parsing", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "envoy.taskCreate": { task: { task_id: "task-1" } },
+  });
+  const tool = getToolDefinition("qf_task_create");
+
+  await tool.handle(rpc)({
+    canvasId: "main",
+    sourceTileId: "hermes",
+    targetTileId: "codex",
+    connectionId: "conn-1",
+    title: "Delegation proof",
+    instruction: "Do the work",
+    acceptanceCriteriaJson: "[\"done\"]",
+    operatorOverride: "true",
+  });
+
+  assert.deepEqual(calls, [
+    {
+      method: "envoy.taskCreate",
+      params: {
+        canvasId: "main",
+        sourceTileId: "hermes",
+        title: "Delegation proof",
+        instruction: "Do the work",
+        targetTileId: "codex",
+        connectionId: "conn-1",
+        acceptanceCriteria: ["done"],
+        operatorOverride: true,
+      },
+    },
+  ]);
+});
+
+test("maps Envoy task claim/update/complete and receipt tools to JSON-RPC", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "envoy.taskClaim": { ok: true },
+    "envoy.taskUpdate": { ok: true },
+    "envoy.taskComplete": { ok: true },
+    "envoy.receiptList": { receipts: [] },
+    "envoy.watch": { events: [] },
+  });
+
+  await getToolDefinition("qf_task_claim").handle(rpc)({
+    taskId: "task-1",
+    claimingTileId: "codex",
+    agentName: "Codex",
+  });
+  await getToolDefinition("qf_task_update").handle(rpc)({
+    taskId: "task-1",
+    summary: "Working",
+  });
+  await getToolDefinition("qf_task_complete").handle(rpc)({
+    taskId: "task-1",
+    resultSummary: "Done",
+    artifactPathsJson: "[\"proof.md\"]",
+  });
+  await getToolDefinition("qf_receipt_list").handle(rpc)({
+    taskId: "task-1",
+  });
+  await getToolDefinition("qf_envoy_watch").handle(rpc)({
+    correlationId: "corr-1",
+  });
+
+  assert.deepEqual(calls, [
+    {
+      method: "envoy.taskClaim",
+      params: { taskId: "task-1", claimingTileId: "codex", agentName: "Codex" },
+    },
+    {
+      method: "envoy.taskUpdate",
+      params: { taskId: "task-1", summary: "Working" },
+    },
+    {
+      method: "envoy.taskComplete",
+      params: {
+        taskId: "task-1",
+        resultSummary: "Done",
+        artifactPaths: ["proof.md"],
+      },
+    },
+    { method: "envoy.receiptList", params: { taskId: "task-1" } },
+    { method: "envoy.watch", params: { correlationId: "corr-1" } },
   ]);
 });
 

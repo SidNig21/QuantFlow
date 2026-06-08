@@ -41,6 +41,13 @@ function stringToBoolean(value) {
   return value.toLowerCase() === "true" || value === "1";
 }
 
+function optionalJsonArray(value) {
+  if (Array.isArray(value)) return value.map(String);
+  if (!value) return undefined;
+  const parsed = JSON.parse(String(value));
+  return Array.isArray(parsed) ? parsed.map(String) : undefined;
+}
+
 function positiveNumber(value, fallback) {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
@@ -510,6 +517,184 @@ export const TOOL_DEFINITIONS = [
         connectionId: cableId,
         fromTileId: sourceTileId,
         text: message,
+      })),
+  },
+  {
+    name: "qf_envoy_space_status",
+    description: "Get QuantFlow Envoy space status for a canvas",
+    schema: {
+      canvasId: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.spaceStatus", {
+        ...(params.canvasId ? { canvasId: params.canvasId } : {}),
+      })),
+  },
+  {
+    name: "qf_task_list",
+    description: "List QuantFlow Envoy tasks",
+    schema: {
+      canvasId: { kind: "string", optional: true },
+      status: { kind: "string", optional: true },
+      targetTileId: { kind: "string", optional: true },
+      sourceTileId: { kind: "string", optional: true },
+      correlationId: { kind: "string", optional: true },
+      connectionId: { kind: "string", optional: true },
+      limit: { kind: "number", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.taskList", {
+        ...(params.canvasId ? { canvasId: params.canvasId } : {}),
+        ...(params.status ? { status: params.status } : {}),
+        ...(params.targetTileId ? { targetTileId: params.targetTileId } : {}),
+        ...(params.sourceTileId ? { sourceTileId: params.sourceTileId } : {}),
+        ...(params.correlationId ? { correlationId: params.correlationId } : {}),
+        ...(params.connectionId ? { connectionId: params.connectionId } : {}),
+        ...(Number.isFinite(params.limit) ? { limit: params.limit } : {}),
+      })),
+  },
+  {
+    name: "qf_task_create",
+    description: "Create a QuantFlow Envoy task for agent delegation",
+    schema: {
+      canvasId: { kind: "string" },
+      sourceTileId: { kind: "string" },
+      title: { kind: "string" },
+      instruction: { kind: "string" },
+      targetTileId: { kind: "string", optional: true },
+      connectionId: { kind: "string", optional: true },
+      acceptanceCriteriaJson: { kind: "string", optional: true },
+      operatorOverride: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.taskCreate", {
+        canvasId: params.canvasId,
+        sourceTileId: params.sourceTileId,
+        title: params.title,
+        instruction: params.instruction,
+        ...(params.targetTileId ? { targetTileId: params.targetTileId } : {}),
+        ...(params.connectionId ? { connectionId: params.connectionId } : {}),
+        ...(params.acceptanceCriteriaJson
+          ? { acceptanceCriteria: optionalJsonArray(params.acceptanceCriteriaJson) }
+          : {}),
+        operatorOverride: stringToBoolean(params.operatorOverride),
+      })),
+  },
+  {
+    name: "qf_task_claim",
+    description: "Atomically claim a QuantFlow Envoy task",
+    schema: {
+      taskId: { kind: "string" },
+      claimingTileId: { kind: "string" },
+      agentName: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.taskClaim", {
+        taskId: params.taskId,
+        claimingTileId: params.claimingTileId,
+        ...(params.agentName ? { agentName: params.agentName } : {}),
+      })),
+  },
+  {
+    name: "qf_task_update",
+    description: "Post a progress update for a QuantFlow Envoy task",
+    schema: {
+      taskId: { kind: "string" },
+      summary: { kind: "string" },
+      actorTileId: { kind: "string", optional: true },
+      agentName: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.taskUpdate", {
+        taskId: params.taskId,
+        summary: params.summary,
+        ...(params.actorTileId ? { actorTileId: params.actorTileId } : {}),
+        ...(params.agentName ? { agentName: params.agentName } : {}),
+      })),
+  },
+  {
+    name: "qf_task_complete",
+    description: "Complete a QuantFlow Envoy task",
+    schema: {
+      taskId: { kind: "string" },
+      resultSummary: { kind: "string" },
+      artifactPathsJson: { kind: "string", optional: true },
+      actorTileId: { kind: "string", optional: true },
+      agentName: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.taskComplete", {
+        taskId: params.taskId,
+        resultSummary: params.resultSummary,
+        ...(params.artifactPathsJson
+          ? { artifactPaths: optionalJsonArray(params.artifactPathsJson) }
+          : {}),
+        ...(params.actorTileId ? { actorTileId: params.actorTileId } : {}),
+        ...(params.agentName ? { agentName: params.agentName } : {}),
+      })),
+  },
+  {
+    name: "qf_task_block",
+    description: "Mark a QuantFlow Envoy task blocked",
+    schema: {
+      taskId: { kind: "string" },
+      reason: { kind: "string" },
+      actorTileId: { kind: "string", optional: true },
+      agentName: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.taskBlock", {
+        taskId: params.taskId,
+        reason: params.reason,
+        ...(params.actorTileId ? { actorTileId: params.actorTileId } : {}),
+        ...(params.agentName ? { agentName: params.agentName } : {}),
+      })),
+  },
+  {
+    name: "qf_task_fail",
+    description: "Mark a QuantFlow Envoy task failed",
+    schema: {
+      taskId: { kind: "string" },
+      reason: { kind: "string" },
+      actorTileId: { kind: "string", optional: true },
+      agentName: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.taskFail", {
+        taskId: params.taskId,
+        reason: params.reason,
+        ...(params.actorTileId ? { actorTileId: params.actorTileId } : {}),
+        ...(params.agentName ? { agentName: params.agentName } : {}),
+      })),
+  },
+  {
+    name: "qf_receipt_list",
+    description: "List QuantFlow Envoy receipts",
+    schema: {
+      taskId: { kind: "string", optional: true },
+      canvasId: { kind: "string", optional: true },
+      correlationId: { kind: "string", optional: true },
+      limit: { kind: "number", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.receiptList", {
+        ...(params.taskId ? { taskId: params.taskId } : {}),
+        ...(params.canvasId ? { canvasId: params.canvasId } : {}),
+        ...(params.correlationId ? { correlationId: params.correlationId } : {}),
+        ...(Number.isFinite(params.limit) ? { limit: params.limit } : {}),
+      })),
+  },
+  {
+    name: "qf_envoy_watch",
+    description: "List recent QuantFlow Envoy events",
+    schema: {
+      correlationId: { kind: "string", optional: true },
+      limit: { kind: "number", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("envoy.watch", {
+        ...(params.correlationId ? { correlationId: params.correlationId } : {}),
+        ...(Number.isFinite(params.limit) ? { limit: params.limit } : {}),
       })),
   },
   {

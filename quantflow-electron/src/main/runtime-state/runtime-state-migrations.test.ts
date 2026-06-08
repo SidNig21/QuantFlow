@@ -3,6 +3,9 @@ import { Database } from "bun:sqlite";
 import migration001 from "./migrations/001-initial.sql?raw";
 import migration002 from "./migrations/002-orchestration-spine.sql?raw";
 import migration003 from "./migrations/003-task-message-schema.sql?raw";
+import migration004 from "./migrations/004-connections-contracts.sql?raw";
+import migration005 from "./migrations/005-backpressure.sql?raw";
+import migration006 from "./migrations/006-envoy-task-bus.sql?raw";
 
 describe("runtime-state migrations", () => {
   test("migrations 002 and 003 preserve 001 rows and extend orchestration schema", () => {
@@ -22,6 +25,9 @@ describe("runtime-state migrations", () => {
 
     db.exec(migration002);
     db.exec(migration003);
+    db.exec(migration004);
+    db.exec(migration005);
+    db.exec(migration006);
 
     expect(
       (db.prepare("SELECT payload FROM tasks WHERE id = 'task-001'").get() as { payload: string })
@@ -47,6 +53,9 @@ describe("runtime-state migrations", () => {
     expect(tables).toContain("artifacts");
     expect(tables).toContain("tile_capabilities");
     expect(tables).toContain("tiles_runtime");
+    expect(tables).toContain("envoy_spaces");
+    expect(tables).toContain("envoy_tasks");
+    expect(tables).toContain("envoy_receipts");
     expect(taskColumns.map((c) => c.name)).toEqual(
       expect.arrayContaining([
         "run_id",
@@ -79,6 +88,11 @@ describe("runtime-state migrations", () => {
         "tile_capabilities_tile_id",
         "tile_capabilities_capability",
         "tasks_schema_id",
+        "envoy_tasks_canvas_id",
+        "envoy_tasks_status",
+        "envoy_tasks_target_tile_id",
+        "envoy_tasks_correlation_id",
+        "envoy_receipts_task_id",
       ]),
     );
     expect(
@@ -88,6 +102,11 @@ describe("runtime-state migrations", () => {
     ).toBe(1);
     expect(
       (db.prepare("SELECT 1 AS found FROM schema_migrations WHERE version = 3").get() as {
+        found: number;
+      }).found,
+    ).toBe(1);
+    expect(
+      (db.prepare("SELECT 1 AS found FROM schema_migrations WHERE version = 6").get() as {
         found: number;
       }).found,
     ).toBe(1);

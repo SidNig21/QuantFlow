@@ -322,3 +322,80 @@ export interface ConnectionConfig {
   smartString?: SmartStringConfig;
   [key: string]: unknown;
 }
+
+export type EnvoySpaceStatus = "pending" | "ready" | "error";
+
+export interface EnvoySpaceRow {
+  canvas_id: string;
+  workspace_hash: string | null;
+  space_name: string;
+  envoy_space_id: string | null;
+  status: EnvoySpaceStatus;
+  error: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export type EnvoyTaskStatus =
+  | "inbox"
+  | "ready"
+  | "claimed"
+  | "working"
+  | "review"
+  | "done"
+  | "blocked"
+  | "failed";
+
+export interface EnvoyTaskRow {
+  task_id: string;
+  envoy_task_id: string | null;
+  canvas_id: string;
+  envoy_space_id: string;
+  source_tile_id: string;
+  target_tile_id: string | null;
+  connection_id: string | null;
+  correlation_id: string;
+  title: string;
+  instruction: string;
+  acceptance_criteria: string;
+  status: EnvoyTaskStatus;
+  claimed_by: string | null;
+  claimed_at: number | null;
+  result_summary: string | null;
+  receipt_ids: string;
+  artifact_paths: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface EnvoyReceiptRow {
+  receipt_id: string;
+  task_id: string;
+  canvas_id: string;
+  envoy_space_id: string;
+  correlation_id: string;
+  connection_id: string | null;
+  kind: string;
+  actor_tile_id: string | null;
+  agent_name: string | null;
+  envoy_message_id: string | null;
+  payload: string;
+  created_at: number;
+}
+
+export interface EnvoyTaskFilter {
+  canvasId?: string;
+  status?: EnvoyTaskStatus | "all";
+  targetTileId?: string;
+  sourceTileId?: string;
+  correlationId?: string;
+  connectionId?: string;
+  limit?: number;
+}
+
+export interface EnvoyReceiptFilter {
+  taskId?: string;
+  canvasId?: string;
+  correlationId?: string;
+  limit?: number;
+}

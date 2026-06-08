@@ -15,10 +15,11 @@ import migration002 from "./migrations/002-orchestration-spine.sql?raw";
 import migration003 from "./migrations/003-task-message-schema.sql?raw";
 import migration004 from "./migrations/004-connections-contracts.sql?raw";
 import migration005 from "./migrations/005-backpressure.sql?raw";
+import migration006 from "./migrations/006-envoy-task-bus.sql?raw";
 
 let _db: Database.Database | null = null;
 
-export const EXPECTED_MIGRATION_VERSIONS = [1, 2, 3, 4, 5] as const;
+export const EXPECTED_MIGRATION_VERSIONS = [1, 2, 3, 4, 5, 6] as const;
 
 export function getRuntimeDbPath(): string {
   return join(QUANTFLOW_DIR, "runtime.db");
@@ -78,6 +79,7 @@ const MIGRATIONS: { version: number; sql: string }[] = [
   { version: 3, sql: migration003 },
   { version: 4, sql: migration004 },
   { version: 5, sql: migration005 },
+  { version: 6, sql: migration006 },
 ];
 
 function runMigrations(db: Database.Database): void {

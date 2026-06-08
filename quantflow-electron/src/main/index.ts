@@ -56,6 +56,7 @@ import { runMigrationIfNeeded } from "./migration/migrate-from-collaborator";
 import { closeDb } from "./runtime-state/database";
 import { recordCrashReport } from "./diagnostics/crash-reports";
 import { writeLaunchTrace } from "./diagnostics/launch-traces";
+import { stopAllEnvoyListeners } from "./envoy-listener";
 
 const APP_NAME = "QuantFlow";
 const launchStartedAtMs = Date.now();
@@ -786,6 +787,7 @@ async function shutdownBackgroundServices(): Promise<void> {
   watcher.stopWorker();
   if (!DISABLE_GIT_REPLAY) gitReplay.stopWorker();
   stopJsonRpcServer();
+  stopAllEnvoyListeners();
   stopImageWorker();
   closeDb();
 }

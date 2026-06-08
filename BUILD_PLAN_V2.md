@@ -20,6 +20,7 @@ Current spine:
 | Unify spawn pipeline through `runtimeTarget` | Done, `de9c497` |
 | Docs collapsed to one build path | Done, `147cabb` |
 | Gate 3, herdr `events.subscribe` tile state | Implemented, pending operator proof |
+| Envoy task bus MVP | Implemented locally, pending operator push |
 
 ## Current Slice
 
@@ -100,9 +101,13 @@ Use archived Layer 4 as reference, with one major correction: no A2A dependency.
 
 Work:
 
-- [ ] Create or attach one Envoy space per canvas.
-- [ ] Add an Electron main bridge for `envoy listen` and post.
-- [ ] Normalize Envoy packets into runtime events.
+- [x] Create or attach one Envoy space per canvas for the task bus MVP.
+- [x] Add an Electron main bridge for `envoy listen` and post.
+- [x] Normalize Envoy packets into runtime events.
+- [x] Add Envoy task create, list, claim, update, complete, block, and fail.
+- [x] Add claim locking so two agents cannot own the same task.
+- [x] Add MCP tools for agent task operations through the `9811` relay.
+- [x] Add `ENVOY.md` and `bun run smoke:envoy-task` proof command.
 - [ ] Let watchers post receipts for dumb tiles. Dumb tiles do not receive Envoy credentials.
 - [ ] Let Hermes read proof through Envoy tooling.
 - [ ] Wire Obsidian vault context pins and handoff paths to Envoy evidence.
@@ -113,6 +118,12 @@ Pass when:
 - One canvas has one Envoy proof space.
 - One real action produces one traceable receipt.
 - Obsidian is operator memory, not a second build plan.
+
+Task bus MVP proof:
+
+- `bun run smoke:envoy-task` creates one task, claims it, rejects a second claim, posts progress, completes it, and prints one `correlation_id` with receipt ids.
+- Agent tools are `qf_envoy_space_status`, `qf_task_list`, `qf_task_create`, `qf_task_claim`, `qf_task_update`, `qf_task_complete`, `qf_task_block`, `qf_task_fail`, `qf_receipt_list`, and `qf_envoy_watch`.
+- See `ENVOY.md` for the task state model and example tool calls.
 
 ## Frozen Until Gate 3 Passes
 
