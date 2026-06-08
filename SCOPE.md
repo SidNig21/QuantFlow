@@ -29,7 +29,7 @@ Full legend palette cleanup, RL template restructure, Watchtower evolution, Fact
 
 ## Out of scope for agents
 
-- `Build Docs/QuantFlow v2 1/` layer charters (reference only; may delete)
+- `reference/archive/quantflow-v2-layer-charters/` (archived 7-layer GoalBuddy docs — do not execute)
 - Vault `Projects/QuantFlow/Build Plan.md` (v1)
 - A2A protocol, string relay cluster, `reference/archive/`
 

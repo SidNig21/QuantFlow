@@ -1,11 +1,17 @@
-# QuantFlow V2 GoalBuddy Templates
+# QuantFlow V2 GoalBuddy Templates — ARCHIVED
 
-Purpose: paste-ready GoalBuddy charters for the separate QuantFlow v2 rebuild on branch `quantflow-v2`.
+**Superseded.** Execute only from repo root: `CONCEPT.md` → `SCOPE.md` → `BUILD_PLAN_V2.md`.
 
-Authority:
+This folder is historical GoalBuddy layer charters (Layers 1–7). Kept for reference; not an active build path. A2A Layer 3 content is rejected.
+
+---
+
+Purpose (historical): paste-ready GoalBuddy charters for the QuantFlow v2 rebuild on branch `quantflow-v2`.
+
+Authority (historical):
 - Repo workspace: `C:\Users\rybow\QuantFlow`
 - Active branch: `quantflow-v2`
-- Source of truth: `ARCHITECTURE.md` and `BUILD_PLAN_V2.md`
+- Was: `ARCHITECTURE.md` and `BUILD_PLAN_V2.md` — now root docs only
 - Supplementary scope map: pasted "QuantFlow V2 - Full Rebuild Scope"
 
 Guardrails:

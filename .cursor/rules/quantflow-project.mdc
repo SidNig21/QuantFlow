@@ -12,7 +12,7 @@ alwaysApply: true
 2. `SCOPE.md` — active gates + frozen work
 3. `BUILD_PLAN_V2.md` — execute current gate only
 
-**Ignore unless operator asks:** `Build Docs/` layer charters, vault v1 Build Plan, `reference/archive/`.
+**Ignore unless operator asks:** `reference/archive/` (incl. old 7-layer charters), vault v1 Build Plan.
 
 **Spine rule:** Canvas + herdr + interactive PTY. `pane.read` tile display = reject.
 

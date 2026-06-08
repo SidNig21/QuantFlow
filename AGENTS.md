@@ -1,14 +1,16 @@
 # QuantFlow — repo entry (Cursor / agents)
 
-**Vault is authority.** This file only routes you there.
+**Branch `quantflow-v2`:** repo root docs are authority. Do not execute from vault v1 Build Plan or archived layer charters.
 
-## Canonical read order (every session)
+## Canonical read order (`quantflow-v2`)
 
-1. `C:\Users\rybow\Obsidian\Cursor Collab\Projects\QuantFlow\Start Here.md`
-2. `...\Projects\QuantFlow\Build Plan.md` — **only execution doc**
-3. `...\Projects\QuantFlow\How the pieces fit.md` — architecture guardrails
+1. `CONCEPT.md` — what QuantFlow is
+2. `SCOPE.md` — active gates, rejects (no A2A)
+3. `BUILD_PLAN_V2.md` — **only execution doc**
+4. `RETIREMENT.md` — what is dead / rejected
+5. `ARCHITECTURE.md` — short pointer only
 
-Never implement from vault `Projects/QuantFlow/reference/` or `reference/archive/`.
+**Ignore:** `reference/archive/` (including old 7-layer charters), vault `Projects/QuantFlow/Build Plan.md` unless operator asks.
 
 ## This repo
 
@@ -16,34 +18,16 @@ Never implement from vault `Projects/QuantFlow/reference/` or `reference/archive
 |---|---|
 | Root | `C:\Users\rybow\QuantFlow` |
 | App | `quantflow-electron/` |
-| Branch | `QuantFlow` — pull/push `origin` only |
+| Branch | `quantflow-v2` — pull/push `origin` only |
 | MCP relay | port **9811** (app must be running) |
-| Git rules | `Obsidian/Cursor Collab/Specs/Github-repos-and-workflow-rules.md` |
 
-## Current slice (see Build Plan)
+## Active slice
 
-**0b next** — operator-led Envoy spike in WSL.
-
-Then **2a** PTY bridge proof → **1** legend → **2** spawn rewire. Do not legend-rewire until **2a** passes.
-
-- herdr = WSL **session**; node-pty = **display** (herdr attach in PTY)
-- Direct socket→xterm: **blocked** (0a)
-
-## Guardrails (summary)
-
-Details in vault **How the pieces fit** and **Build Plan** settled decisions.
-
-- herdr → WSL session authority; node-pty → display via herdr attach in PTY (PTY bridge)
-- Strings → event pings, not stdout firehose
-- Envoy → one canvas-scoped space; dumb processes never call Envoy directly
-- `connections[]` canonical; `connection_id` + `correlation_id` for Watchtower/Envoy proof
-- Legend/templates build canvas; Hermes orchestrates **after** manual **Commence**
+See `BUILD_PLAN_V2.md` — **Gate 3** (`events.subscribe`), then `retirement-herdr-cli`, then `envoy-obsidian`.
 
 ## Before coding
 
 ```bash
-git pull origin QuantFlow
+git pull origin quantflow-v2
 git status --short --branch
 ```
-
-Read **Build Plan** for acceptance criteria for the active slice.

@@ -2,6 +2,8 @@
 
 Read `CONCEPT.md` first. Boundaries in `SCOPE.md`.
 
+**This is the only build plan.** Archived layer charters live in `reference/archive/quantflow-v2-layer-charters/` — do not execute from there.
+
 **Rule:** Next slice only after current gate passes operator acceptance in `SCOPE.md`.
 
 ---
