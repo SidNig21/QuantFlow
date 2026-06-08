@@ -8,33 +8,35 @@ Read `CONCEPT.md` first. Boundaries in `SCOPE.md`.
 
 **Gate 1 — DONE (`f72c0b4`)** — herdr socket ping → pong from Electron main.
 
-Proof: `{"type":"pong","version":"0.5.5","protocol":2}`
-
 ---
 
-**Gate 2 — DONE (`035f4f5`)** — one Hermes tile, end to end.
+**Gate 2 — DONE (`035f4f5`, `15b7852`)** — Hermes legend → herdr pane → interactive PTY.
 
 - retirement-v1-relay: DONE (`6961506`)
-- Legend spawn → herdr socket creates pane, starts agent (`hermes` command).
-- Tile persists `herdrPaneId`, `herdrAgentName`.
-- Display: **PTY bridge** to that pane (v1 slice 2a model). Interactive xterm.
-- Windows Generic CLI unchanged (node-pty only).
+- unify-spawn-pipeline: DONE (`de9c497`) — all WSL legend agents via `runtimeTarget` + herdr
+- canvas polish: legend 400×500 tiles, larger resize handles, cable ports above resize zones
 
 ---
 
-**Gate 3** — live tile state via herdr `events.subscribe` (no WSL polling).
+**Gate 3 — ACTIVE** — live tile state via herdr `events.subscribe` (no WSL polling).
+
+Pass when: tile badges update from socket events; renderer 5s `herdrGetStatus` poll removed or retired.
 
 ---
 
-**unify-spawn-pipeline — ACTIVE** — all WSL legend agents via herdr.
-
-- `runtimeTarget` on every role (`herdr-wsl` | `windows-pty`)
-- `commandTemplate` / `startupPrompt` sent via `pane.send_text` on herdr spawn
-- One shared `spawnRoleTileAt()` — no macro-typing for `herdr-wsl` tiles
-- Pass: Legend Codex → herdr pane → command sent → interactive tile
-
-**Not this slice:** RL template cleanup, A2A, Envoy.
+**retirement-herdr-cli** — port `ipc-herdr.ts` to socket; delete `herdr-bridge.ts` CLI path.
 
 ---
 
-**Later** — A2A strings → legend palette → Envoy bridge (see `SCOPE.md` frozen list).
+**envoy-obsidian** — proof + memory bus (no A2A).
+
+- One Envoy space per canvas; main-process bridge (`envoy listen` / post)
+- Watchers post receipts for dumb tiles; Hermes reads proof
+- Obsidian vault = durable operator memory; wire context pins / handoff paths to Envoy evidence
+- Spike pass: one cable action → one Envoy receipt → visible in Watchtower or vault note
+
+**Rejected:** A2A, Agent Cards, custom string relay (see `RETIREMENT.md`).
+
+---
+
+**Later** — legend cleanup (RL template isolation), Watchtower evolution, full palette.

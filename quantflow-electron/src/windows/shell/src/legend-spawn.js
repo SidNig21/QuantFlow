@@ -1,10 +1,12 @@
+import { defaultSize } from "./canvas-state.js";
 import { LEGEND_RECIPES } from "./legend-dock.js";
 
 export const LEGEND_RECIPE_ROLE_IDS = {
 	...Object.fromEntries(LEGEND_RECIPES.map((recipe) => [recipe.id, recipe.roleId])),
 };
 
-export const LEGEND_TILE_SIZE = Object.freeze({ width: 280, height: 180 });
+/** Match default terminal tile size so legend spawns look like canvas double-click tiles. */
+export const LEGEND_TILE_SIZE = Object.freeze(defaultSize("term"));
 export const LEGEND_GHOST_SIZE = Object.freeze({ width: 120, height: 72 });
 
 export function getLegendRoleId(recipeId) {

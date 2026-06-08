@@ -18,6 +18,11 @@
 - `smart-strings-repo.ts` — wait for A2A slice
 - `herdr:read` IPC — keep for debug until socket equivalent
 
+## Rejected (do not implement)
+
+- **A2A** — Agent Cards, HTTP task delegation, Layer 3 charters in `Build Docs/`
+- Custom string relay (see retired cluster above)
+
 ## Never re-extend
 
 - Any file in the deleted relay cluster

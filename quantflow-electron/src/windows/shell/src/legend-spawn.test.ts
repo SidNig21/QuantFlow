@@ -77,7 +77,7 @@ describe("legend placement", () => {
 			zoom: 1,
 			dockWidth: 56,
 			tileSize: LEGEND_TILE_SIZE,
-		})).toEqual({ x: 460, y: 310 });
+		})).toEqual({ x: 400, y: 150 });
 	});
 
 	test("clamps viewport center placement so the tile clears the dock", () => {
@@ -105,7 +105,7 @@ describe("legend placement", () => {
 			zoom: 1,
 			dockWidth: 240,
 			tileSize: LEGEND_TILE_SIZE,
-		})).toEqual({ x: 272, y: 160 });
+		})).toEqual({ x: 272, y: 40 });
 	});
 
 	test("accounts for pan and zoom when clamping against dock screen space", () => {

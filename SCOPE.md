@@ -4,38 +4,40 @@
 **Read first:** `CONCEPT.md`  
 **Execute:** `BUILD_PLAN_V2.md` only
 
-## Active (spine only)
+## Spine status
 
-Prove **Collaborator canvas + herdr** works like one product. Nothing below Layers 3–7 in `Build Docs/` until spine is done.
+| # | Gate / slice | Status |
+|---|----------------|--------|
+| 1 | Socket ping → pong | **DONE** `f72c0b4` |
+| 2 | Spawn + interactive PTY | **DONE** `035f4f5` + `15b7852` |
+| — | retirement-v1-relay | **DONE** `6961506` |
+| — | unify-spawn-pipeline | **DONE** `de9c497` |
+| 3 | `events.subscribe` tile state | **ACTIVE** |
+| — | retirement-herdr-cli | Next after Gate 3 |
+| — | envoy-obsidian | After herdr-cli retirement |
 
-| # | Gate | Pass when |
-|---|------|-----------|
-| 1 | Socket | Main → herdr ping → pong (**DONE** `f72c0b4`) |
-| 2 | Spawn + display | Legend Hermes → herdr pane → **interactive** xterm (type, see live output) |
-| 3 | Live state | Tile badge from `events.subscribe`, not 5s polling |
+## Comms decision (settled)
 
-## Frozen until gate 2 passes
+- **A2A:** rejected for local QuantFlow. Do not implement Agent Cards or A2A task delegation.
+- **Envoy:** proof and coordination bus — one canvas-scoped space, watchers post, main owns credentials.
+- **Obsidian vault:** durable memory and operator context; integrate with Envoy evidence and existing vault-relative context pins.
+- **MCP :9811:** keep as agent ↔ canvas tools (already works).
 
-A2A, Envoy bridge, full legend palette, Watchtower evolution, Factory Droid, tennis vision, RL infra, custom tile forms.
+## Frozen until Gate 3 passes
 
-## Gate 2 acceptance (operator, non-negotiable)
+Full legend palette cleanup, RL template restructure, Watchtower evolution, Factory Droid, tennis vision, RL infra.
 
-1. Click Hermes in Legend → one tile appears with `herdrPaneId` persisted.
-2. xterm behaves like Generic CLI: **keyboard works**, prompt responds.
-3. herdr pane exists (socket `pane.get` or list matches tile).
-4. **Fail** if display is pane.read refresh, non-interactive mirror, or hidden node-pty WSL session ownership.
+## Out of scope for agents
 
-## Out of scope for agents right now
+- `Build Docs/QuantFlow v2 1/` layer charters (reference only; may delete)
+- Vault `Projects/QuantFlow/Build Plan.md` (v1)
+- A2A protocol, string relay cluster, `reference/archive/`
 
-- Reading or extending `Build Docs/QuantFlow v2 1/` layer charters (reference only; operator may delete later)
-- Vault `Projects/QuantFlow/Build Plan.md` (v1 branch)
-- `reference/archive/`
-
-## Handoff block (paste to any agent)
+## Handoff block
 
 ```
-Branch quantflow-v2. Read CONCEPT.md + SCOPE.md + BUILD_PLAN_V2.md.
-QuantFlow = Collaborator canvas + herdr WSL sessions + PTY display.
-Active: gate 2 only. Interactive terminal required. pane.read display = reject.
-Commit before handoff. One executor at a time.
+Branch quantflow-v2. Read CONCEPT.md + SCOPE.md + BUILD_PLAN_V2.md + RETIREMENT.md.
+Spine done through unify-spawn (de9c497). Active: Gate 3 only.
+No A2A. Next comms slice: envoy-obsidian after retirement-herdr-cli.
+pane.read display = reject. Commit before handoff. One executor at a time.
 ```

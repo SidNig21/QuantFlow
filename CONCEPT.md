@@ -22,13 +22,16 @@ If a tile does not accept keyboard input like a normal terminal, **it is broken*
 | herdr | WSL sessions: panes, agents, state, Unix socket API. |
 | node-pty | **Display glass** for WSL (herdr attach in PTY). **Windows shell fallback** only. |
 | MCP :9811 | Tools for agents. Already exists. |
-| A2A / Envoy | **Later.** A2A routes agent work. Envoy remembers proof. Not active until spine works. |
+| Envoy | **Later.** Canvas-scoped proof bus; watchers post receipts. |
+| Obsidian vault | Durable operator memory; context pins and handoff with Envoy evidence. |
+| A2A | **Rejected** for local v2. Not building Agent Cards or HTTP agent delegation. |
 
 ## Hard rejects (agents: do not “helpfully” add these)
 
 - `herdr pane read` polling as tile display (screenshot loop ≠ terminal)
 - Direct `herdr-client.sock` → xterm (failed in slice 0a)
-- Custom string relay before A2A slice
+- Custom string relay (retired)
+- A2A / Agent Cards
 - Dumb tiles calling Envoy directly
 - New architecture docs, layer charters, or GoalBuddy templates unless the operator asks
 

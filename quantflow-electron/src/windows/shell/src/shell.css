@@ -1623,7 +1623,15 @@ body.platform-win {
 		transform 0.12s ease,
 		background 0.12s ease,
 		box-shadow 0.12s ease;
-	z-index: 12;
+	/* Above resize handles so N/E/S/W string anchors stay grabbable. */
+	z-index: 20;
+}
+
+.tile-port::before {
+	content: "";
+	position: absolute;
+	inset: -10px;
+	border-radius: inherit;
 }
 
 .tile-port[data-side="N"] {
@@ -1792,73 +1800,75 @@ body.platform-win {
 	cursor: grabbing !important;
 }
 
-/* Resize handles */
+/* Resize handles — generous hit targets above tile content overlay */
 .tile-resize-handle {
 	position: absolute;
-	z-index: 1;
+	z-index: 12;
 }
 
 .tile-resize-handle.edge-n,
 .tile-resize-handle.edge-s {
-	left: 8px;
-	right: 8px;
-	height: 9px;
+	/* Leave center gap for cable ports on N/S. */
+	left: 36px;
+	right: 36px;
+	height: 18px;
 	cursor: ns-resize;
 }
 
 .tile-resize-handle.edge-e,
 .tile-resize-handle.edge-w {
-	top: 8px;
-	bottom: 8px;
-	width: 9px;
+	/* Leave center gap for cable ports on E/W. */
+	top: 36px;
+	bottom: 36px;
+	width: 18px;
 	cursor: ew-resize;
 }
 
 .tile-resize-handle.edge-n {
-	top: -4.5px;
+	top: -9px;
 }
 
 .tile-resize-handle.edge-s {
-	bottom: -4.5px;
+	bottom: -9px;
 }
 
 .tile-resize-handle.edge-e {
-	right: -4.5px;
+	right: -9px;
 }
 
 .tile-resize-handle.edge-w {
-	left: -4.5px;
+	left: -9px;
 }
 
 .tile-resize-handle.corner-nw,
 .tile-resize-handle.corner-ne,
 .tile-resize-handle.corner-sw,
 .tile-resize-handle.corner-se {
-	width: 18px;
-	height: 18px;
+	width: 32px;
+	height: 32px;
 }
 
 .tile-resize-handle.corner-nw {
-	top: -4.5px;
-	left: -4.5px;
+	top: -12px;
+	left: -12px;
 	cursor: nwse-resize;
 }
 
 .tile-resize-handle.corner-ne {
-	top: -4.5px;
-	right: -4.5px;
+	top: -12px;
+	right: -12px;
 	cursor: nesw-resize;
 }
 
 .tile-resize-handle.corner-sw {
-	bottom: -4.5px;
-	left: -4.5px;
+	bottom: -12px;
+	left: -12px;
 	cursor: nesw-resize;
 }
 
 .tile-resize-handle.corner-se {
-	bottom: -4.5px;
-	right: -4.5px;
+	bottom: -12px;
+	right: -12px;
 	cursor: nwse-resize;
 }
 
