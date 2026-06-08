@@ -3386,26 +3386,19 @@ async function init() {
 
 	panelManager.applyVisibility();
 
-	// -- herdr status polling (5 s) --
-	// For every tile that has a herdrPaneId, refresh the header badge.
-	// Fire-and-forget per iteration; errors are silently swallowed so a
-	// missing/stopped herdr daemon never crashes the renderer.
-	setInterval(async () => {
-		const herdrTiles = tiles.filter((t) => t.herdrPaneId);
-		if (herdrTiles.length === 0) return;
-		for (const tile of herdrTiles) {
-			try {
-				const status = await window.shellApi.herdrGetStatus(tile.herdrPaneId);
-				const dom = tileManager.getTileDOMs().get(tile.id);
-				if (dom) {
-					const container = dom.container ?? dom;
-					updateHerdrBadge(container, tile.herdrPaneId, status ?? "unknown");
-				}
-			} catch {
-				// herdr unavailable — leave badge as-is
-			}
-		}
-	}, 5_000);
+	// -- herdr status events (Gate 3: main-process events.subscribe) --
+	window.shellApi.onHerdrStatusChanged((payload) => {
+		const { paneId, status } = payload;
+		const tile = tiles.find((t) => t.herdrPaneId === paneId);
+		if (!tile) return;
+		const dom = tileManager.getTileDOMs().get(tile.id);
+		if (!dom) return;
+		const container = dom.container ?? dom;
+		updateHerdrBadge(container, paneId, status ?? "unknown");
+	});
+	for (const tile of tiles.filter((t) => t.herdrPaneId)) {
+		void window.shellApi.herdrLinkPane(tile.id, tile.herdrPaneId);
+	}
 
 	// -- beforeunload save --
 

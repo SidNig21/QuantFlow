@@ -470,6 +470,29 @@ contextBridge.exposeInMainWorld("shellApi", {
     ipcRenderer.invoke("herdr:send", paneId, text),
   herdrGetStatus: (paneId: string): Promise<string> =>
     ipcRenderer.invoke("herdr:status", paneId),
+  onHerdrStatusChanged: (
+    cb: (payload: {
+      paneId: string;
+      tileId: string | null;
+      status: string;
+      fromStatus: string;
+      timestamp: number;
+    }) => void,
+  ) => {
+    const handler = (
+      _event: unknown,
+      payload: {
+        paneId: string;
+        tileId: string | null;
+        status: string;
+        fromStatus: string;
+        timestamp: number;
+      },
+    ) => cb(payload);
+    ipcRenderer.on("herdr:status-changed", handler);
+    return () =>
+      ipcRenderer.removeListener("herdr:status-changed", handler);
+  },
   herdrLinkPane: (tileId: string, paneId: string): Promise<void> =>
     ipcRenderer.invoke("herdr:link-pane", tileId, paneId),
   herdrUnlinkPane: (tileId: string): Promise<void> =>

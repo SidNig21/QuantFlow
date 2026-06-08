@@ -19,7 +19,7 @@ Current spine:
 | Retire v1 relay cluster | Done, `6961506` |
 | Unify spawn pipeline through `runtimeTarget` | Done, `de9c497` |
 | Docs collapsed to one build path | Done, `147cabb` |
-| Gate 3, herdr `events.subscribe` tile state | Active |
+| Gate 3, herdr `events.subscribe` tile state | Implemented, pending operator proof |
 
 ## Current Slice
 
@@ -29,17 +29,17 @@ Goal: replace WSL tile status polling with live herdr socket events.
 
 Do this now:
 
-- [ ] Add a long-lived herdr `events.subscribe` client in Electron main.
-- [ ] Keep the existing one-shot `callHerdrSocket` RPC helper for request/response calls.
-- [ ] Add a separate streaming helper for subscription sockets, with reconnect, backoff, unsubscribe, and cleanup.
-- [ ] Normalize herdr events into a small QuantFlow event shape.
-- [ ] Track `pane_id`, `tile_id`, previous status, next status, timestamp, and raw event payload when useful.
-- [ ] Forward status updates from main to the shell renderer.
-- [ ] Update tile header badges from socket events.
-- [ ] Persist status transitions through `runtime-state/status-repo.ts` if the event carries a real status transition.
-- [ ] Preserve native Windows PTY fallback behavior. Windows-only tiles must not become herdr-owned.
-- [ ] Remove the 5 second `herdrGetStatus` polling loop from `src/windows/shell/src/renderer.js`.
-- [ ] Add tests for event normalization, reconnect/backoff, cleanup, and renderer update behavior.
+- [x] Add a long-lived herdr `events.subscribe` client in Electron main.
+- [x] Keep the existing one-shot `callHerdrSocket` RPC helper for request/response calls.
+- [x] Add a separate streaming helper for subscription sockets, with reconnect, backoff, unsubscribe, and cleanup.
+- [x] Normalize herdr events into a small QuantFlow event shape.
+- [x] Track `pane_id`, `tile_id`, previous status, next status, timestamp, and raw event payload when useful.
+- [x] Forward status updates from main to the shell renderer.
+- [x] Update tile header badges from socket events.
+- [x] Persist status transitions through `runtime-state/status-repo.ts` if the event carries a real status transition.
+- [x] Preserve native Windows PTY fallback behavior. Windows-only tiles must not become herdr-owned.
+- [x] Remove the 5 second `herdrGetStatus` polling loop from `src/windows/shell/src/renderer.js`.
+- [x] Add tests for event normalization, reconnect/backoff, cleanup, and renderer update behavior.
 
 Gate 3 passes when:
 

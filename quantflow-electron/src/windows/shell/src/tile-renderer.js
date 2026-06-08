@@ -569,7 +569,7 @@ function createHerdrBadge(tile) {
 
 /**
  * Updates an existing herdr badge's visual status in place.
- * Called by the polling loop — avoids a full title re-render.
+ * Called by herdr status events — avoids a full title re-render.
  */
 export function updateHerdrBadge(container, paneId, status) {
   const badge = container.querySelector(`.tile-herdr-badge[data-pane-id="${paneId}"]`);

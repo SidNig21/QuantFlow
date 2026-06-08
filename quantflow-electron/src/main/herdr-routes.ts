@@ -4,6 +4,8 @@
 
 /** Maps tileId → herdr paneId for linked tiles */
 const herdrLinks = new Map<string, string>();
+/** Maps herdr paneId → tileId for event routing */
+const paneToTile = new Map<string, string>();
 
 type PendingReply = {
   resolve: (result: string) => void;
@@ -43,19 +45,31 @@ export function awaitCorrelatedReply(
 }
 
 export function registerHerdrPaneLink(tileId: string, paneId: string): void {
+  const previousPaneId = herdrLinks.get(tileId);
+  if (previousPaneId && previousPaneId !== paneId) {
+    paneToTile.delete(previousPaneId);
+  }
   herdrLinks.set(tileId, paneId);
+  paneToTile.set(paneId, tileId);
 }
 
 export function unregisterHerdrPaneLink(tileId: string): void {
+  const paneId = herdrLinks.get(tileId);
   herdrLinks.delete(tileId);
+  if (paneId) paneToTile.delete(paneId);
 }
 
 export function getHerdrPaneId(tileId: string): string | undefined {
   return herdrLinks.get(tileId);
 }
 
+export function getTileIdForPane(paneId: string): string | undefined {
+  return paneToTile.get(paneId);
+}
+
 /** Resets internal state — used only in tests */
 export function _resetHerdrRoutesForTests(): void {
   herdrLinks.clear();
+  paneToTile.clear();
   pendingReplies.clear();
 }

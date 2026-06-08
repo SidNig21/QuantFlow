@@ -148,7 +148,7 @@ function rpcOnce<T>(
   });
 }
 
-async function resolveSocketPath(): Promise<string> {
+export async function resolveHerdrSocketPath(): Promise<string> {
   if (process.env.HERDR_SOCKET_PATH?.trim()) {
     return process.env.HERDR_SOCKET_PATH.trim();
   }
@@ -261,7 +261,7 @@ export async function callHerdrSocket<T = Record<string, unknown>>(
   },
 ): Promise<T> {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const socketPath = options?.socketPath ?? (await resolveSocketPath());
+  const socketPath = options?.socketPath ?? (await resolveHerdrSocketPath());
 
   if (process.platform === "win32") {
     return rpcViaWsl<T>(socketPath, method, params, timeoutMs);
