@@ -7,12 +7,13 @@ alwaysApply: true
 
 **Branch:** `quantflow-v2`
 
-**Read order (token-cheap):**
-1. `CONCEPT.md` — what QuantFlow is
-2. `SCOPE.md` — active gates + frozen work
-3. `BUILD_PLAN_V2.md` — execute current gate only
+**Read order:**
+1. `CONCEPT.md` — product definition
+2. `BUILD_PLAN_V2.md` — **only** execution plan (scope, gates, frozen, rejected, handoff)
 
-**Ignore unless operator asks:** `reference/archive/` (incl. old 7-layer charters), vault v1 Build Plan.
+`SCOPE.md`, `RETIREMENT.md`, `ARCHITECTURE.md` are stubs — do not treat as second authorities.
+
+**Ignore unless operator asks:** `reference/archive/` (incl. 7-layer charters), vault v1 Build Plan.
 
 **Spine rule:** Canvas + herdr + interactive PTY. `pane.read` tile display = reject.
 

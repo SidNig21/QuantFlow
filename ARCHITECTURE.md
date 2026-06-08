@@ -1,9 +1,7 @@
 # Architecture
 
-**Authority:** `CONCEPT.md` (what QuantFlow is) + `SCOPE.md` (what's active).
+The active architecture summary now lives in `BUILD_PLAN_V2.md`.
 
-Four roles when you need names: **canvas** (visual) · **herdr** (WSL runtime) · **MCP** (tools) · **Envoy + Obsidian** (proof + memory).
+Use `CONCEPT.md` for the product definition, then `BUILD_PLAN_V2.md` for the build path.
 
-Build order: gates 1–2 ✓ → unify ✓ → gate 3 (events) → retirement-herdr-cli → envoy-obsidian. No A2A.
-
-Do not expand this file. Update `CONCEPT.md` or `SCOPE.md` instead.
+Do not expand this file.
