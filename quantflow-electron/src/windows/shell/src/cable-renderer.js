@@ -2,6 +2,7 @@ import { bezierPath, portPosition } from "./cable-math.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const DEFAULT_CABLE_WIDTH = 1.6;
+const CABLE_KINDS = new Set(["pipe", "context", "trigger"]);
 
 /**
  * Resolve a connection's endpoints to PortPoints in world space.
@@ -47,6 +48,12 @@ export function isCableSourceRunning(tile) {
 	return Boolean(tile.ptySessionId);
 }
 
+export function normalizeCableKind(kind) {
+	const value = String(kind ?? "").trim().toLowerCase();
+	if (value === "relay" || value === "route") return "pipe";
+	return CABLE_KINDS.has(value) ? value : "pipe";
+}
+
 export function getCableRenderGroups(connections, tilesById) {
 	const bundles = new Map();
 	for (const conn of connections) {
@@ -68,11 +75,16 @@ export function getCableRenderGroups(connections, tilesById) {
 		const pathItem = activeItem ?? sorted[0];
 		const count = items.length;
 		const width = count > 1 ? 3 + Math.min(count, 5) : DEFAULT_CABLE_WIDTH;
+		const kind = normalizeCableKind(
+			items.find((item) => normalizeCableKind(item.conn.kind) !== "pipe")?.conn.kind
+				?? sorted[0].conn.kind,
+		);
 		return {
 			id: sorted[0].conn.id,
 			deleteId: sorted[0].conn.id,
 			count,
 			active: Boolean(activeItem),
+			kind,
 			width,
 			a: pathItem.a,
 			b: pathItem.b,
@@ -203,6 +215,24 @@ function createCableGroup(id) {
 	flow.setAttribute("class", "cable-flow");
 	g.appendChild(flow);
 
+	const endpoints = document.createElementNS(SVG_NS, "g");
+	endpoints.setAttribute("class", "cable-endpoints");
+	for (const endpoint of ["a", "b"]) {
+		const marker = document.createElementNS(SVG_NS, "g");
+		marker.setAttribute("class", "cable-endpoint-marker");
+		marker.setAttribute("data-endpoint", endpoint);
+		const outer = document.createElementNS(SVG_NS, "circle");
+		outer.setAttribute("class", "cable-endpoint-outer");
+		outer.setAttribute("r", "7");
+		marker.appendChild(outer);
+		const inner = document.createElementNS(SVG_NS, "circle");
+		inner.setAttribute("class", "cable-endpoint-inner");
+		inner.setAttribute("r", "3.4");
+		marker.appendChild(inner);
+		endpoints.appendChild(marker);
+	}
+	g.appendChild(endpoints);
+
 	const badge = document.createElementNS(SVG_NS, "g");
 	badge.setAttribute("class", "cable-badge");
 	const badgeBg = document.createElementNS(SVG_NS, "circle");
@@ -216,6 +246,18 @@ function createCableGroup(id) {
 	badge.appendChild(badgeText);
 	g.appendChild(badge);
 
+	const errorIcon = document.createElementNS(SVG_NS, "g");
+	errorIcon.setAttribute("class", "cable-error-icon");
+	const errorIconBg = document.createElementNS(SVG_NS, "circle");
+	errorIconBg.setAttribute("class", "cable-error-icon-bg");
+	errorIconBg.setAttribute("r", "9");
+	errorIcon.appendChild(errorIconBg);
+	const errorIconMark = document.createElementNS(SVG_NS, "path");
+	errorIconMark.setAttribute("class", "cable-error-icon-mark");
+	errorIconMark.setAttribute("d", "M0 -4.2 L0 1.2 M0 3.6 L0 4");
+	errorIcon.appendChild(errorIconMark);
+	g.appendChild(errorIcon);
+
 	return g;
 }
 
@@ -226,10 +268,13 @@ function updateCableGroup(group, info) {
 	}
 	group.setAttribute("data-cable-count", String(info.count));
 	group.setAttribute("data-cable-delete-id", info.deleteId);
-	group.classList.toggle("cable-selected", Boolean(info.selected));
-	group.classList.toggle("cable-sending", info.relayState === "sending");
-	group.classList.toggle("cable-sent", info.relayState === "sent");
-	group.classList.toggle("cable-failed", info.relayState === "failed");
+	group.setAttribute("data-cable-kind", info.kind);
+	group.setAttribute("class", getCableClasses({
+		active: info.active,
+		kind: info.kind,
+		relayState: info.relayState,
+		selected: info.selected,
+	}));
 
 	const hit = group.querySelector(".cable-hit");
 	if (hit) hit.setAttribute("stroke-width", "14");
@@ -237,7 +282,7 @@ function updateCableGroup(group, info) {
 	const glow = group.querySelector(".cable-glow");
 	if (glow) {
 		glow.setAttribute("stroke-width", String(info.width + 6));
-		setHidden(glow, !info.active);
+		setHidden(glow, !(info.active || info.selected || info.relayState === "queued" || info.relayState === "failed"));
 	}
 
 	const main = group.querySelector(".cable-main");
@@ -246,7 +291,16 @@ function updateCableGroup(group, info) {
 	const flow = group.querySelector(".cable-flow");
 	if (flow) {
 		flow.setAttribute("stroke-width", String(info.width));
-		setHidden(flow, !info.active);
+		setHidden(flow, !(info.active || info.selected || info.relayState === "queued"));
+	}
+
+	const endpoints = group.querySelector(".cable-endpoints");
+	if (endpoints) {
+		const markerA = endpoints.querySelector("[data-endpoint=\"a\"]");
+		const markerB = endpoints.querySelector("[data-endpoint=\"b\"]");
+		if (markerA) markerA.setAttribute("transform", `translate(${info.a.x} ${info.a.y})`);
+		if (markerB) markerB.setAttribute("transform", `translate(${info.b.x} ${info.b.y})`);
+		setHidden(endpoints, !info.selected);
 	}
 
 	const badge = group.querySelector(".cable-badge");
@@ -258,6 +312,29 @@ function updateCableGroup(group, info) {
 		if (text) text.textContent = String(info.count);
 		setHidden(badge, info.count <= 1);
 	}
+
+	const errorIcon = group.querySelector(".cable-error-icon");
+	if (errorIcon) {
+		const mx = (info.a.x + info.b.x) / 2;
+		const my = (info.a.y + info.b.y) / 2;
+		errorIcon.setAttribute("transform", `translate(${mx} ${my})`);
+		setHidden(errorIcon, info.relayState !== "failed");
+		const mark = errorIcon.querySelector(".cable-error-icon-mark");
+		if (mark) mark.setAttribute("d", "M0 -4.2 L0 1.2 M0 3.6 L0 4");
+	}
+}
+
+export function getCableClasses({ active = false, kind = "pipe", relayState = "", selected = false } = {}) {
+	const classes = ["cable-root", `cable-kind--${normalizeCableKind(kind)}`];
+	if (active) classes.push("cable-live");
+	if (selected) classes.push("cable-selected");
+	if (relayState === "sending") classes.push("cable-sending");
+	if (relayState === "sent") classes.push("cable-sent");
+	if (relayState === "queued") classes.push("cable-queued");
+	if (relayState === "failed" || relayState === "error") {
+		classes.push("cable-error", "cable-failed");
+	}
+	return classes.join(" ");
 }
 
 function setHidden(element, hidden) {

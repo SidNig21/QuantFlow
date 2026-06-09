@@ -1427,8 +1427,24 @@ body.platform-win {
 	cursor: pointer;
 }
 
+#cable-layer .cable-root {
+	--cable-kind: var(--cable-pipe);
+}
+
+#cable-layer .cable-kind--pipe {
+	--cable-kind: var(--cable-pipe);
+}
+
+#cable-layer .cable-kind--context {
+	--cable-kind: var(--cable-context);
+}
+
+#cable-layer .cable-kind--trigger {
+	--cable-kind: var(--cable-trigger);
+}
+
 #cable-layer path.cable-glow {
-	stroke: var(--cable-default);
+	stroke: var(--cable-kind);
 	stroke-width: 7.6;
 	opacity: 0.18;
 	fill: none;
@@ -1445,6 +1461,10 @@ body.platform-win {
 	opacity: 0.9;
 }
 
+#cable-layer .cable-live path.cable-main {
+	stroke: var(--cable-kind);
+}
+
 #cable-layer .cable-selected path.cable-main {
 	stroke: var(--cable-selected);
 }
@@ -1459,9 +1479,28 @@ body.platform-win {
 	stroke: var(--cable-default);
 }
 
+#cable-layer .cable-queued path.cable-main,
+#cable-layer .cable-queued path.cable-flow,
+#cable-layer .cable-queued path.cable-glow {
+	stroke: var(--amber);
+}
+
+#cable-layer .cable-queued path.cable-flow {
+	stroke-dasharray: 2 8;
+	animation: cableFlowDense var(--cable-queue-duration) linear infinite;
+}
+
+#cable-layer .cable-error path.cable-main,
+#cable-layer .cable-error path.cable-flow,
+#cable-layer .cable-error path.cable-glow,
 #cable-layer .cable-failed path.cable-main,
 #cable-layer .cable-failed path.cable-flow {
-	stroke: var(--cable-failed);
+	stroke: var(--cable-error);
+}
+
+#cable-layer .cable-error path.cable-main,
+#cable-layer .cable-failed path.cable-main {
+	stroke-dasharray: 11 7;
 }
 
 #cable-layer path.cable-pulse {
@@ -1469,7 +1508,7 @@ body.platform-win {
 }
 
 #cable-layer path.cable-flow {
-	stroke: var(--cable-selected);
+	stroke: var(--cable-kind);
 	stroke-width: var(--cable-w-default);
 	stroke-dasharray: 2 14;
 	stroke-linecap: round;
@@ -1484,7 +1523,7 @@ body.platform-win {
 
 #cable-layer .cable-badge-bg {
 	fill: #0d1218;
-	stroke: color-mix(in srgb, var(--accent) 50%, transparent);
+	stroke: color-mix(in srgb, var(--cable-kind) 50%, transparent);
 	stroke-width: 1;
 }
 
@@ -1497,6 +1536,36 @@ body.platform-win {
 	dominant-baseline: central;
 }
 
+#cable-layer .cable-endpoints,
+#cable-layer .cable-error-icon {
+	pointer-events: none;
+}
+
+#cable-layer .cable-endpoint-outer {
+	fill: none;
+	stroke: var(--flow-bright);
+	stroke-width: 1.3;
+	opacity: 0.5;
+}
+
+#cable-layer .cable-endpoint-inner {
+	fill: var(--flow-bright);
+	filter: drop-shadow(0 0 6px rgba(var(--flow-rgb), 0.72));
+}
+
+#cable-layer .cable-error-icon-bg {
+	fill: var(--ink);
+	stroke: var(--cable-error);
+	stroke-width: 1.2;
+}
+
+#cable-layer .cable-error-icon-mark {
+	fill: none;
+	stroke: var(--cable-error);
+	stroke-width: 1.6;
+	stroke-linecap: round;
+}
+
 #cable-layer path.cable-preview {
 	stroke: color-mix(in srgb, var(--accent) 70%, transparent);
 	stroke-width: 2;
@@ -1507,6 +1576,10 @@ body.platform-win {
 
 @keyframes cableFlow {
 	to { stroke-dashoffset: -32; }
+}
+
+@keyframes cableFlowDense {
+	to { stroke-dashoffset: -28; }
 }
 
 @keyframes ledBreathe {

@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
 	getCableBundleKey,
+	getCableClasses,
 	getCableRenderGroups,
 	isCableSourceRunning,
+	normalizeCableKind,
 	clearCablePreview,
 	renderCablePreview,
 	renderCables,
@@ -146,6 +148,25 @@ const tiles = [
 ];
 
 describe("cable render grouping", () => {
+	test("normalizes V2 cable kinds and keeps relay as pipe", () => {
+		expect(normalizeCableKind("pipe")).toBe("pipe");
+		expect(normalizeCableKind("context")).toBe("context");
+		expect(normalizeCableKind("trigger")).toBe("trigger");
+		expect(normalizeCableKind("relay")).toBe("pipe");
+		expect(normalizeCableKind("unknown")).toBe("pipe");
+	});
+
+	test("derives V2 cable root classes", () => {
+		expect(getCableClasses({
+			active: true,
+			kind: "context",
+			relayState: "queued",
+			selected: true,
+		})).toBe("cable-root cable-kind--context cable-live cable-selected cable-queued");
+		expect(getCableClasses({ kind: "pipe", relayState: "failed" }))
+			.toBe("cable-root cable-kind--pipe cable-error cable-failed");
+	});
+
 	test("groups by tile pair and side pair regardless of direction", () => {
 		expect(getCableBundleKey({
 			id: "a",
@@ -275,7 +296,7 @@ describe("renderCables interactions", () => {
 		const contentG = createElement("g");
 		renderCables(
 			contentG,
-			[{ id: "conn-a", tileAId: "tile-a", tileBId: "tile-b" }],
+			[{ id: "conn-a", tileAId: "tile-a", tileBId: "tile-b", kind: "context" }],
 			tiles,
 			{ panX: 0, panY: 0, zoom: 1 },
 			{
@@ -288,6 +309,35 @@ describe("renderCables interactions", () => {
 		expect(group.classList.contains("cable-selected")).toBe(true);
 		expect(group.classList.contains("cable-sending")).toBe(true);
 		expect(group.classList.contains("cable-sent")).toBe(false);
+		expect(group.classList.contains("cable-kind--context")).toBe(true);
+		expect(group.getAttribute("data-cable-kind")).toBe("context");
+		expect(group.querySelector(".cable-endpoints").getAttribute("hidden")).toBe(null);
+	});
+
+	test("renders queued and failed relay states with V2 classes and markers", () => {
+		const contentG = createElement("g");
+		renderCables(
+			contentG,
+			[
+				{ id: "conn-a", tileAId: "tile-a", tileBId: "tile-b", kind: "trigger" },
+				{ id: "conn-b", tileAId: "tile-b", tileBId: "tile-c" },
+			],
+			tiles,
+			{ panX: 0, panY: 0, zoom: 1 },
+			{
+				getRelayState: (id) => id === "conn-a" ? "queued" : "failed",
+			},
+		);
+
+		const queued = contentG.querySelector('g[data-cable-id="conn-a"]');
+		const failed = contentG.querySelector('g[data-cable-id="conn-b"]');
+		expect(queued.classList.contains("cable-queued")).toBe(true);
+		expect(queued.classList.contains("cable-kind--trigger")).toBe(true);
+		expect(queued.querySelector(".cable-flow").getAttribute("hidden")).toBe(null);
+		expect(failed.classList.contains("cable-error")).toBe(true);
+		expect(failed.classList.contains("cable-failed")).toBe(true);
+		expect(failed.querySelector(".cable-error-icon").getAttribute("hidden")).toBe(null);
+		expect(failed.querySelector(".cable-flow").getAttribute("hidden")).toBe("");
 	});
 
 	test("collapses bundled cables into one path with a count badge", () => {
