@@ -247,6 +247,42 @@ body.platform-win {
 	align-items: center;
 }
 
+.titlebar-brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 100%;
+	margin-left: 18px;
+	color: var(--ivory);
+	pointer-events: none;
+	-webkit-app-region: drag;
+}
+
+.titlebar-brand-mark {
+	width: 18px;
+	height: 18px;
+	color: var(--ivory);
+	display: block;
+	overflow: visible;
+	flex: 0 0 auto;
+}
+
+.titlebar-brand-signal {
+	fill: var(--flow);
+	filter: drop-shadow(0 0 4px var(--flow)) drop-shadow(0 0 1px var(--flow));
+}
+
+.titlebar-wordmark {
+	font-family: var(--font-display);
+	font-size: 10.5px;
+	line-height: 1;
+	font-weight: 600;
+	letter-spacing: 0.28em;
+	text-transform: uppercase;
+	color: var(--ivory);
+	opacity: 0.92;
+}
+
 /* ── Panels ── */
 
 #panels {

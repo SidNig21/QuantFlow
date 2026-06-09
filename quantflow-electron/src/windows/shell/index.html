@@ -12,7 +12,23 @@
 </head>
 
 <body>
-	<div id="titlebar"></div>
+	<div id="titlebar">
+		<div class="titlebar-brand" aria-label="QuantFlow">
+			<svg class="titlebar-brand-mark" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+				<circle cx="60" cy="60" r="38" fill="none" stroke="currentColor" stroke-width="2.4" />
+				<line x1="84" y1="82" x2="94" y2="93" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+				<g stroke="currentColor" stroke-width="3.6" stroke-linecap="square">
+					<line x1="53" y1="40" x2="53" y2="82" />
+					<line x1="53" y1="40" x2="74" y2="40" />
+					<line x1="53" y1="60" x2="68" y2="60" />
+					<line x1="50" y1="40" x2="55" y2="40" stroke-width="3.2" />
+					<line x1="49" y1="82" x2="57" y2="82" stroke-width="3.4" />
+				</g>
+				<circle class="titlebar-brand-signal" cx="87" cy="33" r="4.2" />
+			</svg>
+			<span class="titlebar-wordmark">QuantFlow</span>
+		</div>
+	</div>
 <button type="button" id="nav-toggle" class="panel-toggle" aria-pressed="true" aria-label="Hide Navigator"
 		data-tooltip="Toggle Nav" data-shortcut="Cmd+B"></button>
 
