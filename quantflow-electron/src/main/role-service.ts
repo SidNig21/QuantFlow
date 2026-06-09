@@ -25,6 +25,10 @@ export interface Role {
   startupPrompt?: string;
   systemPrompt?: string;
   statusParser?: RoleStatusParser;
+  /** Envoy profile for lifecycle messages in the canvas space. */
+  envoyProfile?: string;
+  /** When true, legend commandTemplate runs through envoy-run.sh (one-shot workers). */
+  envoyWrapCommand?: boolean;
 }
 
 export function requiresHerdrSpawn(
@@ -50,6 +54,8 @@ const BUILT_IN_ROLES: Role[] = [
     defaultShell: "auto",
     runtimeTarget: "herdr-wsl",
     systemPrompt: "Act as Hermes, the run orchestrator for this QuantFlow canvas.",
+    envoyProfile: "hermes-agent",
+    envoyWrapCommand: false,
   },
   {
     id: "shell",
@@ -76,6 +82,8 @@ const BUILT_IN_ROLES: Role[] = [
       waiting: ["approval required", "continue?", "waiting for", "confirm"],
       blocked: ["error:", "failed:", "panic", "traceback"],
     },
+    envoyProfile: "codex-agent",
+    envoyWrapCommand: false,
   },
   {
     id: "claude-worker",
@@ -92,6 +100,8 @@ const BUILT_IN_ROLES: Role[] = [
       waiting: ["do you want", "proceed?", "continue?", "yes/no"],
       blocked: ["error:", "failed:", "exception", "traceback"],
     },
+    envoyProfile: "claude-worker",
+    envoyWrapCommand: false,
   },
   {
     id: "claude-reviewer",
@@ -108,6 +118,8 @@ const BUILT_IN_ROLES: Role[] = [
       waiting: ["do you want", "proceed?", "continue?", "yes/no"],
       blocked: ["error:", "failed:", "exception", "traceback"],
     },
+    envoyProfile: "claude-reviewer",
+    envoyWrapCommand: false,
   },
   {
     id: "opencode",
@@ -124,6 +136,8 @@ const BUILT_IN_ROLES: Role[] = [
       waiting: ["approval required", "confirm", "continue?"],
       blocked: ["error:", "failed:", "panic"],
     },
+    envoyProfile: "opencode-agent",
+    envoyWrapCommand: false,
   },
   {
     id: "coder",
@@ -141,6 +155,8 @@ const BUILT_IN_ROLES: Role[] = [
     defaultShell: "auto",
     runtimeTarget: "herdr-wsl",
     startupPrompt: "Open a Python worker shell and wait for a script command.",
+    envoyProfile: "python-script",
+    envoyWrapCommand: true,
   },
   {
     id: "puffer",
@@ -152,6 +168,8 @@ const BUILT_IN_ROLES: Role[] = [
     defaultShell: "auto",
     runtimeTarget: "herdr-wsl",
     startupPrompt: "Open a PufferLib worker shell. Do not start training until Commence.",
+    envoyProfile: "puffer-script",
+    envoyWrapCommand: true,
   },
   {
     id: "reviewer",

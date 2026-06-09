@@ -94,11 +94,9 @@ Pass when:
 
 ## Next After That
 
-### envoy-obsidian
+### envoy-obsidian (Phase 5a + 5b)
 
-Goal: add proof and durable memory after the herdr runtime spine is stable.
-
-Use archived Layer 4 as reference, with one major correction: no A2A dependency.
+Goal: Envoy truth + Obsidian live read + legend spawn wiring.
 
 Work:
 
@@ -109,8 +107,10 @@ Work:
 - [x] Add claim locking so two agents cannot own the same task.
 - [x] Add MCP tools for agent task operations through the `9811` relay.
 - [x] Add `ENVOY.md` and `bun run smoke:envoy-task` proof command.
+- [x] **5a** Obsidian live mirror (`obsidian-envoy-mirror.ts` → `Projects/QuantFlow/Envoy/`).
+- [x] **5b** `envoyProfile` on roles, `envoy-run.sh`, spawn lifecycle posts, worker command wrap.
+- [ ] **6** Delegation proof: Hermes creates task via MCP, Codex claims, no manual paste.
 - [ ] Let watchers post receipts for dumb tiles. Dumb tiles do not receive Envoy credentials.
-- [ ] Let Hermes read proof through Envoy tooling.
 - [ ] Wire Obsidian vault context pins and handoff paths to Envoy evidence.
 - [ ] Prove one cable action creates one receipt visible in Watchtower or a vault note.
 
@@ -191,6 +191,6 @@ Do not execute archived layer charters.
 Do not use Obsidian v1 build plans.
 No A2A. No string relay revival. pane.read display is rejected.
 Next after Gate 3: retirement-herdr-cli.
-Next after that: envoy-obsidian.
+Next after that: Phase 6 delegation proof (Hermes → Codex via MCP).
 One executor at a time. Commit before handoff.
 ```

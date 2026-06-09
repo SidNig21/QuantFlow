@@ -304,14 +304,58 @@ export class EnvoyService {
   async sendMessage(params: {
     envoySpaceId: string;
     body: string;
+    profile?: string;
   }): Promise<{ envoyMessageId: string | null; raw: string }> {
-    const args = ["--json", "send", "--space", params.envoySpaceId, "--stdin"];
+    const args = params.profile
+      ? [
+          "--profile",
+          params.profile,
+          "--json",
+          "send",
+          "--space",
+          params.envoySpaceId,
+          "--stdin",
+        ]
+      : ["--json", "send", "--space", params.envoySpaceId, "--stdin"];
     const result = await this.runner(args, params.body);
     requireOk(result, args);
     return {
       envoyMessageId: extractEnvoyMessageId(result.stdout),
       raw: result.stdout,
     };
+  }
+
+  async listTasks(params: {
+    envoySpaceId: string;
+    includeCompleted?: boolean;
+  }): Promise<string> {
+    const args = [
+      "--json",
+      "task",
+      "list",
+      "--space",
+      params.envoySpaceId,
+    ];
+    if (params.includeCompleted) args.push("--include-completed");
+    const result = await this.runner(args);
+    requireOk(result, args);
+    return result.stdout;
+  }
+
+  async getHistory(params: {
+    envoySpaceId: string;
+    limit?: number;
+  }): Promise<string> {
+    const args = [
+      "--json",
+      "history",
+      params.envoySpaceId,
+      "--limit",
+      String(params.limit ?? 200),
+    ];
+    const result = await this.runner(args);
+    requireOk(result, args);
+    return result.stdout;
   }
 
   private async createSpace(spaceName: string): Promise<string> {

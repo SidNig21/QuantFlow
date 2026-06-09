@@ -2,21 +2,9 @@ import { ipcMain, dialog, type BrowserWindow } from "electron";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve, normalize } from "node:path";
 import { QUANTFLOW_DIR } from "./paths";
+import { readVaultConfig, type VaultConfig } from "./vault-config";
 
 const CONFIG_PATH = join(QUANTFLOW_DIR, "vault-config.json");
-
-interface VaultConfig {
-  vaultPath?: string;
-}
-
-export async function readVaultConfig(): Promise<VaultConfig> {
-  try {
-    const raw = await readFile(CONFIG_PATH, "utf-8");
-    return JSON.parse(raw) as VaultConfig;
-  } catch {
-    return {};
-  }
-}
 
 async function writeConfig(cfg: VaultConfig): Promise<void> {
   await mkdir(QUANTFLOW_DIR, { recursive: true });

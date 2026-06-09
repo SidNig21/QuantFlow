@@ -129,6 +129,53 @@ describe("herdr role spawn planning", () => {
     });
   });
 
+  test("wraps commandTemplate through envoy-run when envoy wrap is enabled", async () => {
+    const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
+    await spawnHerdrRoleSession({
+      tileId: "tile-python",
+      roleId: "python",
+      roleName: "Python script",
+      commandTemplate: "python train.py",
+      envoySpaceId: "space-1",
+      envoyProfile: "python-script",
+      envoyWrapCommand: true,
+    }, async (method, params) => {
+      calls.push({ method, params });
+      if (method === "workspace.create") {
+        return {
+          workspace: { workspace_id: "workspace-1" },
+          root_pane: { pane_id: "root-pane" },
+        };
+      }
+      if (method === "pane.split") {
+        return {
+          pane: {
+            pane_id: "pane-1",
+            terminal_id: "terminal-1",
+          },
+        };
+      }
+      if (method === "pane.get") {
+        return {
+          pane: {
+            pane_id: "pane-1",
+            terminal_id: "terminal-1",
+          },
+        };
+      }
+      if (method === "pane.send_text" || method === "pane.send_keys") {
+        return {};
+      }
+      throw new Error(`unexpected method ${method}`);
+    });
+
+    const sentText = calls.find((call) => call.method === "pane.send_text")?.params?.text;
+    expect(String(sentText)).toContain("ENVOY_SPACE='space-1'");
+    expect(String(sentText)).toContain("ENVOY_PROFILE='python-script'");
+    expect(String(sentText)).toContain("envoy-run.sh");
+    expect(String(sentText)).toContain("python train.py");
+  });
+
   test("sends startup prompts into the herdr pane when no command template exists", async () => {
     const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
     const result = await spawnHerdrRoleSession({

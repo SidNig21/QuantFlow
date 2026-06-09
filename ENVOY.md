@@ -2,7 +2,7 @@
 
 Status: Envoy task bus MVP implementation slice.
 
-Envoy is the durable task bus for agent delegation. QuantFlow mirrors task state in SQLite for fast canvas queries, claim locking, receipts, and runtime-event correlation. Obsidian mirrors this later; it is not part of this slice.
+Envoy is the durable task bus for agent delegation. QuantFlow mirrors task state in SQLite for fast canvas queries, claim locking, receipts, and runtime-event correlation. Obsidian is a live read dashboard mirrored from Envoy by Electron main (not a second lock).
 
 ## Ownership
 
@@ -11,6 +11,7 @@ Envoy is the durable task bus for agent delegation. QuantFlow mirrors task state
 - Agents use MCP tools through the QuantFlow relay on `127.0.0.1:9811`.
 - Cables declare allowed delegation targets through `connection_id`.
 - Obsidian is not the task lock manager.
+- One mirror process in Electron main writes vault markdown; agents and scripts post to Envoy only.
 
 ## State Model
 
@@ -55,6 +56,10 @@ Core implementation:
 - `quantflow-electron/src/main/envoy-listener.ts`
 - `quantflow-electron/src/main/envoy-task-service.ts`
 - `quantflow-electron/src/main/ipc-envoy.ts`
+- `quantflow-electron/src/main/obsidian-envoy-mirror.ts`
+- `quantflow-electron/src/main/envoy-spawn-lifecycle.ts`
+- `quantflow-electron/src/main/herdr-envoy-wrap.ts`
+- `quantflow-electron/scripts/envoy-run.sh`
 - `quantflow-electron/src/main/runtime-state/envoy-repo.ts`
 - `quantflow-electron/src/main/runtime-state/migrations/006-envoy-task-bus.sql`
 
@@ -151,10 +156,35 @@ event_kinds
 
 The smoke uses the real Envoy CLI boundary and a test runtime database.
 
+## Obsidian Live Mirror
+
+Vault path comes from `vault-config.json` (default: `Obsidian/Cursor Collab`).
+
+Mirror directory:
+
+```text
+Projects/QuantFlow/Envoy/
+  task-board.md   # envoy task list (poll ~2s)
+  history.md      # envoy history (poll ~2s)
+  live.md         # envoy listen packets (append)
+```
+
+Started when a legend spawn ensures the canvas Envoy space. Stopped on app shutdown.
+
+## Legend Spawn Wiring
+
+Roles carry `envoyProfile` and optional `envoyWrapCommand`.
+
+- Agents (Hermes, Codex, Claude, OpenCode): main posts `spawn.started` via Envoy; agent uses MCP for tasks.
+- One-shot workers (python, puffer): `commandTemplate` runs through `scripts/envoy-run.sh` in WSL, which posts started/complete/fail with exit code.
+
+```bash
+ENVOY_SPACE=<canvas_space_id> ENVOY_PROFILE=<profile> ./envoy-run.sh <command>
+```
+
 ## Out Of Scope
 
-- Obsidian board mirror.
-- Live Hermes to Codex tile proof.
+- Live Hermes to Codex tile proof (Phase 6).
 - Watchtower redesign.
 - A2A or Agent Cards.
 - Custom string relay revival.

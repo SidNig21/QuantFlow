@@ -1,5 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { callHerdrSocket } from "./herdr-socket-bridge";
+import { buildEnvoyWrappedCommand } from "./herdr-envoy-wrap";
 import { buildHerdrDisplayTarget } from "./pty-spawn-params";
 
 const ROLE_STARTUP_PROMPT_DELAY_MS = 1800;
@@ -13,6 +14,9 @@ export interface HerdrRoleSpawnRequest {
   startupPrompt?: string;
   canvasId?: string;
   workspaceId?: string;
+  envoySpaceId?: string;
+  envoyProfile?: string;
+  envoyWrapCommand?: boolean;
 }
 
 export interface HerdrRoleSpawnResult {
@@ -171,8 +175,21 @@ export async function spawnHerdrRoleSession(
     throw new Error("herdr pane get did not return an agent terminal id");
   }
 
-  const commandTemplate = request.commandTemplate?.trim() ?? "";
+  let commandTemplate = request.commandTemplate?.trim() ?? "";
   const startupPrompt = request.startupPrompt?.trim() ?? "";
+
+  if (
+    commandTemplate
+    && request.envoyWrapCommand
+    && request.envoySpaceId
+    && request.envoyProfile
+  ) {
+    commandTemplate = buildEnvoyWrappedCommand({
+      command: commandTemplate,
+      envoySpaceId: request.envoySpaceId,
+      envoyProfile: request.envoyProfile,
+    });
+  }
 
   if (commandTemplate) {
     await sendHerdrPaneLine(rpc, herdrPaneId, commandTemplate);
