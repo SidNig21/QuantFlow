@@ -13,7 +13,7 @@ import {
   addDecision,
 } from "./context-service";
 import { readFile as readVaultFile } from "node:fs/promises";
-import { readVaultConfig } from "./ipc-vault";
+import { readVaultConfig } from "./vault-config";
 
 async function requireVaultPath(): Promise<string> {
   const cfg = await readVaultConfig();
