@@ -5,65 +5,88 @@ export const LEGEND_PREF_KEYS = {
 
 export const LEGEND_RECIPES = [
 	{
-		id: "hermes",
-		roleId: "hermes",
-		group: "agents",
-		name: "Hermes",
-		description: "Sync · gossip rooms",
-		color: "#06b6d4",
-		icon: "hermes",
+		id: "shell",
+		roleId: "shell",
+		group: "spawn",
+		type: "generic",
+		name: "Generic CLI",
+		description: "windows-pty",
+		runtime: "windows-pty",
+		color: "var(--rail-generic, #a3ff12)",
+		icon: "shell",
 	},
 	{
 		id: "codex",
 		roleId: "codex",
-		group: "agents",
+		group: "spawn",
+		type: "codex",
 		name: "Codex CLI",
-		description: "Local Codex agent",
-		color: "#38bdf8",
+		description: "herdr-wsl",
+		runtime: "herdr-wsl",
+		color: "var(--rail-codex, #14d9ff)",
 		icon: "codex",
+	},
+	{
+		id: "hermes",
+		roleId: "hermes",
+		group: "spawn",
+		type: "agent",
+		name: "Hermes",
+		description: "orchestrator",
+		runtime: "herdr-wsl",
+		color: "var(--rail-agent, #4fc3ff)",
+		icon: "hermes",
 	},
 	{
 		id: "claude",
 		roleId: "claude-worker",
-		group: "agents",
+		group: "spawn",
+		type: "worker",
 		name: "Claude Code",
-		description: "Implementation agent",
-		color: "#f97316",
+		description: "task-runner",
+		runtime: "herdr-wsl",
+		color: "var(--rail-worker, #ffc24a)",
 		icon: "claude",
 	},
 	{
 		id: "puffer",
 		roleId: "puffer",
-		group: "workers",
+		group: "spawn",
+		type: "worker",
 		name: "PufferLib worker",
-		description: "RL training · dumb",
-		color: "#f59e0b",
+		description: "paper-trade loop",
+		runtime: "herdr-wsl",
+		color: "var(--rail-worker, #ffc24a)",
 		icon: "puffer",
 	},
 	{
 		id: "python",
 		roleId: "python",
-		group: "workers",
+		group: "spawn",
+		type: "tool",
 		name: "Python script",
-		description: "One-shot script",
-		color: "#6366f1",
+		description: "one-shot script",
+		runtime: "local-script",
+		color: "var(--rail-tool, #14d9ff)",
 		icon: "python",
 	},
 	{
-		id: "shell",
-		roleId: "shell",
-		group: "shell",
-		name: "Generic CLI",
-		description: "Plain shell terminal",
-		color: "#64748b",
-		icon: "shell",
+		id: "memory",
+		roleId: "memory",
+		group: "spawn",
+		type: "memory",
+		name: "Envoy memory",
+		description: "disabled",
+		runtime: "Gate 3+",
+		color: "var(--rail-memory, #9b7cff)",
+		icon: "memory",
+		disabled: true,
 	},
 ];
 
 const GROUPS = [
-	{ id: "agents", label: "Agents" },
-	{ id: "workers", label: "Workers" },
-	{ id: "shell", label: "Shell" },
+	{ id: "flow", label: "Flow" },
+	{ id: "spawn", label: "Spawn" },
 ];
 
 const TEMPLATE_ID = "rl-training";
@@ -75,7 +98,11 @@ const ICONS = {
 	puffer: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 1.5 L3 9 H7 L5.5 14.5 L11 7 H7 Z"></path></svg>`,
 	python: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5 L1.5 8 L5 12.5 M11 3.5 L14.5 8 L11 12.5 M9.5 2.5 L6.5 13.5"></path></svg>`,
 	shell: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4 L5.5 7.5 L2 11"></path><path d="M7 11 H13.5"></path></svg>`,
+	memory: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3.5 H12 A1.5 1.5 0 0 1 13.5 5 V11 A1.5 1.5 0 0 1 12 12.5 H4 A1.5 1.5 0 0 1 2.5 11 V5 A1.5 1.5 0 0 1 4 3.5 Z"></path><path d="M5 6.5 H11 M5 9.5 H9"></path></svg>`,
 	legend: `<svg class="lv1-dock__glyph" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9 L7 5 L11 9 L15 5"></path><path d="M3 13 L7 9 L11 13 L15 9" opacity="0.45"></path></svg>`,
+	activity: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9 H5 L6.5 4 L9.5 12 L11 8 H14"></path></svg>`,
+	connect: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="3.5" cy="8" r="1.7"></circle><circle cx="12.5" cy="8" r="1.7"></circle><path d="M5.2 8 H10.8"></path></svg>`,
+	spawn: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5"></circle><path d="M8 5.4 V10.6 M5.4 8 H10.6"></path></svg>`,
 	play: `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><path d="M3 2 L12 7 L3 12 Z"></path></svg>`,
 	pause: `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="3" height="8"></rect><rect x="8" y="3" width="3" height="8"></rect></svg>`,
 	densityCompact: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M2 4 H12"></path><path d="M2 7 H12"></path><path d="M2 10 H12"></path></svg>`,
@@ -147,29 +174,33 @@ export function getCommenceCopy(state) {
 }
 
 export function getDisabledRecipeIds(state) {
+	const ids = new Set(LEGEND_RECIPES
+		.filter((recipe) => recipe.disabled)
+		.map((recipe) => recipe.id));
 	if (state.armedTemplate === TEMPLATE_ID && state.running) {
-		return new Set(["hermes", "puffer"]);
+		ids.add("hermes");
+		ids.add("puffer");
 	}
-	return new Set();
+	return ids;
 }
 
 export function getSpawnModeChipText(spawnMode) {
 	return spawnMode === "click"
-		? "spawn · click-to-place"
-		: "spawn · viewport center";
+		? "spawn - click-to-place"
+		: "spawn - viewport center";
 }
 
 export function getToggleContent(state) {
 	return {
 		density: {
 			icon: state.density === "comfortable" ? "densityComfortable" : "densityCompact",
-			label: state.density === "comfortable" ? "Density · compact" : "Density · comfortable",
+			label: state.density === "comfortable" ? "Density - compact" : "Density - comfortable",
 			title: state.density === "comfortable" ? "Compact density" : "Comfortable density",
 			value: state.density,
 		},
 		spawnMode: {
 			icon: state.spawnMode === "click" ? "spawnClick" : "spawnCenter",
-			label: state.spawnMode === "click" ? "Spawn · click-to-place" : "Spawn · center",
+			label: state.spawnMode === "click" ? "Spawn - click-to-place" : "Spawn - center",
 			title: state.spawnMode === "click" ? "Viewport center" : "Click-to-place",
 			value: state.spawnMode,
 		},
@@ -275,16 +306,20 @@ function escapeHtml(value) {
 function recipeButton(recipe, state) {
 	const disabled = getDisabledRecipeIds(state).has(recipe.id);
 	const recipeState = disabled ? "disabled" : "idle";
+	const runtime = recipe.runtime ?? recipe.description;
 	return `
 		<button
 			class="lv1-recipe"
 			data-recipe="${escapeHtml(recipe.id)}"
+			data-role-type="${escapeHtml(recipe.type ?? recipe.id)}"
 			data-state="${recipeState}"
 			data-role-color="${escapeHtml(recipe.color)}"
+			data-runtime="${escapeHtml(runtime)}"
 			style="--role-color: ${escapeHtml(recipe.color)}"
 			type="button"
-			aria-label="Spawn ${escapeHtml(recipe.name)}"
-			title="${escapeHtml(recipe.name)} — ${escapeHtml(recipe.description)}"
+			${disabled ? "disabled" : ""}
+			aria-label="${disabled ? "Disabled" : "Spawn"} ${escapeHtml(recipe.name)}"
+			title="${escapeHtml(recipe.name)} - ${escapeHtml(runtime)}"
 		>
 			<span class="lv1-recipe__disc">${ICONS[recipe.icon]}</span>
 			<span class="lv1-recipe__copy">
@@ -293,7 +328,32 @@ function recipeButton(recipe, state) {
 			</span>
 			<span class="lv1-recipe__tip" role="tooltip">
 				<span class="lv1-recipe__tip-name">${escapeHtml(recipe.name)}</span>
-				<span class="lv1-recipe__tip-desc">${escapeHtml(recipe.description)}</span>
+				<span class="lv1-recipe__tip-desc">${escapeHtml(runtime)}</span>
+			</span>
+		</button>
+	`;
+}
+
+function flowActivityButton() {
+	return `
+		<button
+			class="lv1-recipe lv1-recipe--activity"
+			data-role-type="activity"
+			data-state="disabled"
+			data-runtime="route activity"
+			style="--role-color: var(--flow)"
+			type="button"
+			aria-label="Route activity"
+			disabled
+		>
+			<span class="lv1-recipe__disc">${ICONS.activity}</span>
+			<span class="lv1-recipe__copy">
+				<span class="lv1-recipe__name">Activity</span>
+				<span class="lv1-recipe__desc">route activity</span>
+			</span>
+			<span class="lv1-recipe__tip" role="tooltip">
+				<span class="lv1-recipe__tip-name">Activity</span>
+				<span class="lv1-recipe__tip-desc">route activity</span>
 			</span>
 		</button>
 	`;
@@ -306,17 +366,23 @@ function renderDockHtml(state) {
 	const groups = GROUPS.map((group) => `
 		<section class="lv1-group" data-group="${group.id}">
 			<div class="lv1-group__label">${group.label}</div>
-			${LEGEND_RECIPES.filter((recipe) => recipe.group === group.id)
-				.map((recipe) => recipeButton(recipe, state)).join("")}
+			${group.id === "flow"
+				? flowActivityButton()
+				: LEGEND_RECIPES.filter((recipe) => recipe.group === group.id)
+					.map((recipe) => recipeButton(recipe, state)).join("")}
 		</section>
 	`).join("");
 
 	return `
 		<header class="lv1-dock__header">
-			<span class="lv1-dock__title">Legend</span>
-			<span class="lv1-dock__eyebrow">spawn</span>
+			<span class="lv1-dock__title">QF Dock</span>
+			<span class="lv1-dock__eyebrow">spawn rail</span>
 			${ICONS.legend}
 		</header>
+		<div class="lv1-mode-toggle" role="group" aria-label="Dock mode">
+			<button class="lv1-mode-toggle__btn" data-mode="spawn" data-active="true" type="button" title="Spawn nodes">${ICONS.spawn}<span>Spawn</span></button>
+			<button class="lv1-mode-toggle__btn" data-mode="connect" data-active="false" type="button" title="Connect via ports" disabled>${ICONS.connect}<span>Route</span></button>
+		</div>
 		<div class="lv1-dock__body">
 			${groups}
 			<section class="lv1-group lv1-group--templates" data-group="templates">
@@ -338,11 +404,11 @@ function renderDockHtml(state) {
 					</span>
 					<span class="lv1-template__copy">
 						<span class="lv1-template__name">RL Training</span>
-						<span class="lv1-template__summary">Hermes ↔ PufferLib · paper trade loop</span>
-						<span class="lv1-template__meta">2 tiles · 1 string</span>
+						<span class="lv1-template__summary">Hermes to PufferLib - paper trade loop</span>
+						<span class="lv1-template__meta">2 tiles - 1 string</span>
 					</span>
 					<span class="lv1-template__compact-label">RL</span>
-					<span class="lv1-template__armed-badge">● ARMED</span>
+					<span class="lv1-template__armed-badge">ARMED</span>
 				</button>
 			</section>
 		</div>
@@ -448,7 +514,7 @@ export function createLegendDock(options) {
 	const root = document.createElement("aside");
 	root.className = "lv1-dock";
 	root.setAttribute("role", "toolbar");
-	root.setAttribute("aria-label", "Spawn legend");
+	root.setAttribute("aria-label", "Spawn dock");
 
 	const chip = document.createElement("div");
 	chip.className = "lv1-spawn-mode-chip";
@@ -457,7 +523,7 @@ export function createLegendDock(options) {
 	emptyHint.className = "lv1-empty-canvas";
 	emptyHint.innerHTML = `
 		<div class="lv1-empty-canvas__title">Empty canvas</div>
-		<div class="lv1-empty-canvas__sub">Click a spawn recipe to drop a tile · arm a template to chain</div>
+		<div class="lv1-empty-canvas__sub">Click a spawn recipe to drop a tile - arm a template to chain</div>
 	`;
 
 	function updateEmptyHint() {

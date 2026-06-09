@@ -42,14 +42,15 @@ describe("legend recipe role mapping", () => {
 		expect(source).toContain('from "./role-tile-spawn.js"');
 	});
 
-	test("maps all six legend recipes to role ids", () => {
+	test("maps all visible dock recipes to role ids", () => {
 		expect(LEGEND_RECIPE_ROLE_IDS).toEqual({
-			hermes: "hermes",
+			shell: "shell",
 			codex: "codex",
+			hermes: "hermes",
 			claude: "claude-worker",
 			puffer: "puffer",
 			python: "python",
-			shell: "shell",
+			memory: "memory",
 		});
 		expect(getLegendRoleId("unknown")).toBeNull();
 	});

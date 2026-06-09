@@ -24,34 +24,39 @@ function createStorage(seed: Record<string, string> = {}) {
 	};
 }
 
-describe("Legend v1 recipes", () => {
-	test("keeps the Session 1A recipe order and copy", () => {
+describe("Legend v2 dock recipes", () => {
+	test("keeps the real spawn roles and the forward-looking memory slot", () => {
 		expect(LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
-			"hermes",
+			"shell",
 			"codex",
+			"hermes",
 			"claude",
 			"puffer",
 			"python",
-			"shell",
+			"memory",
 		]);
 		expect(LEGEND_RECIPES.map((recipe) => recipe.name)).toEqual([
-			"Hermes",
+			"Generic CLI",
 			"Codex CLI",
+			"Hermes",
 			"Claude Code",
 			"PufferLib worker",
 			"Python script",
-			"Generic CLI",
+			"Envoy memory",
 		]);
 		expect(LEGEND_RECIPES.map((recipe) => recipe.roleId)).toEqual([
-			"hermes",
+			"shell",
 			"codex",
+			"hermes",
 			"claude-worker",
 			"puffer",
 			"python",
-			"shell",
+			"memory",
 		]);
 		expect(LEGEND_RECIPES.find((recipe) => recipe.id === "puffer")?.description)
-			.toBe("RL training · dumb");
+			.toBe("paper-trade loop");
+		expect(LEGEND_RECIPES.find((recipe) => recipe.id === "memory")?.disabled)
+			.toBe(true);
 	});
 });
 
@@ -111,6 +116,7 @@ describe("LegendState", () => {
 
 		expect([...getDisabledRecipeIds(state.getSnapshot())].sort()).toEqual([
 			"hermes",
+			"memory",
 			"puffer",
 		]);
 	});
@@ -133,19 +139,19 @@ describe("LegendState", () => {
 	test("reports toggle labels and canvas chip copy from current state", () => {
 		const state = createLegendState({ storage: createStorage() });
 		expect(getSpawnModeChipText(state.getSnapshot().spawnMode))
-			.toBe("spawn · viewport center");
+			.toBe("spawn - viewport center");
 		expect(getToggleContent(state.getSnapshot()).density.label)
-			.toBe("Density · comfortable");
+			.toBe("Density - comfortable");
 
 		state.setDensity("comfortable");
 		state.setSpawnMode("click");
 
 		expect(getSpawnModeChipText(state.getSnapshot().spawnMode))
-			.toBe("spawn · click-to-place");
+			.toBe("spawn - click-to-place");
 		expect(getToggleContent(state.getSnapshot()).density.label)
-			.toBe("Density · compact");
+			.toBe("Density - compact");
 		expect(getToggleContent(state.getSnapshot()).spawnMode.label)
-			.toBe("Spawn · click-to-place");
+			.toBe("Spawn - click-to-place");
 	});
 
 	test("tracks click-to-place pending recipe without changing persisted preferences", () => {
@@ -163,5 +169,11 @@ describe("LegendState", () => {
 
 		expect(state.getSnapshot().pendingRecipe).toBeNull();
 		expect(storage.values.get("legendV1.spawnMode")).toBe("click");
+	});
+
+	test("does not activate disabled forward-looking recipes", () => {
+		const state = createLegendState({ storage: createStorage() });
+		expect(state.activateRecipe("memory")).toBe(false);
+		expect(state.getSnapshot().pendingRecipe).toBeNull();
 	});
 });
