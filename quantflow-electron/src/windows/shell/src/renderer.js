@@ -2020,7 +2020,14 @@ async function init() {
 		<div class="wt-header">
 			<div class="wt-title-block">
 				<span class="wt-live-dot" aria-hidden="true"></span>
-				<span class="wt-title">Watchtower</span>
+				<span class="wt-title-copy">
+					<span class="wt-title">Watchtower</span>
+					<span class="wt-source-note">polled every 2s - Gate 3 events.subscribe pending</span>
+				</span>
+			</div>
+			<div class="wt-status-pills" aria-label="Watchtower sources">
+				<span class="wt-status-pill wt-status-pill-live">Socket</span>
+				<span class="wt-status-pill">MCP :9811</span>
 			</div>
 			<div class="wt-tabs">
 				${WATCHTOWER_TABS.map((tab) => `
@@ -2035,7 +2042,7 @@ async function init() {
 			<button class="wt-clear" type="button">Clear</button>
 			<button class="wt-copy" type="button" title="Copy diagnostics">Copy</button>
 			<button class="wt-refresh" type="button" title="Refresh">Refresh</button>
-			<button class="wt-close" type="button" aria-label="Collapse Watchtower">×</button>
+			<button class="wt-close" type="button" aria-label="Collapse Watchtower">x</button>
 		</div>
 		<div class="wt-filter-bar"></div>
 		<div class="wt-content">
