@@ -99,6 +99,7 @@ import {
 	getLegendViewportCenterPlacement,
 	resolveLegendRecipeRole,
 } from "./legend-spawn.js";
+import { updateCanvasWatermark } from "./canvas-watermark.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
 const PLATFORM = window.shellApi.getPlatform();
@@ -109,6 +110,7 @@ const viewportState = { panX: 0, panY: 0, zoom: 1 };
 
 const canvasEl = document.getElementById("panel-viewer");
 const gridCanvas = document.getElementById("grid-canvas");
+const canvasWatermark = document.getElementById("canvas-watermark");
 canvasEl.tabIndex = -1;
 const toasts = createToastController({ document });
 const operationalEvents = createOperationalEventLog({ limit: 120 });
@@ -763,6 +765,7 @@ async function init() {
 		zoom: document.getElementById("status-zoom"),
 		version: document.getElementById("status-version"),
 		paletteHint: document.getElementById("status-palette-hint"),
+		watermarkShortcut: document.querySelector("[data-watermark-shortcut='palette']"),
 	};
 
 	function normalizeHealthLevel(value) {
@@ -796,6 +799,10 @@ async function init() {
 		if (statusEls.paletteHint) {
 			statusEls.paletteHint.textContent = IS_MAC ? "Cmd+K" : "Ctrl+K";
 		}
+		if (statusEls.watermarkShortcut) {
+			statusEls.watermarkShortcut.textContent = IS_MAC ? "Cmd+K" : "Ctrl+K";
+		}
+		updateCanvasWatermark(canvasWatermark, tiles.length);
 		legendDock.updateEmptyHint();
 	}
 

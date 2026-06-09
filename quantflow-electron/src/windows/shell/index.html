@@ -58,6 +58,50 @@
 				</svg>
 			</button>
 			<canvas id="grid-canvas"></canvas>
+			<div id="canvas-watermark" data-empty="true">
+				<div class="canvas-watermark-lockup">
+					<svg class="canvas-watermark-mark" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+						<circle cx="60" cy="60" r="38" fill="none" stroke="currentColor" stroke-width="2.4" />
+						<line x1="84" y1="82" x2="94" y2="93" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+						<g stroke="currentColor" stroke-width="3.6" stroke-linecap="square">
+							<line x1="53" y1="40" x2="53" y2="82" />
+							<line x1="53" y1="40" x2="74" y2="40" />
+							<line x1="53" y1="60" x2="68" y2="60" />
+							<line x1="50" y1="40" x2="55" y2="40" stroke-width="3.2" />
+							<line x1="49" y1="82" x2="57" y2="82" stroke-width="3.4" />
+						</g>
+						<circle class="canvas-watermark-signal" cx="87" cy="33" r="4.2" />
+					</svg>
+					<div class="canvas-watermark-wordmark">QuantFlow</div>
+					<div class="canvas-watermark-underline"></div>
+				</div>
+				<div class="canvas-watermark-hints" aria-label="Canvas quick actions">
+					<div class="canvas-watermark-hint">
+						<span class="canvas-watermark-hint-icon" aria-hidden="true">+</span>
+						<span class="canvas-watermark-hint-copy">
+							<strong>Spawn a node</strong>
+							<small>agent - CLI - tool from the dock</small>
+						</span>
+						<kbd data-watermark-shortcut="palette">Ctrl+K</kbd>
+					</div>
+					<div class="canvas-watermark-hint">
+						<span class="canvas-watermark-hint-icon" aria-hidden="true">~</span>
+						<span class="canvas-watermark-hint-copy">
+							<strong>Route a cable</strong>
+							<small>port + port to connect nodes</small>
+						</span>
+						<kbd>drag</kbd>
+					</div>
+					<div class="canvas-watermark-hint">
+						<span class="canvas-watermark-hint-icon" aria-hidden="true">+</span>
+						<span class="canvas-watermark-hint-copy">
+							<strong>Pan the field</strong>
+							<small>scroll to zoom</small>
+						</span>
+						<kbd>space+drag</kbd>
+					</div>
+				</div>
+			</div>
 			<div id="tile-layer"></div>
 			<svg id="cable-layer" xmlns="http://www.w3.org/2000/svg">
 				<g id="cable-layer-content"></g>
