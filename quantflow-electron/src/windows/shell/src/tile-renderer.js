@@ -184,8 +184,7 @@ export function createTileDOM(tile, callbacks) {
   const container = document.createElement("div");
   container.className = "canvas-tile";
   container.dataset.tileId = tile.id;
-  container.dataset.tileType = tile.type;
-  if (isTileRunning(tile)) container.dataset.running = "true";
+  applyTileVisualMetadata(container, tile);
 
   const titleBar = document.createElement("div");
   titleBar.className = "tile-title-bar";
@@ -196,6 +195,8 @@ export function createTileDOM(tile, callbacks) {
 
   const titleText = document.createElement("span");
   titleText.className = "tile-title-text";
+  const typeGlyph = createTileTypeGlyph(tile);
+  if (typeGlyph) titleBar.appendChild(typeGlyph);
   const label = getTileLabel(tile);
   const parentSpan = document.createElement("span");
   parentSpan.className = "tile-title-parent";
@@ -494,6 +495,47 @@ export function getTileStatusBadge(tile) {
   return "idle";
 }
 
+export function getTileVisualType(tile) {
+  if (!tile) return "term";
+  if (tile.type === "graph") return "graph";
+  if (tile.type !== "term") return tile.type;
+
+  const signature = [
+    tile.roleId,
+    tile.roleName,
+    tile.roleShellKind,
+    tile.roleCommandTemplate,
+    tile.runtimeTarget,
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  if (signature.includes("codex")) return "codex";
+  if (signature.includes("hermes") || signature.includes("agent")) return "agent";
+  if (signature.includes("worker") || signature.includes("replay")) return "worker";
+  if (signature.includes("mcp") || signature.includes("tool")) return "tool";
+  if (signature.includes("generic")) return "generic";
+  if (tile.runtimeTarget === "windows-pty") return "generic";
+  if (tile.runtimeTarget === "herdr-wsl") return "agent";
+  return "term";
+}
+
+export function getTileVisualState(tile) {
+  if (tile?.experimental) return "experimental";
+  const status = String(tile?.ptyStatus ?? "").toLowerCase();
+  if (status === "error" || status === "exited") return "error";
+  if (status === "queued" || status === "blocked" || status === "waiting") return "queued";
+  if (isTileRunning(tile)) return "running";
+  return "idle";
+}
+
+export function applyTileVisualMetadata(container, tile) {
+  if (!container) return;
+  const visualType = getTileVisualType(tile);
+  container.dataset.tileType = visualType;
+  container.dataset.sourceTileType = tile?.type ?? "";
+  container.dataset.tileState = getTileVisualState(tile);
+  container.dataset.running = isTileRunning(tile) ? "true" : "false";
+}
+
 export function isTileRunning(tile) {
   if (tile?.type !== "term") return false;
   const status = String(tile.ptyStatus ?? "").toLowerCase();
@@ -539,6 +581,30 @@ function createTileShellBadge(tile) {
   return badge;
 }
 
+const TILE_GLYPHS = {
+  term: ">_",
+  generic: ">_",
+  codex: "</>",
+  agent: "<>",
+  worker: "*",
+  tool: "#",
+  memory: "[]",
+  graph: "::",
+};
+
+function createTileTypeGlyph(tile) {
+  const visualType = getTileVisualType(tile);
+  const glyph = TILE_GLYPHS[visualType];
+  if (!glyph) return null;
+  const chip = document.createElement("span");
+  chip.className = "tile-type-glyph";
+  chip.dataset.tileType = visualType;
+  chip.textContent = glyph;
+  chip.title = visualType;
+  chip.setAttribute("aria-hidden", "true");
+  return chip;
+}
+
 function createTileStatusBadge(tile) {
   const status = getTileStatusBadge(tile);
   if (!status) return null;
@@ -580,7 +646,14 @@ export function updateHerdrBadge(container, paneId, status) {
 
 export function updateTileTitle(dom, tile) {
   const container = dom.container ?? dom;
-  container.dataset.running = isTileRunning(tile) ? "true" : "false";
+  applyTileVisualMetadata(container, tile);
+  const typeGlyph = dom.titleBar?.querySelector(".tile-type-glyph");
+  if (typeGlyph) {
+    const visualType = getTileVisualType(tile);
+    typeGlyph.dataset.tileType = visualType;
+    typeGlyph.textContent = TILE_GLYPHS[visualType] ?? "";
+    typeGlyph.title = visualType;
+  }
   const label = getTileLabel(tile);
   const titleText = dom.titleText;
   titleText.textContent = "";

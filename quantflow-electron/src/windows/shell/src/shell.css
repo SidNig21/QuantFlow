@@ -1570,7 +1570,8 @@ body.platform-win {
 .canvas-tile {
 	position: absolute;
 	border-radius: var(--r-tile);
-	box-shadow: inset 2px 0 0 var(--tile-border-hi), var(--sh-tile);
+	--rail: var(--tile-border-hi);
+	box-shadow: inset 2px 0 0 var(--rail), var(--sh-tile);
 	display: flex;
 	flex-direction: column;
 	background: var(--tile-bg);
@@ -1578,6 +1579,15 @@ body.platform-win {
 	overflow: hidden;
 	user-select: none;
 }
+
+.canvas-tile[data-tile-type="term"] { --rail: var(--rail-term); }
+.canvas-tile[data-tile-type="generic"] { --rail: var(--rail-generic); }
+.canvas-tile[data-tile-type="codex"] { --rail: var(--rail-codex); }
+.canvas-tile[data-tile-type="agent"] { --rail: var(--rail-agent); }
+.canvas-tile[data-tile-type="worker"] { --rail: var(--rail-worker); }
+.canvas-tile[data-tile-type="tool"] { --rail: var(--rail-tool); }
+.canvas-tile[data-tile-type="memory"] { --rail: var(--rail-memory); }
+.canvas-tile[data-tile-type="graph"] { --rail: var(--rail-graph); }
 
 /* Crosshair corner extensions — lines overshoot each corner */
 .canvas-tile::before,
@@ -1608,12 +1618,12 @@ body.platform-win {
 }
 
 .canvas-tile.tile-focused {
-	border-color: var(--tile-border-hi);
-	box-shadow: inset 2px 0 0 var(--tile-border-hi), 0 10px 28px rgba(0, 0, 0, 0.48);
+	border-color: color-mix(in srgb, var(--rail) 58%, var(--tile-border-hi));
+	box-shadow: inset 2px 0 0 var(--rail), 0 10px 28px rgba(0, 0, 0, 0.48);
 }
 .canvas-tile.tile-focused::before,
 .canvas-tile.tile-focused::after {
-	border-color: var(--tile-border-hi);
+	border-color: color-mix(in srgb, var(--rail) 58%, var(--tile-border-hi));
 }
 
 .canvas-tile.tile-selected {
@@ -1626,10 +1636,34 @@ body.platform-win {
 }
 
 .canvas-tile[data-running="true"] {
-	border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-	box-shadow: inset 2px 0 0 var(--accent), var(--sh-tile-running);
+	border-color: color-mix(in srgb, var(--rail) 42%, transparent);
+	box-shadow: inset 2px 0 0 var(--rail), var(--sh-tile-running);
 }
 
+.canvas-tile[data-tile-state="queued"] {
+	border-color: color-mix(in srgb, var(--amber) 42%, transparent);
+	box-shadow: inset 2px 0 0 var(--amber), var(--sh-tile);
+}
+
+.canvas-tile[data-tile-state="queued"]::before,
+.canvas-tile[data-tile-state="queued"]::after {
+	border-color: color-mix(in srgb, var(--amber) 34%, transparent);
+}
+
+.canvas-tile[data-tile-state="error"] {
+	border-color: color-mix(in srgb, var(--coral) 46%, transparent);
+	box-shadow: inset 2px 0 0 var(--coral), var(--sh-error);
+}
+
+.canvas-tile[data-tile-state="error"]::before,
+.canvas-tile[data-tile-state="error"]::after {
+	border-color: color-mix(in srgb, var(--coral) 38%, transparent);
+}
+
+.canvas-tile[data-tile-state="experimental"] {
+	border-style: dashed;
+	opacity: 0.7;
+}
 
 .tile-title-bar {
 	display: flex;
@@ -1645,6 +1679,23 @@ body.platform-win {
 	cursor: grab;
 	user-select: none;
 	flex-shrink: 0;
+}
+
+.tile-type-glyph {
+	display: grid;
+	width: 22px;
+	height: 18px;
+	place-items: center;
+	flex: 0 0 auto;
+	border: 1px solid color-mix(in srgb, var(--rail) 44%, transparent);
+	border-radius: 4px;
+	background: color-mix(in srgb, var(--rail) 10%, transparent);
+	box-shadow: inset 0 0 14px color-mix(in srgb, var(--rail) 9%, transparent);
+	color: var(--rail);
+	font-family: var(--font-mono);
+	font-size: 9px;
+	font-weight: 800;
+	line-height: 1;
 }
 
 .tile-title-bar:active {
@@ -1952,21 +2003,21 @@ body.platform-win {
 	border: none;
 }
 
-.canvas-tile[data-tile-type="term"] {
+.canvas-tile[data-source-tile-type="term"] {
 	background: var(--tile-bg);
 }
 
-.canvas-tile[data-tile-type="term"] .tile-title-bar {
+.canvas-tile[data-source-tile-type="term"] .tile-title-bar {
 	background: color-mix(in srgb, var(--bg) 52%, transparent);
 	color: var(--fg);
 	opacity: 0.85;
 }
 
-.dark .canvas-tile[data-tile-type="term"] {
+.dark .canvas-tile[data-source-tile-type="term"] {
 	background: var(--tile-bg);
 }
 
-.dark .canvas-tile[data-tile-type="term"] .tile-title-bar {
+.dark .canvas-tile[data-source-tile-type="term"] .tile-title-bar {
 	background: color-mix(in srgb, var(--bg) 52%, transparent);
 	color: var(--fg);
 	opacity: 0.85;
@@ -2002,7 +2053,7 @@ body.platform-win {
 	color: inherit;
 }
 
-.canvas-tile[data-tile-type="term"] .tile-content {
+.canvas-tile[data-source-tile-type="term"] .tile-content {
 	padding: 0 2px 0 12px;
 }
 

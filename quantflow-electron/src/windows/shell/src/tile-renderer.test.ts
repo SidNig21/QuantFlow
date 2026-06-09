@@ -8,6 +8,8 @@ import {
   getTileRoleBadge,
   getTileShellBadge,
   getTileStatusBadge,
+  getTileVisualState,
+  getTileVisualType,
   isTileRunning,
   splitFilepath,
   positionTile,
@@ -123,6 +125,36 @@ describe("formatContextPreviewDetail", () => {
       { path: "/vault/missing.md", mode: "excerpt" },
       { path: "/vault/missing.md", ok: false, error: "missing" },
     )).toBe("Excerpt - /vault/missing.md (unreadable)");
+  });
+});
+
+describe("getTileVisualType", () => {
+  test("maps terminal roles to V2 visual node types", () => {
+    expect(getTileVisualType({ type: "term", roleName: "Codex CLI" })).toBe("codex");
+    expect(getTileVisualType({ type: "term", roleName: "Generic CLI" })).toBe("generic");
+    expect(getTileVisualType({ type: "term", roleId: "hermes" })).toBe("agent");
+    expect(getTileVisualType({ type: "term", roleName: "Replay worker" })).toBe("worker");
+    expect(getTileVisualType({ type: "term", roleShellKind: "MCP tool" })).toBe("tool");
+  });
+
+  test("keeps known non-terminal types as their source type", () => {
+    expect(getTileVisualType({ type: "graph" })).toBe("graph");
+    expect(getTileVisualType({ type: "browser" })).toBe("browser");
+  });
+});
+
+describe("getTileVisualState", () => {
+  test("maps PTY lifecycle to V2 tile states", () => {
+    expect(getTileVisualState({ type: "term", ptyStatus: "running" })).toBe("running");
+    expect(getTileVisualState({ type: "term", ptyStatus: "waiting" })).toBe("queued");
+    expect(getTileVisualState({ type: "term", ptyStatus: "blocked" })).toBe("queued");
+    expect(getTileVisualState({ type: "term", ptyStatus: "error" })).toBe("error");
+    expect(getTileVisualState({ type: "term", ptyStatus: "exited" })).toBe("error");
+    expect(getTileVisualState({ type: "term", ptyStatus: "idle" })).toBe("idle");
+  });
+
+  test("treats experimental tiles as their own visual state", () => {
+    expect(getTileVisualState({ type: "term", ptyStatus: "running", experimental: true })).toBe("experimental");
   });
 });
 
