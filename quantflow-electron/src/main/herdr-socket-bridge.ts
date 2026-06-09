@@ -148,6 +148,16 @@ function rpcOnce<T>(
   });
 }
 
+/** Windows local/test sockets use native net; WSL Unix paths route through rpcViaWsl. */
+export function shouldUseNativeHerdrSocket(
+  socketPath: string,
+  explicitPath = false,
+): boolean {
+  if (process.platform !== "win32") return true;
+  if (explicitPath) return true;
+  return /^[A-Za-z]:[\\/]/.test(socketPath) || socketPath.includes("\\");
+}
+
 export async function resolveHerdrSocketPath(): Promise<string> {
   if (process.env.HERDR_SOCKET_PATH?.trim()) {
     return process.env.HERDR_SOCKET_PATH.trim();
@@ -261,9 +271,10 @@ export async function callHerdrSocket<T = Record<string, unknown>>(
   },
 ): Promise<T> {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const socketPath = options?.socketPath ?? (await resolveHerdrSocketPath());
+  const explicitSocketPath = options?.socketPath;
+  const socketPath = explicitSocketPath ?? (await resolveHerdrSocketPath());
 
-  if (process.platform === "win32") {
+  if (process.platform === "win32" && !shouldUseNativeHerdrSocket(socketPath, Boolean(explicitSocketPath))) {
     return rpcViaWsl<T>(socketPath, method, params, timeoutMs);
   }
   return rpcOnce<T>(socketPath, method, params, timeoutMs);

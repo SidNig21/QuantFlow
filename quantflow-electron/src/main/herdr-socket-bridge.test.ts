@@ -3,7 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import net from "node:net";
-import { callHerdrSocket, HerdrSocketError } from "./herdr-socket-bridge";
+import {
+  callHerdrSocket,
+  HerdrSocketError,
+  shouldUseNativeHerdrSocket,
+} from "./herdr-socket-bridge";
 
 const tempDirs: string[] = [];
 
@@ -54,6 +58,14 @@ function onRpcLine(
     handler(JSON.parse(line));
   });
 }
+
+describe("shouldUseNativeHerdrSocket", () => {
+  test("uses native transport for explicit or Windows-local socket paths", () => {
+    expect(shouldUseNativeHerdrSocket("/home/user/.config/herdr/herdr.sock")).toBe(false);
+    expect(shouldUseNativeHerdrSocket("C:\\Temp\\herdr.sock")).toBe(true);
+    expect(shouldUseNativeHerdrSocket("/home/user/herdr.sock", true)).toBe(true);
+  });
+});
 
 describe("callHerdrSocket", () => {
   test("sends a newline-framed RPC request and returns the matching result", async () => {

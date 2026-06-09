@@ -20,7 +20,8 @@ Current spine:
 | Unify spawn pipeline through `runtimeTarget` | Done, `de9c497` |
 | Docs collapsed to one build path | Done, `147cabb` |
 | Gate 3, herdr `events.subscribe` tile state | Implemented, pending operator proof |
-| Envoy task bus MVP | Implemented locally, pending operator push |
+| Envoy task bus MVP | Done locally, `562de05`, pending operator push |
+| retirement-herdr-cli | Done locally (Cursor), uncommitted |
 
 ## Current Slice
 
@@ -71,19 +72,19 @@ Goal: remove the remaining herdr CLI bridge after Gate 3 proves socket state is 
 Current reason this exists:
 
 - `src/main/herdr-session-spawn.ts` already uses `herdr-socket-bridge.ts`.
-- `src/main/ipc-herdr.ts` still imports `src/main/herdr-bridge.ts` for legacy list/read/send/status calls.
+- `src/main/ipc-herdr.ts` previously imported `herdr-bridge.ts` (retired).
 - `herdr:read` is allowed as debug only, not as tile display.
 
 Work:
 
-- [ ] Port `herdr:available` to socket.
-- [ ] Port `herdr:list` to socket.
-- [ ] Port `herdr:send` to socket.
-- [ ] Decide whether `herdr:status` is still needed after Gate 3. If kept, port it to socket.
-- [ ] Keep or replace `herdr:read` only as a debug path. It must never become display.
-- [ ] Delete or quarantine `src/main/herdr-bridge.ts`.
-- [ ] Update tests so socket behavior is the default.
-- [ ] Fix Windows test harness issues around local Unix sockets versus WSL socket routing.
+- [x] Port `herdr:available` to socket (`ping`).
+- [x] Port `herdr:list` to socket (`pane.list`).
+- [x] Port `herdr:send` to socket (`pane.send_text` + `pane.send_keys`).
+- [x] Keep `herdr:status` as thin debug/one-shot via `pane.get` (badges use Gate 3 events).
+- [x] Keep `herdr:read` as DEBUG ONLY via `pane.read` — never display.
+- [x] Delete `src/main/herdr-bridge.ts`; add `herdr-socket-ops.ts`.
+- [x] Update tests so socket behavior is the default.
+- [x] Fix Windows test harness: native socket for explicit/local paths, WSL for production Unix paths.
 
 Pass when:
 
