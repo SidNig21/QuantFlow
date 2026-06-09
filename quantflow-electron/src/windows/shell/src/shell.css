@@ -2790,6 +2790,201 @@ body.platform-win {
 	color: var(--fg);
 }
 
+/* V2 cable inspector */
+.cable-popover {
+	--inspector-kind: var(--cable-pipe);
+	min-width: 320px;
+	max-width: min(380px, calc(100vw - 32px));
+	padding: 12px;
+	gap: 8px;
+	border: 1px solid color-mix(in srgb, var(--inspector-kind) 38%, var(--border));
+	border-radius: 8px;
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--tile-bg) 96%, transparent), color-mix(in srgb, var(--bg) 96%, transparent)),
+		var(--tile-bg);
+	box-shadow: var(--sh-float), inset 2px 0 0 color-mix(in srgb, var(--inspector-kind) 82%, transparent);
+	color: var(--ivory);
+	backdrop-filter: blur(12px);
+}
+
+.cable-popover[data-kind="context"] {
+	--inspector-kind: var(--cable-context);
+}
+
+.cable-popover[data-kind="trigger"] {
+	--inspector-kind: var(--cable-trigger);
+}
+
+.cable-popover[data-relay-state="failed"] {
+	--inspector-kind: var(--failed);
+}
+
+.dark .cable-popover {
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--tile-bg) 96%, transparent), color-mix(in srgb, var(--bg) 96%, transparent)),
+		var(--tile-bg);
+	border-color: color-mix(in srgb, var(--inspector-kind) 42%, var(--border));
+}
+
+.cable-inspector-header {
+	display: grid;
+	grid-template-columns: 28px minmax(0, 1fr);
+	gap: 9px;
+	align-items: center;
+	min-width: 0;
+}
+
+.cable-inspector-glyph {
+	display: grid;
+	width: 28px;
+	height: 28px;
+	place-items: center;
+	border: 1px solid color-mix(in srgb, var(--inspector-kind) 42%, transparent);
+	border-radius: 7px;
+	background: color-mix(in srgb, var(--inspector-kind) 12%, transparent);
+	box-shadow: 0 0 16px color-mix(in srgb, var(--inspector-kind) 18%, transparent);
+	color: var(--inspector-kind);
+	font-family: var(--font-mono);
+	font-size: 16px;
+	font-weight: 700;
+}
+
+.cable-inspector-title-block {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.cable-inspector-title {
+	color: var(--ivory);
+	font-family: var(--font-display);
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+.cable-inspector-id {
+	overflow: hidden;
+	color: var(--muted-foreground);
+	font-family: var(--font-mono);
+	font-size: 10px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cable-chip-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+	min-width: 0;
+}
+
+.cable-chip {
+	max-width: 100%;
+	overflow: hidden;
+	padding: 2px 6px;
+	border: 1px solid color-mix(in srgb, var(--inspector-kind) 28%, var(--border));
+	border-radius: 4px;
+	background: color-mix(in srgb, var(--inspector-kind) 9%, transparent);
+	color: var(--inspector-kind);
+	font-family: var(--font-mono);
+	font-size: 9px;
+	line-height: 1.2;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.cable-chip-id {
+	flex: 1 1 90px;
+	color: var(--muted-foreground);
+	text-transform: none;
+}
+
+.cable-chip-state[data-state="idle"] {
+	color: var(--muted-foreground);
+}
+
+.cable-chip-state[data-state="sending"] {
+	color: var(--cable-context);
+}
+
+.cable-chip-state[data-state="sent"] {
+	color: var(--flow);
+}
+
+.cable-chip-state[data-state="failed"] {
+	border-color: color-mix(in srgb, var(--failed) 44%, var(--border));
+	background: color-mix(in srgb, var(--failed) 12%, transparent);
+	color: var(--failed);
+}
+
+.cable-dir-btn {
+	border-color: color-mix(in srgb, var(--inspector-kind) 28%, transparent);
+	border-radius: 7px;
+	background: color-mix(in srgb, var(--inspector-kind) 8%, transparent);
+	color: var(--ivory);
+	font-family: var(--font-mono);
+	font-size: 10.5px;
+}
+
+.cable-dir-btn:hover {
+	background: color-mix(in srgb, var(--inspector-kind) 14%, transparent);
+	color: var(--ivory);
+}
+
+.cable-endpoint-row,
+.cable-input,
+.cable-action-btn {
+	border-radius: 7px;
+	background: color-mix(in srgb, var(--ink) 58%, transparent);
+}
+
+.cable-input {
+	border-color: color-mix(in srgb, var(--inspector-kind) 28%, transparent);
+	color: var(--ivory);
+	font-family: var(--font-ui);
+}
+
+.cable-input:focus {
+	border-color: var(--inspector-kind);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--inspector-kind) 16%, transparent);
+}
+
+.cable-send-btn {
+	border: 1px solid color-mix(in srgb, var(--flow) 64%, transparent);
+	border-radius: 7px;
+	background: var(--flow);
+	color: #071007;
+	font-family: var(--font-ui);
+	font-weight: 700;
+}
+
+.cable-send-btn:hover {
+	background: var(--flow-bright);
+}
+
+.cable-actions {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.cable-action-btn {
+	border-color: color-mix(in srgb, var(--inspector-kind) 22%, transparent);
+	color: var(--muted-foreground);
+}
+
+.cable-action-btn:hover,
+.cable-action-btn:focus-visible {
+	background: color-mix(in srgb, var(--inspector-kind) 14%, transparent);
+	border-color: color-mix(in srgb, var(--inspector-kind) 42%, transparent);
+	color: var(--ivory);
+}
+
+.cable-history {
+	border-top-color: color-mix(in srgb, var(--inspector-kind) 18%, transparent);
+}
+
 /* Role-colored tile title bars */
 
 .tile-title-bar--role {

@@ -246,6 +246,14 @@ describe("createCableInspector", () => {
 
 		const popover = container.querySelector(".cable-popover");
 		expect(popover).toBeTruthy();
+		expect(popover.dataset.kind).toBe("pipe");
+		expect(popover.dataset.relayState).toBe("idle");
+		expect(popover.querySelector(".cable-inspector-title").textContent)
+			.toBe("Route");
+		expect(popover.querySelector(".cable-chip-kind").textContent)
+			.toBe("pipe");
+		expect(popover.querySelector(".cable-chip-id").textContent)
+			.toBe("conn-ab");
 		expect(popover.querySelector(".cable-dir-btn").textContent)
 			.toBe("Worker -> Reviewer");
 

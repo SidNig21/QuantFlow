@@ -71,7 +71,23 @@ export function createCableInspector({
 		} else {
 			relayStateByConnection.set(connectionId, state);
 		}
+		syncPopoverRelayState(connectionId, state);
 		emitStateChanged();
+	}
+
+	function getCableKind(conn) {
+		return String(conn?.kind || conn?.cableKind || "pipe").trim() || "pipe";
+	}
+
+	function syncPopoverRelayState(connectionId, state) {
+		if (!popoverEl || popoverEl.dataset.connectionId !== connectionId) return;
+		const relayState = state || "idle";
+		popoverEl.dataset.relayState = relayState;
+		const stateChip = popoverEl.querySelector(".cable-chip-state");
+		if (stateChip) {
+			stateChip.dataset.state = relayState;
+			stateChip.textContent = relayState;
+		}
 	}
 
 	function showPopover(conn, mx, my, tileA, tileB, pointer = null) {
@@ -91,9 +107,47 @@ export function createCableInspector({
 
 		popoverEl = document.createElement("div");
 		popoverEl.className = "cable-popover";
+		popoverEl.dataset.connectionId = conn.id;
+		popoverEl.dataset.kind = getCableKind(conn);
+		popoverEl.dataset.relayState = relayStateByConnection.get(conn.id) ?? "idle";
 		popoverEl.style.left = `${mx}px`;
 		popoverEl.style.top = `${my + 12}px`;
 		popoverEl.addEventListener("click", (e) => e.stopPropagation());
+
+		const headerEl = document.createElement("div");
+		headerEl.className = "cable-inspector-header";
+		const glyphEl = document.createElement("span");
+		glyphEl.className = "cable-inspector-glyph";
+		glyphEl.textContent = "~";
+		const titleEl = document.createElement("div");
+		titleEl.className = "cable-inspector-title-block";
+		const titleTextEl = document.createElement("span");
+		titleTextEl.className = "cable-inspector-title";
+		titleTextEl.textContent = "Route";
+		const idTextEl = document.createElement("span");
+		idTextEl.className = "cable-inspector-id";
+		idTextEl.textContent = conn.label || conn.id;
+		titleEl.appendChild(titleTextEl);
+		titleEl.appendChild(idTextEl);
+		headerEl.appendChild(glyphEl);
+		headerEl.appendChild(titleEl);
+
+		const chipsEl = document.createElement("div");
+		chipsEl.className = "cable-chip-row";
+		const kindChip = document.createElement("span");
+		kindChip.className = "cable-chip cable-chip-kind";
+		kindChip.textContent = getCableKind(conn);
+		const stateChip = document.createElement("span");
+		stateChip.className = "cable-chip cable-chip-state";
+		const relayState = relayStateByConnection.get(conn.id) ?? "idle";
+		stateChip.dataset.state = relayState;
+		stateChip.textContent = relayState;
+		const idChip = document.createElement("span");
+		idChip.className = "cable-chip cable-chip-id";
+		idChip.textContent = conn.id;
+		chipsEl.appendChild(kindChip);
+		chipsEl.appendChild(stateChip);
+		chipsEl.appendChild(idChip);
 
 		const dirBtn = document.createElement("button");
 		dirBtn.type = "button";
@@ -390,6 +444,8 @@ export function createCableInspector({
 		});
 
 		refreshDirLabel();
+		popoverEl.appendChild(headerEl);
+		popoverEl.appendChild(chipsEl);
 		popoverEl.appendChild(dirBtn);
 		popoverEl.appendChild(endpointHealthEl);
 		popoverEl.appendChild(input);
