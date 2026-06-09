@@ -1,0 +1,214 @@
+:root {
+  --font-display: "Space Grotesk", "Geist", system-ui, sans-serif;
+  --font-sans: "Geist", "Inter", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Geist Mono", Consolas, monospace;
+
+  --ivory: #f2f0ec;
+  --ink: #05080c;
+  --canvas: #090d12;
+  --tile: #10161e;
+  --border-rail: #263241;
+  --muted-rail: #6b7686;
+
+  --flow: #b7ff00;
+  --flow-bright: #d7ff57;
+  --cyan: #13d8f2;
+  --blue: #5ab7ff;
+  --amber: #f2bf4a;
+  --coral: #ff6060;
+  --violet: #9b6cf5;
+
+  --radius-panel: 8px;
+  --shadow-flow: 0 0 18px rgba(183, 255, 0, 0.18), 0 0 4px rgba(183, 255, 0, 0.4);
+
+  --background: var(--canvas);
+  --foreground: var(--ivory);
+  --card: var(--tile);
+  --card-foreground: var(--ivory);
+  --popover: #0d1218;
+  --popover-foreground: var(--ivory);
+  --primary: var(--flow);
+  --primary-foreground: var(--ink);
+  --secondary: #121a23;
+  --secondary-foreground: var(--ivory);
+  --muted: #111820;
+  --muted-foreground: var(--muted-rail);
+  --accent: rgba(183, 255, 0, 0.11);
+  --accent-foreground: var(--ivory);
+  --destructive: var(--coral);
+  --destructive-foreground: var(--ink);
+  --border: var(--border-rail);
+  --input: var(--border-rail);
+  --ring: var(--flow);
+}
+
+:root.theme-light {
+  --background: #f2f0ec;
+  --foreground: #111821;
+  --card: #ffffff;
+  --card-foreground: #111821;
+  --popover: #ffffff;
+  --popover-foreground: #111821;
+  --primary: var(--flow);
+  --primary-foreground: #05080c;
+  --secondary: #e7ebee;
+  --secondary-foreground: #111821;
+  --muted: #e7ebee;
+  --muted-foreground: #5d6875;
+  --accent: rgba(104, 145, 0, 0.15);
+  --accent-foreground: #111821;
+  --border: #cfd6dd;
+  --input: #cfd6dd;
+  --ring: #6a9300;
+}
+
+:root.theme-high-contrast {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #050505;
+  --card-foreground: #ffffff;
+  --popover: #050505;
+  --popover-foreground: #ffffff;
+  --primary: var(--flow);
+  --primary-foreground: #000000;
+  --secondary: #111111;
+  --secondary-foreground: #ffffff;
+  --muted: #111111;
+  --muted-foreground: #c9d2dd;
+  --accent: rgba(183, 255, 0, 0.22);
+  --accent-foreground: #ffffff;
+  --border: #ffffff;
+  --input: #ffffff;
+  --ring: var(--flow);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle at 68% 100%, rgba(183, 255, 0, 0.09), transparent 32%),
+    radial-gradient(circle at 100% 100%, rgba(155, 108, 245, 0.13), transparent 36%),
+    var(--background);
+  color: var(--foreground);
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 1px solid var(--flow);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-flow);
+}
+
+[data-density="compact"] .settings-shell {
+  font-size: 13px;
+}
+
+.settings-shell {
+  background:
+    linear-gradient(90deg, rgba(183, 255, 0, 0.045), transparent 18%),
+    radial-gradient(circle at 72% 112%, rgba(183, 255, 0, 0.09), transparent 30%),
+    radial-gradient(circle at 100% 100%, rgba(155, 108, 245, 0.16), transparent 42%),
+    var(--background);
+}
+
+.settings-sidebar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 40%),
+    color-mix(in srgb, var(--background) 92%, #000 8%);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.settings-brand-lockup {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 9px;
+}
+
+.settings-brand-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settings-brand-name {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.settings-brand-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+}
+
+.settings-nav button {
+  border: 1px solid transparent;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.settings-nav button.bg-accent {
+  border-color: color-mix(in srgb, var(--flow) 36%, transparent);
+  box-shadow: inset 2px 0 0 var(--flow);
+}
+
+.settings-nav svg {
+  color: color-mix(in srgb, var(--flow) 62%, var(--muted-foreground));
+}
+
+.settings-content {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.settings-content h2,
+.settings-content h3 {
+  font-family: var(--font-display);
+}
+
+.settings-content kbd,
+.settings-content .font-mono {
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 720px) {
+  .settings-sidebar {
+    width: 168px;
+  }
+
+  .settings-brand-name {
+    font-size: 11px;
+  }
+}

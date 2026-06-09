@@ -3,7 +3,6 @@ import {
   ArrowClockwise,
   CheckCircle,
   CircleNotch,
-  GearSix,
   Keyboard,
   Palette,
   Play,
@@ -16,6 +15,7 @@ import {
   WarningCircle,
   XCircle,
 } from "@phosphor-icons/react";
+import { QFMark } from "@collab/components/brand";
 import {
   HEALTH_GROUPS,
   aggregateHealthLevel,
@@ -1298,22 +1298,23 @@ export default function App() {
     <div
       ref={paneRef}
       tabIndex={-1}
-      className="flex h-full w-full bg-background text-foreground focus:outline-none"
+      className="settings-shell flex h-full w-full bg-background text-foreground focus:outline-none"
     >
       {/* Sidebar */}
-      <div className="flex w-48 flex-col border-r border-border/50 bg-background p-3 pt-4">
+      <div className="settings-sidebar flex w-48 flex-col border-r border-border/50 bg-background p-3 pt-4">
         <div className="flex items-start gap-2 px-2">
           <CloseButton onClick={() => api.close()} />
         </div>
 
-        <div className="px-2 mt-4">
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
-            <GearSix className="h-5 w-5" />
-            Settings
-          </h1>
+        <div className="settings-brand-lockup px-2 mt-4">
+          <QFMark size={26} glow strokeScale={1.05} />
+          <div className="settings-brand-copy">
+            <span className="settings-brand-name">QuantFlow</span>
+            <span className="settings-brand-sub">Settings</span>
+          </div>
         </div>
 
-        <nav className="mt-3 space-y-0.5">
+        <nav className="settings-nav mt-3 space-y-0.5">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -1344,7 +1345,7 @@ export default function App() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="settings-content flex-1 overflow-auto">
         {activePane === "appearance" && <AppearancePane />}
         {activePane === "health" && <HealthPane />}
         {activePane === "logs" && <LogsPane />}

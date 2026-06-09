@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { initDarkMode } from "@collab/shared/dark-mode";
 import "@collab/theme/styles.css";
+import "./settings.css";
 import { AnalyticsProvider } from "../../shared/PostHogProvider";
 
 initDarkMode();
