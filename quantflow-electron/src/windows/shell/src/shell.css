@@ -1,6 +1,7 @@
 :root {
-	--font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
-	--font-mono: ui-monospace, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+	--font-display: 'Space Grotesk', 'Geist', system-ui, sans-serif;
+	--font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: 'IBM Plex Mono', 'Geist Mono', ui-monospace, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
 
 	/* Surface ramp — deep near-black */
 	--bg:           #0a0d12;
@@ -9,13 +10,8 @@
 	--canvas-bg-hi: #0f141b;
 	--canvas-bg-rgb: 12, 17, 23;
 	--canvas-opacity: 1;
-	--canvas-gradient: linear-gradient(
-		to top,
-		#16092a 0%,
-		#0a0820 30%,
-		#06070d 65%,
-		#050812 100%
-	);
+	--canvas-gradient: linear-gradient(to top, #0e0a1a 0%, #0a0a16 26%, #07080f 62%, #06080c 100%);
+	--canvas-origin-glow: radial-gradient(ellipse 70% 55% at 50% 100%, oklch(0.78 0.16 145 / 0.18) 0%, transparent 56%);
 
 	/* Tile surfaces */
 	--tile-bg:       #0f141b;
@@ -29,22 +25,45 @@
 	--muted-2: #4a5466;
 	--border: #1c232d;
 
-	/* Terminal-green accent */
-	--accent:      oklch(0.78 0.16 145);
-	--accent-dim:  oklch(0.62 0.13 145);
-	--accent-glow: oklch(0.78 0.16 145 / 0.18);
+	/* QuantFlow Brand meaning palette */
+	--flow:        #b7ff00;
+	--flow-dim:    oklch(0.62 0.13 145);
+	--flow-bright: #caff4d;
+	--flow-glow:   oklch(0.78 0.16 145 / 0.18);
+	--cyan:        oklch(0.72 0.13 210);
+	--blue:        oklch(0.70 0.14 240);
+	--amber:       oklch(0.80 0.14 80);
+	--coral:       oklch(0.68 0.19 25);
+	--violet:      oklch(0.62 0.16 295);
+	--ivory:       #f2f0ec;
+	--live-green:  var(--flow);
+	--slate:       #0a0d12;
 
-	--selected: oklch(0.85 0.17 145);
-	--failed:   oklch(0.68 0.19 25);
-	--armed:    oklch(0.78 0.14 80);
+	/* Legacy aliases retained while the shell migrates to Brand names. */
+	--accent:      var(--flow);
+	--accent-dim:  var(--flow-dim);
+	--accent-glow: var(--flow-glow);
+	--selected:    var(--flow-bright);
+	--failed:      var(--coral);
+	--armed:       var(--amber);
 
-	--cable-pipe:       var(--accent);
-	--cable-context:    oklch(0.70 0.14 240);
-	--cable-trigger:    var(--armed);
-	--cable-default:    color-mix(in srgb, var(--accent) 70%, transparent);
-	--cable-hover:      oklch(0.85 0.18 145);
-	--cable-selected:   oklch(0.92 0.18 145);
-	--cable-failed:     var(--failed);
+	--rail-term:    var(--flow);
+	--rail-generic: var(--flow);
+	--rail-codex:   var(--cyan);
+	--rail-agent:   var(--blue);
+	--rail-worker:  var(--amber);
+	--rail-tool:    var(--cyan);
+	--rail-memory:  var(--violet);
+	--rail-graph:   var(--blue);
+
+	--cable-pipe:       var(--flow);
+	--cable-context:    var(--blue);
+	--cable-trigger:    var(--amber);
+	--cable-error:      var(--coral);
+	--cable-default:    color-mix(in srgb, var(--flow) 70%, transparent);
+	--cable-hover:      color-mix(in srgb, var(--flow-bright) 88%, var(--ivory) 12%);
+	--cable-selected:   var(--flow-bright);
+	--cable-failed:     var(--coral);
 	--cable-idle:       color-mix(in srgb, var(--muted-2) 70%, transparent);
 	--cable-w-default:  1.6px;
 	--cable-w-hit:      14px;
@@ -63,19 +82,24 @@
 	--space-5: 12px;
 	--tile-title-pad-y: 7px;
 	--tile-title-pad-x: 12px;
-	--t-cable-flow: 1.6s;
+	--cable-flow-duration: 1.6s;
+	--cable-queue-duration: 0.85s;
+	--cable-pulse-duration: 0.65s;
+	--led-breathe-duration: 2s;
+	--tile-entrance: 240ms;
+	--t-cable-flow: var(--cable-flow-duration);
 	--sh-tile: 0 6px 20px rgba(0, 0, 0, 0.4);
 	--sh-tile-running: 0 0 0 1px var(--accent-glow), 0 8px 24px rgba(0, 0, 0, 0.55);
 	--sh-tile-error: 0 0 0 1px color-mix(in srgb, var(--failed) 15%, transparent), 0 8px 24px rgba(0, 0, 0, 0.55);
 
 	/* Status */
-	--running: oklch(0.78 0.16 145);
+	--running: var(--flow);
 	--idle:    #6b7686;
 	--error:   var(--failed);
 
 	/* Edge dot */
 	--edge-dot:       var(--accent);
-	--edge-dot-hover: oklch(0.85 0.17 145);
+	--edge-dot-hover: var(--flow-bright);
 
 	/* New-tile button matched to surface ramp */
 	--new-tile-btn-bg:       #13191f;
@@ -278,7 +302,7 @@ body.platform-win {
 	overflow: hidden;
 	position: relative;
 	background:
-		radial-gradient(ellipse at 50% 100%, var(--accent-glow) 0%, transparent 54%),
+		var(--canvas-origin-glow),
 		var(--canvas-gradient);
 	outline: none;
 }
@@ -308,7 +332,7 @@ body.platform-win {
 
 .platform-win #panel-viewer {
 	background:
-		radial-gradient(ellipse at 50% 100%, var(--accent-glow) 0%, transparent 54%),
+		var(--canvas-origin-glow),
 		var(--canvas-gradient);
 }
 
@@ -1114,19 +1138,22 @@ body.platform-win {
 }
 
 .status-led[data-level="healthy"] {
-	background: var(--accent);
-	box-shadow: 0 0 0 1px var(--accent-glow), 0 0 10px var(--accent-glow);
+	background: var(--flow);
+	box-shadow: 0 0 0 1px var(--flow-glow), 0 0 10px var(--flow-glow);
+	animation: ledBreathe var(--led-breathe-duration) ease-in-out infinite;
 }
 
 .status-led[data-level="degraded"] {
-	background: var(--armed);
-	box-shadow: 0 0 0 1px color-mix(in srgb, var(--armed) 35%, transparent);
+	background: var(--amber);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 35%, transparent);
+	animation: none;
 }
 
 .status-led[data-level="down"],
 .status-led[data-level="error"] {
-	background: var(--failed);
-	box-shadow: 0 0 0 1px color-mix(in srgb, var(--failed) 35%, transparent);
+	background: var(--coral);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--coral) 35%, transparent);
+	animation: none;
 }
 
 /* ── Minimap ── */
@@ -1280,6 +1307,15 @@ body.platform-win {
 
 @keyframes cableFlow {
 	to { stroke-dashoffset: -32; }
+}
+
+@keyframes ledBreathe {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.42; }
+}
+
+@keyframes qfSpin {
+	to { transform: rotate(360deg); }
 }
 
 .edge-dot {

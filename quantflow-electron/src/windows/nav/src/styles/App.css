@@ -7,6 +7,9 @@ button {
 }
 
 :root {
+	--font-display: 'Space Grotesk', 'Geist', system-ui, sans-serif;
+	--font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: 'IBM Plex Mono', 'Geist Mono', ui-monospace, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
 	--top-spacing: 0px;
 	--nav-inset: 12px;
 	--card: rgb(242, 242, 242);
