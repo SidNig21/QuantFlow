@@ -15,6 +15,8 @@ export interface TileRegistrySummary {
   total: number;
   running: number;
   error: number;
+  queued: number;
+  waiting: number;
   idle: number;
 }
 
@@ -26,13 +28,34 @@ export interface TileRegistryGroup {
 }
 
 const TYPE_GROUP_LABELS: Record<string, string> = {
-  term: "Terminal Sessions",
+  codex: "Codex CLI agents",
+  generic: "Generic CLI agents",
+  agent: "Agents",
+  worker: "Workers",
+  term: "Terminal sessions",
+  tool: "Tools",
+  memory: "Memory",
   browser: "Browsers",
-  graph: "Graphs",
+  graph: "Graph tiles",
   note: "Notes",
   code: "Code",
   image: "Images",
 };
+
+const GROUP_ORDER = [
+  "codex cli agents",
+  "generic cli agents",
+  "agents",
+  "workers",
+  "terminal sessions",
+  "graph tiles",
+  "tools",
+  "memory",
+  "browsers",
+  "notes",
+  "code",
+  "images",
+];
 
 export function typeGroupLabel(type: string): string {
   return TYPE_GROUP_LABELS[type] ?? "Other Tiles";
@@ -43,17 +66,18 @@ export function groupLabelForEntry(entry: TileRegistryEntry): string {
   return label || typeGroupLabel(entry.type);
 }
 
-export function normalizeTileStatus(status: TileRegistryStatus): "running" | "error" | "exited" | "idle" {
+export function normalizeTileStatus(status: TileRegistryStatus): "running" | "error" | "exited" | "queued" | "waiting" | "idle" {
   const value = String(status ?? "").trim().toLowerCase();
   if (!value) return "idle";
   if (
     value === "running" ||
     value === "active" ||
-    value === "working" ||
-    value === "waiting"
+    value === "working"
   ) {
     return "running";
   }
+  if (value === "queued" || value === "queue") return "queued";
+  if (value === "waiting" || value === "pending") return "waiting";
   if (
     value === "error" ||
     value === "failed" ||
@@ -74,6 +98,8 @@ export function summarizeTileRegistry(entries: TileRegistryEntry[]): TileRegistr
     total: entries.length,
     running: 0,
     error: 0,
+    queued: 0,
+    waiting: 0,
     idle: 0,
   };
 
@@ -83,6 +109,10 @@ export function summarizeTileRegistry(entries: TileRegistryEntry[]): TileRegistr
       summary.running += 1;
     } else if (status === "error") {
       summary.error += 1;
+    } else if (status === "queued") {
+      summary.queued += 1;
+    } else if (status === "waiting") {
+      summary.waiting += 1;
     } else {
       summary.idle += 1;
     }
@@ -115,11 +145,16 @@ export function buildTileRegistryGroups(
   filter = "",
 ): TileRegistryGroup[] {
   const map = new Map<string, TileRegistryEntry[]>();
+  const baseLabels = new Map<string, string>();
 
   for (const entry of entries) {
-    if (!matchesTileRegistryFilter(entry, filter)) continue;
     const label = groupLabelForEntry(entry);
     const key = label.toLowerCase();
+    baseLabels.set(key, label);
+    if (!matchesTileRegistryFilter(entry, filter)) {
+      if (!map.has(key)) map.set(key, []);
+      continue;
+    }
     const items = map.get(key) ?? [];
     items.push(entry);
     map.set(key, items);
@@ -134,12 +169,16 @@ export function buildTileRegistryGroups(
       });
       return {
         id,
-        label: groupLabelForEntry(sortedEntries[0]),
+        label: sortedEntries[0]
+          ? groupLabelForEntry(sortedEntries[0])
+          : baseLabels.get(id) ?? id,
         summary: summarizeTileRegistry(sortedEntries),
         entries: sortedEntries,
       };
     })
     .sort((a, b) => {
+      const orderDelta = groupRank(a.label) - groupRank(b.label);
+      if (orderDelta !== 0) return orderDelta;
       const errorDelta = b.summary.error - a.summary.error;
       if (errorDelta !== 0) return errorDelta;
       const runningDelta = b.summary.running - a.summary.running;
@@ -151,7 +190,15 @@ export function buildTileRegistryGroups(
 function statusRank(status: TileRegistryStatus): number {
   const normalized = normalizeTileStatus(status);
   if (normalized === "error") return 0;
-  if (normalized === "running") return 1;
-  if (normalized === "idle") return 2;
-  return 3;
+  if (normalized === "queued") return 1;
+  if (normalized === "waiting") return 2;
+  if (normalized === "running") return 3;
+  if (normalized === "idle") return 4;
+  return 5;
+}
+
+function groupRank(label: string): number {
+  const normalized = label.toLowerCase();
+  const index = GROUP_ORDER.indexOf(normalized);
+  return index >= 0 ? index : GROUP_ORDER.length;
 }

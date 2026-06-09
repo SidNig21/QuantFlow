@@ -1,12 +1,3 @@
-import type { Icon } from "@phosphor-icons/react";
-import {
-  Terminal,
-  Browser,
-  ChartLineUp,
-  Note,
-  Code,
-  Image,
-} from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import {
@@ -16,7 +7,19 @@ import {
   type TileRegistryEntry,
 } from "./tile-registry";
 
-type TileType = "term" | "note" | "code" | "image" | "graph" | "browser";
+type TileType =
+  | "term"
+  | "generic"
+  | "codex"
+  | "agent"
+  | "worker"
+  | "tool"
+  | "memory"
+  | "note"
+  | "code"
+  | "image"
+  | "graph"
+  | "browser";
 
 interface TileEntry extends TileRegistryEntry {
   type: TileType;
@@ -50,19 +53,27 @@ const DEFAULT_REGISTRY_META: TileRegistryMeta = {
   workspaceName: "Workspace",
 };
 
-const TYPE_ICONS: Record<TileType, Icon> = {
-  term: Terminal,
-  browser: Browser,
-  graph: ChartLineUp,
-  note: Note,
-  code: Code,
-  image: Image,
+const TYPE_GLYPHS: Record<TileType, string> = {
+  term: ">_",
+  generic: ">_",
+  codex: "</>",
+  agent: "<>",
+  worker: "*",
+  tool: "#",
+  memory: "[]",
+  browser: "www",
+  graph: "::",
+  note: "--",
+  code: "{}",
+  image: "im",
 };
 
 function statusLabel(status: TileEntry["status"]) {
   const normalized = normalizeTileStatus(status);
   if (normalized === "running") return "LIVE";
   if (normalized === "error") return "ERR";
+  if (normalized === "queued") return "QUEUE";
+  if (normalized === "waiting") return "WAIT";
   if (normalized === "exited") return "EXIT";
   return "IDLE";
 }
@@ -92,7 +103,7 @@ function TileEntryRow({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const normalizedStatus = normalizeTileStatus(entry.status);
-  const IconComp = TYPE_ICONS[entry.type] ?? Terminal;
+  const glyph = TYPE_GLYPHS[entry.type] ?? ">_";
 
   useEffect(() => {
     if (isRenaming) {
@@ -109,8 +120,8 @@ function TileEntryRow({
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
     >
-      <div className="tile-icon" data-type={entry.type}>
-        <IconComp size={14} weight="regular" />
+      <div className="tile-icon" data-type={entry.type} aria-hidden="true">
+        {glyph}
       </div>
       {isRenaming ? (
         <input
@@ -138,7 +149,7 @@ function TileEntryRow({
               <div className="tile-route">@{entry.routeHandle}</div>
             )}
           </div>
-          <div className="tile-description">
+          <div className="tile-description" title={entry.metaLabel || entry.description || entry.type}>
             {entry.metaLabel || entry.description || entry.type}
           </div>
         </div>
@@ -283,7 +294,7 @@ function App() {
             <span>{summary.running}</span>
             <small>LIVE</small>
           </div>
-          <div className="registry-stat" data-tone="error">
+          <div className="registry-stat" data-tone="error" data-empty={summary.error === 0 ? "true" : "false"}>
             <span>{summary.error}</span>
             <small>ERR</small>
           </div>
@@ -326,13 +337,27 @@ function App() {
                 onRenameCancel={cancelRename}
               />
             ))}
+            {group.entries.length === 0 && (
+              <div className="tile-empty-group" aria-hidden="true" />
+            )}
           </section>
         ))}
       </div>
 
       {entries.length === 0 && (
         <div className="tile-empty">
-          No tiles on canvas
+          <svg className="tile-empty-mark" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+            <circle cx="60" cy="60" r="38" fill="none" stroke="currentColor" strokeWidth="2.4" />
+            <line x1="84" y1="82" x2="94" y2="93" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+            <g stroke="currentColor" strokeWidth="3.6" strokeLinecap="square">
+              <line x1="53" y1="40" x2="53" y2="82" />
+              <line x1="53" y1="40" x2="74" y2="40" />
+              <line x1="53" y1="60" x2="68" y2="60" />
+            </g>
+            <circle className="tile-empty-signal" cx="87" cy="33" r="4.2" />
+          </svg>
+          <strong>No tiles yet</strong>
+          <span>Spawn from the dock or press {PLATFORM === "darwin" ? "Cmd+K" : "Ctrl+K"}</span>
         </div>
       )}
       {entries.length > 0 && visibleEntries.length === 0 && (

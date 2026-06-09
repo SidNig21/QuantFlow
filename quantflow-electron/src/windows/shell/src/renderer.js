@@ -49,6 +49,7 @@ import { createOperationalEventLog } from "./operational-event-log.js";
 import { resolveCableDrop } from "./cable-drop.js";
 import {
 	formatContextPreviewDetail,
+	getTileVisualType,
 	updateTileTitle,
 	updateHerdrBadge,
 	getTileLabel,
@@ -689,6 +690,7 @@ async function init() {
 	}
 
 	const tileListEntryFields = [
+		"type",
 		"title",
 		"description",
 		"status",
@@ -721,9 +723,15 @@ async function init() {
 	}
 
 	function typeGroupLabel(type) {
-		if (type === "term") return "Terminal Sessions";
+		if (type === "codex") return "Codex CLI agents";
+		if (type === "generic") return "Generic CLI agents";
+		if (type === "agent") return "Agents";
+		if (type === "worker") return "Workers";
+		if (type === "term") return "Terminal sessions";
+		if (type === "tool") return "Tools";
+		if (type === "memory") return "Memory";
 		if (type === "browser") return "Browsers";
-		if (type === "graph") return "Graphs";
+		if (type === "graph") return "Graph tiles";
 		if (type === "note") return "Notes";
 		if (type === "code") return "Code";
 		if (type === "image") return "Images";
@@ -731,11 +739,10 @@ async function init() {
 	}
 
 	function buildTileGroupLabel(tile, label) {
-		if (tile.type === "term") {
-			return tile.roleName ? `${tile.roleName} Agents` : "Terminal Sessions";
-		}
+		const visualType = getTileVisualType(tile);
+		if (tile.type === "term") return typeGroupLabel(visualType);
 		const parent = pathBaseName(label.parent);
-		return parent || typeGroupLabel(tile.type);
+		return parent || typeGroupLabel(visualType);
 	}
 
 	function buildTileMetaLabel(tile, label, description) {
@@ -875,7 +882,7 @@ async function init() {
 		}
 
 		return {
-			id: tile.id, type: tile.type,
+			id: tile.id, type: getTileVisualType(tile),
 			title, description, status,
 			groupLabel: buildTileGroupLabel(tile, label),
 			metaLabel: buildTileMetaLabel(tile, label, description),
