@@ -29,6 +29,7 @@ import { registerHerdrSpawnHandlers } from "./ipc-herdr-spawn";
 import { startHerdrStatusService } from "./herdr-status-service";
 import { registerOrchestrationHandlers } from "./ipc-orchestration";
 import { registerEnvoyHandlers } from "./ipc-envoy";
+import { registerWorkflowHandlers } from "./ipc-workflow";
 
 const FS_CHANGE_DELETED = 3;
 
@@ -156,4 +157,5 @@ export function registerIpcHandlers(config: AppConfig): void {
   startHerdrStatusService();
   registerOrchestrationHandlers();
   registerEnvoyHandlers();
+  registerWorkflowHandlers();
 }

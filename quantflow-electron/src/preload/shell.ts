@@ -512,6 +512,19 @@ contextBridge.exposeInMainWorld("shellApi", {
   }): Promise<unknown> =>
     ipcRenderer.invoke("herdr:spawn-role", params),
 
+  // ── Run Workflow ──
+  workflowSubmit: (params: {
+    canvasId?: string;
+    prompt: string;
+  }): Promise<{
+    taskId: string;
+    envoyTaskId: string;
+    envoySpaceId: string;
+    correlationId: string;
+    canvasId: string;
+    title: string;
+  }> => ipcRenderer.invoke("workflow:submit", params),
+
   // ── Shared context ──
   contextGet: (): Promise<unknown> =>
     ipcRenderer.invoke("context:get"),

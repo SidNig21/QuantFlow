@@ -1,11 +1,20 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { EnvoyService, type EnvoyCliRunner } from "./envoy-service";
+import { EnvoyTaskService } from "./envoy-task-service";
+import { installTestRuntimeDb } from "./runtime-state/test-sqlite-adapter";
+import { closeDb } from "./runtime-state/database";
+import { _resetForTesting as resetEnvoy, listEnvoyTasks } from "./runtime-state/envoy-repo";
+import { _resetForTesting as resetEvents, listEvents } from "./runtime-state/events-repo";
 import {
   CANVAS_SKILL_RELATIVE_PATH,
+  WORKFLOW_SOURCE_TILE_ID,
+  createWorkflowTask,
   readCanvasSkill,
   truncateCanvasSkill,
+  workflowTitleFromPrompt,
 } from "./workflow-service";
 
 async function makeVaultWithSkill(content: string): Promise<string> {
@@ -49,5 +58,78 @@ describe("readCanvasSkill", () => {
     const vaultPath = await makeVaultWithSkill("   \n  \n");
     expect(readCanvasSkill({ vaultPath }))
       .rejects.toThrow("is empty");
+  });
+});
+
+describe("workflowTitleFromPrompt", () => {
+  test("uses the first line and truncates long titles", () => {
+    expect(workflowTitleFromPrompt("Fix the build\nmore detail")).toBe("Fix the build");
+    const long = "y".repeat(120);
+    const title = workflowTitleFromPrompt(long);
+    expect(title.length).toBe(80);
+    expect(title).toEndWith("...");
+  });
+});
+
+function makeRunner(): EnvoyCliRunner {
+  return async (args) => {
+    if (args.includes("spaces")) {
+      return { stdout: JSON.stringify({ spaces: [] }), stderr: "", exitCode: 0 };
+    }
+    if (args.includes("space") && args.includes("create")) {
+      return { stdout: JSON.stringify({ space_id: "space-wf" }), stderr: "", exitCode: 0 };
+    }
+    if (args.includes("task") && args.includes("create")) {
+      return { stdout: JSON.stringify({ message_id: "envoy-task-wf" }), stderr: "", exitCode: 0 };
+    }
+    return { stdout: JSON.stringify({ message_id: "status-msg" }), stderr: "", exitCode: 0 };
+  };
+}
+
+function makeTaskService(): EnvoyTaskService {
+  return new EnvoyTaskService({
+    envoy: new EnvoyService({ runner: makeRunner() }),
+    startListener: false,
+  });
+}
+
+describe("createWorkflowTask", () => {
+  beforeEach(() => {
+    installTestRuntimeDb();
+    resetEvents();
+    resetEnvoy();
+  });
+
+  afterAll(() => {
+    closeDb();
+  });
+
+  test("creates an operator-sourced Envoy task before any spawn", async () => {
+    const result = await createWorkflowTask(
+      { canvasId: "main", prompt: "Ship the workflow slice\nDetails here." },
+      makeTaskService(),
+    );
+
+    expect(result.title).toBe("Ship the workflow slice");
+    expect(result.correlationId).toMatch(/.+/);
+    expect(result.envoySpaceId).toBe("space-wf");
+
+    const tasks = listEnvoyTasks({ canvasId: "main" });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].source_tile_id).toBe(WORKFLOW_SOURCE_TILE_ID);
+    expect(tasks[0].instruction).toBe("Ship the workflow slice\nDetails here.");
+    expect(tasks[0].status).toBe("inbox");
+    expect(tasks[0].correlation_id).toBe(result.correlationId);
+
+    const kinds = listEvents({ correlationId: result.correlationId })
+      .map((event) => event.kind);
+    expect(kinds).toContain("envoy.task.create");
+    expect(kinds).toContain("workflow.task.created");
+  });
+
+  test("rejects an empty prompt without touching Envoy", async () => {
+    expect(createWorkflowTask({ prompt: "   " }, makeTaskService()))
+      .rejects.toThrow("non-empty prompt");
+    expect(listEnvoyTasks({})).toHaveLength(0);
   });
 });
