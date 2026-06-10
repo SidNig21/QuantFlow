@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { getEnvoyTaskService, type EnvoyTaskService } from "./envoy-task-service";
+import type { HerdrRpc } from "./herdr-session-spawn";
+import { callHerdrSocket } from "./herdr-socket-bridge";
 import { appendEvent } from "./runtime-state/events-repo";
 import { readVaultConfig } from "./vault-config";
 
@@ -135,4 +138,127 @@ export async function createWorkflowTask(
     },
   });
   return result;
+}
+
+/** Matches ROLE_STARTUP_PROMPT_DELAY_MS in herdr-session-spawn. */
+export const WORKFLOW_STARTUP_DELAY_MS = 1800;
+/** Small pause so the skill block finishes echoing before the next line. */
+export const WORKFLOW_SKILL_RENDER_DELAY_MS = 400;
+
+const SKILL_HEREDOC_TAG = "QF_CANVAS_SKILL";
+
+/**
+ * Render the skill in the pane scrollback without bash executing it:
+ * a quoted no-op heredoc echoes every line as typed and runs nothing.
+ */
+export function buildSkillDisplayCommand(skillText: string): string {
+  const safe = skillText
+    .split("\n")
+    .filter((line) => line.trim() !== SKILL_HEREDOC_TAG)
+    .join("\n");
+  return `: <<'${SKILL_HEREDOC_TAG}'\n${safe}\n${SKILL_HEREDOC_TAG}`;
+}
+
+export function buildWorkflowActivationLine(params: {
+  correlationId: string;
+  taskId: string;
+  skillPath: string;
+}): string {
+  return [
+    "Read the Envoy inbox and claim your task via qf_task_list / qf_task_claim.",
+    `correlation_id=${params.correlationId}`,
+    `task_id=${params.taskId}`,
+    `Canvas skill shown above; full file: ${params.skillPath}.`,
+    "Begin orchestrating.",
+  ].join(" ");
+}
+
+async function sendPaneLine(
+  rpc: HerdrRpc,
+  paneId: string,
+  text: string,
+): Promise<void> {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  await rpc("pane.send_text", { pane_id: paneId, text: trimmed });
+  await rpc("pane.send_keys", { pane_id: paneId, keys: ["Enter"] });
+}
+
+export interface WorkflowInjectInput {
+  herdrPaneId: string;
+  taskId: string;
+  correlationId: string;
+  /** Agent launch command; defaults to the Hermes role template. */
+  command?: string;
+  /** Test override for the vault location. */
+  vaultPath?: string;
+}
+
+export interface WorkflowInjectResult {
+  skillPath: string;
+  skillTruncated: boolean;
+  command: string;
+  activationLine: string;
+}
+
+/**
+ * CNVS-style ordered pane injection after the Hermes tile spawns:
+ * skill preamble (displayed, not executed) → agent command → activation
+ * line carrying the correlation and task ids.
+ */
+export async function injectWorkflowContext(
+  input: WorkflowInjectInput,
+  rpc: HerdrRpc = callHerdrSocket,
+  delays: { render: number; startup: number } = {
+    render: WORKFLOW_SKILL_RENDER_DELAY_MS,
+    startup: WORKFLOW_STARTUP_DELAY_MS,
+  },
+): Promise<WorkflowInjectResult> {
+  const herdrPaneId = String(input?.herdrPaneId ?? "").trim();
+  const taskId = String(input?.taskId ?? "").trim();
+  const correlationId = String(input?.correlationId ?? "").trim();
+  if (!herdrPaneId || !taskId || !correlationId) {
+    throw new Error("workflow:inject requires herdrPaneId, taskId, and correlationId");
+  }
+
+  const skill = await readCanvasSkill({ vaultPath: input.vaultPath });
+  await sendPaneLine(rpc, herdrPaneId, buildSkillDisplayCommand(skill.text));
+  appendEvent({
+    kind: "workflow.context.injected",
+    taskId,
+    correlationId,
+    data: {
+      herdr_pane_id: herdrPaneId,
+      skill_path: skill.path,
+      skill_truncated: skill.truncated,
+    },
+  });
+
+  if (delays.render > 0) await delay(delays.render);
+  const command = input.command?.trim() || "hermes";
+  await sendPaneLine(rpc, herdrPaneId, command);
+
+  if (delays.startup > 0) await delay(delays.startup);
+  const activationLine = buildWorkflowActivationLine({
+    correlationId,
+    taskId,
+    skillPath: skill.path,
+  });
+  await sendPaneLine(rpc, herdrPaneId, activationLine);
+  appendEvent({
+    kind: "workflow.activated",
+    taskId,
+    correlationId,
+    data: {
+      herdr_pane_id: herdrPaneId,
+      command,
+    },
+  });
+
+  return {
+    skillPath: skill.path,
+    skillTruncated: skill.truncated,
+    command,
+    activationLine,
+  };
 }

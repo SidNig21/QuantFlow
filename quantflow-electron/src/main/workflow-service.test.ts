@@ -11,7 +11,10 @@ import { _resetForTesting as resetEvents, listEvents } from "./runtime-state/eve
 import {
   CANVAS_SKILL_RELATIVE_PATH,
   WORKFLOW_SOURCE_TILE_ID,
+  buildSkillDisplayCommand,
+  buildWorkflowActivationLine,
   createWorkflowTask,
+  injectWorkflowContext,
   readCanvasSkill,
   truncateCanvasSkill,
   workflowTitleFromPrompt,
@@ -131,5 +134,109 @@ describe("createWorkflowTask", () => {
     expect(createWorkflowTask({ prompt: "   " }, makeTaskService()))
       .rejects.toThrow("non-empty prompt");
     expect(listEnvoyTasks({})).toHaveLength(0);
+  });
+});
+
+describe("buildSkillDisplayCommand", () => {
+  test("wraps the skill in a quoted no-op heredoc so bash executes nothing", () => {
+    const command = buildSkillDisplayCommand("# Skill\nrm -rf / # would be fatal if run");
+    expect(command.startsWith(": <<'QF_CANVAS_SKILL'\n")).toBe(true);
+    expect(command.endsWith("\nQF_CANVAS_SKILL")).toBe(true);
+    expect(command).toContain("# Skill");
+  });
+
+  test("drops lines that would terminate the heredoc early", () => {
+    const command = buildSkillDisplayCommand("a\nQF_CANVAS_SKILL\nb");
+    expect(command).toBe(": <<'QF_CANVAS_SKILL'\na\nb\nQF_CANVAS_SKILL");
+  });
+});
+
+describe("injectWorkflowContext", () => {
+  const NO_DELAYS = { render: 0, startup: 0 };
+
+  beforeEach(() => {
+    installTestRuntimeDb();
+    resetEvents();
+    resetEnvoy();
+  });
+
+  function makeRpc() {
+    const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const rpc = (async (method: string, params: Record<string, unknown> = {}) => {
+      calls.push({ method, params });
+      return {};
+    }) as Parameters<typeof injectWorkflowContext>[1];
+    return { rpc, calls };
+  }
+
+  test("sends skill, command, then activation line with the correlation id", async () => {
+    const vaultPath = await makeVaultWithSkill("# QuantFlow Canvas Skill\nqf_task_claim\n");
+    const { rpc, calls } = makeRpc();
+
+    const result = await injectWorkflowContext(
+      {
+        herdrPaneId: "pane-7",
+        taskId: "task-1",
+        correlationId: "corr-abc",
+        vaultPath,
+      },
+      rpc,
+      NO_DELAYS,
+    );
+
+    const sends = calls.filter((call) => call.method === "pane.send_text");
+    expect(sends).toHaveLength(3);
+    expect(sends.every((call) => call.params.pane_id === "pane-7")).toBe(true);
+    expect(String(sends[0].params.text)).toContain("QuantFlow Canvas Skill");
+    expect(String(sends[0].params.text)).toStartWith(": <<'QF_CANVAS_SKILL'");
+    expect(sends[1].params.text).toBe("hermes");
+    expect(String(sends[2].params.text)).toContain("correlation_id=corr-abc");
+    expect(String(sends[2].params.text)).toContain("task_id=task-1");
+
+    // Each send_text is followed by an Enter keypress.
+    const methods = calls.map((call) => call.method);
+    expect(methods).toEqual([
+      "pane.send_text", "pane.send_keys",
+      "pane.send_text", "pane.send_keys",
+      "pane.send_text", "pane.send_keys",
+    ]);
+
+    expect(result.activationLine).toBe(buildWorkflowActivationLine({
+      correlationId: "corr-abc",
+      taskId: "task-1",
+      skillPath: result.skillPath,
+    }));
+
+    const kinds = listEvents({ correlationId: "corr-abc" }).map((event) => event.kind);
+    expect(kinds).toContain("workflow.context.injected");
+    expect(kinds).toContain("workflow.activated");
+  });
+
+  test("uses the provided agent command", async () => {
+    const vaultPath = await makeVaultWithSkill("# Skill\n");
+    const { rpc, calls } = makeRpc();
+    await injectWorkflowContext(
+      {
+        herdrPaneId: "pane-7",
+        taskId: "task-1",
+        correlationId: "corr-abc",
+        command: "hermes --canvas",
+        vaultPath,
+      },
+      rpc,
+      NO_DELAYS,
+    );
+    const sends = calls.filter((call) => call.method === "pane.send_text");
+    expect(sends[1].params.text).toBe("hermes --canvas");
+  });
+
+  test("rejects missing pane or ids before any pane writes", async () => {
+    const { rpc, calls } = makeRpc();
+    expect(injectWorkflowContext(
+      { herdrPaneId: "", taskId: "t", correlationId: "c" },
+      rpc,
+      NO_DELAYS,
+    )).rejects.toThrow("requires herdrPaneId");
+    expect(calls).toHaveLength(0);
   });
 });

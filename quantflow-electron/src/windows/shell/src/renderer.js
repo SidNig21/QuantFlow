@@ -1592,6 +1592,59 @@ async function init() {
 			message: `Envoy task created - ${submitted.correlationId}`,
 			tone: "success",
 		});
+		await spawnWorkflowHermes(submitted);
+	}
+
+	async function spawnWorkflowHermes(submitted) {
+		try {
+			const role = await window.shellApi.rolesGet?.("hermes");
+			if (!role) throw new Error("Hermes role not found");
+			clearPendingLegendRecipe();
+			const position = getLegendViewportCenterPlacement(getLegendPlacementOptions());
+			// Suppress the role's auto-start so the workflow controls injection
+			// order: skill preamble → hermes → activation line.
+			const tile = await spawnRoleTileAt(
+				{ ...role, commandTemplate: undefined, startupPrompt: undefined },
+				position.x,
+				position.y,
+				{ size: LEGEND_TILE_SIZE, displayName: role.name ?? "Hermes" },
+			);
+			if (!tile?.herdrPaneId) {
+				throw new Error("Hermes spawn did not return a herdr pane");
+			}
+			legendDock.updateEmptyHint();
+			const injected = await window.shellApi.workflowInject({
+				herdrPaneId: tile.herdrPaneId,
+				taskId: submitted.taskId,
+				correlationId: submitted.correlationId,
+				command: role.commandTemplate || "hermes",
+			});
+			operationalEvents.record({
+				type: "workflow.activated",
+				severity: "info",
+				summary: `Hermes activated for task ${submitted.title}`,
+				meta: {
+					taskId: submitted.taskId,
+					correlationId: submitted.correlationId,
+					tileId: tile.id,
+					skillPath: injected.skillPath,
+				},
+			});
+			toasts.show({
+				message: `Hermes activated - ${submitted.correlationId}`,
+				tone: "success",
+			});
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			operationalEvents.record({
+				type: "workflow.activation_failed",
+				severity: "error",
+				summary: "Run Workflow could not spawn or activate Hermes",
+				detail: message,
+				meta: { taskId: submitted.taskId, correlationId: submitted.correlationId },
+			});
+			toasts.show({ message: `Hermes activation failed: ${message}`, tone: "error" });
+		}
 	}
 
 	function handleLegendRecipeActivate(recipeId, spawnMode, event = null) {

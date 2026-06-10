@@ -524,6 +524,17 @@ contextBridge.exposeInMainWorld("shellApi", {
     canvasId: string;
     title: string;
   }> => ipcRenderer.invoke("workflow:submit", params),
+  workflowInject: (params: {
+    herdrPaneId: string;
+    taskId: string;
+    correlationId: string;
+    command?: string;
+  }): Promise<{
+    skillPath: string;
+    skillTruncated: boolean;
+    command: string;
+    activationLine: string;
+  }> => ipcRenderer.invoke("workflow:inject", params),
 
   // ── Shared context ──
   contextGet: (): Promise<unknown> =>
