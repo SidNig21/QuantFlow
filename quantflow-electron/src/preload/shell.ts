@@ -38,6 +38,9 @@ ipcRenderer.on("shell:forward", (_event, target, channel, ...args) => {
 
 contextBridge.exposeInMainWorld("shellApi", {
   getPlatform: (): NodeJS.Platform => process.platform,
+  minimizeWindow: (): void => ipcRenderer.send("window:minimize"),
+  maximizeWindow: (): void => ipcRenderer.send("window:maximize"),
+  closeWindow: (): void => ipcRenderer.send("window:close"),
   appVersion: (): Promise<string> => ipcRenderer.invoke("app:version"),
 
   getViewConfig: (): Promise<AllViewConfigs> =>

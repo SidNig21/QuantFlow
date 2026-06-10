@@ -650,15 +650,7 @@
 }
 
 .lv1-empty-canvas {
-	position: absolute;
-	top: 40%;
-	left: 50%;
-	z-index: 5;
-	width: min(360px, 48vw);
-	color: var(--muted-foreground);
-	text-align: center;
-	transform: translate(-50%, -50%);
-	pointer-events: none;
+	display: none;
 }
 
 .lv1-empty-canvas[hidden] {

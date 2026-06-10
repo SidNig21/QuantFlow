@@ -530,8 +530,8 @@ function createWindow(): void {
 
   if (process.platform === "win32") {
     Object.assign(windowOptions, {
-      backgroundColor: "#00000000",
-      backgroundMaterial: "mica",
+      frame: false,
+      backgroundColor: "#0a0d12",
     } satisfies Partial<Electron.BrowserWindowConstructorOptions>);
   }
 
@@ -541,6 +541,10 @@ function createWindow(): void {
   }
 
   mainWindow = new BrowserWindow(windowOptions);
+
+  if (process.platform === "win32") {
+    mainWindow.setMenuBarVisibility(false);
+  }
 
   if (state.isMaximized) {
     mainWindow.maximize();

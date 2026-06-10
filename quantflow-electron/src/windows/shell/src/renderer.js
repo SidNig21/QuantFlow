@@ -120,6 +120,18 @@ const viewport = createViewport(canvasEl, gridCanvas, tiles);
 document.documentElement.classList.toggle("platform-win", IS_WINDOWS);
 document.body.classList.toggle("platform-win", IS_WINDOWS);
 
+if (IS_WINDOWS) {
+	const windowControls = document.querySelector(".window-controls");
+	windowControls?.removeAttribute("hidden");
+	for (const [selector, action] of [
+		[".window-control-minimize", () => window.shellApi.minimizeWindow()],
+		[".window-control-maximize", () => window.shellApi.maximizeWindow()],
+		[".window-control-close", () => window.shellApi.closeWindow()],
+	]) {
+		windowControls?.querySelector(selector)?.addEventListener("click", () => action());
+	}
+}
+
 // -- Appearance --
 
 let activeThemeMode = "dark";

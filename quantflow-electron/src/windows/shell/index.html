@@ -29,6 +29,11 @@
 			<span class="titlebar-wordmark">QuantFlow</span>
 		</div>
 	</div>
+	<div class="window-controls" aria-label="Window controls" hidden>
+		<button type="button" class="window-control window-control-minimize" aria-label="Minimize">&#8722;</button>
+		<button type="button" class="window-control window-control-maximize" aria-label="Maximize">&#9633;</button>
+		<button type="button" class="window-control window-control-close" aria-label="Close">&#10005;</button>
+	</div>
 <button type="button" id="nav-toggle" class="panel-toggle" aria-pressed="true" aria-label="Hide Navigator"
 		data-tooltip="Toggle Nav" data-shortcut="Cmd+B"></button>
 
@@ -70,7 +75,9 @@
 							<line x1="50" y1="40" x2="55" y2="40" stroke-width="3.2" />
 							<line x1="49" y1="82" x2="57" y2="82" stroke-width="3.4" />
 						</g>
-						<circle class="canvas-watermark-signal" cx="87" cy="33" r="4.2" />
+						<g class="canvas-watermark-signal-orbit">
+							<circle class="canvas-watermark-signal" cx="60" cy="22" r="4.2" />
+						</g>
 					</svg>
 					<div class="canvas-watermark-wordmark">QuantFlow</div>
 					<div class="canvas-watermark-underline"></div>

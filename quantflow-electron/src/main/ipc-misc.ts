@@ -4,7 +4,8 @@ import {
   Menu,
   Notification,
   shell,
-  type BrowserWindow,
+  BrowserWindow,
+  type BrowserWindow as BrowserWindowType,
 } from "electron";
 import * as gitReplay from "./git-replay";
 import { importWebArticle } from "./import-service";
@@ -14,7 +15,7 @@ import { DISABLE_GIT_REPLAY } from "@collab/shared/replay-types";
 import { workspaceForFile } from "./ipc-workspace";
 
 interface IpcContext {
-  mainWindow: () => BrowserWindow | null;
+  mainWindow: () => BrowserWindowType | null;
   workspaces: () => string[];
   forwardToWebview: (
     target: string,
@@ -313,4 +314,19 @@ export function registerMiscHandlers(
       },
     },
   );
+
+  ipcMain.on("window:minimize", (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+
+  ipcMain.on("window:maximize", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (win.isMaximized()) win.unmaximize();
+    else win.maximize();
+  });
+
+  ipcMain.on("window:close", (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+  });
 }
