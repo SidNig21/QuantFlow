@@ -3935,3 +3935,101 @@ html.platform-win #panel-viewer::before {
 .cable-mode-hud[hidden] {
 	display: none;
 }
+
+/* ── Run Workflow modal ── */
+
+.qf-workflow-overlay {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 9600;
+}
+
+.qf-workflow-overlay[hidden] {
+	display: none;
+}
+
+.qf-workflow-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(8px);
+}
+
+.qf-workflow-modal {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	width: min(520px, calc(100vw - 96px));
+	padding: 18px 20px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: var(--bg, #0a0d12);
+	box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+.qf-workflow-title {
+	color: var(--fg);
+	font-family: var(--font-sans);
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.qf-workflow-input {
+	resize: vertical;
+	min-height: 64px;
+	padding: 8px 10px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.03);
+	color: var(--fg);
+	font-family: var(--font-mono);
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.qf-workflow-input:focus {
+	border-color: var(--accent);
+	outline: none;
+}
+
+.qf-workflow-hint {
+	color: var(--muted-foreground);
+	font-family: var(--font-sans);
+	font-size: var(--fs-xs, 11px);
+}
+
+.qf-workflow-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.qf-workflow-actions button {
+	padding: 6px 14px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: transparent;
+	color: var(--fg);
+	font-family: var(--font-sans);
+	font-size: 12.5px;
+	cursor: pointer;
+}
+
+.qf-workflow-cancel:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.qf-workflow-submit {
+	border-color: var(--accent);
+	background: var(--accent);
+	color: var(--bg, #0a0d12);
+	font-weight: 600;
+}
+
+.qf-workflow-submit:hover {
+	filter: brightness(1.1);
+}
