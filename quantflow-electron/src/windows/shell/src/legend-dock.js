@@ -138,7 +138,7 @@ export function normalizeLegendSpawnMode(value) {
 export function getCommenceState(state) {
 	if (state.running) return "running";
 	if (state.armedTemplate === TEMPLATE_ID) return "armed";
-	return "idle";
+	return "workflow";
 }
 
 export function getCommenceCopy(state) {
@@ -164,12 +164,12 @@ export function getCommenceCopy(state) {
 		};
 	}
 	return {
-		state: "idle",
-		label: "Commence",
-		subLabel: "Arm a template first",
-		compactLabel: "GO",
+		state: "workflow",
+		label: "Run Workflow",
+		subLabel: "Describe a task for Hermes",
+		compactLabel: "RUN",
 		icon: "play",
-		ariaDisabled: "true",
+		ariaDisabled: "false",
 	};
 }
 
@@ -486,7 +486,14 @@ function bindDockEvents(root, stateStore, options = {}) {
 	});
 
 	root.querySelector(".lv1-commence")?.addEventListener("click", () => {
-		stateStore.commence();
+		const commenceState = getCommenceState(stateStore.getSnapshot());
+		if (commenceState === "armed") {
+			stateStore.commence();
+			return;
+		}
+		if (commenceState === "workflow") {
+			options.onRunWorkflow?.();
+		}
 	});
 
 	root.querySelector(".lv1-toggle--density")?.addEventListener("click", () => {
@@ -505,6 +512,7 @@ export function createLegendDock(options) {
 		storage = globalThis.localStorage,
 		getTileCount = () => 0,
 		onRecipeActivate = null,
+		onRunWorkflow = null,
 	} = options;
 	if (!document || !container) {
 		throw new Error("createLegendDock requires document and container");
@@ -534,7 +542,7 @@ export function createLegendDock(options) {
 		applyRootAttributes(root, snapshot);
 		root.innerHTML = renderDockHtml(snapshot);
 		chip.textContent = getSpawnModeChipText(snapshot.spawnMode);
-		bindDockEvents(root, stateStore, { onRecipeActivate });
+		bindDockEvents(root, stateStore, { onRecipeActivate, onRunWorkflow });
 		updateEmptyHint();
 	}
 

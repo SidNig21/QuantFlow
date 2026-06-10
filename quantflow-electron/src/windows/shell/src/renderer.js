@@ -93,6 +93,7 @@ import {
 } from "./launch-diagnostics-view.js";
 import { formatRoleStartupEvent } from "./role-startup.js";
 import { createLegendDock, LEGEND_RECIPES } from "./legend-dock.js";
+import { createWorkflowModal } from "./workflow-modal.js";
 import { spawnRoleTileAt as spawnRoleTileAtShared } from "./role-tile-spawn.js";
 import {
 	LEGEND_TILE_SIZE,
@@ -399,7 +400,11 @@ async function init() {
 		onRecipeActivate: ({ recipeId, spawnMode, event }) => {
 			handleLegendRecipeActivate(recipeId, spawnMode, event);
 		},
+		onRunWorkflow: () => {
+			void runWorkflow();
+		},
 	});
+	const workflowModal = createWorkflowModal({ document });
 	const panelAgent = document.getElementById("panel-agent");
 	const agentResizeHandle = document.getElementById("agent-resize");
 	const agentToggle = document.getElementById("agent-toggle");
@@ -1550,6 +1555,43 @@ async function init() {
 		});
 		legendDock.updateEmptyHint();
 		return tile;
+	}
+
+	// -- Run Workflow (play button → modal → Envoy task → Hermes) --
+
+	async function runWorkflow() {
+		const prompt = await workflowModal.open();
+		if (!prompt) return;
+		let submitted;
+		try {
+			submitted = await window.shellApi.workflowSubmit({
+				canvasId: workspaceData.workspaces?.[0],
+				prompt,
+			});
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			operationalEvents.record({
+				type: "workflow.task_failed",
+				severity: "error",
+				summary: "Run Workflow could not create the Envoy task",
+				detail: message,
+			});
+			toasts.show({ message: `Workflow task failed: ${message}`, tone: "error" });
+			return;
+		}
+		operationalEvents.record({
+			type: "workflow.task_created",
+			severity: "info",
+			summary: `Envoy task created: ${submitted.title}`,
+			meta: {
+				taskId: submitted.taskId,
+				correlationId: submitted.correlationId,
+			},
+		});
+		toasts.show({
+			message: `Envoy task created - ${submitted.correlationId}`,
+			tone: "success",
+		});
 	}
 
 	function handleLegendRecipeActivate(recipeId, spawnMode, event = null) {

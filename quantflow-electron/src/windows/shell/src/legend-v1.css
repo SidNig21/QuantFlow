@@ -511,6 +511,26 @@
 	cursor: default;
 }
 
+.lv1-commence[data-state="workflow"] {
+	border-style: solid;
+	border-color: color-mix(in srgb, var(--flow) 64%, transparent);
+	background: color-mix(in srgb, var(--flow) 10%, transparent);
+	color: var(--flow);
+	cursor: pointer;
+}
+
+.lv1-commence[data-state="workflow"]:hover {
+	border-color: var(--flow);
+	background: color-mix(in srgb, var(--flow) 22%, transparent);
+	box-shadow: 0 0 18px var(--accent-glow);
+}
+
+.lv1-commence[data-state="workflow"] .lv1-commence__label,
+.lv1-commence[data-state="workflow"] .lv1-commence__sub,
+.lv1-commence[data-state="workflow"] .lv1-commence__compact-label {
+	color: var(--flow);
+}
+
 .lv1-commence__icon {
 	display: flex;
 	align-items: center;

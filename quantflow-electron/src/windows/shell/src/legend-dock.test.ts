@@ -94,6 +94,20 @@ describe("LegendState", () => {
 		expect(storage.values.get("legendV1.spawnMode")).toBe("center");
 	});
 
+	test("play button is Run Workflow when no template is armed", () => {
+		const state = createLegendState({ storage: createStorage() });
+		expect(getCommenceCopy(state.getSnapshot())).toMatchObject({
+			state: "workflow",
+			label: "Run Workflow",
+			subLabel: "Describe a task for Hermes",
+			compactLabel: "RUN",
+			ariaDisabled: "false",
+		});
+		// Run Workflow does not flip the RL-template running state.
+		expect(state.commence()).toBe(false);
+		expect(state.getSnapshot().running).toBe(false);
+	});
+
 	test("transitions template visual states without spawn side effects", () => {
 		const state = createLegendState({ storage: createStorage() });
 		state.toggleTemplate("rl-training");
