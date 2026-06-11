@@ -11,7 +11,7 @@ import { _resetForTesting as resetEvents, listEvents } from "./runtime-state/eve
 import {
   CANVAS_SKILL_RELATIVE_PATH,
   WORKFLOW_SOURCE_TILE_ID,
-  buildSkillDisplayCommand,
+  buildSkillCatCommand,
   buildWorkflowActivationLine,
   createWorkflowTask,
   injectWorkflowContext,
@@ -137,22 +137,28 @@ describe("createWorkflowTask", () => {
   });
 });
 
-describe("buildSkillDisplayCommand", () => {
-  test("wraps the skill in a quoted no-op heredoc so bash executes nothing", () => {
-    const command = buildSkillDisplayCommand("# Skill\nrm -rf / # would be fatal if run");
-    expect(command.startsWith(": <<'QF_CANVAS_SKILL'\n")).toBe(true);
-    expect(command.endsWith("\nQF_CANVAS_SKILL")).toBe(true);
-    expect(command).toContain("# Skill");
+describe("buildSkillCatCommand", () => {
+  test("prints the skill with a single-line cat command in WSL", () => {
+    const command = buildSkillCatCommand(
+      "C:\\Users\\rybow\\Obsidian\\Cursor Collab\\Projects\\QuantFlow\\QUANTFLOW_CANVAS_SKILL.md",
+    );
+    expect(command).toBe(
+      "cat '/mnt/c/Users/rybow/Obsidian/Cursor Collab/Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md'",
+    );
   });
 
-  test("drops lines that would terminate the heredoc early", () => {
-    const command = buildSkillDisplayCommand("a\nQF_CANVAS_SKILL\nb");
-    expect(command).toBe(": <<'QF_CANVAS_SKILL'\na\nb\nQF_CANVAS_SKILL");
+  test("throws when the path cannot be converted to WSL", () => {
+    expect(() => buildSkillCatCommand("/posix/only/path.md"))
+      .toThrow("Cannot convert skill path to WSL");
   });
 });
 
 describe("injectWorkflowContext", () => {
-  const NO_DELAYS = { render: 0, startup: 0 };
+  const NO_DELAYS = {
+    paneReady: 0,
+    promptTimeout: 5000,
+    promptSettle: 0,
+  };
 
   beforeEach(() => {
     installTestRuntimeDb();
@@ -160,16 +166,19 @@ describe("injectWorkflowContext", () => {
     resetEnvoy();
   });
 
-  function makeRpc() {
+  function makeRpc(readPayload: unknown = {
+    read: { text: "Welcome to Hermes Agent! Type your message or /help.\n❯" },
+  }) {
     const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
     const rpc = (async (method: string, params: Record<string, unknown> = {}) => {
       calls.push({ method, params });
+      if (method === "pane.read") return readPayload;
       return {};
     }) as Parameters<typeof injectWorkflowContext>[1];
     return { rpc, calls };
   }
 
-  test("sends skill, command, then activation line with the correlation id", async () => {
+  test("when agent already launched, injects activation after prompt-ready wait", async () => {
     const vaultPath = await makeVaultWithSkill("# QuantFlow Canvas Skill\nqf_task_claim\n");
     const { rpc, calls } = makeRpc();
 
@@ -179,27 +188,17 @@ describe("injectWorkflowContext", () => {
         taskId: "task-1",
         correlationId: "corr-abc",
         vaultPath,
+        agentAlreadyLaunched: true,
       },
       rpc,
       NO_DELAYS,
     );
 
     const sends = calls.filter((call) => call.method === "pane.send_text");
-    expect(sends).toHaveLength(3);
-    expect(sends.every((call) => call.params.pane_id === "pane-7")).toBe(true);
-    expect(String(sends[0].params.text)).toContain("QuantFlow Canvas Skill");
-    expect(String(sends[0].params.text)).toStartWith(": <<'QF_CANVAS_SKILL'");
-    expect(sends[1].params.text).toBe("hermes");
-    expect(String(sends[2].params.text)).toContain("correlation_id=corr-abc");
-    expect(String(sends[2].params.text)).toContain("task_id=task-1");
-
-    // Each send_text is followed by an Enter keypress.
-    const methods = calls.map((call) => call.method);
-    expect(methods).toEqual([
-      "pane.send_text", "pane.send_keys",
-      "pane.send_text", "pane.send_keys",
-      "pane.send_text", "pane.send_keys",
-    ]);
+    expect(sends).toHaveLength(1);
+    expect(String(sends[0].params.text)).toContain("correlation_id=corr-abc");
+    expect(String(sends[0].params.text)).toContain("task_id=task-1");
+    expect(calls.some((call) => call.method === "pane.read")).toBe(true);
 
     expect(result.activationLine).toBe(buildWorkflowActivationLine({
       correlationId: "corr-abc",
@@ -212,22 +211,25 @@ describe("injectWorkflowContext", () => {
     expect(kinds).toContain("workflow.activated");
   });
 
-  test("uses the provided agent command", async () => {
+  test("launches the agent when spawn left the pane at a shell prompt", async () => {
     const vaultPath = await makeVaultWithSkill("# Skill\n");
     const { rpc, calls } = makeRpc();
+
     await injectWorkflowContext(
       {
         herdrPaneId: "pane-7",
         taskId: "task-1",
         correlationId: "corr-abc",
-        command: "hermes --canvas",
         vaultPath,
+        command: "hermes --canvas",
       },
       rpc,
       NO_DELAYS,
     );
+
     const sends = calls.filter((call) => call.method === "pane.send_text");
-    expect(sends[1].params.text).toBe("hermes --canvas");
+    expect(sends[0].params.text).toBe("hermes --canvas");
+    expect(sends).toHaveLength(2);
   });
 
   test("rejects missing pane or ids before any pane writes", async () => {

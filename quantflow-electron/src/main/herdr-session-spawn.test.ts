@@ -129,6 +129,59 @@ describe("herdr role spawn planning", () => {
     });
   });
 
+  test("waits for the agent prompt before sending postLaunchPrompt", async () => {
+    const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
+    let readCount = 0;
+    await spawnHerdrRoleSession({
+      tileId: "tile-1",
+      roleId: "hermes",
+      roleName: "Hermes",
+      commandTemplate: "hermes",
+      postLaunchPrompt: "correlation_id=corr-test",
+    }, async (method, params) => {
+      calls.push({ method, params });
+      if (method === "workspace.create") {
+        return {
+          workspace: { workspace_id: "workspace-1" },
+          root_pane: { pane_id: "root-pane" },
+        };
+      }
+      if (method === "pane.split") {
+        return {
+          pane: {
+            pane_id: "pane-1",
+            terminal_id: "terminal-1",
+          },
+        };
+      }
+      if (method === "pane.get") {
+        return {
+          pane: {
+            pane_id: "pane-1",
+            terminal_id: "terminal-1",
+          },
+        };
+      }
+      if (method === "pane.read") {
+        readCount += 1;
+        if (readCount < 2) {
+          return { read: { text: "rybowen21@DESKTOP$ hermes" } };
+        }
+        return { read: { text: "Welcome to Hermes Agent! Type your message or /help.\n❯" } };
+      }
+      if (method === "pane.send_text" || method === "pane.send_keys") {
+        return {};
+      }
+      throw new Error(`unexpected method ${method}`);
+    });
+
+    const sent = calls
+      .filter((call) => call.method === "pane.send_text")
+      .map((call) => call.params?.text);
+    expect(sent).toEqual(["hermes", "correlation_id=corr-test"]);
+    expect(calls.some((call) => call.method === "pane.read")).toBe(true);
+  });
+
   test("wraps commandTemplate through envoy-run when envoy wrap is enabled", async () => {
     const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
     await spawnHerdrRoleSession({

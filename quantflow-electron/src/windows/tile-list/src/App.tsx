@@ -348,7 +348,7 @@ function App() {
         <div className="tile-empty">
           <svg className="tile-empty-mark" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
             <circle cx="60" cy="60" r="38" fill="none" stroke="currentColor" strokeWidth="2.4" />
-            <line x1="84" y1="82" x2="94" y2="93" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+            <polyline points="86.87,86.87 98,98" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="butt" strokeLinejoin="miter" />
             <g stroke="currentColor" strokeWidth="3.6" strokeLinecap="square">
               <line x1="53" y1="40" x2="53" y2="82" />
               <line x1="53" y1="40" x2="74" y2="40" />

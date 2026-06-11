@@ -15,6 +15,7 @@ import {
   type WebContents,
 } from "electron";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fromCollabFileUrl } from "@collab/shared/collab-file-url";
@@ -58,6 +59,8 @@ import { recordCrashReport } from "./diagnostics/crash-reports";
 import { writeLaunchTrace } from "./diagnostics/launch-traces";
 import { stopAllEnvoyListeners } from "./envoy-listener";
 import { stopAllObsidianEnvoyMirrors } from "./obsidian-envoy-mirror";
+import { bootstrapHerdrRuntime } from "./herdr-runtime";
+import { stopHerdrStatusService } from "./herdr-status-service";
 
 const APP_NAME = "QuantFlow";
 const launchStartedAtMs = Date.now();
@@ -499,6 +502,16 @@ function getRendererURL(name: string): string {
   ).href;
 }
 
+function getAppIconPath(): string | undefined {
+  const base = join(__dirname, "../../build/icon");
+  if (process.platform === "win32") {
+    const icoPath = `${base}.ico`;
+    if (existsSync(icoPath)) return icoPath;
+  }
+  const pngPath = `${base}.png`;
+  return existsSync(pngPath) ? pngPath : undefined;
+}
+
 function createWindow(): void {
   const saved = config.window_state;
   const useSaved =
@@ -538,6 +551,11 @@ function createWindow(): void {
   if (useSaved) {
     windowOptions.x = state.x;
     windowOptions.y = state.y;
+  }
+
+  const iconPath = getAppIconPath();
+  if (iconPath) {
+    windowOptions.icon = iconPath;
   }
 
   mainWindow = new BrowserWindow(windowOptions);
@@ -794,6 +812,7 @@ async function shutdownBackgroundServices(): Promise<void> {
   stopJsonRpcServer();
   stopAllObsidianEnvoyMirrors();
   stopAllEnvoyListeners();
+  stopHerdrStatusService();
   stopImageWorker();
   closeDb();
 }
@@ -921,13 +940,18 @@ app.whenReady().then(async () => {
   });
   recordLaunchPhase("services.registered", servicesStartedAt);
 
-  const sidecarStartedAt = Date.now();
+  const runtimeStartedAt = Date.now();
   try {
     await pty.ensureSidecar();
   } catch (err) {
     console.error("Sidecar failed to start:", err);
   }
-  recordLaunchPhase("pty.sidecar", sidecarStartedAt);
+  try {
+    await bootstrapHerdrRuntime();
+  } catch (err) {
+    console.error("Herdr bootstrap failed:", err);
+  }
+  recordLaunchPhase("runtime.pty-herdr", runtimeStartedAt);
 
   const windowStartedAt = Date.now();
   buildAppMenu();

@@ -1,6 +1,8 @@
 const IVORY = "#f2f0ec";
 const LIVE_GREEN = "#b7ff00";
 
+import { getQfMarkTailPolyline } from "./qf-mark-geometry";
+
 export interface QFMarkProps {
   size?: number;
   color?: string;
@@ -38,7 +40,14 @@ export function QFMark({
       focusable="false"
     >
       <circle cx="60" cy="60" r={ringR} fill="none" stroke={color} strokeWidth={sw} />
-      <line x1="84" y1="82" x2="94" y2="93" stroke={color} strokeWidth={sw} strokeLinecap="round" />
+      <polyline
+        points={getQfMarkTailPolyline(ringR)}
+        fill="none"
+        stroke={color}
+        strokeWidth={sw}
+        strokeLinecap="butt"
+        strokeLinejoin="miter"
+      />
       <g stroke={color} strokeWidth={fSw} strokeLinecap="square">
         <line x1="53" y1="40" x2="53" y2="82" />
         <line x1="53" y1="40" x2="74" y2="40" />

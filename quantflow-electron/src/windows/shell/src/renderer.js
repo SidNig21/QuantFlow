@@ -24,7 +24,6 @@ import {
 } from "./command-palette.js";
 import { createViewport } from "./canvas-viewport.js";
 import { createEdgeIndicators } from "./edge-indicators.js";
-import { createMinimap } from "./canvas-minimap.js";
 import { createPanel } from "./panel-manager.js";
 import { createWorkspaceManager } from "./workspace-manager.js";
 import { confirmTileClose } from "./pty-close-confirmation.js";
@@ -88,8 +87,6 @@ import {
 import {
 	createPtyStartFailureDiagnostic,
 	createPtyRestoreFailureDiagnostic,
-	normalizeLaunchDiagnostic,
-	renderLaunchDiagnostics,
 } from "./launch-diagnostics-view.js";
 import { formatRoleStartupEvent } from "./role-startup.js";
 import { createLegendDock, LEGEND_RECIPES } from "./legend-dock.js";
@@ -288,74 +285,6 @@ async function init() {
 			},
 		});
 	}
-
-	const launchDiagnostics = new Map();
-	const launchDiagnosticsEl = document.createElement("div");
-	launchDiagnosticsEl.id = "launch-diagnostics";
-	launchDiagnosticsEl.hidden = true;
-	document.body.appendChild(launchDiagnosticsEl);
-
-	function syncLaunchDiagnosticsOverlay() {
-		const items = [...launchDiagnostics.values()];
-		launchDiagnosticsEl.hidden = items.length === 0;
-		launchDiagnosticsEl.innerHTML = renderLaunchDiagnostics(items);
-	}
-
-	async function copyLaunchDiagnosticCommand(diagnostic) {
-		if (!diagnostic.fixCommand) {
-			toasts.show({ message: "No fix command available.", tone: "warn" });
-			return;
-		}
-		try {
-			await navigator.clipboard.writeText(diagnostic.fixCommand);
-			toasts.show({ message: "Fix command copied.", tone: "info" });
-		} catch (err) {
-			toasts.show({
-				message: err instanceof Error ? err.message : "Could not copy fix command.",
-				tone: "error",
-			});
-		}
-	}
-
-	function upsertLaunchDiagnostic(input) {
-		const diagnostic = normalizeLaunchDiagnostic(input);
-		if (!diagnostic) return null;
-		launchDiagnostics.set(diagnostic.id, diagnostic);
-		syncLaunchDiagnosticsOverlay();
-		return diagnostic;
-	}
-
-	function showRuntimeDiagnostics(items) {
-		for (const item of items || []) {
-			const diagnostic = upsertLaunchDiagnostic(item);
-			if (!diagnostic) continue;
-			operationalEvents.record({
-				type: "launch.diagnostic",
-				severity: diagnostic.severity,
-				summary: diagnostic.title,
-				detail: diagnostic.message,
-				meta: { diagnosticId: diagnostic.id },
-			});
-		}
-	}
-
-	launchDiagnosticsEl.addEventListener("click", (event) => {
-		const dismiss = event.target.closest?.("[data-launch-dismiss]");
-		if (dismiss) {
-			launchDiagnostics.clear();
-			syncLaunchDiagnosticsOverlay();
-			return;
-		}
-		const button = event.target.closest?.("[data-launch-action]");
-		if (!button) return;
-		const diagnostic = launchDiagnostics.get(button.dataset.launchAction);
-		if (!diagnostic) return;
-		if (diagnostic.action === "settings") {
-			window.shellApi.openSettings();
-		} else {
-			void copyLaunchDiagnosticCommand(diagnostic);
-		}
-	});
 
 	function syncConnectionGraph() {
 		window.shellApi.stringSyncConnections?.(
@@ -1020,7 +949,6 @@ async function init() {
 
 	// -- Tile manager --
 
-	let minimapRef = null;
 	let cableHudTimer = null;
 	const cableHudEl = document.createElement("div");
 	cableHudEl.className = "cable-mode-hud";
@@ -1169,7 +1097,7 @@ async function init() {
 				showConfirmDialog: window.shellApi.showConfirmDialog,
 			}),
 		onCableMousedown,
-		onReposition: () => { viewport.redrawGrid(); minimapRef?.update(); updateCables(); },
+		onReposition: () => { viewport.redrawGrid(); updateCables(); },
 		onSaveDebounced(state) {
 			window.shellApi.canvasSaveState(
 				toCenterPointState(state),
@@ -1202,11 +1130,9 @@ async function init() {
 		},
 		onTerminalStartFailed(tile, payload) {
 			const wasRestoring = tile.ptyStatus === "restoring";
-			const diagnostic = upsertLaunchDiagnostic(
-				wasRestoring
-					? createPtyRestoreFailureDiagnostic(payload, tile)
-					: createPtyStartFailureDiagnostic(payload, tile),
-			);
+			const diagnostic = wasRestoring
+				? createPtyRestoreFailureDiagnostic(payload, tile)
+				: createPtyStartFailureDiagnostic(payload, tile);
 			operationalEvents.record({
 				type: "pty.failed",
 				severity: "error",
@@ -1414,17 +1340,6 @@ async function init() {
 		},
 	});
 
-	// -- Minimap --
-
-	const minimap = createMinimap({
-		viewportEl: canvasEl,
-		wrapperEl: document.getElementById("minimap-wrapper"),
-		viewportState,
-		getTiles: () => tiles,
-		viewport,
-	});
-	minimapRef = minimap;
-
 	// -- Canvas RPC --
 
 	const handleCanvasRpc = createCanvasRpc({
@@ -1601,24 +1516,23 @@ async function init() {
 			if (!role) throw new Error("Hermes role not found");
 			clearPendingLegendRecipe();
 			const position = getLegendViewportCenterPlacement(getLegendPlacementOptions());
-			// Suppress the role's auto-start so the workflow controls injection
-			// order: skill preamble → hermes → activation line.
+			// One herdr spawn: launch Hermes, wait for the ❯ prompt, then send
+			// the workflow activation line (no separate inject IPC).
 			const tile = await spawnRoleTileAt(
-				{ ...role, commandTemplate: undefined, startupPrompt: undefined },
+				{ ...role, startupPrompt: undefined },
 				position.x,
 				position.y,
-				{ size: LEGEND_TILE_SIZE, displayName: role.name ?? "Hermes" },
+				{
+					size: LEGEND_TILE_SIZE,
+					displayName: role.name ?? "Hermes",
+					workflowTaskId: submitted.taskId,
+					workflowCorrelationId: submitted.correlationId,
+				},
 			);
 			if (!tile?.herdrPaneId) {
 				throw new Error("Hermes spawn did not return a herdr pane");
 			}
 			legendDock.updateEmptyHint();
-			const injected = await window.shellApi.workflowInject({
-				herdrPaneId: tile.herdrPaneId,
-				taskId: submitted.taskId,
-				correlationId: submitted.correlationId,
-				command: role.commandTemplate || "hermes",
-			});
 			operationalEvents.record({
 				type: "workflow.activated",
 				severity: "info",
@@ -1627,7 +1541,6 @@ async function init() {
 					taskId: submitted.taskId,
 					correlationId: submitted.correlationId,
 					tileId: tile.id,
-					skillPath: injected.skillPath,
 				},
 			});
 			toasts.show({
@@ -1665,7 +1578,6 @@ async function init() {
 		);
 		tileManager.spawnTerminalWebview(tile, true);
 		tileManager.saveCanvasImmediate();
-		minimap.update();
 		return tile;
 	}
 
@@ -1673,7 +1585,6 @@ async function init() {
 		const tile = tileManager.createCanvasTile("browser", x, y);
 		tileManager.spawnBrowserWebview(tile, true);
 		tileManager.saveCanvasImmediate();
-		minimap.update();
 		return tile;
 	}
 
@@ -1698,25 +1609,9 @@ async function init() {
 			createRoleSpawnFailureEvent,
 			createRoleSpawnedEvent,
 			updateRoleTileChrome,
-			minimap,
 			toasts,
 		}, role, x, y, options);
 	}
-
-	Promise.resolve(window.shellApi.runtimeDiagnostics?.() ?? [])
-		.then((items) => {
-			if (Array.isArray(items) && items.length > 0) {
-				showRuntimeDiagnostics(items);
-			}
-		})
-		.catch((err) => {
-			operationalEvents.record({
-				type: "launch.diagnostic_failed",
-				severity: "warn",
-				summary: "Runtime diagnostics failed",
-				detail: err instanceof Error ? err.message : String(err),
-			});
-		});
 
 	// -- Wire viewport updates --
 
@@ -1724,14 +1619,13 @@ async function init() {
 	viewport.init(viewportState, () => {
 		tileManager.repositionAllTiles();
 		edgeIndicators.update();
-		minimap.update();
 		updateCables();
 		updateStatusBar();
 		tileManager.saveCanvasDebounced();
 	});
 
 	edgeIndicators.update();
-	minimap.update();
+	updateCables();
 	updateCables();
 
 	// -- Agent panel init (after tileManager, since getAllWebviews references it) --
@@ -1911,7 +1805,6 @@ async function init() {
 		);
 		tileManager.spawnTerminalWebview(tile, true);
 		tileManager.saveCanvasImmediate();
-		minimap.update();
 	});
 
 	// -- Right-click context menu --
@@ -2049,7 +1942,6 @@ async function init() {
 				}
 				clearSelection();
 				tileManager.syncSelectionVisuals();
-				minimap.update();
 			});
 		}
 	});
@@ -2921,7 +2813,6 @@ async function init() {
 			);
 			tileManager.spawnTerminalWebview(tile, true);
 			tileManager.saveCanvasImmediate();
-			minimap.update();
 		} else if (action === "close-tile") {
 			const focusedId = tileManager.getFocusedTileId();
 			if (focusedId) {
@@ -2930,7 +2821,6 @@ async function init() {
 					tileManager.setFocusedTileId(null);
 					canvasEl.focus();
 					noteSurfaceFocus("canvas");
-					minimap.update();
 				});
 			}
 		} else if (
@@ -3018,7 +2908,6 @@ async function init() {
 				}
 				if (channel === "files-deleted") {
 					tileManager.closeTilesForDeletedPaths(args[0]);
-					minimap.update();
 				}
 				if (channel !== "workspace-changed") {
 					singletonViewer.send(channel, ...args);
@@ -3051,7 +2940,6 @@ async function init() {
 					);
 					tileManager.spawnTerminalWebview(tile, true);
 					tileManager.saveCanvasImmediate();
-					minimap.update();
 				}
 				if (channel === "open-browser-tile") {
 					const url = args[0];
@@ -3078,7 +2966,6 @@ async function init() {
 					);
 					tileManager.spawnBrowserWebview(newTile, true);
 					tileManager.saveCanvasImmediate();
-					minimap.update();
 				}
 				if (channel === "create-graph-tile") {
 					const folderPath = args[0];
@@ -3095,7 +2982,6 @@ async function init() {
 					tileManager.createGraphTile(
 						cx, cy, folderPath, wsPath,
 					);
-					minimap.update();
 				}
 			}
 		},
@@ -3124,7 +3010,6 @@ async function init() {
 				tile.ptySessionId === payload.sessionId
 			) {
 				tileManager.closeCanvasTile(id);
-				minimap.update();
 				break;
 			}
 		}
@@ -3485,7 +3370,6 @@ async function init() {
 		}
 		syncConnectionGraph();
 		viewport.redrawGrid();
-		minimap.update();
 		updateCables();
 		updateStatusBar();
 

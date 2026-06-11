@@ -9,6 +9,7 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { TOOL_DEFINITIONS } from "./tool-definitions.js";
+import { withRelayToken } from "./relay-token.js";
 
 const execFileAsync = promisify(execFile);
 const RPC_ONCE_SCRIPT = fileURLToPath(new URL("./rpc-once.js", import.meta.url));
@@ -46,7 +47,9 @@ function rpcAtHost(host, method, params = {}) {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ host, port: RELAY_PORT }, () => {
       const id = rpcId++;
-      socket.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
+      socket.write(
+        JSON.stringify({ jsonrpc: "2.0", id, method, params: withRelayToken(params) }) + "\n",
+      );
     });
 
     let buffer = "";

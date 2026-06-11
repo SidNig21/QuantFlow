@@ -2,6 +2,7 @@
 import net from "node:net";
 import fs from "node:fs";
 import os from "node:os";
+import { withRelayToken } from "./relay-token.js";
 
 const REQUIRED_RPC_METHODS = [
   "ping",
@@ -54,7 +55,7 @@ function rpcAtHost(host, method, params = {}) {
         jsonrpc: "2.0",
         id: rpcId++,
         method,
-        params,
+        params: withRelayToken(params),
       }) + "\n");
     });
 

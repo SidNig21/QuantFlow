@@ -9,6 +9,7 @@ function ctx(): ProbeContext {
     quantflowDir: "/tmp/qf-dir",
     runtimeDbPath: "/tmp/qf-dir/runtime.db",
     socketPathFile: "/tmp/qf-home/socket-path",
+    relayTokenFile: "/tmp/qf-home/relay-token",
     tcpHost: "127.0.0.1",
     tcpPort: 9811,
     mcpToolDefinitionPaths: [],

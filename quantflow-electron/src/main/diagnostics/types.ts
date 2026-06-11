@@ -12,6 +12,7 @@ export interface ProbeContext {
   quantflowDir: string;
   runtimeDbPath: string;
   socketPathFile: string;
+  relayTokenFile: string;
   tcpHost: string;
   tcpPort: number;
   mcpToolDefinitionPaths: string[];

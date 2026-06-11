@@ -2,6 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { callHerdrSocket } from "./herdr-socket-bridge";
 import { buildEnvoyWrappedCommand } from "./herdr-envoy-wrap";
 import { buildHerdrDisplayTarget } from "./pty-spawn-params";
+import { waitForWorkflowAgentPrompt } from "./workflow-agent-ready";
 
 const ROLE_STARTUP_PROMPT_DELAY_MS = 1800;
 
@@ -17,6 +18,10 @@ export interface HerdrRoleSpawnRequest {
   envoySpaceId?: string;
   envoyProfile?: string;
   envoyWrapCommand?: boolean;
+  workflowTaskId?: string;
+  workflowCorrelationId?: string;
+  /** After the agent prompt is ready, send this line (workflow activation). */
+  postLaunchPrompt?: string;
 }
 
 export interface HerdrRoleSpawnResult {
@@ -199,6 +204,14 @@ export async function spawnHerdrRoleSession(
       await delay(ROLE_STARTUP_PROMPT_DELAY_MS);
     }
     await sendHerdrPaneLine(rpc, herdrPaneId, startupPrompt);
+  }
+
+  const postLaunchPrompt = request.postLaunchPrompt?.trim() ?? "";
+  if (postLaunchPrompt) {
+    if (commandTemplate || startupPrompt) {
+      await waitForWorkflowAgentPrompt(rpc, herdrPaneId, commandTemplate || "hermes");
+    }
+    await sendHerdrPaneLine(rpc, herdrPaneId, postLaunchPrompt);
   }
 
   return {

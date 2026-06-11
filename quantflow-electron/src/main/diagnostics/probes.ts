@@ -106,11 +106,22 @@ function methodNames(discoverResult: unknown): string[] {
     .filter((name): name is string => typeof name === "string");
 }
 
+async function readRelayToken(path: string): Promise<string | null> {
+  try {
+    const token = (await readFile(path, "utf-8")).trim();
+    return token || null;
+  } catch {
+    return null;
+  }
+}
+
 async function checkRpcCatalog(
   target: RpcTarget,
   detail: Record<string, unknown>,
+  token?: string,
 ): Promise<ProbeCheckResult> {
-  const result = await jsonRpcRequest(target, "rpc.discover", {}, 2500);
+  const params = token ? { token } : {};
+  const result = await jsonRpcRequest(target, "rpc.discover", params, 2500);
   const names = methodNames(result);
   detail.methodCount = names.length;
   detail.hasControllerHealth = names.includes("controller.health");
@@ -121,9 +132,22 @@ async function checkRpcCatalog(
 }
 
 async function relayTcp(ctx: ProbeContext): Promise<ProbeCheckResult> {
+  const detail = {
+    host: ctx.tcpHost,
+    port: ctx.tcpPort,
+    relayTokenFile: ctx.relayTokenFile,
+  };
+  const token = await readRelayToken(ctx.relayTokenFile);
+  if (!token) {
+    return down("Relay token file is missing.", {
+      ...detail,
+      tokenPresent: false,
+    });
+  }
   return checkRpcCatalog(
     { host: ctx.tcpHost, port: ctx.tcpPort },
-    { host: ctx.tcpHost, port: ctx.tcpPort },
+    { ...detail, tokenPresent: true },
+    token,
   );
 }
 

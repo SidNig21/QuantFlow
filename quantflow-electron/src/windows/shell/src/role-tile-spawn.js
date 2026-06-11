@@ -27,7 +27,6 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 		createRoleSpawnFailureEvent,
 		createRoleSpawnedEvent,
 		updateRoleTileChrome,
-		minimap,
 		toasts,
 	} = deps;
 
@@ -74,7 +73,6 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 
 	onRoleSpawned?.(createRoleSpawnedEvent(tile, role));
 	tileManager.saveCanvasImmediate();
-	minimap?.update?.();
 
 	if (shouldUseHerdr) {
 		try {
@@ -87,12 +85,13 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 				startupPrompt: role.startupPrompt,
 				canvasId: options.canvasId ?? canvasId ?? workspaceId,
 				workspaceId: options.workspaceId ?? workspaceId ?? canvasId,
+				workflowTaskId: options.workflowTaskId,
+				workflowCorrelationId: options.workflowCorrelationId,
 			});
 			applyHerdrSpawnIdentityToTile(tile, spawn);
 			tileManager.spawnTerminalWebview(tile, true);
 			updateRoleTileChrome?.(tile);
 			tileManager.saveCanvasImmediate();
-			minimap?.update?.();
 		} catch (err) {
 			const message = err instanceof Error
 				? err.message

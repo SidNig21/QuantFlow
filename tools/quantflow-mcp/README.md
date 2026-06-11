@@ -2,7 +2,9 @@
 
 Stdio MCP server for Hermes Agent to control QuantFlow through the in-app JSON-RPC TCP relay.
 
-QuantFlow must be running. The Electron app starts the relay automatically on `127.0.0.1:9811`.
+QuantFlow must be running. The Electron app starts the relay automatically on `127.0.0.1:9811` and writes a relay token to `%USERPROFILE%\.quantflow\relay-token` (or `~/.quantflow/relay-token` on Linux). TCP clients must pass that token in each JSON-RPC `params.token` field. The local unix-socket relay used by `qf` does not require a token.
+
+Override the token with `QUANTFLOW_RELAY_TOKEN` or point to a file with `QUANTFLOW_RELAY_TOKEN_FILE`.
 
 Hermes config shape:
 

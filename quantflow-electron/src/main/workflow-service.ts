@@ -1,9 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { windowsPathToWslPath } from "@collab/shared/path-utils";
 import { getEnvoyTaskService, type EnvoyTaskService } from "./envoy-task-service";
 import type { HerdrRpc } from "./herdr-session-spawn";
 import { callHerdrSocket } from "./herdr-socket-bridge";
+import {
+  waitForWorkflowAgentPrompt,
+  WORKFLOW_AGENT_PROMPT_TIMEOUT_MS,
+  WORKFLOW_PROMPT_SETTLE_MS,
+} from "./workflow-agent-ready";
 import { appendEvent } from "./runtime-state/events-repo";
 import { readVaultConfig } from "./vault-config";
 
@@ -140,23 +146,31 @@ export async function createWorkflowTask(
   return result;
 }
 
-/** Matches ROLE_STARTUP_PROMPT_DELAY_MS in herdr-session-spawn. */
-export const WORKFLOW_STARTUP_DELAY_MS = 1800;
-/** Small pause so the skill block finishes echoing before the next line. */
-export const WORKFLOW_SKILL_RENDER_DELAY_MS = 400;
+/** Brief settle after spawn before launching the agent command. */
+export const WORKFLOW_PANE_READY_DELAY_MS = 800;
 
-const SKILL_HEREDOC_TAG = "QF_CANVAS_SKILL";
+function shellQuoteSingle(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
 
 /**
- * Render the skill in the pane scrollback without bash executing it:
- * a quoted no-op heredoc echoes every line as typed and runs nothing.
+ * Print the skill file in scrollback with one line — multiline heredocs break
+ * because pane.send_text delivers newlines as Enter keypresses.
  */
-export function buildSkillDisplayCommand(skillText: string): string {
-  const safe = skillText
-    .split("\n")
-    .filter((line) => line.trim() !== SKILL_HEREDOC_TAG)
-    .join("\n");
-  return `: <<'${SKILL_HEREDOC_TAG}'\n${safe}\n${SKILL_HEREDOC_TAG}`;
+export function buildSkillCatCommand(skillPath: string): string {
+  const wslPath = windowsPathToWslPath(skillPath);
+  if (!wslPath) {
+    throw new Error(`Cannot convert skill path to WSL: ${skillPath}`);
+  }
+  return `cat ${shellQuoteSingle(wslPath)}`;
+}
+
+export function resolveSkillWslPath(skillPath: string): string {
+  const wslPath = windowsPathToWslPath(skillPath);
+  if (!wslPath) {
+    throw new Error(`Cannot convert skill path to WSL: ${skillPath}`);
+  }
+  return wslPath;
 }
 
 export function buildWorkflowActivationLine(params: {
@@ -164,11 +178,12 @@ export function buildWorkflowActivationLine(params: {
   taskId: string;
   skillPath: string;
 }): string {
+  const skillRef = resolveSkillWslPath(params.skillPath);
   return [
     "Read the Envoy inbox and claim your task via qf_task_list / qf_task_claim.",
     `correlation_id=${params.correlationId}`,
     `task_id=${params.taskId}`,
-    `Canvas skill shown above; full file: ${params.skillPath}.`,
+    `Read the canvas skill file: ${skillRef}`,
     "Begin orchestrating.",
   ].join(" ");
 }
@@ -178,10 +193,27 @@ async function sendPaneLine(
   paneId: string,
   text: string,
 ): Promise<void> {
-  const trimmed = text.trim();
-  if (!trimmed) return;
-  await rpc("pane.send_text", { pane_id: paneId, text: trimmed });
+  const line = text.trim();
+  if (!line) return;
+  await rpc("pane.send_text", { pane_id: paneId, text: line });
   await rpc("pane.send_keys", { pane_id: paneId, keys: ["Enter"] });
+}
+
+async function waitForHerdrPaneReady(
+  rpc: HerdrRpc,
+  paneId: string,
+  timeoutMs = 5000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      await rpc("pane.get", { pane_id: paneId });
+      return;
+    } catch {
+      await delay(200);
+    }
+  }
+  throw new Error(`herdr pane ${paneId} not ready after ${timeoutMs}ms`);
 }
 
 export interface WorkflowInjectInput {
@@ -190,6 +222,8 @@ export interface WorkflowInjectInput {
   correlationId: string;
   /** Agent launch command; defaults to the Hermes role template. */
   command?: string;
+  /** When true, spawn already ran the agent — inject context only. */
+  agentAlreadyLaunched?: boolean;
   /** Test override for the vault location. */
   vaultPath?: string;
 }
@@ -202,16 +236,20 @@ export interface WorkflowInjectResult {
 }
 
 /**
- * CNVS-style ordered pane injection after the Hermes tile spawns:
- * skill preamble (displayed, not executed) → agent command → activation
- * line carrying the correlation and task ids.
+ * After the Hermes tile spawns: launch agent (if needed), wait for boot, then
+ * inject the activation line into the running agent session.
  */
 export async function injectWorkflowContext(
   input: WorkflowInjectInput,
   rpc: HerdrRpc = callHerdrSocket,
-  delays: { render: number; startup: number } = {
-    render: WORKFLOW_SKILL_RENDER_DELAY_MS,
-    startup: WORKFLOW_STARTUP_DELAY_MS,
+  delays: {
+    paneReady: number;
+    promptTimeout: number;
+    promptSettle: number;
+  } = {
+    paneReady: WORKFLOW_PANE_READY_DELAY_MS,
+    promptTimeout: WORKFLOW_AGENT_PROMPT_TIMEOUT_MS,
+    promptSettle: WORKFLOW_PROMPT_SETTLE_MS,
   },
 ): Promise<WorkflowInjectResult> {
   const herdrPaneId = String(input?.herdrPaneId ?? "").trim();
@@ -221,8 +259,28 @@ export async function injectWorkflowContext(
     throw new Error("workflow:inject requires herdrPaneId, taskId, and correlationId");
   }
 
+  const command = input.command?.trim() || "hermes";
+  const agentAlreadyLaunched = Boolean(input.agentAlreadyLaunched);
+
+  await waitForHerdrPaneReady(rpc, herdrPaneId);
+  if (delays.paneReady > 0) await delay(delays.paneReady);
+
+  if (!agentAlreadyLaunched) {
+    await sendPaneLine(rpc, herdrPaneId, command);
+  }
+
+  await waitForWorkflowAgentPrompt(rpc, herdrPaneId, command, {
+    timeoutMs: delays.promptTimeout,
+    settleMs: delays.promptSettle,
+  });
+
   const skill = await readCanvasSkill({ vaultPath: input.vaultPath });
-  await sendPaneLine(rpc, herdrPaneId, buildSkillDisplayCommand(skill.text));
+  const activationLine = buildWorkflowActivationLine({
+    correlationId,
+    taskId,
+    skillPath: skill.path,
+  });
+  await sendPaneLine(rpc, herdrPaneId, activationLine);
   appendEvent({
     kind: "workflow.context.injected",
     taskId,
@@ -231,20 +289,9 @@ export async function injectWorkflowContext(
       herdr_pane_id: herdrPaneId,
       skill_path: skill.path,
       skill_truncated: skill.truncated,
+      agent_already_launched: agentAlreadyLaunched,
     },
   });
-
-  if (delays.render > 0) await delay(delays.render);
-  const command = input.command?.trim() || "hermes";
-  await sendPaneLine(rpc, herdrPaneId, command);
-
-  if (delays.startup > 0) await delay(delays.startup);
-  const activationLine = buildWorkflowActivationLine({
-    correlationId,
-    taskId,
-    skillPath: skill.path,
-  });
-  await sendPaneLine(rpc, herdrPaneId, activationLine);
   appendEvent({
     kind: "workflow.activated",
     taskId,
@@ -252,6 +299,7 @@ export async function injectWorkflowContext(
     data: {
       herdr_pane_id: herdrPaneId,
       command,
+      agent_already_launched: agentAlreadyLaunched,
     },
   });
 

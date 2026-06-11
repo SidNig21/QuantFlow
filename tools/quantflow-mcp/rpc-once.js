@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import net from "node:net";
+import { withRelayToken } from "./relay-token.js";
 
 const [, , method, encodedParams = "e30="] = process.argv;
 const params = JSON.parse(Buffer.from(encodedParams, "base64").toString("utf8"));
@@ -9,7 +10,14 @@ const relayPort = Number.parseInt(process.env.QUANTFLOW_RELAY_PORT || "9811", 10
 function rpc(methodName, rpcParams) {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ host: relayHost, port: relayPort }, () => {
-      socket.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: methodName, params: rpcParams }) + "\n");
+      socket.write(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: methodName,
+          params: withRelayToken(rpcParams),
+        }) + "\n",
+      );
     });
 
     let buffer = "";

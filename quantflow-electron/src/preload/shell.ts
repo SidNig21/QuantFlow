@@ -509,6 +509,8 @@ contextBridge.exposeInMainWorld("shellApi", {
     startupPrompt?: string;
     canvasId?: string;
     workspaceId?: string;
+    workflowTaskId?: string;
+    workflowCorrelationId?: string;
   }): Promise<unknown> =>
     ipcRenderer.invoke("herdr:spawn-role", params),
 
@@ -529,6 +531,7 @@ contextBridge.exposeInMainWorld("shellApi", {
     taskId: string;
     correlationId: string;
     command?: string;
+    agentAlreadyLaunched?: boolean;
   }): Promise<{
     skillPath: string;
     skillTruncated: boolean;

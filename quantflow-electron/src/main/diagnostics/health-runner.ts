@@ -29,6 +29,7 @@ export function createProbeContext(): ProbeContext {
     quantflowDir: QUANTFLOW_DIR,
     runtimeDbPath: getRuntimeDbPath(),
     socketPathFile: join(QUANTFLOW_HOME, "socket-path"),
+    relayTokenFile: join(QUANTFLOW_HOME, "relay-token"),
     tcpHost: "127.0.0.1",
     tcpPort: 9811,
     mcpToolDefinitionPaths: repoRootCandidates.map((root) =>

@@ -26,7 +26,6 @@ import { registerDiagnosticsHandlers } from "./ipc-diagnostics";
 import { registerRuntimeStateHandlers } from "./ipc-runtime-state";
 import { registerHerdrHandlers } from "./ipc-herdr";
 import { registerHerdrSpawnHandlers } from "./ipc-herdr-spawn";
-import { startHerdrStatusService } from "./herdr-status-service";
 import { registerOrchestrationHandlers } from "./ipc-orchestration";
 import { registerEnvoyHandlers } from "./ipc-envoy";
 import { registerWorkflowHandlers } from "./ipc-workflow";
@@ -154,7 +153,6 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerRuntimeStateHandlers();
   registerHerdrHandlers();
   registerHerdrSpawnHandlers();
-  startHerdrStatusService();
   registerOrchestrationHandlers();
   registerEnvoyHandlers();
   registerWorkflowHandlers();

@@ -15,9 +15,16 @@ import {
   makeEndpointPath,
   prepareEndpoint,
 } from "./ipc-endpoint";
+import {
+  ensureRelayToken,
+  extractRelayToken,
+  RELAY_TOKEN_FILE,
+  RELAY_UNAUTHORIZED_CODE,
+  stripRelayToken,
+} from "./relay-auth";
 
 const SOCKET_PATH = makeEndpointPath("ipc");
-const DEFAULT_TCP_HOST = "0.0.0.0";
+const DEFAULT_TCP_HOST = "127.0.0.1";
 const DEFAULT_TCP_PORT = 9811;
 // Write the breadcrumb to the base directory (~/.quantflow/)
 // so the hook script can discover the socket regardless of
@@ -49,6 +56,10 @@ interface JsonRpcResponse {
   error?: { code: number; message: string; data?: unknown };
 }
 
+interface HandleMessageOptions {
+  requiresToken: boolean;
+}
+
 const methods = new Map<string, MethodEntry>();
 
 function discoverMethods(): {
@@ -64,12 +75,14 @@ function discoverMethods(): {
 }
 let socketServer: Server | null = null;
 let tcpServer: Server | null = null;
+let activeRelayToken: string | null = null;
 const connections = new Set<Socket>();
 
 export interface JsonRpcServerOptions {
   enableSocket?: boolean;
   tcpHost?: string;
   tcpPort?: number;
+  relayToken?: string;
 }
 
 export interface JsonRpcServerInfo {
@@ -98,8 +111,13 @@ function makeErrorResponse(
   return { jsonrpc: "2.0", id, error: { code, message } };
 }
 
+function isAuthorizedRelayToken(token: string | null): boolean {
+  return Boolean(activeRelayToken && token === activeRelayToken);
+}
+
 async function handleMessage(
   raw: string,
+  options: HandleMessageOptions,
 ): Promise<JsonRpcResponse | null> {
   let parsed: unknown;
   try {
@@ -110,6 +128,17 @@ async function handleMessage(
 
   if (!isJsonRpcRequest(parsed)) {
     return makeErrorResponse(null, -32600, "Invalid request");
+  }
+
+  if (options.requiresToken) {
+    const token = extractRelayToken(parsed.params);
+    if (!isAuthorizedRelayToken(token)) {
+      return makeErrorResponse(
+        parsed.id,
+        RELAY_UNAUTHORIZED_CODE,
+        "Unauthorized relay token",
+      );
+    }
   }
 
   const entry = methods.get(parsed.method);
@@ -123,7 +152,7 @@ async function handleMessage(
   }
 
   try {
-    const result = await handler(parsed.params);
+    const result = await handler(stripRelayToken(parsed.params));
     return { jsonrpc: "2.0", id: parsed.id, result };
   } catch (err) {
     const message =
@@ -132,7 +161,7 @@ async function handleMessage(
   }
 }
 
-function handleConnection(socket: Socket): void {
+function handleConnection(socket: Socket, requiresToken: boolean): void {
   connections.add(socket);
   let buffer = "";
 
@@ -145,7 +174,7 @@ function handleConnection(socket: Socket): void {
       buffer = buffer.slice(newlineIdx + 1);
 
       if (line.length > 0) {
-        void handleMessage(line).then((response) => {
+        void handleMessage(line, { requiresToken }).then((response) => {
           if (response && !socket.destroyed) {
             socket.write(JSON.stringify(response) + "\n");
           }
@@ -222,16 +251,30 @@ export function getJsonRpcTcpAddress(): JsonRpcServerInfo["tcp"] | null {
   };
 }
 
+export function getActiveRelayToken(): string | null {
+  return activeRelayToken;
+}
+
+function resolveTcpHost(options: JsonRpcServerOptions): string {
+  return (
+    options.tcpHost ??
+    process.env.QUANTFLOW_RELAY_HOST ??
+    DEFAULT_TCP_HOST
+  );
+}
+
 export async function startJsonRpcServer(
   options: JsonRpcServerOptions = {},
 ): Promise<JsonRpcServerInfo> {
   const enableSocket = options.enableSocket ?? true;
-  const tcpHost = options.tcpHost ?? DEFAULT_TCP_HOST;
+  const tcpHost = resolveTcpHost(options);
   const tcpPort = options.tcpPort ?? DEFAULT_TCP_PORT;
 
   if (socketServer || tcpServer) {
     throw new Error("JSON-RPC server is already running");
   }
+
+  activeRelayToken = ensureRelayToken({ relayToken: options.relayToken });
 
   registerMethod(
     "rpc.discover",
@@ -246,7 +289,9 @@ export async function startJsonRpcServer(
       mkdirSync(QUANTFLOW_HOME, { recursive: true });
       prepareEndpoint(SOCKET_PATH);
 
-      socketServer = createServer(handleConnection);
+      socketServer = createServer((socket) =>
+        handleConnection(socket, false),
+      );
       await listenServer(
         socketServer,
         () => socketServer!.listen(SOCKET_PATH),
@@ -258,7 +303,13 @@ export async function startJsonRpcServer(
       info.socketPath = SOCKET_PATH;
     }
 
-    tcpServer = createServer(handleConnection);
+    if (tcpHost !== "127.0.0.1" && tcpHost !== "::1") {
+      console.warn(
+        `[json-rpc] TCP relay binding to ${tcpHost} — use relay token and restrict network access`,
+      );
+    }
+
+    tcpServer = createServer((socket) => handleConnection(socket, true));
     await listenServer(
       tcpServer,
       () => tcpServer!.listen(tcpPort, tcpHost),
@@ -268,7 +319,7 @@ export async function startJsonRpcServer(
     if (tcpAddress) {
       info.tcp = tcpAddress;
       console.log(
-        `[json-rpc] TCP relay listening on ${tcpAddress.host}:${tcpAddress.port}`,
+        `[json-rpc] TCP relay listening on ${tcpAddress.host}:${tcpAddress.port} (token required)`,
       );
     }
 
@@ -292,10 +343,11 @@ export function stopJsonRpcServer(): void {
   }
   socketServer = null;
   tcpServer = null;
+  activeRelayToken = null;
 
   cleanupEndpoint(SOCKET_PATH);
 
-  for (const f of [SOCKET_PATH_FILE, NODE_PATH_FILE]) {
+  for (const f of [SOCKET_PATH_FILE, NODE_PATH_FILE, RELAY_TOKEN_FILE]) {
     try {
       unlinkSync(f);
     } catch {

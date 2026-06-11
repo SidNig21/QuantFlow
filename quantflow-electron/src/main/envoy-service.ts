@@ -168,10 +168,33 @@ export function extractEnvoyMessageId(output: string): string | null {
   ]);
 }
 
+export function extractEnvoyInviteCode(output: string): string | null {
+  const parsed = parseJsonObject(output);
+  if (!parsed) return null;
+  const direct = pickString(parsed, ["code", "invite_code"]);
+  if (direct) return direct;
+  const invites = parsed.invites;
+  if (!Array.isArray(invites)) return null;
+  for (const invite of invites) {
+    if (!invite || typeof invite !== "object" || Array.isArray(invite)) continue;
+    const code = pickString(invite as Record<string, unknown>, ["code", "invite_code"]);
+    if (code) return code;
+  }
+  return null;
+}
+
+export function isEnvoyEpochRevokedError(raw: string): boolean {
+  return raw.toLowerCase().includes("epoch_revoked");
+}
+
+function envoyFailureText(result: EnvoyCliResult): string {
+  return result.stderr || result.stdout;
+}
+
 function requireOk(result: EnvoyCliResult, args: string[]): void {
   if (result.exitCode === 0) return;
   throw new Error(
-    `envoy ${args.join(" ")} failed (${result.exitCode}): ${result.stderr || result.stdout}`,
+    `envoy ${args.join(" ")} failed (${result.exitCode}): ${envoyFailureText(result)}`,
   );
 }
 
@@ -187,25 +210,69 @@ export class EnvoyService {
     workspaceId?: string | null;
   }): Promise<EnvoySpaceRow> {
     const spaceName = makeEnvoySpaceName(params);
+    const hash = workspaceHash(params.workspaceId ?? "default");
     const existing = getEnvoySpace(params.canvasId);
-    if (existing?.status === "ready" && existing.envoy_space_id) return existing;
-
-    upsertEnvoySpace({
-      canvasId: params.canvasId,
-      workspaceHash: workspaceHash(params.workspaceId ?? "default"),
-      spaceName,
-      status: "pending",
-      error: null,
-    });
 
     try {
       const listed = await this.runner(["--json", "spaces"]);
       requireOk(listed, ["--json", "spaces"]);
-      const existingSpaceId = extractEnvoySpaceId(listed.stdout, spaceName);
-      const envoySpaceId = existingSpaceId ?? await this.createSpace(spaceName);
+      const listedSpaceId = extractEnvoySpaceId(listed.stdout, spaceName);
+
+      if (
+        existing?.status === "ready"
+        && existing.envoy_space_id
+        && listedSpaceId
+        && existing.envoy_space_id === listedSpaceId
+      ) {
+        return existing;
+      }
+
+      if (listedSpaceId) {
+        const row = upsertEnvoySpace({
+          canvasId: params.canvasId,
+          workspaceHash: hash,
+          spaceName,
+          envoySpaceId: listedSpaceId,
+          status: "ready",
+          error: null,
+        });
+        if (existing?.envoy_space_id && existing.envoy_space_id !== listedSpaceId) {
+          appendEvent({
+            kind: "envoy.space.rebound",
+            level: "warn",
+            data: {
+              canvas_id: params.canvasId,
+              previous_envoy_space_id: existing.envoy_space_id,
+              envoy_space_id: listedSpaceId,
+              space_name: spaceName,
+            },
+          });
+        } else if (!existing?.envoy_space_id) {
+          appendEvent({
+            kind: "envoy.space.ready",
+            level: "info",
+            data: {
+              canvas_id: params.canvasId,
+              envoy_space_id: listedSpaceId,
+              space_name: spaceName,
+            },
+          });
+        }
+        return row;
+      }
+
+      upsertEnvoySpace({
+        canvasId: params.canvasId,
+        workspaceHash: hash,
+        spaceName,
+        status: "pending",
+        error: null,
+      });
+
+      const envoySpaceId = await this.createSpace(spaceName);
       const row = upsertEnvoySpace({
         canvasId: params.canvasId,
-        workspaceHash: workspaceHash(params.workspaceId ?? "default"),
+        workspaceHash: hash,
         spaceName,
         envoySpaceId,
         status: "ready",
@@ -223,9 +290,9 @@ export class EnvoyService {
       return row;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      const row = upsertEnvoySpace({
+      upsertEnvoySpace({
         canvasId: params.canvasId,
-        workspaceHash: workspaceHash(params.workspaceId ?? "default"),
+        workspaceHash: hash,
         spaceName,
         status: "error",
         error: message,
@@ -241,6 +308,57 @@ export class EnvoyService {
       });
       throw err;
     }
+  }
+
+  /**
+   * Ensure a named Envoy profile can read/send in a space. Joins via a fresh
+   * invite when the profile's capability epoch was revoked.
+   */
+  async ensureEnvoyProfileInSpace(params: {
+    envoySpaceId: string;
+    profile: string;
+  }): Promise<void> {
+    const envoySpaceId = params.envoySpaceId.trim();
+    const profile = params.profile.trim();
+    if (!envoySpaceId || !profile) return;
+
+    const probeArgs = [
+      "--profile",
+      profile,
+      "--json",
+      "history",
+      envoySpaceId,
+      "--limit",
+      "1",
+    ];
+    const probe = await this.runner(probeArgs);
+    if (probe.exitCode === 0) return;
+
+    const failure = envoyFailureText(probe);
+    if (!isEnvoyEpochRevokedError(failure)) {
+      requireOk(probe, probeArgs);
+    }
+
+    const inviteArgs = ["--json", "invite", envoySpaceId];
+    const invite = await this.runner(inviteArgs);
+    requireOk(invite, inviteArgs);
+    const code = extractEnvoyInviteCode(invite.stdout);
+    if (!code) {
+      throw new Error(`envoy invite did not return a code for ${envoySpaceId}`);
+    }
+
+    const joinArgs = ["--profile", profile, "--json", "join", code];
+    const joined = await this.runner(joinArgs);
+    requireOk(joined, joinArgs);
+
+    appendEvent({
+      kind: "envoy.profile.joined",
+      level: "info",
+      data: {
+        envoy_space_id: envoySpaceId,
+        profile,
+      },
+    });
   }
 
   async spaceStatus(canvasId?: string): Promise<EnvoySpaceRow | EnvoySpaceRow[] | null> {
