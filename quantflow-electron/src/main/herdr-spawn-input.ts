@@ -33,5 +33,6 @@ export function normalizeHerdrSpawnInput(
     workspaceId: optionalString(params.workspaceId),
     workflowTaskId: optionalString(params.workflowTaskId),
     workflowCorrelationId: optionalString(params.workflowCorrelationId),
+    workflowEnvoySpaceId: optionalString(params.workflowEnvoySpaceId),
   };
 }

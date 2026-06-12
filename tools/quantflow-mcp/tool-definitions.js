@@ -75,10 +75,20 @@ function patternMatches(text, pattern, mode) {
 }
 
 function normalizeTile(tile) {
+  const displayName =
+    tile.displayName ||
+    tile.userTitle ||
+    tile.autoTitle ||
+    tile.roleName ||
+    tile.id;
   return {
+    tileId: tile.id,
     id: tile.id,
+    displayName,
     type: tile.type,
-    label: tile.userTitle || tile.autoTitle || tile.roleName || tile.id,
+    label: displayName,
+    herdrPaneId: tile.herdrPaneId ?? null,
+    herdrAgentName: tile.herdrAgentName ?? null,
     routeHandle: tile.routeHandle,
     position: tile.position,
     size: tile.size,
@@ -563,6 +573,7 @@ export const TOOL_DEFINITIONS = [
       instruction: { kind: "string" },
       targetTileId: { kind: "string", optional: true },
       connectionId: { kind: "string", optional: true },
+      correlationId: { kind: "string", optional: true },
       acceptanceCriteriaJson: { kind: "string", optional: true },
       operatorOverride: { kind: "string", optional: true },
     },
@@ -574,6 +585,7 @@ export const TOOL_DEFINITIONS = [
         instruction: params.instruction,
         ...(params.targetTileId ? { targetTileId: params.targetTileId } : {}),
         ...(params.connectionId ? { connectionId: params.connectionId } : {}),
+        ...(params.correlationId ? { correlationId: params.correlationId } : {}),
         ...(params.acceptanceCriteriaJson
           ? { acceptanceCriteria: optionalJsonArray(params.acceptanceCriteriaJson) }
           : {}),
@@ -713,13 +725,25 @@ export const TOOL_DEFINITIONS = [
       width: { kind: "number", optional: true },
       height: { kind: "number", optional: true },
       cwd: { kind: "string", optional: true },
+      tileId: { kind: "string", optional: true },
+      workflowTaskId: { kind: "string", optional: true },
+      workflowCorrelationId: { kind: "string", optional: true },
+      workflowEnvoySpaceId: { kind: "string", optional: true },
+      canvasId: { kind: "string", optional: true },
+      workspaceId: { kind: "string", optional: true },
     },
     handle: (rpc) => async (params = {}) => {
       const role = await rpc("role.get", { id: params.roleId });
       if (!role) throw new Error(`Role not found: ${params.roleId}`);
       return jsonText(await rpc("canvas.roleSpawn", {
         role,
+        ...(params.tileId ? { tileId: params.tileId } : {}),
         ...(params.cwd ? { cwd: params.cwd } : {}),
+        ...(params.workflowTaskId ? { workflowTaskId: params.workflowTaskId } : {}),
+        ...(params.workflowCorrelationId ? { workflowCorrelationId: params.workflowCorrelationId } : {}),
+        ...(params.workflowEnvoySpaceId ? { workflowEnvoySpaceId: params.workflowEnvoySpaceId } : {}),
+        ...(params.canvasId ? { canvasId: params.canvasId } : {}),
+        ...(params.workspaceId ? { workspaceId: params.workspaceId } : {}),
         ...(Number.isFinite(params.x) && Number.isFinite(params.y)
           ? { position: { x: params.x, y: params.y } }
           : {}),

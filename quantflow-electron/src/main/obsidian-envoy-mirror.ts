@@ -4,6 +4,7 @@ import { readVaultConfig } from "./vault-config";
 import { ensureEnvoyListener } from "./envoy-listener";
 import type { NormalizedEnvoyPacket } from "./envoy-listener";
 import { getEnvoyService } from "./envoy-service";
+import { listEnvoyTasks } from "./runtime-state/envoy-repo";
 
 const DEFAULT_VAULT_PATH = "C:\\Users\\rybow\\Obsidian\\Cursor Collab";
 const POLL_INTERVAL_MS = 2000;
@@ -52,16 +53,17 @@ async function writeTaskBoard(
   dir: string,
   envoySpaceId: string,
 ): Promise<void> {
-  const envoy = getEnvoyService();
-  const tasksJson = await envoy.listTasks({
-    envoySpaceId,
-    includeCompleted: true,
-  });
+  const tasksJson = JSON.stringify(
+    listEnvoyTasks({ status: "all" }),
+    null,
+    2,
+  );
   const content = [
     "# Envoy Task Board",
     "",
     `Updated: ${formatTimestamp()}`,
-    `Canvas space: ${envoySpaceId}`,
+    `Active mirror space: ${envoySpaceId}`,
+    "Scope: all local QuantFlow task rows",
     "",
     "```json",
     tasksJson.trim(),

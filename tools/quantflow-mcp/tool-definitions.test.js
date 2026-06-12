@@ -134,6 +134,7 @@ test("maps Envoy task create to JSON-RPC with operator override parsing", async 
     sourceTileId: "hermes",
     targetTileId: "codex",
     connectionId: "conn-1",
+    correlationId: "corr-parent",
     title: "Delegation proof",
     instruction: "Do the work",
     acceptanceCriteriaJson: "[\"done\"]",
@@ -150,8 +151,57 @@ test("maps Envoy task create to JSON-RPC with operator override parsing", async 
         instruction: "Do the work",
         targetTileId: "codex",
         connectionId: "conn-1",
+        correlationId: "corr-parent",
         acceptanceCriteria: ["done"],
         operatorOverride: true,
+      },
+    },
+  ]);
+});
+
+test("maps role spawn workflow context to canvas.roleSpawn", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "role.get": {
+      id: "codex",
+      name: "Codex CLI",
+      color: "#38bdf8",
+      commandTemplate: "codex",
+      runtimeTarget: "herdr-wsl",
+    },
+    "canvas.roleSpawn": { id: "tile-codex-worker" },
+  });
+  const tool = getToolDefinition("quantflow_role_spawn");
+
+  await tool.handle(rpc)({
+    roleId: "codex",
+    tileId: "tile-codex-worker",
+    cwd: "/mnt/c/Users/rybow/Obsidian/Cursor Collab",
+    workflowTaskId: "task-child",
+    workflowCorrelationId: "corr-parent",
+    workflowEnvoySpaceId: "space-main",
+    canvasId: "canvas-main",
+    workspaceId: "workspace-main",
+  });
+
+  assert.deepEqual(calls, [
+    { method: "role.get", params: { id: "codex" } },
+    {
+      method: "canvas.roleSpawn",
+      params: {
+        role: {
+          id: "codex",
+          name: "Codex CLI",
+          color: "#38bdf8",
+          commandTemplate: "codex",
+          runtimeTarget: "herdr-wsl",
+        },
+        tileId: "tile-codex-worker",
+        cwd: "/mnt/c/Users/rybow/Obsidian/Cursor Collab",
+        workflowTaskId: "task-child",
+        workflowCorrelationId: "corr-parent",
+        workflowEnvoySpaceId: "space-main",
+        canvasId: "canvas-main",
+        workspaceId: "workspace-main",
       },
     },
   ]);

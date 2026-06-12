@@ -12,6 +12,9 @@ describe("normalizeHerdrSpawnInput", () => {
       startupPrompt: " Coordinate the canvas. ",
       canvasId: " canvas-1 ",
       workspaceId: " QuantFlow V2 ",
+      workflowTaskId: " task-1 ",
+      workflowCorrelationId: " corr-1 ",
+      workflowEnvoySpaceId: " space-1 ",
     })).toEqual({
       tileId: "tile-hermes",
       roleId: "hermes",
@@ -21,6 +24,9 @@ describe("normalizeHerdrSpawnInput", () => {
       startupPrompt: "Coordinate the canvas.",
       canvasId: "canvas-1",
       workspaceId: "QuantFlow V2",
+      workflowTaskId: "task-1",
+      workflowCorrelationId: "corr-1",
+      workflowEnvoySpaceId: "space-1",
     });
   });
 
@@ -34,6 +40,9 @@ describe("normalizeHerdrSpawnInput", () => {
       startupPrompt: null,
       canvasId: undefined,
       workspaceId: 42,
+      workflowTaskId: "",
+      workflowCorrelationId: " ",
+      workflowEnvoySpaceId: null,
     })).toEqual({
       tileId: "tile-hermes",
       roleId: "hermes",
@@ -43,6 +52,9 @@ describe("normalizeHerdrSpawnInput", () => {
       startupPrompt: undefined,
       canvasId: undefined,
       workspaceId: undefined,
+      workflowTaskId: undefined,
+      workflowCorrelationId: undefined,
+      workflowEnvoySpaceId: undefined,
     });
   });
 

@@ -10,8 +10,9 @@ import {
 	createRoleSpawnFailureEvent,
 	createTerminalReadFailureEvent,
 	createTerminalWriteFailureEvent,
-	findAutoPlacement,
-	normalizeHerdrSpawnIdentity,
+  findAutoPlacement,
+  resolveRoleDisplayName,
+  normalizeHerdrSpawnIdentity,
 	validateRpcConnectionCreate,
 	validateRpcTerminalRead,
 	validateRpcTerminalWrite,
@@ -165,6 +166,33 @@ describe("buildRpcTileSummary", () => {
       size: { width: 400, height: 500 },
       zIndex: 7,
     });
+  });
+});
+
+describe("resolveRoleDisplayName", () => {
+  beforeEach(() => {
+    tiles.length = 0;
+  });
+
+  test("uses role name for first tile of a role", () => {
+    expect(resolveRoleDisplayName(tiles, { id: "codex", name: "Codex CLI" }))
+      .toBe("Codex CLI");
+  });
+
+  test("adds counter for additional tiles with the same role", () => {
+    addTile({
+      id: "tile-1",
+      type: "term",
+      x: 0,
+      y: 0,
+      width: 400,
+      height: 300,
+      zIndex: 1,
+      roleId: "codex",
+      roleName: "Codex CLI",
+    });
+    expect(resolveRoleDisplayName(tiles, { id: "codex", name: "Codex CLI" }))
+      .toBe("Codex CLI (2)");
   });
 });
 
@@ -673,6 +701,9 @@ describe("createCanvasRpc roleSpawn", () => {
           },
           cwd: "/repo",
           tileId: "tile-codex",
+          workflowTaskId: "task-child",
+          workflowCorrelationId: "corr-parent",
+          workflowEnvoySpaceId: "space-main",
         },
       });
     } finally {
@@ -680,6 +711,12 @@ describe("createCanvasRpc roleSpawn", () => {
     }
 
     expect(herdrRequests).toHaveLength(1);
+    expect(herdrRequests[0]).toMatchObject({
+      tileId: "tile-codex",
+      workflowTaskId: "task-child",
+      workflowCorrelationId: "corr-parent",
+      workflowEnvoySpaceId: "space-main",
+    });
     expect(harness.createdTiles).toHaveLength(1);
     expect(harness.createdTiles[0]).toMatchObject({
       id: "tile-codex",

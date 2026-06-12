@@ -1,7 +1,9 @@
 import {
 	applyHerdrSpawnIdentityToTile,
 	buildRoleTileOptions,
+	resolveRoleDisplayName,
 } from "./canvas-rpc.js";
+import { tiles } from "./canvas-state.js";
 import { requiresHerdrSpawn } from "./role-herdr-spawn.js";
 
 /**
@@ -32,8 +34,8 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 
 	if (!role) return null;
 
-	const displayName = String(options.displayName ?? role.name ?? "").trim()
-		|| role.name;
+	const displayName = String(options.displayName ?? "").trim()
+		|| resolveRoleDisplayName(tiles, role);
 
 	if (isMissingRoleCommand?.(role)) {
 		const message = `${displayName} is missing command: ${getRoleCommandName?.(role)}`;
@@ -87,6 +89,7 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 				workspaceId: options.workspaceId ?? workspaceId ?? canvasId,
 				workflowTaskId: options.workflowTaskId,
 				workflowCorrelationId: options.workflowCorrelationId,
+				workflowEnvoySpaceId: options.workflowEnvoySpaceId,
 			});
 			applyHerdrSpawnIdentityToTile(tile, spawn);
 			tileManager.spawnTerminalWebview(tile, true);

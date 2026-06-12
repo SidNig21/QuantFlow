@@ -11,6 +11,8 @@ import { _resetForTesting as resetEvents, listEvents } from "./runtime-state/eve
 import {
   CANVAS_SKILL_RELATIVE_PATH,
   WORKFLOW_SOURCE_TILE_ID,
+  buildCodexWorkerCommand,
+  buildCodexWorkerPrompt,
   buildSkillCatCommand,
   buildWorkflowActivationLine,
   createWorkflowTask,
@@ -150,6 +152,59 @@ describe("buildSkillCatCommand", () => {
   test("throws when the path cannot be converted to WSL", () => {
     expect(() => buildSkillCatCommand("/posix/only/path.md"))
       .toThrow("Cannot convert skill path to WSL");
+  });
+});
+
+describe("worker activation prompts", () => {
+  const skillPath = "C:\\Users\\rybow\\Obsidian\\Cursor Collab\\Projects\\QuantFlow\\QUANTFLOW_CANVAS_SKILL.md";
+
+  test("includes Envoy space and worker tile id in workflow activation lines", () => {
+    const line = buildWorkflowActivationLine({
+      taskId: "task-1",
+      correlationId: "corr-1",
+      canvasId: "canvas-1",
+      envoySpaceId: "space-1",
+      claimingTileId: "tile-codex",
+      skillPath,
+    });
+
+    expect(line).toContain("task_id=task-1");
+    expect(line).toContain("correlation_id=corr-1");
+    expect(line).toContain("canvas_id=canvas-1");
+    expect(line).toContain("envoy_space_id=space-1");
+    expect(line).toContain("claiming_tile_id=tile-codex");
+    expect(line).toContain("/mnt/c/Users/rybow/Obsidian/Cursor Collab/Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md");
+  });
+
+  test("builds a Codex command that carries task context as the launch prompt", () => {
+    const prompt = buildCodexWorkerPrompt({
+      taskId: "task-1",
+      correlationId: "corr-1",
+      canvasId: "canvas-1",
+      envoySpaceId: "space-1",
+      claimingTileId: "tile-codex",
+      skillPath,
+    });
+    const command = buildCodexWorkerCommand({
+      command: "codex",
+      taskId: "task-1",
+      correlationId: "corr-1",
+      canvasId: "canvas-1",
+      envoySpaceId: "space-1",
+      claimingTileId: "tile-codex",
+      skillPath,
+    });
+
+    expect(prompt).toContain("qf_task_claim");
+    expect(prompt).toContain("Do not wait for terminal instructions");
+    expect(command).toContain(" exec ");
+    expect(command).toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(command).toContain("--skip-git-repo-check");
+    expect(command).toContain("mcp_servers.quantflow.command");
+    expect(command).toContain("tools\\\\quantflow-mcp\\\\server.js");
+    expect(command).toContain("task_id=task-1");
+    expect(command).toContain("canvas_id=canvas-1");
+    expect(command).toContain("claiming_tile_id=tile-codex");
   });
 });
 

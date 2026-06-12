@@ -7,7 +7,8 @@
   "main": "server.js",
   "scripts": {
     "test": "node --test tool-definitions.test.js",
-    "smoke:relay": "node smoke-relay.js"
+    "smoke:relay": "node smoke-relay.js",
+    "smoke:phase6": "node smoke-delegation-phase6.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",

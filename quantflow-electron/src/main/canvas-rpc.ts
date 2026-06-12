@@ -9,7 +9,7 @@ type PendingRequest = {
 };
 
 const pending = new Map<string, PendingRequest>();
-const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 let shellWindow: BrowserWindow | null = null;
 

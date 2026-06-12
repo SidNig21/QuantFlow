@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   getEnvoySpace,
   listEnvoySpaces,
@@ -24,6 +25,10 @@ export interface EnvoyServiceOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const SHARE_PENDING_RETRY_DELAYS_MS =
+  process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test"
+    ? [1, 1, 1]
+    : [1000, 2000, 4000, 6000, 8000];
 
 let runnerOverride: EnvoyCliRunner | null = null;
 
@@ -187,6 +192,11 @@ export function isEnvoyEpochRevokedError(raw: string): boolean {
   return raw.toLowerCase().includes("epoch_revoked");
 }
 
+export function isEnvoySharePendingError(raw: string): boolean {
+  const text = raw.toLowerCase();
+  return text.includes("share_pending") || text.includes("share setup is still pending");
+}
+
 function envoyFailureText(result: EnvoyCliResult): string {
   return result.stderr || result.stdout;
 }
@@ -196,6 +206,22 @@ function requireOk(result: EnvoyCliResult, args: string[]): void {
   throw new Error(
     `envoy ${args.join(" ")} failed (${result.exitCode}): ${envoyFailureText(result)}`,
   );
+}
+
+async function runWithSharePendingRetry(
+  runner: EnvoyCliRunner,
+  args: string[],
+  input?: string,
+): Promise<EnvoyCliResult> {
+  let result = await runner(args, input);
+  for (const waitMs of SHARE_PENDING_RETRY_DELAYS_MS) {
+    if (result.exitCode === 0 || !isEnvoySharePendingError(envoyFailureText(result))) {
+      return result;
+    }
+    await delay(waitMs);
+    result = await runner(args, input);
+  }
+  return result;
 }
 
 export class EnvoyService {
@@ -378,7 +404,7 @@ export class EnvoyService {
       "--body",
       params.body,
     ];
-    const result = await this.runner(args);
+    const result = await runWithSharePendingRetry(this.runner, args);
     requireOk(result, args);
     return {
       envoyMessageId: extractEnvoyMessageId(result.stdout),
@@ -411,7 +437,7 @@ export class EnvoyService {
           params.envoyTaskId,
           params.status,
         ];
-    const result = await this.runner(args);
+    const result = await runWithSharePendingRetry(this.runner, args);
     requireOk(result, args);
     return {
       envoyMessageId: extractEnvoyMessageId(result.stdout),
@@ -435,7 +461,7 @@ export class EnvoyService {
           "--stdin",
         ]
       : ["--json", "send", "--space", params.envoySpaceId, "--stdin"];
-    const result = await this.runner(args, params.body);
+    const result = await runWithSharePendingRetry(this.runner, args, params.body);
     requireOk(result, args);
     return {
       envoyMessageId: extractEnvoyMessageId(result.stdout),

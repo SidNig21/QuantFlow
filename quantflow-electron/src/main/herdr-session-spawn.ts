@@ -20,6 +20,7 @@ export interface HerdrRoleSpawnRequest {
   envoyWrapCommand?: boolean;
   workflowTaskId?: string;
   workflowCorrelationId?: string;
+  workflowEnvoySpaceId?: string;
   /** After the agent prompt is ready, send this line (workflow activation). */
   postLaunchPrompt?: string;
 }

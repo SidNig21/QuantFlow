@@ -242,14 +242,36 @@ export function createTerminalReadFailureEvent(
 	};
 }
 
+/**
+ * Default human-facing tile title when the caller did not pass displayName.
+ * @param {import('./canvas-state.js').Tile[]} existingTiles
+ * @param {{ id?: string, name?: string }} role
+ */
+export function resolveRoleDisplayName(existingTiles, role) {
+	const base = String(role?.name ?? role?.id ?? "Tile").trim() || "Tile";
+	const roleId = String(role?.id ?? "").trim();
+	const sameRoleCount = existingTiles.filter((t) => {
+		if (roleId && t.roleId === roleId) return true;
+		const name = String(t.roleName ?? t.userTitle ?? "").trim();
+		return name === base;
+	}).length;
+	const index = sameRoleCount + 1;
+	if (index <= 1) return base;
+	return `${base} (${index})`;
+}
+
 export function buildRpcTileSummary(tile, existingConnections = []) {
 	const connectionIds = existingConnections
 		.filter((conn) =>
 			conn.tileAId === tile.id || conn.tileBId === tile.id,
 		)
 		.map((conn) => conn.id);
+	const displayName =
+		tile.userTitle || tile.autoTitle || tile.roleName || tile.id;
 	const summary = {
 		id: tile.id,
+		tileId: tile.id,
+		displayName,
 		type: tile.type,
 		filePath: tile.filePath,
 		folderPath: tile.folderPath,
@@ -560,6 +582,8 @@ export function createCanvasRpc({
 							requestedSize.width ?? defaultTermSize.width,
 							requestedSize.height ?? defaultTermSize.height,
 						);
+					const displayName = String(params.displayName ?? "").trim()
+						|| resolveRoleDisplayName(tiles, role);
 					const tile = await spawnRoleTileAtShared({
 						tileManager,
 						generateId,
@@ -580,7 +604,10 @@ export function createCanvasRpc({
 						size: requestedSize,
 						canvasId: params.canvasId,
 						workspaceId: params.workspaceId,
-						displayName: params.displayName,
+						workflowTaskId: params.workflowTaskId,
+						workflowCorrelationId: params.workflowCorrelationId,
+						workflowEnvoySpaceId: params.workflowEnvoySpaceId,
+						displayName,
 					});
 					if (!tile) {
 						respondError(requestId, 4, "Role spawn failed");

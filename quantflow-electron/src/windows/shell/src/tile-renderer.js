@@ -546,10 +546,10 @@ export function isTileRunning(tile) {
 
 export function getTileRoleBadge(tile) {
   if (tile?.type !== "term") return null;
-  const roleName = String(tile.roleName ?? "").trim();
-  if (roleName) return roleName;
   const roleId = String(tile.roleId ?? "").trim();
-  return roleId || null;
+  if (roleId) return roleId;
+  const roleName = String(tile.roleName ?? "").trim();
+  return roleName || null;
 }
 
 export function getTileShellBadge(tile) {
@@ -567,7 +567,7 @@ function createTileRoleBadge(tile) {
   const badge = document.createElement("span");
   badge.className = "tile-role-badge";
   badge.textContent = roleId;
-  badge.title = `Role: ${roleId}`;
+  badge.title = `Role: ${roleId}${tile.herdrPaneId ? ` · pane ${tile.herdrPaneId}` : ""}`;
   return badge;
 }
 

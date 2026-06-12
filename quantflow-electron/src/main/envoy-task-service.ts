@@ -33,6 +33,7 @@ export interface CreateEnvoyTaskInput {
   sourceTileId: string;
   targetTileId?: string | null;
   connectionId?: string | null;
+  correlationId?: string | null;
   title: string;
   instruction: string;
   acceptanceCriteria?: string[];
@@ -98,7 +99,7 @@ export class EnvoyTaskService {
       throw new Error(`Envoy space is not ready for canvas ${input.canvasId}`);
     }
 
-    const correlationId = newCorrelationId();
+    const correlationId = input.correlationId?.trim() || newCorrelationId();
     const body = JSON.stringify({
       schema: "quantflow.envoy_task.v1",
       canvas_id: input.canvasId,

@@ -9,7 +9,9 @@ import { normalizeHerdrSpawnInput } from "./herdr-spawn-input";
 import { readVaultConfig } from "./vault-config";
 import { ensureObsidianEnvoyMirror } from "./obsidian-envoy-mirror";
 import { getRole } from "./role-service";
+import { getEnvoyTask } from "./runtime-state/envoy-repo";
 import {
+  buildCodexWorkerCommand,
   buildWorkflowActivationLine,
   readCanvasSkill,
 } from "./workflow-service";
@@ -49,11 +51,43 @@ export function registerHerdrSpawnHandlers(): void {
     if (request.workflowTaskId && request.workflowCorrelationId) {
       const cfg = await readVaultConfig();
       workflowSkill = await readCanvasSkill({ vaultPath: cfg.vaultPath });
-      spawnRequest.postLaunchPrompt = buildWorkflowActivationLine({
-        taskId: request.workflowTaskId,
-        correlationId: request.workflowCorrelationId,
-        skillPath: workflowSkill.path,
-      });
+      const workflowTask = getEnvoyTask(request.workflowTaskId);
+      const workflowEnvoySpaceId = workflowTask?.envoy_space_id
+        ?? request.workflowEnvoySpaceId
+        ?? envoySpaceId;
+      if (workflowEnvoySpaceId) {
+        ensureEnvoyListener(workflowEnvoySpaceId);
+        await ensureObsidianEnvoyMirror({
+          canvasId: workflowTask?.canvas_id ?? canvasId,
+          envoySpaceId: workflowEnvoySpaceId,
+          vaultPath: cfg.vaultPath,
+        });
+      }
+      if (request.roleId === "codex") {
+        spawnRequest = {
+          ...spawnRequest,
+          commandTemplate: buildCodexWorkerCommand({
+            command: request.commandTemplate ?? "codex",
+            taskId: request.workflowTaskId,
+            correlationId: request.workflowCorrelationId,
+            canvasId: workflowTask?.canvas_id ?? canvasId,
+            envoySpaceId: workflowEnvoySpaceId,
+            claimingTileId: request.tileId,
+            skillPath: workflowSkill.path,
+          }),
+          startupPrompt: undefined,
+          postLaunchPrompt: undefined,
+        };
+      } else {
+        spawnRequest.postLaunchPrompt = buildWorkflowActivationLine({
+          taskId: request.workflowTaskId,
+          correlationId: request.workflowCorrelationId,
+          canvasId: workflowTask?.canvas_id ?? canvasId,
+          envoySpaceId: workflowEnvoySpaceId,
+          claimingTileId: request.tileId,
+          skillPath: workflowSkill.path,
+        });
+      }
     }
 
     const result = await spawnHerdrRoleSession(spawnRequest);

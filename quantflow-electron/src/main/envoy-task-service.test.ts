@@ -60,12 +60,14 @@ describe("EnvoyTaskService", () => {
       sourceTileId: "hermes",
       targetTileId: "codex",
       connectionId: "conn-1",
+      correlationId: "corr-parent",
       title: "Proof",
       instruction: "Do the proof",
       acceptanceCriteria: ["done"],
     }) as { task: { task_id: string; correlation_id: string } };
     const taskId = created.task.task_id;
     const correlationId = created.task.correlation_id;
+    expect(correlationId).toBe("corr-parent");
 
     await service.claimTask({ taskId, claimingTileId: "codex", agentName: "Codex" });
     await expect(service.claimTask({ taskId, claimingTileId: "other" })).rejects.toThrow(/already claimed/);
@@ -111,5 +113,55 @@ describe("EnvoyTaskService", () => {
     }) as { task: { task_id: string } };
 
     expect(created.task.task_id).toBeString();
+  });
+
+  test("retries transient Envoy share pending failures when creating tasks", async () => {
+    let createAttempts = 0;
+    const runner: EnvoyCliRunner = async (args) => {
+      if (args.includes("spaces")) {
+        return { stdout: JSON.stringify({ spaces: [] }), stderr: "", exitCode: 0 };
+      }
+      if (args.includes("space") && args.includes("create")) {
+        return { stdout: JSON.stringify({ space_id: "space-pending" }), stderr: "", exitCode: 0 };
+      }
+      if (args.includes("task") && args.includes("create")) {
+        createAttempts += 1;
+        if (createAttempts === 1) {
+          return {
+            stdout: JSON.stringify({
+              error_code: "SHARE_PENDING",
+              error: "room share setup is still pending",
+            }),
+            stderr: "",
+            exitCode: 1,
+          };
+        }
+        return {
+          stdout: JSON.stringify({ message_id: "envoy-task-after-retry" }),
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      return { stdout: JSON.stringify({ message_id: "status-msg" }), stderr: "", exitCode: 0 };
+    };
+    const service = new EnvoyTaskService({
+      envoy: new EnvoyService({ runner }),
+      startListener: false,
+    });
+
+    const created = await service.createTask({
+      canvasId: "main",
+      sourceTileId: "operator",
+      targetTileId: "hermes",
+      correlationId: "corr-retry",
+      title: "Retry proof",
+      instruction: "Create after room share settles.",
+      operatorOverride: true,
+    }) as { task: { task_id: string; envoy_task_id: string } };
+
+    expect(createAttempts).toBe(2);
+    expect(created.task.envoy_task_id).toBe("envoy-task-after-retry");
+    expect(listEnvoyTasks({ correlationId: "corr-retry" })).toHaveLength(1);
+    expect(listEnvoyReceipts({ correlationId: "corr-retry" })).toHaveLength(1);
   });
 });

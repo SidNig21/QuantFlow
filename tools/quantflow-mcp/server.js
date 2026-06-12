@@ -7,12 +7,14 @@ import fs from "node:fs";
 import os from "node:os";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { TOOL_DEFINITIONS } from "./tool-definitions.js";
 import { withRelayToken } from "./relay-token.js";
 
 const execFileAsync = promisify(execFile);
 const RPC_ONCE_SCRIPT = fileURLToPath(new URL("./rpc-once.js", import.meta.url));
+const RPC_ONCE_DIR = dirname(RPC_ONCE_SCRIPT);
 
 function detectRelayHosts() {
   if (process.env.QUANTFLOW_RELAY_HOST) return [process.env.QUANTFLOW_RELAY_HOST];
@@ -37,6 +39,28 @@ function toWindowsPath(path) {
   const match = /^\/mnt\/([a-z])\/(.+)$/i.exec(normalized);
   if (!match) return path;
   return `${match[1].toUpperCase()}:\\${match[2].replaceAll("/", "\\")}`;
+}
+
+function readRelayTokenForProxy() {
+  const envToken = process.env.QUANTFLOW_RELAY_TOKEN?.trim();
+  if (envToken) return envToken;
+
+  const envTokenFile = process.env.QUANTFLOW_RELAY_TOKEN_FILE?.trim();
+  const candidates = [
+    envTokenFile,
+    `${os.homedir()}/.quantflow/relay-token`,
+    "/mnt/c/Users/rybow/.quantflow/relay-token",
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const token = fs.readFileSync(candidate, "utf8").trim();
+      if (token) return token;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return "";
 }
 
 const RELAY_PORT = Number.parseInt(process.env.QUANTFLOW_RELAY_PORT || "9811", 10);
@@ -87,10 +111,17 @@ function rpcAtHost(host, method, params = {}) {
 async function rpcViaWindowsNode(method, params = {}) {
   const encodedParams = Buffer.from(JSON.stringify(params), "utf8").toString("base64");
   const scriptPath = toWindowsPath(RPC_ONCE_SCRIPT);
+  const scriptDir = toWindowsPath(RPC_ONCE_DIR);
+  const proxyEnv = {
+    ...process.env,
+    QUANTFLOW_RELAY_HOST: "127.0.0.1",
+    QUANTFLOW_RELAY_PORT: String(RELAY_PORT),
+    QUANTFLOW_RELAY_TOKEN: readRelayTokenForProxy(),
+  };
   const { stdout } = await execFileAsync(
     "cmd.exe",
-    ["/c", "node", scriptPath, method, encodedParams],
-    { timeout: 20000 },
+    ["/d", "/c", "cd", "/d", scriptDir, "&&", "node", scriptPath, method, encodedParams],
+    { timeout: 20000, env: proxyEnv },
   );
   const payload = JSON.parse(stdout.trim().split(/\r?\n/).at(-1) || "{}");
   if (!payload.ok) throw new Error(payload.error || "Windows relay proxy failed");

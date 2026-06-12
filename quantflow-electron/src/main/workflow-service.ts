@@ -1,5 +1,7 @@
+import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { windowsPathToWslPath } from "@collab/shared/path-utils";
 import { getEnvoyTaskService, type EnvoyTaskService } from "./envoy-task-service";
@@ -14,6 +16,7 @@ import { appendEvent } from "./runtime-state/events-repo";
 import { readVaultConfig } from "./vault-config";
 
 const DEFAULT_VAULT_PATH = "C:\\Users\\rybow\\Obsidian\\Cursor Collab";
+const DEFAULT_REPO_ROOT = "C:\\Users\\rybow\\QuantFlow";
 
 export const CANVAS_SKILL_RELATIVE_PATH = join(
   "Projects",
@@ -149,7 +152,7 @@ export async function createWorkflowTask(
 /** Brief settle after spawn before launching the agent command. */
 export const WORKFLOW_PANE_READY_DELAY_MS = 800;
 
-function shellQuoteSingle(value: string): string {
+export function shellQuoteSingle(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
@@ -177,14 +180,124 @@ export function buildWorkflowActivationLine(params: {
   correlationId: string;
   taskId: string;
   skillPath: string;
+  canvasId?: string;
+  envoySpaceId?: string;
+  claimingTileId?: string;
 }): string {
   const skillRef = resolveSkillWslPath(params.skillPath);
   return [
     "Read the Envoy inbox and claim your task via qf_task_list / qf_task_claim.",
+    params.canvasId ? `canvas_id=${params.canvasId}` : "",
+    params.envoySpaceId ? `envoy_space_id=${params.envoySpaceId}` : "",
     `correlation_id=${params.correlationId}`,
     `task_id=${params.taskId}`,
+    params.claimingTileId ? `claiming_tile_id=${params.claimingTileId}` : "",
     `Read the canvas skill file: ${skillRef}`,
     "Begin orchestrating.",
+  ].filter(Boolean).join(" ");
+}
+
+export function buildCodexWorkerPrompt(params: {
+  taskId: string;
+  correlationId: string;
+  skillPath: string;
+  canvasId?: string;
+  envoySpaceId?: string;
+  claimingTileId?: string;
+}): string {
+  const skillRef = resolveSkillWslPath(params.skillPath);
+  return [
+    "You are a QuantFlow Codex worker tile.",
+    "Do not wait for terminal instructions and do not rely on terminal_write.",
+    "Use the QuantFlow MCP tools now.",
+    "First call qf_envoy_space_status.",
+    "Then call qf_task_list and qf_task_claim for the exact task below.",
+    `task_id=${params.taskId}`,
+    `correlation_id=${params.correlationId}`,
+    params.canvasId ? `canvas_id=${params.canvasId}` : "",
+    params.envoySpaceId ? `envoy_space_id=${params.envoySpaceId}` : "",
+    params.claimingTileId ? `claiming_tile_id=${params.claimingTileId}` : "",
+    `Read the canvas skill file: ${skillRef}`,
+    "Post progress with qf_task_update and finish with qf_task_complete.",
+  ].filter(Boolean).join(" ");
+}
+
+function resolveRepoRoot(): string {
+  const candidates = [
+    process.env["QUANTFLOW_REPO_ROOT"],
+    DEFAULT_REPO_ROOT,
+    resolve(process.cwd(), ".."),
+    process.cwd(),
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  for (const candidate of candidates) {
+    const serverPath = join(candidate, "tools", "quantflow-mcp", "server.js");
+    if (existsSync(serverPath)) return candidate;
+  }
+  return DEFAULT_REPO_ROOT;
+}
+
+function readConfiguredCodexCliPath(): string | null {
+  const envPath = process.env["CODEX_CLI_PATH"]?.trim();
+  if (envPath && existsSync(envPath)) return envPath;
+
+  const configPath = join(homedir(), ".codex", "config.toml");
+  try {
+    const config = readFileSync(configPath, "utf-8");
+    const match = /\bCODEX_CLI_PATH\s*=\s*['"]([^'"]+)['"]/.exec(config);
+    const configuredPath = match?.[1]?.trim();
+    if (configuredPath && existsSync(configuredPath)) return configuredPath;
+  } catch {
+    // Fall back to the command template.
+  }
+  return null;
+}
+
+function resolveCodexCommand(command: string): string {
+  const baseCommand = command.trim() || "codex";
+  if (!/^codex(?:\s|$)/.test(baseCommand)) return baseCommand;
+
+  const configuredPath = readConfiguredCodexCliPath();
+  if (!configuredPath) return baseCommand;
+
+  const wslPath = windowsPathToWslPath(configuredPath);
+  return wslPath ? shellQuoteSingle(wslPath) : shellQuoteSingle(configuredPath);
+}
+
+function escapeTomlString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+}
+
+function buildCodexMcpConfigArgs(repoRoot: string): string {
+  const serverPath = join(repoRoot, "tools", "quantflow-mcp", "server.js");
+  const mcpArgs = [
+    `mcp_servers.quantflow.command="cmd.exe"`,
+    `mcp_servers.quantflow.args=["/d","/c","node","${escapeTomlString(serverPath)}"]`,
+  ];
+  return mcpArgs.map((arg) => `-c ${shellQuoteSingle(arg)}`).join(" ");
+}
+
+export function buildCodexWorkerCommand(params: {
+  command: string;
+  taskId: string;
+  correlationId: string;
+  skillPath: string;
+  canvasId?: string;
+  envoySpaceId?: string;
+  claimingTileId?: string;
+}): string {
+  const repoRoot = resolveRepoRoot();
+  const baseCommand = resolveCodexCommand(params.command);
+  const prompt = buildCodexWorkerPrompt(params);
+  return [
+    baseCommand,
+    "exec",
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--skip-git-repo-check",
+    "-C",
+    shellQuoteSingle(repoRoot),
+    buildCodexMcpConfigArgs(repoRoot),
+    shellQuoteSingle(prompt),
   ].join(" ");
 }
 

@@ -275,12 +275,12 @@ describe("updateTileTitle", () => {
 });
 
 describe("getTileRoleBadge", () => {
-  test("returns terminal role name before role id", () => {
+  test("returns role id before role name for tool-stable badges", () => {
     expect(getTileRoleBadge({
       type: "term",
       roleId: "codex-reviewer",
       roleName: " Codex Reviewer ",
-    })).toBe("Codex Reviewer");
+    })).toBe("codex-reviewer");
   });
 
   test("skips terminals without roles and non-terminal tiles", () => {

@@ -5,6 +5,7 @@ import {
   extractEnvoyMessageId,
   extractEnvoySpaceId,
   isEnvoyEpochRevokedError,
+  isEnvoySharePendingError,
   makeEnvoySpaceName,
   sanitizeEnvoyName,
   type EnvoyCliRunner,
@@ -111,6 +112,12 @@ describe("EnvoyService", () => {
     expect(isEnvoyEpochRevokedError("permission denied: EPOCH_REVOKED")).toBe(true);
     expect(isEnvoyEpochRevokedError("{\"error_code\":\"epoch_revoked\"}")).toBe(true);
     expect(isEnvoyEpochRevokedError("not found")).toBe(false);
+  });
+
+  test("detects transient share pending errors", () => {
+    expect(isEnvoySharePendingError("{\"error_code\":\"SHARE_PENDING\"}")).toBe(true);
+    expect(isEnvoySharePendingError("room share setup is still pending")).toBe(true);
+    expect(isEnvoySharePendingError("epoch revoked")).toBe(false);
   });
 
   test("extracts invite codes from envoy invite JSON", () => {
