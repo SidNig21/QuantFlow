@@ -5,7 +5,7 @@ Use two files only:
 1. `CONCEPT.md`
 2. `BUILD_PLAN_V2.md`
 
-`BUILD_PLAN_V2.md` is the only execution plan. Do not execute from archived layer charters or Obsidian v1 build plans.
+`BUILD_PLAN_V2.md` is the only execution plan. Vault `Projects/QuantFlow/Build Plan.md` and `Start Here.md` are **ARCHIVED** — do not execute from them. Do not execute from archived layer charters or other Obsidian v1 build plans.
 
 Current branch: `quantflow-v2`
 

@@ -10,123 +10,77 @@ The archived 7-layer charters in `reference/archive/quantflow-v2-layer-charters/
 
 Branch: `quantflow-v2`
 
-Current spine:
+Date: 2026-06-11
 
-| Area | Status |
-| --- | --- |
-| Gate 1, herdr socket ping to pong | Done, `f72c0b4` |
-| Gate 2, legend spawn to herdr pane to interactive PTY | Done, `035f4f5`, `15b7852` |
-| Retire v1 relay cluster | Done, `6961506` |
-| Unify spawn pipeline through `runtimeTarget` | Done, `de9c497` |
-| Docs collapsed to one build path | Done, `147cabb` |
-| Gate 3, herdr `events.subscribe` tile state | Implemented, pending operator proof |
-| Envoy task bus MVP | Done locally, `562de05`, pending operator push |
-| retirement-herdr-cli | Done locally (Cursor), uncommitted |
+**Shipped:** Gate 2 spawn/PTY, Gate 3 `events.subscribe` (code done), herdr socket retirement, Envoy task bus MVP, Obsidian mirror, Run Workflow button activating Hermes, relay token + herdr bootstrap.
+
+**Trial result 2026-06-11:** Hermes claim/Envoy OK. Codex spawned but no worker context on spawn. Handoff via `terminal_write` only. Relay/WSL proxy flaky mid-run.
+
+**Active gap:** worker spawn ≠ worker activation.
+
+**Current slice:** `delegation-phase-6`
+
+**Pass when:** Hermes `qf_task_create` → Codex claims via MCP, no `terminal_write` handoff, receipt chain visible in Envoy.
+
+**Not current:** legend cleanup, redesign, RL, Watchtower redesign.
+
+Earlier gates (reference): Gate 1 ping (`f72c0b4`), v1 relay retirement (`6961506`), spawn unify (`de9c497`), docs collapse (`147cabb`).
 
 ## Current Slice
 
-### Gate 3: Live tile state from herdr socket events
+### delegation-phase-6
 
-Goal: replace WSL tile status polling with live herdr socket events.
+Goal: prove autonomous delegation — Hermes creates a child task in Envoy, Codex claims and completes via MCP, without the operator or Hermes pasting into Codex’s terminal.
 
 Do this now:
 
-- [x] Add a long-lived herdr `events.subscribe` client in Electron main.
-- [x] Keep the existing one-shot `callHerdrSocket` RPC helper for request/response calls.
-- [x] Add a separate streaming helper for subscription sockets, with reconnect, backoff, unsubscribe, and cleanup.
-- [x] Normalize herdr events into a small QuantFlow event shape.
-- [x] Track `pane_id`, `tile_id`, previous status, next status, timestamp, and raw event payload when useful.
-- [x] Forward status updates from main to the shell renderer.
-- [x] Update tile header badges from socket events.
-- [x] Persist status transitions through `runtime-state/status-repo.ts` if the event carries a real status transition.
-- [x] Preserve native Windows PTY fallback behavior. Windows-only tiles must not become herdr-owned.
-- [x] Remove the 5 second `herdrGetStatus` polling loop from `src/windows/shell/src/renderer.js`.
-- [x] Add tests for event normalization, reconnect/backoff, cleanup, and renderer update behavior.
-
-Gate 3 passes when:
-
-- A herdr-backed tile changes status without the renderer polling `herdr:status`.
-- The 5 second `herdrGetStatus` loop is gone or fully disabled.
-- Native Windows PTY tiles still work.
-- A missing or restarted herdr socket does not crash the app.
-- A manual proof can show: spawn a herdr tile, trigger a status change, see the badge update from events.
-
-Do not do during Gate 3:
-
-- Do not build Envoy.
-- Do not build Obsidian integration.
-- Do not redesign Watchtower.
-- Do not implement A2A.
-- Do not revive the string relay.
-- Do not do legend cleanup except where needed for Gate 3 proof.
-- Do not implement memory/context tile work.
-- Do not implement RL templates.
-- Do not start visual redesign implementation.
-
-## Next Slice
-
-### retirement-herdr-cli
-
-Goal: remove the remaining herdr CLI bridge after Gate 3 proves socket state is stable.
-
-Current reason this exists:
-
-- `src/main/herdr-session-spawn.ts` already uses `herdr-socket-bridge.ts`.
-- `src/main/ipc-herdr.ts` previously imported `herdr-bridge.ts` (retired).
-- `herdr:read` is allowed as debug only, not as tile display.
-
-Work:
-
-- [x] Port `herdr:available` to socket (`ping`).
-- [x] Port `herdr:list` to socket (`pane.list`).
-- [x] Port `herdr:send` to socket (`pane.send_text` + `pane.send_keys`).
-- [x] Keep `herdr:status` as thin debug/one-shot via `pane.get` (badges use Gate 3 events).
-- [x] Keep `herdr:read` as DEBUG ONLY via `pane.read` — never display.
-- [x] Delete `src/main/herdr-bridge.ts`; add `herdr-socket-ops.ts`.
-- [x] Update tests so socket behavior is the default.
-- [x] Fix Windows test harness: native socket for explicit/local paths, WSL for production Unix paths.
+- [ ] Hermes uses `qf_task_create` with `sourceTileId`, `targetTileId`, parent `correlation_id`, and full instruction.
+- [ ] Codex discovers and claims the child task via `qf_task_list` / `qf_task_claim` (MCP), not markdown and not `terminal_write`.
+- [ ] Codex completes with `qf_task_complete`; receipts share one `correlation_id`.
+- [ ] Hermes reads proof via `qf_task_list` / `qf_receipt_list` or Envoy mirror — not terminal echo as success signal.
 
 Pass when:
 
-- No active code imports `herdr-bridge.ts`.
-- WSL/herdr runtime operations use socket APIs.
-- Interactive tile display still goes through PTY attach, not pane reads.
+- One canvas trial: Run Workflow or operator task → Hermes orchestrates → Codex claims via MCP → complete → receipt chain visible in Envoy and Obsidian mirror.
+- No `terminal_write` handoff required for the worker to start work.
+- `bun run smoke:envoy-task` still passes.
 
-## Next After That
+Known landmines (trial 2026-06-11):
 
-### envoy-obsidian (Phase 5a + 5b)
+- WSL Hermes MCP → Windows relay: intermittent `ECONNREFUSED` and UNC cwd on `rpc-once.js`.
+- `quantflow_role_spawn` does not wire worker activation; only Run Workflow wires Hermes `postLaunchPrompt`.
+- Codex TUI: `terminal_write` may compose without submitting; verify with tile read.
 
-Goal: Envoy truth + Obsidian live read + legend spawn wiring.
+Still open after phase 6 passes:
 
-Work:
-
-- [x] Create or attach one Envoy space per canvas for the task bus MVP.
-- [x] Add an Electron main bridge for `envoy listen` and post.
-- [x] Normalize Envoy packets into runtime events.
-- [x] Add Envoy task create, list, claim, update, complete, block, and fail.
-- [x] Add claim locking so two agents cannot own the same task.
-- [x] Add MCP tools for agent task operations through the `9811` relay.
-- [x] Add `ENVOY.md` and `bun run smoke:envoy-task` proof command.
-- [x] **5a** Obsidian live mirror (`obsidian-envoy-mirror.ts` → `Projects/QuantFlow/Envoy/`).
-- [x] **5b** `envoyProfile` on roles, `envoy-run.sh`, spawn lifecycle posts, worker command wrap.
-- [ ] **6** Delegation proof: Hermes creates task via MCP, Codex claims, no manual paste.
 - [ ] Let watchers post receipts for dumb tiles. Dumb tiles do not receive Envoy credentials.
 - [ ] Wire Obsidian vault context pins and handoff paths to Envoy evidence.
 - [ ] Prove one cable action creates one receipt visible in Watchtower or a vault note.
 
-Pass when:
+Task bus reference:
 
-- One canvas has one Envoy proof space.
-- One real action produces one traceable receipt.
-- Obsidian is operator memory, not a second build plan.
-
-Task bus MVP proof:
-
-- `bun run smoke:envoy-task` creates one task, claims it, rejects a second claim, posts progress, completes it, and prints one `correlation_id` with receipt ids.
-- Agent tools are `qf_envoy_space_status`, `qf_task_list`, `qf_task_create`, `qf_task_claim`, `qf_task_update`, `qf_task_complete`, `qf_task_block`, `qf_task_fail`, `qf_receipt_list`, and `qf_envoy_watch`.
+- `bun run smoke:envoy-task` — automated Envoy task loop proof.
+- Agent tools: `qf_envoy_space_status`, `qf_task_list`, `qf_task_create`, `qf_task_claim`, `qf_task_update`, `qf_task_complete`, `qf_task_block`, `qf_task_fail`, `qf_receipt_list`, `qf_envoy_watch`.
 - See `ENVOY.md` for the task state model and example tool calls.
+- Canvas tile playbook: vault `Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md`.
 
-## Frozen Until Gate 3 Passes
+## Completed Slices
+
+### Gate 3: Live tile state from herdr socket events
+
+- [x] Long-lived `events.subscribe`, normalization, renderer push, status persistence, tests.
+- [x] Removed 5s `herdrGetStatus` polling loop from renderer.
+
+### retirement-herdr-cli
+
+- [x] Socket-only herdr ops; `herdr-bridge.ts` retired; `herdr:read` debug-only.
+
+### envoy-obsidian (5a + 5b)
+
+- [x] Envoy space per canvas, listen/post bridge, task CRUD + claim locking, MCP tools, `ENVOY.md`.
+- [x] Obsidian live mirror, `envoyProfile` on roles, spawn lifecycle posts.
+
+## Not Current
 
 These are not current work:
 
@@ -152,7 +106,7 @@ Do not implement:
 - Direct `herdr-client.sock` to xterm.
 - Direct `envoy-stub` calls.
 - Parallel GoalBuddy layer execution.
-- Vault `Projects/QuantFlow/Build Plan.md` as execution source.
+- Vault `Projects/QuantFlow/Build Plan.md` and `Start Here.md` as execution source.
 - New build-plan layers unless the operator explicitly asks.
 
 ## Archived 7-Layer Map
@@ -162,10 +116,10 @@ The old layer charters are useful as a memory palace, not as a plan.
 | Archived layer | New status |
 | --- | --- |
 | Layer 1, Visual Canvas | Mostly audit/reference. Visual implementation waits until backend gates stabilize. |
-| Layer 2, Process Runtime Herdr | Active source of ideas. Current work is the old 2C: `events.subscribe`. 2B is done. CLI retirement follows. |
+| Layer 2, Process Runtime Herdr | Done for current spine (`events.subscribe`, socket retirement). Reference for future herdr work. |
 | Layer 3, Communication A2A + MCP | A2A is rejected. MCP on port 9811 stays. Correlation/runtime-state ideas may survive without A2A. |
 | Layer 4, Shared Memory Envoy | Future `envoy-obsidian` reference. Remove A2A dependency from interpretation. |
-| Layer 5, Legend Palette + Templates | Frozen until Gate 3. Later used for role config, templates, and Commence cleanup. |
+| Layer 5, Legend Palette + Templates | Not current. Later: role config, templates, Commence cleanup. |
 | Layer 6, Watchtower | Later. It should consume herdr events and Envoy receipts after those exist. |
 | Layer 7, External QA Loop | Later. Useful for testing strategy, not current app scope. |
 
@@ -186,11 +140,12 @@ Use this block for coding agents:
 Branch quantflow-v2.
 Read CONCEPT.md, then BUILD_PLAN_V2.md.
 BUILD_PLAN_V2.md is the only execution plan.
-Current slice: Gate 3 only, herdr events.subscribe tile state.
-Do not execute archived layer charters.
-Do not use Obsidian v1 build plans.
+Vault Projects/QuantFlow/Build Plan.md and Start Here.md are ARCHIVED — do not execute.
+Current slice: delegation-phase-6.
+Pass when: Hermes qf_task_create → Codex claims via MCP, no terminal_write handoff,
+  receipt chain visible in Envoy.
+Active gap: worker spawn ≠ worker activation.
+Do not execute archived layer charters or reference/archive/ as a plan.
 No A2A. No string relay revival. pane.read display is rejected.
-Next after Gate 3: retirement-herdr-cli.
-Next after that: Phase 6 delegation proof (Hermes → Codex via MCP).
 One executor at a time. Commit before handoff.
 ```

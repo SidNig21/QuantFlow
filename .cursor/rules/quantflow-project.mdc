@@ -13,7 +13,7 @@ alwaysApply: true
 
 `SCOPE.md`, `RETIREMENT.md`, `ARCHITECTURE.md` are stubs — do not treat as second authorities.
 
-**Ignore unless operator asks:** `reference/archive/` (incl. 7-layer charters), vault v1 Build Plan.
+**Ignore unless operator asks:** `reference/archive/` (incl. 7-layer charters). Vault `Projects/QuantFlow/Build Plan.md` and `Start Here.md` are **ARCHIVED**.
 
 **Spine rule:** Canvas + herdr + interactive PTY. `pane.read` tile display = reject.
 
