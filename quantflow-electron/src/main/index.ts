@@ -86,6 +86,17 @@ if (!process.env.LANG || !process.env.LANG.includes("UTF-8")) {
 
 app.setName(APP_NAME);
 
+// Opt-in CDP debug port for agent QA tooling (e.g. agent-browser).
+// Off unless QUANTFLOW_DEBUG_PORT is set; binds to loopback only.
+const qaDebugPort = Number.parseInt(
+  process.env.QUANTFLOW_DEBUG_PORT ?? "",
+  10,
+);
+if (Number.isInteger(qaDebugPort) && qaDebugPort > 0 && qaDebugPort < 65536) {
+  app.commandLine.appendSwitch("remote-debugging-port", String(qaDebugPort));
+  app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
+}
+
 process.on("uncaughtException", (error) => {
   recordCrashReport({
     type: "uncaughtException",

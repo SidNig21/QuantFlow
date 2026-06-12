@@ -2,6 +2,7 @@
 
 Status: operator working plan  
 Created: 2026-06-08  
+Updated: 2026-06-12  
 Repo source of truth: `C:\Users\rybow\QuantFlow\CONCEPT.md` then `C:\Users\rybow\QuantFlow\BUILD_PLAN_V2.md`
 
 This note exists to keep QuantFlow focused on the one thing that matters first:
@@ -60,18 +61,45 @@ Keep the mandatory tool stack small:
 - Dumb tiles do not receive Envoy credentials. Watchers or main-process services post on their behalf.
 - No A2A, Agent Cards, HTTP delegation, custom string relay revival, or pane-read display path.
 
-## Current Repo Reality
+## Current Truth (2026-06-12)
 
-The current repo plan says the next implementation work is still runtime foundation:
+Branch: `quantflow-v2`
 
-1. Gate 3: replace herdr status polling with `events.subscribe`.
-2. Retire the remaining herdr CLI bridge.
-3. Build `envoy-obsidian`.
-4. Evolve Watchtower after herdr events and Envoy receipts exist.
+**Foundation shipped:** Gate 2 spawn/PTY, Gate 3 `events.subscribe`, herdr socket retirement, Envoy task bus MVP, Obsidian mirror, Run Workflow → Hermes activation, relay token + herdr bootstrap.
 
-Do not skip straight to Envoy before the herdr runtime is stable. The delegation loop depends on persistent agents and truthful status.
+**Session shipped (uncommitted):** canvas perf transform layer, relay breadcrumb ownership fix, cable SVG `[hidden]` fix, agent QA (`TESTING.md`, CDP port), idle PTY close without nag, spawn `displayName` + MCP tile fields.
 
-## Execution Sequence
+**Trial 2026-06-11:** Hermes claim/Envoy OK. Codex spawned without worker context; handoff via `terminal_write`. Relay flaky mid-run — likely breadcrumb wipe (fixed in code; WSL re-trial required).
+
+**Active gap:** worker spawn ≠ worker activation at the *trial* level — spawn activation code is wired; phase-6 canvas trial not yet passed.
+
+**Current slice:** `delegation-phase-6`
+
+**Pass when:** Hermes `qf_task_create` → Codex claims via MCP → `qf_task_complete` → receipt chain in Envoy/Obsidian; no `terminal_write` handoff; WSL breadcrumb proof on Electron restart.
+
+## Build Path (honest priority stack)
+
+One slice at a time. Full checkboxes live in `BUILD_PLAN_V2.md`.
+
+| Order | Slice | Why now |
+| --- | --- | --- |
+| **1** | `delegation-phase-6` | Prove Hermes → Codex without operator paste — the north star |
+| **2** | `spawn-ux` | Optimistic tile + lifecycle strings — friction from real spawn waits |
+| **3** | `orchestration-snappiness` | Persistent relay socket + Envoy worker — kills per-call 30s tax |
+| **4** | `mission-rehydration` | `qf_mission_brief` + stale-claim reaper — long-horizon Hermes |
+| **5** | `product-polish` | Toasts, status badges, claim-aware close, first-run screen |
+| **6** | `envoy-evidence-2` | Dumb-tile watcher receipts, vault pins, cable → receipt proof |
+| — | **Moat (parked)** | DuckDB `qf_query`, SkillOpt, trajectories, Jesse, Obsidian Bases, task trees |
+
+**Naming:** `correlation_id` = internal chain. `tileId` / `herdrPaneId` = tool addresses. Title bar = `displayName`. Agents call `quantflow_tile_list` and use returned ids.
+
+**Professional floor (done or in flight):** relay token + loopback bind, CI/typecheck — do not reopen unless audit finds regression.
+
+**Friction log practice:** use the canvas; log annoyances; let usage rank slices after phase 6 — do not speculate past the Build Path without evidence.
+
+## Execution Sequence (reference)
+
+Phases 0–7 below are the operator narrative. **Slice order above wins** when they disagree.
 
 ### Phase 0: Scope Lock
 
@@ -97,7 +125,7 @@ Pass when:
 - Agents stop using old layer docs as active plans.
 - Agents can state the current slice before editing files.
 
-### Phase 1: Live Herdr State
+### Phase 1: Live Herdr State — SHIPPED
 
 Goal: QuantFlow knows tile status from herdr events, not polling.
 
@@ -134,7 +162,7 @@ Windows-only PTY tile still works.
 Herdr socket restart does not crash the app.
 ```
 
-### Phase 2: Socket-Only Herdr Runtime
+### Phase 2: Socket-Only Herdr Runtime — SHIPPED
 
 Goal: remove the remaining legacy CLI bridge from active runtime paths.
 
@@ -167,7 +195,7 @@ PTY attach remains the display path.
 No pane-read polling becomes display.
 ```
 
-### Phase 3: Agent Context Contract
+### Phase 3: Agent Context Contract — mostly shipped; activation trial = slice 1
 
 Goal: every spawned agent knows enough to participate in delegation.
 
@@ -230,7 +258,7 @@ Each agent can see MCP tools.
 Hermes can identify Codex as an allowed delegation target only when a cable exists.
 ```
 
-### Phase 4: Envoy Task Bus MVP
+### Phase 4: Envoy Task Bus MVP — SHIPPED
 
 Goal: Envoy becomes the durable place where agent work is created, claimed, updated, completed, and proven.
 
@@ -389,7 +417,7 @@ Receipt is visible in the note.
 No agent needed to edit markdown to claim the task.
 ```
 
-### Phase 6: Autonomous Delegation MVP
+### Phase 6: Autonomous Delegation MVP — CURRENT (`delegation-phase-6`)
 
 Goal: prove that one agent can delegate to another from start to finish.
 
@@ -439,11 +467,11 @@ obsidian_task_note:
 result_file_or_artifact:
 ```
 
-### Phase 7: Watchtower and Visual Proof
+### Phase 7: Watchtower and Visual Proof — slice 6 (`envoy-evidence-2`) + polish
 
 Goal: make the proof readable inside QuantFlow after the underlying task loop works.
 
-Do not start this before Phase 6 passes.
+Do not start full Watchtower evolution before Phase 6 passes.
 
 Likely files:
 
@@ -507,8 +535,8 @@ Read CONCEPT.md first.
 Read BUILD_PLAN_V2.md second.
 Use C:\Users\rybow\Obsidian\Cursor Collab\QuantFlow Simplified Plan.md only as the operator simplification guide.
 
-The priority is autonomous agent delegation, but do not skip foundation gates.
-Current repo slice controls the work.
+Current slice: delegation-phase-6 (see Build Path in BUILD_PLAN_V2.md).
+Do not skip to spawn-ux, snappiness, or moat until phase 6 passes.
 
 Long-term proof:
 Hermes creates a task for Codex through Envoy, Codex claims and completes it, Hermes reads the proof, Obsidian mirrors the board, and QuantFlow shows the live state.
@@ -532,9 +560,10 @@ Before starting a coding session:
 2. Confirm worktree state.
 3. Read `CONCEPT.md`.
 4. Read `BUILD_PLAN_V2.md`.
-5. Name the active phase from this note.
-6. Name the pass proof before coding.
-7. Reject work outside the active phase unless intentionally changing scope.
+5. Read Build Path order in this note or BUILD_PLAN_V2.md.
+6. Confirm current slice is `delegation-phase-6` unless operator changed it.
+7. Name the pass proof before coding.
+8. Reject work outside the active slice unless intentionally changing scope.
 
 Before accepting a handoff:
 

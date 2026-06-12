@@ -26,7 +26,6 @@ import { createViewport } from "./canvas-viewport.js";
 import { createEdgeIndicators } from "./edge-indicators.js";
 import { createPanel } from "./panel-manager.js";
 import { createWorkspaceManager } from "./workspace-manager.js";
-import { confirmTileClose } from "./pty-close-confirmation.js";
 import {
 	SHORTCUTS,
 	shortcutToCommand,
@@ -1092,11 +1091,7 @@ async function init() {
 		tileLayer, viewportState, configs,
 		getAllWebviews,
 		isSpaceHeld: () => spaceHeld,
-		onBeforeClose: (tile, options = {}) =>
-			confirmTileClose(tile, {
-				event: options.event,
-				showConfirmDialog: window.shellApi.showConfirmDialog,
-			}),
+		onBeforeClose: () => true,
 		onCableMousedown,
 		onReposition: () => updateCables(),
 		onSaveDebounced(state) {
