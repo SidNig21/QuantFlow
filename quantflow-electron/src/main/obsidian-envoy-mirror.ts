@@ -130,14 +130,22 @@ export async function ensureObsidianEnvoyMirror(
   let liveLines: string[] = [];
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
+  let pollInFlight = false;
 
   const poll = async (): Promise<void> => {
     if (stopped) return;
+    // Envoy history calls can take far longer than the poll interval under
+    // load; overlapping polls stack unbounded envoy CLI processes and starve
+    // every other Envoy op (taskCreate timeouts mid-trial).
+    if (pollInFlight) return;
+    pollInFlight = true;
     try {
       await writeTaskBoard(dir, options.envoySpaceId);
       await writeHistory(dir, options.envoySpaceId);
     } catch {
       // Mirror is best-effort; Envoy CLI may be unavailable during startup.
+    } finally {
+      pollInFlight = false;
     }
   };
 

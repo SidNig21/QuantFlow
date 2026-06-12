@@ -50,7 +50,13 @@ function detectRelayHosts() {
 
 const RELAY_HOSTS = detectRelayHosts();
 
+const RPC_TIMEOUT_MS = Number.parseInt(process.env.QF_PHASE6_RPC_TIMEOUT_MS || "60000", 10);
+// canvas.roleSpawn waits for pane spawn + herdr attach and can exceed the default RPC timeout.
+const SLOW_RPC_TIMEOUT_MS = Number.parseInt(process.env.QF_PHASE6_SLOW_RPC_TIMEOUT_MS || "180000", 10);
+const SLOW_RPC_METHODS = new Set(["canvas.roleSpawn"]);
+
 function rpcAtHost(host, method, params = {}) {
+  const timeoutMs = SLOW_RPC_METHODS.has(method) ? SLOW_RPC_TIMEOUT_MS : RPC_TIMEOUT_MS;
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ host, port: RELAY_PORT }, () => {
       socket.write(JSON.stringify({
@@ -64,8 +70,8 @@ function rpcAtHost(host, method, params = {}) {
     let buffer = "";
     const timer = setTimeout(() => {
       socket.destroy();
-      reject(new Error(`Relay timeout at ${host}:${RELAY_PORT}`));
-    }, 20000);
+      reject(new Error(`Relay timeout at ${host}:${RELAY_PORT} after ${timeoutMs}ms (${method})`));
+    }, timeoutMs);
 
     socket.on("data", (chunk) => {
       buffer += chunk.toString();

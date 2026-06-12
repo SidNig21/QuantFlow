@@ -24,7 +24,9 @@ Date: 2026-06-12
 
 **Trial result 2026-06-11:** Hermes claim/Envoy OK. Codex spawned but no worker context on spawn. Handoff via `terminal_write` only. Relay flaky mid-run — **likely breadcrumb wipe (fixed); WSL-path proof still required on re-trial.**
 
-**Active gap:** worker spawn ≠ worker activation.
+**Trial result 2026-06-12 (Session 0): PASS.** Full autonomous loop on canvas (`corr-phase6-mqakzoyx`): operator parent task → Hermes claim → Hermes `qf_task_create` child → Codex worker spawned with workflow context → Codex `qf_task_claim` → `qf_task_complete` → Hermes read receipts and completed parent. No `terminal_write` handoff. 14 receipts on one correlation_id; chain mirrored to Obsidian task-board. WSL proof: `qf_task_list` from WSL MCP OK (direct TCP 9811 refused from WSL2 — windows-node-proxy fallback is the working path). `smoke:envoy-task` green. Observed glitches: (1) Hermes's first Codex spawn died with `pty:create` error 267 (invalid cwd, Windows ERROR_DIRECTORY) — visible only on the tile face, not in receipts; Hermes failed the mis-targeted child and retried successfully. (2) `smoke:phase6` client had a hard-coded 20s RPC timeout — too short for `canvas.roleSpawn` and busy-relay `envoy.taskCreate`; raised to 60s default / 180s for roleSpawn.
+
+**Active gap:** worker spawn ≠ worker activation. **Closed 2026-06-12** — Codex claimed via MCP from spawn context alone.
 
 **Current slice:** `delegation-phase-6`
 
@@ -69,10 +71,10 @@ Do this now:
 
 - [x] **Spawn activation (code):** `workflowTaskId` / `workflowCorrelationId` / `workflowEnvoySpaceId` already wire MCP → `canvas.roleSpawn` → `herdr:spawn-role` → `postLaunchPrompt` or Codex worker command (`ipc-herdr-spawn.ts`). Canvas skill documents the delegation order.
 - [x] **Tile naming:** auto `displayName` at spawn (role + counter); `displayName` / `tileId` / `herdrPaneId` in `quantflow_tile_list`.
-- [ ] Hermes uses `qf_task_create` with `sourceTileId`, `targetTileId`, parent `correlation_id`, and full instruction.
-- [ ] Codex discovers and claims the child task via `qf_task_list` / `qf_task_claim` (MCP), not markdown and not `terminal_write`.
-- [ ] Codex completes with `qf_task_complete`; receipts share one `correlation_id`.
-- [ ] Hermes reads proof via `qf_task_list` / `qf_receipt_list` or Envoy mirror — not terminal echo as success signal.
+- [x] Hermes uses `qf_task_create` with `sourceTileId`, `targetTileId`, parent `correlation_id`, and full instruction.
+- [x] Codex discovers and claims the child task via `qf_task_list` / `qf_task_claim` (MCP), not markdown and not `terminal_write`.
+- [x] Codex completes with `qf_task_complete`; receipts share one `correlation_id`.
+- [x] Hermes reads proof via `qf_task_list` / `qf_receipt_list` or Envoy mirror — not terminal echo as success signal.
 
 Pass when:
 
@@ -85,6 +87,7 @@ Known landmines:
 - WSL Hermes MCP → Windows relay: was intermittent `ECONNREFUSED` — breadcrumb fix landed; **verify on WSL re-trial**.
 - UNC cwd on `rpc-once.js` from WSL may still bite; prefer Windows-side MCP for QA if needed.
 - Codex TUI: `terminal_write` may compose without submitting; verify with tile read.
+- `quantflow_role_spawn` with a bad/WSL-path `cwd` → tile shows `pty:create` error 267 (invalid directory) but no receipt/event records it — diagnose visually on the tile face until product-polish lands spawn-failure surfacing. Spawning agents should pass a Windows cwd or omit it.
 
 Task bus reference:
 
@@ -203,13 +206,25 @@ The old layer charters are useful as a memory palace, not as a plan.
 | Layer 6, Watchtower | Stale-claim reaper is slice 4. Full evolution not current. |
 | Layer 7, External QA Loop | `TESTING.md` + agent-browser done locally. Cloud/tunnel QA later. |
 
+## Vault pairing
+
+Repo code and Obsidian vault are **two workspaces**; agents with both should use each for its role.
+
+| Workspace | Root | Authority |
+| --- | --- | --- |
+| **Repo** | `C:\Users\rybow\QuantFlow` | This file + `CONCEPT.md` + `ENVOY.md` + `TESTING.md` |
+| **Vault** | `C:\Users\rybow\Obsidian\Cursor Collab` | `QuantFlow Goal Sessions.md`, canvas skill, Envoy mirror, vision docs |
+
+Full cross-map: repo `VAULT.md`. Vault archived: `Projects/QuantFlow/Build Plan.md`, `Start Here.md`.
+
 ## Operator Checklist Before Any Coding Session
 
 1. Confirm branch is `quantflow-v2`.
 2. Read `CONCEPT.md`.
 3. Read this file — check **Build Path** order and **Current Slice**.
-4. If the requested work is not the current slice, ask before coding.
-5. Commit before handoff.
+4. If using Claude Code goals, check vault `QuantFlow Goal Sessions.md` for session number.
+5. If the requested work is not the current slice, ask before coding.
+6. Commit before handoff.
 
 ## Agent Handoff
 
@@ -219,7 +234,9 @@ Use this block for coding agents:
 Branch quantflow-v2.
 Read CONCEPT.md, then BUILD_PLAN_V2.md.
 BUILD_PLAN_V2.md is the only execution plan.
-Vault Projects/QuantFlow/Build Plan.md and Start Here.md are ARCHIVED — do not execute.
+Paired vault: C:\Users\rybow\Obsidian\Cursor Collab — see repo VAULT.md.
+Vault ladder: QuantFlow Goal Sessions.md. Tile agents: Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md.
+Vault Build Plan.md and Start Here.md are ARCHIVED — do not execute.
 Current slice: delegation-phase-6 (see Build Path — do not skip to moat or polish).
 Pass when: spawn activation wired; Hermes qf_task_create → Codex claims via MCP;
   no terminal_write handoff; receipt chain in Envoy; WSL breadcrumb proof on re-trial.
