@@ -13,6 +13,7 @@ import {
   isTileRunning,
   splitFilepath,
   positionTile,
+  applyViewportTransform,
   updateTileTitle,
 } from "./tile-renderer.js";
 
@@ -431,67 +432,61 @@ describe("getTileLabel", () => {
 describe("positionTile", () => {
   function mockContainer() {
     const style: Record<string, string> = {};
-    return { style };
+    return { style } as unknown as HTMLElement & {
+      style: Record<string, string>;
+      __qfPosKey?: string;
+    };
   }
 
-  test("sets position from tile coords + pan offset", () => {
+  test("positions in world coordinates (viewport handled by layer)", () => {
     const container = mockContainer();
     const tile = { x: 100, y: 200, width: 400, height: 500, zIndex: 5 };
-    positionTile(container, tile, 50, 30, 1);
-    expect(container.style.left).toBe("150px");
-    expect(container.style.top).toBe("230px");
-  });
-
-  test("applies zoom to screen position", () => {
-    const container = mockContainer();
-    const tile = { x: 100, y: 200, width: 400, height: 500, zIndex: 1 };
-    positionTile(container, tile, 0, 0, 0.5);
-    // screen x = 100 * 0.5 + 0 = 50
-    // screen y = 200 * 0.5 + 0 = 100
-    expect(container.style.left).toBe("50px");
-    expect(container.style.top).toBe("100px");
-    expect(container.style.transform).toBe("scale(0.5)");
+    positionTile(container, tile);
+    expect(container.style.left).toBe("100px");
+    expect(container.style.top).toBe("200px");
   });
 
   test("sets width, height, and zIndex", () => {
     const container = mockContainer();
     const tile = { x: 0, y: 0, width: 400, height: 500, zIndex: 7 };
-    positionTile(container, tile, 0, 0, 1);
+    positionTile(container, tile);
     expect(container.style.width).toBe("400px");
     expect(container.style.height).toBe("500px");
     expect(container.style.zIndex).toBe("7");
   });
 
-  test("sets transformOrigin to top left", () => {
+  test("does not apply per-tile transforms", () => {
     const container = mockContainer();
     const tile = { x: 0, y: 0, width: 100, height: 100, zIndex: 1 };
-    positionTile(container, tile, 0, 0, 1);
-    expect(container.style.transformOrigin).toBe("top left");
-  });
-
-  test("handles negative pan offset", () => {
-    const container = mockContainer();
-    const tile = { x: 100, y: 100, width: 100, height: 100, zIndex: 1 };
-    positionTile(container, tile, -50, -50, 1);
-    expect(container.style.left).toBe("50px");
-    expect(container.style.top).toBe("50px");
+    positionTile(container, tile);
+    expect(container.style.transform).toBeUndefined();
   });
 
   test("handles negative tile coordinates", () => {
     const container = mockContainer();
     const tile = { x: -100, y: -200, width: 100, height: 100, zIndex: 1 };
-    positionTile(container, tile, 500, 400, 1);
-    expect(container.style.left).toBe("400px");
-    expect(container.style.top).toBe("200px");
+    positionTile(container, tile);
+    expect(container.style.left).toBe("-100px");
+    expect(container.style.top).toBe("-200px");
   });
 
-  test("zoom and pan combine correctly", () => {
+  test("skips style writes when tile geometry is unchanged", () => {
     const container = mockContainer();
-    const tile = { x: 200, y: 300, width: 100, height: 100, zIndex: 1 };
-    positionTile(container, tile, 10, 20, 0.75);
-    // screen x = 200 * 0.75 + 10 = 160
-    // screen y = 300 * 0.75 + 20 = 245
-    expect(container.style.left).toBe("160px");
-    expect(container.style.top).toBe("245px");
+    const tile = { x: 10, y: 20, width: 100, height: 100, zIndex: 1 };
+    positionTile(container, tile);
+    container.style.left = "tampered";
+    positionTile(container, tile);
+    expect(container.style.left).toBe("tampered");
+    tile.x = 30;
+    positionTile(container, tile);
+    expect(container.style.left).toBe("30px");
+  });
+
+  test("applyViewportTransform sets single layer transform", () => {
+    const layer = mockContainer();
+    applyViewportTransform(layer, { panX: 50, panY: -20, zoom: 0.5 });
+    expect(layer.style.transform).toBe(
+      "translate(50px, -20px) scale(0.5)",
+    );
   });
 });

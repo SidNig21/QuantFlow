@@ -146,11 +146,7 @@ export function createTileManager({
 		for (const tile of tiles) {
 			const dom = tileDOMs.get(tile.id);
 			if (!dom) continue;
-			positionTile(
-				dom.container, tile,
-				viewportState.panX, viewportState.panY,
-				viewportState.zoom,
-			);
+			positionTile(dom.container, tile);
 		}
 		onReposition?.();
 	}
@@ -693,11 +689,7 @@ export function createTileManager({
 
 		tileLayer.appendChild(dom.container);
 		tileDOMs.set(tile.id, dom);
-		positionTile(
-			dom.container, tile,
-			viewportState.panX, viewportState.panY,
-			viewportState.zoom,
-		);
+		positionTile(dom.container, tile);
 
 		return tile;
 	}

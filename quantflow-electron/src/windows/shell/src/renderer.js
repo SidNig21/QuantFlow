@@ -52,6 +52,7 @@ import {
 	updateTileTitle,
 	updateHerdrBadge,
 	getTileLabel,
+	applyViewportTransform,
 } from "./tile-renderer.js";
 import { formatCableContextRelay } from "./cable-overlay.js";
 import { createCableInspector } from "./cable-inspector.js";
@@ -1097,7 +1098,7 @@ async function init() {
 				showConfirmDialog: window.shellApi.showConfirmDialog,
 			}),
 		onCableMousedown,
-		onReposition: () => { viewport.redrawGrid(); updateCables(); },
+		onReposition: () => updateCables(),
 		onSaveDebounced(state) {
 			window.shellApi.canvasSaveState(
 				toCenterPointState(state),
@@ -1615,14 +1616,39 @@ async function init() {
 
 	// -- Wire viewport updates --
 
+	// Pan/zoom moves two layer transforms (tiles + cables); it never
+	// repositions individual tiles. Edge indicators and the status bar are
+	// cosmetic, so they refresh on a trailing 100ms throttle instead of
+	// every frame.
+	function syncViewportTransforms() {
+		applyViewportTransform(tileLayer, viewportState);
+		if (cableLayerContent) {
+			cableLayerContent.setAttribute(
+				"transform",
+				`translate(${viewportState.panX} ${viewportState.panY}) ` +
+				`scale(${viewportState.zoom})`,
+			);
+		}
+	}
+
+	let viewportChromePending = false;
+	function scheduleViewportChrome() {
+		if (viewportChromePending) return;
+		viewportChromePending = true;
+		setTimeout(() => {
+			viewportChromePending = false;
+			edgeIndicators.update();
+			updateStatusBar();
+		}, 100);
+	}
+
 	viewportReady = true;
 	viewport.init(viewportState, () => {
-		tileManager.repositionAllTiles();
-		edgeIndicators.update();
-		updateCables();
-		updateStatusBar();
+		syncViewportTransforms();
+		scheduleViewportChrome();
 		tileManager.saveCanvasDebounced();
 	});
+	syncViewportTransforms();
 
 	edgeIndicators.update();
 	updateCables();
@@ -3362,6 +3388,7 @@ async function init() {
 			? h / 2 - centerY * viewportState.zoom
 			: 0;
 		viewport.updateCanvas();
+		syncViewportTransforms();
 		tileManager.restoreCanvasState(savedState.tiles);
 		clearConnections();
 		for (const conn of savedState.connections ?? []) {

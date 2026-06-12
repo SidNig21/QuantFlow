@@ -2264,7 +2264,12 @@ html.platform-win #panel-viewer::before {
 #tile-layer {
 	position: absolute;
 	inset: 0;
-	overflow: hidden;
+	/* Tiles are positioned in world coordinates; this layer carries the
+	   single pan/zoom transform. Clipping is handled by #panel-viewer
+	   (overflow: hidden) — clipping here would cut off transformed tiles. */
+	overflow: visible;
+	transform-origin: 0 0;
+	will-change: transform;
 	pointer-events: none;
 	z-index: 103;
 }

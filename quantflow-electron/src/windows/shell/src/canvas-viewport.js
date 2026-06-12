@@ -3,6 +3,7 @@ export const ZOOM_MAX = 1;
 const ZOOM_RUBBER_BAND_K = 400;
 const CELL = 20;
 const MAJOR = 80;
+const MINOR_PER_MAJOR = MAJOR / CELL;
 
 const isMac = globalThis.window?.shellApi?.getPlatform?.() === "darwin";
 
@@ -25,6 +26,7 @@ export function createViewport(canvasEl, gridCanvas, tilesRef) {
 	let zoomIndicatorTimer = null;
 	let prevCanvasW = canvasEl.clientWidth;
 	let prevCanvasH = canvasEl.clientHeight;
+	let frameRaf = null;
 
 	const zoomIndicatorEl = document.getElementById("zoom-indicator");
 
@@ -37,77 +39,100 @@ export function createViewport(canvasEl, gridCanvas, tilesRef) {
 		gridCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 	}
 
+	// The dot grid is rendered from a small cached pattern tile (one major
+	// cell) instead of per-dot fillRect calls. Rebuilt only when zoom or
+	// theme changes; panning just shifts the pattern offset.
+	let gridPatternCache = { key: "", pattern: null, sizeDev: 0 };
+
+	function buildGridPattern(dark) {
+		const dpr = window.devicePixelRatio || 1;
+		const majorStepCss = MAJOR * state.zoom;
+		const sizeDev = Math.max(4, Math.round(majorStepCss * dpr));
+		const stepDev = sizeDev / MINOR_PER_MAJOR;
+		const dotSize = Math.max(1, 1.5 * state.zoom) * dpr;
+		const majorDotSize = Math.max(1.5, 1.5 * state.zoom) * dpr;
+		const minorFade = Math.min(1, Math.max(0,
+			(state.zoom - 0.5) / (0.75 - 0.5),
+		));
+		const majorFade = Math.min(1, Math.max(0,
+			(state.zoom - ZOOM_MIN) / (0.5 - ZOOM_MIN),
+		));
+
+		const key = [
+			dark, sizeDev, dotSize.toFixed(2),
+			minorFade.toFixed(3), majorFade.toFixed(3),
+		].join("|");
+		if (key === gridPatternCache.key && gridPatternCache.pattern) {
+			return gridPatternCache;
+		}
+
+		const tile = document.createElement("canvas");
+		tile.width = sizeDev;
+		tile.height = sizeDev;
+		const c = tile.getContext("2d");
+
+		// Draw positions one cell beyond each edge so dots that straddle the
+		// pattern seam render their full shape on both sides.
+		if (minorFade > 0) {
+			const minorAlpha = dark ? 0.15 * minorFade : 0.25 * minorFade;
+			c.fillStyle = dark
+				? `rgba(255,255,255,${minorAlpha})`
+				: `rgba(0,0,0,${minorAlpha})`;
+			const half = dotSize / 2;
+			for (let i = -1; i <= MINOR_PER_MAJOR; i++) {
+				for (let j = -1; j <= MINOR_PER_MAJOR; j++) {
+					const onMajor =
+						((i % MINOR_PER_MAJOR) + MINOR_PER_MAJOR) % MINOR_PER_MAJOR === 0 &&
+						((j % MINOR_PER_MAJOR) + MINOR_PER_MAJOR) % MINOR_PER_MAJOR === 0;
+					if (onMajor) continue;
+					c.fillRect(i * stepDev - half, j * stepDev - half, dotSize, dotSize);
+				}
+			}
+		}
+
+		if (majorFade > 0) {
+			const majorAlpha = dark ? 0.25 * majorFade : 0.40 * majorFade;
+			c.fillStyle = dark
+				? `rgba(255,255,255,${majorAlpha})`
+				: `rgba(0,0,0,${majorAlpha})`;
+			const half = majorDotSize / 2;
+			for (const px of [0, sizeDev]) {
+				for (const py of [0, sizeDev]) {
+					c.fillRect(px - half, py - half, majorDotSize, majorDotSize);
+				}
+			}
+		}
+
+		gridPatternCache = {
+			key,
+			pattern: gridCtx.createPattern(tile, "repeat"),
+			sizeDev,
+		};
+		return gridPatternCache;
+	}
+
 	function drawGrid() {
 		const w = canvasEl.clientWidth;
 		const h = canvasEl.clientHeight;
 		if (w === 0 || h === 0) return;
 
-		const dark = isDark();
 		gridCtx.clearRect(0, 0, w, h);
 
-		const rects = tilesRef.map((t) => ({
-			l: t.x * state.zoom + state.panX,
-			t: t.y * state.zoom + state.panY,
-			r: (t.x + t.width) * state.zoom + state.panX,
-			b: (t.y + t.height) * state.zoom + state.panY,
-		}));
+		const { pattern, sizeDev } = buildGridPattern(isDark());
+		if (!pattern || sizeDev <= 0) return;
 
-		function insideTile(px, py) {
-			for (let i = 0; i < rects.length; i++) {
-				const r = rects[i];
-				if (px >= r.l && px <= r.r && py >= r.t && py <= r.b) {
-					return true;
-				}
-			}
-			return false;
-		}
+		// The pattern tile is in device pixels; paint it with an identity
+		// transform so it repeats at exactly one major cell per tile.
+		const dpr = window.devicePixelRatio || 1;
+		const offX = (((state.panX * dpr) % sizeDev) + sizeDev) % sizeDev;
+		const offY = (((state.panY * dpr) % sizeDev) + sizeDev) % sizeDev;
 
-		const step = CELL * state.zoom;
-		const majorStep = MAJOR * state.zoom;
-		const offX = ((state.panX % majorStep) + majorStep) % majorStep;
-		const offY = ((state.panY % majorStep) + majorStep) % majorStep;
-
-		const dotOffX = ((state.panX % step) + step) % step;
-		const dotOffY = ((state.panY % step) + step) % step;
-		const dotSize = Math.max(1, 1.5 * state.zoom);
-		const minorFade = Math.min(1, Math.max(0,
-			(state.zoom - 0.5) / (0.75 - 0.5),
-		));
-		if (minorFade > 0) {
-			const minorAlpha = dark ? 0.15 * minorFade : 0.25 * minorFade;
-			gridCtx.fillStyle = dark
-				? `rgba(255,255,255,${minorAlpha})`
-				: `rgba(0,0,0,${minorAlpha})`;
-			const halfDot = dotSize / 2;
-			for (let x = dotOffX; x <= w; x += step) {
-				for (let y = dotOffY; y <= h; y += step) {
-					const px = Math.round(x - halfDot);
-					const py = Math.round(y - halfDot);
-					if (insideTile(x, y)) continue;
-					gridCtx.fillRect(px, py, dotSize, dotSize);
-				}
-			}
-		}
-
-		const majorFade = Math.min(1, Math.max(0,
-			(state.zoom - ZOOM_MIN) / (0.5 - ZOOM_MIN),
-		));
-		if (majorFade > 0) {
-			const majorDotSize = Math.max(1.5, 1.5 * state.zoom);
-			const halfMajor = majorDotSize / 2;
-			const majorAlpha = dark ? 0.25 * majorFade : 0.40 * majorFade;
-			gridCtx.fillStyle = dark
-				? `rgba(255,255,255,${majorAlpha})`
-				: `rgba(0,0,0,${majorAlpha})`;
-			for (let x = offX; x <= w; x += majorStep) {
-				for (let y = offY; y <= h; y += majorStep) {
-					const px = Math.round(x - halfMajor);
-					const py = Math.round(y - halfMajor);
-					if (insideTile(x, y)) continue;
-					gridCtx.fillRect(px, py, majorDotSize, majorDotSize);
-				}
-			}
-		}
+		gridCtx.save();
+		gridCtx.setTransform(1, 0, 0, 1, 0, 0);
+		gridCtx.translate(offX - sizeDev, offY - sizeDev);
+		gridCtx.fillStyle = pattern;
+		gridCtx.fillRect(0, 0, w * dpr + 2 * sizeDev, h * dpr + 2 * sizeDev);
+		gridCtx.restore();
 	}
 
 	function showZoomIndicator() {
@@ -120,9 +145,18 @@ export function createViewport(canvasEl, gridCanvas, tilesRef) {
 		}, 1200);
 	}
 
-	function updateCanvas() {
+	function renderFrame() {
+		frameRaf = null;
 		drawGrid();
 		if (onUpdate) onUpdate();
+	}
+
+	// All viewport mutations funnel through here; actual rendering is
+	// coalesced to one pass per display frame no matter how fast wheel or
+	// drag events arrive.
+	function updateCanvas() {
+		if (frameRaf != null) return;
+		frameRaf = requestAnimationFrame(renderFrame);
 	}
 
 	function snapBackZoom() {

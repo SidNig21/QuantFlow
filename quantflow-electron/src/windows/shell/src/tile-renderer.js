@@ -736,23 +736,26 @@ export function startInlineRename(dom, tile, onCommit) {
 }
 
 /**
- * Positions a tile container in screen coordinates.
+ * Positions a tile container in WORLD coordinates.
+ *
+ * Tiles live inside #tile-layer, which carries the single viewport
+ * transform (translate(panX, panY) scale(zoom)). Panning and zooming
+ * never touch individual tiles — only this layer transform changes —
+ * so a tile's styles are only written when the tile itself moves.
+ *
  * @param {HTMLElement} container
  * @param {import('./canvas-state.js').Tile} tile
- * @param {number} panX
- * @param {number} panY
- * @param {number} zoom
  */
-export function positionTile(container, tile, panX, panY, zoom) {
-  const sx = tile.x * zoom + panX;
-  const sy = tile.y * zoom + panY;
+export function positionTile(container, tile) {
+  const key =
+    `${tile.x}|${tile.y}|${tile.width}|${tile.height}|${tile.zIndex}`;
+  if (container.__qfPosKey === key) return;
+  container.__qfPosKey = key;
 
-  container.style.left = `${sx}px`;
-  container.style.top = `${sy}px`;
+  container.style.left = `${tile.x}px`;
+  container.style.top = `${tile.y}px`;
   container.style.width = `${tile.width}px`;
   container.style.height = `${tile.height}px`;
-  container.style.transform = `scale(${zoom})`;
-  container.style.transformOrigin = "top left";
   container.style.zIndex = String(tile.zIndex);
 }
 
@@ -760,13 +763,21 @@ export function positionTile(container, tile, panX, panY, zoom) {
  * Positions all tile containers.
  * @param {Map<string, {container: HTMLElement}>} tileDOMs
  * @param {import('./canvas-state.js').Tile[]} tiles
- * @param {number} panX
- * @param {number} panY
- * @param {number} zoom
  */
-export function positionAllTiles(tileDOMs, tiles, panX, panY, zoom) {
+export function positionAllTiles(tileDOMs, tiles) {
   for (const tile of tiles) {
     const dom = tileDOMs.get(tile.id);
-    if (dom) positionTile(dom.container, tile, panX, panY, zoom);
+    if (dom) positionTile(dom.container, tile);
   }
+}
+
+/**
+ * Applies the viewport transform to the tile layer. One composited
+ * transform replaces per-tile repositioning on pan/zoom.
+ * @param {HTMLElement} tileLayer
+ * @param {{panX: number, panY: number, zoom: number}} viewport
+ */
+export function applyViewportTransform(tileLayer, { panX, panY, zoom }) {
+  tileLayer.style.transform =
+    `translate(${panX}px, ${panY}px) scale(${zoom})`;
 }
