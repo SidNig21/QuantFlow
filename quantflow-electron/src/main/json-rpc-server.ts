@@ -5,6 +5,7 @@ import {
 } from "node:net";
 import {
   mkdirSync,
+  readFileSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -343,15 +344,28 @@ export function stopJsonRpcServer(): void {
   }
   socketServer = null;
   tcpServer = null;
+  const ownToken = activeRelayToken;
   activeRelayToken = null;
 
   cleanupEndpoint(SOCKET_PATH);
 
-  for (const f of [SOCKET_PATH_FILE, NODE_PATH_FILE, RELAY_TOKEN_FILE]) {
+  // The breadcrumb files in ~/.quantflow/ are shared across instances
+  // (dev + prod). Only delete a file if this instance still owns its
+  // contents — otherwise a dying instance wipes the breadcrumbs of a
+  // newer one and external relay clients lose discovery/auth mid-run.
+  const ownedBreadcrumbs: Array<[string, string | null]> = [
+    [SOCKET_PATH_FILE, SOCKET_PATH],
+    [NODE_PATH_FILE, process.execPath],
+    [RELAY_TOKEN_FILE, ownToken],
+  ];
+  for (const [file, expected] of ownedBreadcrumbs) {
     try {
-      unlinkSync(f);
+      if (expected == null) continue;
+      const current = readFileSync(file, "utf-8").trim();
+      if (current !== expected.trim()) continue;
+      unlinkSync(file);
     } catch {
-      // File already gone
+      // File already gone or unreadable
     }
   }
 }
