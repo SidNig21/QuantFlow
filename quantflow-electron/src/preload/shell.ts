@@ -574,3 +574,12 @@ contextBridge.exposeInMainWorld("kernelApi", {
     return () => ipcRenderer.removeListener("kernel:event", handler);
   },
 });
+
+// Embedded read-only Conductor (Goal 5A): read the assembled planning view and
+// run a plan (which appends a single planning receipt). No spawn/assign here.
+contextBridge.exposeInMainWorld("conductorApi", {
+  readView: (params?: { workflowId?: string }) =>
+    ipcRenderer.invoke("conductor:read-view", params ?? {}),
+  run: (params?: { workflowId?: string }) =>
+    ipcRenderer.invoke("conductor:run", params ?? {}),
+});

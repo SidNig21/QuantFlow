@@ -7,6 +7,12 @@ import {
   queryStateCardGet as stateCardGet,
   type StateCardSnapshot,
 } from '../state-cards/index';
+import {
+  queryConductorContext as conductorContext,
+  queryWorkflowSnapshot as workflowSnapshot,
+  type ConductorContext,
+  type WorkflowSnapshot,
+} from '../conductor/index';
 
 export interface TileSnapshot {
   id: string;
@@ -128,4 +134,19 @@ export function queryStateCardList(params: { workflowId?: string } = {}): StateC
 
 export function queryStateCardGet(tileId: string): StateCardSnapshot | null {
   return stateCardGet(getKernelDb(), tileId);
+}
+
+// ---------------------------------------------------------------------------
+// Conductor read surface (Goal 5A)
+// ---------------------------------------------------------------------------
+
+export function queryConductorContext(params: {
+  workflowId?: string;
+  receiptLimit?: number;
+} = {}): ConductorContext {
+  return conductorContext(getKernelDb(), params);
+}
+
+export function queryWorkflowSnapshot(workflowId: string): WorkflowSnapshot | null {
+  return workflowSnapshot(getKernelDb(), workflowId);
 }

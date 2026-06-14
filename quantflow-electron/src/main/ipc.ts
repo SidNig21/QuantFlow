@@ -31,6 +31,7 @@ import { registerEnvoyHandlers } from "./ipc-envoy";
 import { registerWorkflowHandlers } from "./ipc-workflow";
 import { registerKernelIpcHandlers } from "@qf-v3-main/ipc/kernel-ipc";
 import { registerKernelTaskRpc } from "@qf-v3-main/ipc/task-ipc";
+import { registerConductorIpc } from "@qf-v3-main/conductor/conductor-ipc";
 import { registerMethod } from "./json-rpc-server";
 import { QUANTFLOW_DIR } from "./paths";
 
@@ -163,4 +164,6 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerKernelIpcHandlers(QUANTFLOW_DIR);
   // Kernel task lifecycle + receipt chain over JSON-RPC (MCP gate tools).
   registerKernelTaskRpc(registerMethod);
+  // Embedded read-only Conductor (Goal 5A): read view + planning receipt.
+  registerConductorIpc();
 }

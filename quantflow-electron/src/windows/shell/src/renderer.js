@@ -84,6 +84,7 @@ import {
 	renderWatchtowerRail,
 	runWatchtowerFocusPlan,
 } from "./watchtower-view.js";
+import { createConductorPanel } from "./conductor-panel.js";
 import {
 	createPtyStartFailureDiagnostic,
 	createPtyRestoreFailureDiagnostic,
@@ -2435,6 +2436,9 @@ async function init() {
 		watchtowerTimer = null;
 	}
 
+	// -- Conductor panel (Goal 5A): read-only planner surface --
+	const conductorPanel = createConductorPanel();
+
 	const commandPalette = createCommandPalette({
 		document,
 		onClose: () => {
@@ -2669,6 +2673,14 @@ async function init() {
 					if (watchtowerVisible) hideWatchtower();
 					else showWatchtower();
 				},
+			},
+			{
+				id: "conductor-toggle",
+				title: conductorPanel.isVisible() ? "Hide Conductor" : "Open Conductor",
+				subtitle: "Read-only planner: reads Kernel state, posts planning receipts",
+				section: "Conductor",
+				keywords: ["planner", "plan", "conductor", "state cards"],
+				run: () => conductorPanel.toggle(),
 			},
 			{
 				id: "context-preview",

@@ -62,7 +62,11 @@ export type ReceiptType =
   | 'verification_passed'
   | 'verification_failed'
   | 'task_completed'
-  | 'task_failed';
+  | 'task_failed'
+  // Conductor planning evidence (Goal 5A). The read-only Conductor records its
+  // plan/reads/blockers/next-action as an append-only planning receipt. It is
+  // not a task transition — it never advances a task.
+  | 'planning';
 
 export type StateCardStatus = 'idle' | 'active' | 'blocked' | 'complete' | 'error';
 
@@ -314,7 +318,8 @@ export type KernelCommandType =
   | 'kernel.task.fail'
   | 'kernel.receipt.post'
   | 'kernel.state_card.update'
-  | 'kernel.artifact.create';
+  | 'kernel.artifact.create'
+  | 'kernel.conductor.plan';
 
 // ---------------------------------------------------------------------------
 // Canonical query types (Goal 2 will implement handlers for these)
@@ -330,4 +335,5 @@ export type KernelQueryType =
   | 'kernel.receipt.list'
   | 'kernel.state_card.list'
   | 'kernel.state_card.get'
-  | 'kernel.worker.list';
+  | 'kernel.worker.list'
+  | 'kernel.conductor.context';

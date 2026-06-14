@@ -10,6 +10,8 @@ import {
   queryReceiptList,
   queryStateCardList,
   queryStateCardGet,
+  queryConductorContext,
+  queryWorkflowSnapshot,
 } from '../../kernel/queries/index';
 import { startStateCardWatcher } from '../../kernel/watchers/index';
 import type { TaskStatus } from '../../kernel/schema/types';
@@ -56,6 +58,13 @@ export function registerKernelIpcHandlers(dataDir: string): void {
           });
         case 'kernel.state_card.get':
           return queryStateCardGet(params['tileId'] as string);
+        case 'kernel.conductor.context':
+          return queryConductorContext({
+            workflowId: params['workflowId'] as string | undefined,
+            receiptLimit: params['receiptLimit'] as number | undefined,
+          });
+        case 'kernel.workflow.snapshot':
+          return queryWorkflowSnapshot(params['workflowId'] as string);
         default:
           throw new Error(`Unknown kernel query: ${type}`);
       }

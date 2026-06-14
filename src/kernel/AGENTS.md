@@ -22,6 +22,7 @@ All canonical state and the mutation/query boundary:
 - `receipts/index.ts` — Append-only receipt store: `postReceipt`, `kernel.receipt.post`, `kernel.artifact.create`, receipt-chain query. (Goal 3)
 - `state-cards/index.ts` and `watchers/index.ts` — Kernel-owned StateCard upserts/queries and the event watcher that promotes task, receipt, and tile events into current tile summaries. (Goal 4)
 - `worker-instances/index.ts` — minimal Goal 4 link only: `ensureWorkerInstanceForTile` / `queryWorkerForTile` create/return a default WorkerInstance per tile so Kernel tasks claimed by tile surface on its State Card. role/harness/model are intentionally NULL. (Goal 4)
+- `conductor/index.ts` — read-only Conductor surface: `queryConductorContext` (aggregate read of workflow/tiles/state-cards/tasks/receipts), `queryWorkflowSnapshot`, and `kernel.conductor.plan` which appends an append-only `planning` receipt (the Conductor's only write). No task advancement. (Goal 5A)
 - Future: full WorkerInstance registry — roles, harness, model, permissions, lifecycle (Goal 6).
 - Future: Harness registry — configuration only, not harness implementations (Goal 6).
 

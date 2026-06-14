@@ -2163,6 +2163,111 @@ html.platform-win #panel-viewer::before {
 	word-break: break-word;
 }
 
+/* -- Conductor panel (Goal 5A) -- read-only planner surface */
+#conductor-panel {
+	position: fixed;
+	top: 56px;
+	right: 16px;
+	width: 360px;
+	max-height: calc(100vh - 96px);
+	display: flex;
+	flex-direction: column;
+	background: var(--tile-bg);
+	color: var(--fg);
+	border: 1px solid var(--tile-border);
+	border-radius: var(--r-tile);
+	box-shadow: var(--sh-tile);
+	z-index: 50;
+	overflow: hidden;
+}
+
+#conductor-panel[hidden] {
+	display: none;
+}
+
+.cdr-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	border-bottom: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+}
+
+.cdr-title {
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.cdr-mode {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	opacity: 0.5;
+}
+
+.cdr-actions {
+	margin-left: auto;
+	display: flex;
+	gap: 6px;
+}
+
+.cdr-actions button {
+	font-size: 11px;
+	padding: 3px 8px;
+	border-radius: 5px;
+	border: 1px solid var(--tile-border);
+	background: transparent;
+	color: var(--fg);
+	cursor: pointer;
+}
+
+.cdr-actions button:hover {
+	background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.cdr-workflow {
+	padding: 6px 10px;
+	font-size: 11px;
+	opacity: 0.7;
+	border-bottom: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.cdr-body {
+	padding: 8px 10px;
+	overflow: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.cdr-row {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.cdr-label {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	opacity: 0.5;
+}
+
+.cdr-value {
+	font-size: 12px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.cdr-foot {
+	padding: 6px 10px;
+	font-size: 10px;
+	opacity: 0.5;
+	border-top: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
 .canvas-tile[data-source-tile-type="term"] {
 	background: var(--tile-bg);
 }
