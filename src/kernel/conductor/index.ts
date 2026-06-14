@@ -98,7 +98,7 @@ export function queryConductorContext(
     tiles: readTiles(db, workflowId),
     stateCards: queryStateCardList(db, workflowId ? { workflowId } : {}),
     tasks: queryTaskList(db, workflowId ? { workflowId } : {}),
-    recentReceipts: queryReceiptList(db, { limit: receiptLimit }),
+    recentReceipts: queryReceiptList(db, workflowId ? { workflowId, limit: receiptLimit } : { limit: receiptLimit }),
   };
 }
 

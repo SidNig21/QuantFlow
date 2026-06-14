@@ -200,7 +200,8 @@ CREATE TABLE receipts (
   type              TEXT NOT NULL,
   -- canonical: task_created, task_claimed, task_started, progress, artifact_created,
   --            task_blocked, task_submitted, verification_started, verification_passed,
-  --            verification_failed, task_completed, task_failed
+  --            verification_failed, task_completed, task_failed,
+  --            planning (Goal 5A: Conductor planning evidence; not a task transition)
   summary           TEXT NOT NULL DEFAULT '',
   artifact_refs_json TEXT NOT NULL DEFAULT '[]',
   parent_receipt_id TEXT REFERENCES receipts(id),

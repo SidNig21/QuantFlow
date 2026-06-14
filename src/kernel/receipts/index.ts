@@ -198,12 +198,14 @@ function rowToReceipt(r: ReceiptRow): ReceiptSnapshot {
 }
 
 /**
- * The receipt chain for a task or correlation id, oldest first. This is the
- * "inspect the receipt chain" surface from the Goal 3 acceptance test.
+ * The receipt chain for a task, correlation id, or workflow, oldest first
+ * (newest first for the unscoped list). This is the "inspect the receipt chain"
+ * surface from the Goal 3 acceptance test. A `workflowId` keeps a workflow-scoped
+ * reader (e.g. the Conductor) from seeing receipts in other workflows.
  */
 export function queryReceiptList(
   db: KernelDB,
-  params: { taskId?: string; correlationId?: string; limit?: number } = {},
+  params: { taskId?: string; correlationId?: string; workflowId?: string; limit?: number } = {},
 ): ReceiptSnapshot[] {
   const limit = Number.isFinite(params.limit) ? Number(params.limit) : 200;
   let rows: ReceiptRow[];
@@ -215,6 +217,10 @@ export function queryReceiptList(
     rows = db
       .prepare('SELECT * FROM receipts WHERE correlation_id = ? ORDER BY created_at ASC, rowid ASC LIMIT ?')
       .all(params.correlationId, limit) as ReceiptRow[];
+  } else if (params.workflowId) {
+    rows = db
+      .prepare('SELECT * FROM receipts WHERE workflow_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?')
+      .all(params.workflowId, limit) as ReceiptRow[];
   } else {
     rows = db
       .prepare('SELECT * FROM receipts ORDER BY created_at DESC, rowid DESC LIMIT ?')

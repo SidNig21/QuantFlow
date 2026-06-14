@@ -232,6 +232,7 @@ verification_passed
 verification_failed
 task_completed
 task_failed
+planning          (Goal 5A: Conductor planning evidence; not a task transition)
 ```
 
 ---

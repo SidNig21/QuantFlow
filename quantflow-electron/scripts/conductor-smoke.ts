@@ -91,6 +91,19 @@ check('no task advanced by planning', JSON.stringify(before) === JSON.stringify(
 console.log('\n— planning requires a summary (guard) —');
 check('empty plan rejected', handleConductorCommand(kdb, 'kernel.conductor.plan', {}).ok === false);
 
+console.log('\n— workflow scoping: wf1 context excludes wf2 receipts —');
+db.prepare(`INSERT INTO workflows (id, name, objective, status, created_at, updated_at) VALUES ('wf2','Other','o','active',?,?)`).run(now, now);
+handleTileCommand(kdb, 'kernel.tile.create', { id: 'tile2', workflowId: 'wf2', displayName: 'Other worker', tileKind: 'worker' });
+handleTaskCommand(kdb, 'kernel.task.create', { id: 'taskW2', workflowId: 'wf2', title: 'Other work', objective: 'o' });
+handleConductorCommand(kdb, 'kernel.conductor.plan', { workflowId: 'wf2', summary: 'WF2 ONLY plan' });
+
+const ctx1 = queryConductorContext(kdb, { workflowId: 'wf1' });
+const ctx2 = queryConductorContext(kdb, { workflowId: 'wf2' });
+check('wf1 context has no wf2 receipts', ctx1.recentReceipts.every((r) => r.workflowId === 'wf1'));
+check('wf1 context excludes the WF2 ONLY plan', !ctx1.recentReceipts.some((r) => r.summary === 'WF2 ONLY plan'));
+check('wf2 context includes its own plan', ctx2.recentReceipts.some((r) => r.summary === 'WF2 ONLY plan'));
+check('wf1 tasks exclude wf2 tasks', ctx1.tasks.every((t) => t.workflowId === 'wf1'));
+
 console.log('\n— renderer projector (formatConductorView) —');
 const view = {
   workflow: { name: 'Replay loader', status: 'active', taskCount: 2, blockedTaskCount: 1 },

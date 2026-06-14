@@ -50,6 +50,7 @@ export function registerKernelIpcHandlers(dataDir: string): void {
           return queryReceiptList({
             taskId: params['taskId'] as string | undefined,
             correlationId: params['correlationId'] as string | undefined,
+            workflowId: params['workflowId'] as string | undefined,
             limit: params['limit'] as number | undefined,
           });
         case 'kernel.state_card.list':

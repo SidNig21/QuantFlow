@@ -123,6 +123,7 @@ export function queryTaskGet(taskId: string): TaskSnapshot | null {
 export function queryReceiptList(params: {
   taskId?: string;
   correlationId?: string;
+  workflowId?: string;
   limit?: number;
 } = {}): ReceiptSnapshot[] {
   return receiptList(getKernelDb(), params);

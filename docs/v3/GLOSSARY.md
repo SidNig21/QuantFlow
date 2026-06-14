@@ -57,7 +57,8 @@ The evidence unit. Append-only proof of what a worker did, submitted, or complet
 ```text
 task_created, task_claimed, task_started, progress, artifact_created,
 task_blocked, task_submitted, verification_started, verification_passed,
-verification_failed, task_completed, task_failed
+verification_failed, task_completed, task_failed,
+planning   (Conductor planning evidence — Goal 5A; not a task transition)
 ```
 
 Receipts are never deleted or modified.

@@ -159,12 +159,17 @@ export function registerKernelTaskRpc(registerMethod: RegisterMethod): void {
       return queryReceiptList({
         taskId: p['taskId'] as string | undefined,
         correlationId: p['correlationId'] as string | undefined,
+        workflowId: p['workflowId'] as string | undefined,
         limit: p['limit'] as number | undefined,
       });
     },
     {
-      description: 'Inspect the Kernel receipt chain for a task or correlation id',
-      params: { taskId: '(optional) task id', correlationId: '(optional) correlation id' },
+      description: 'Inspect the Kernel receipt chain for a task, correlation id, or workflow',
+      params: {
+        taskId: '(optional) task id',
+        correlationId: '(optional) correlation id',
+        workflowId: '(optional) workflow id',
+      },
     },
   );
 
