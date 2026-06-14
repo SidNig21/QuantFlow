@@ -42,7 +42,7 @@ Installed:
 
 ## Current Plan State
 
-Goals 0-5A are complete and approved.
+Goals 0-5A are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens Conductor through the shell command palette, and the read-only panel live-refreshes from Kernel state after tile spawn.
 
 The back half has been refined:
 

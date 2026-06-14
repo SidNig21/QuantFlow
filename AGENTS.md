@@ -171,7 +171,7 @@ Repo docs win for code scope. Vault root reference files can inform decisions, b
 
 ## Current v3 State
 
-Goals 0-5A are complete and approved. The next step is the worker-spawn reconciliation gate:
+Goals 0-5A are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens the shell command palette/Conductor path, and the read-only Conductor panel live-refreshes from Kernel state after tile spawn. The next step is the worker-spawn reconciliation gate:
 
 ```text
 Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry
