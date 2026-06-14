@@ -20,6 +20,7 @@ import type { KernelDB } from '../database';
 import type { TaskRow, TaskStatus } from '../schema/types';
 import { emitKernelEvent } from '../events/index';
 import { postReceipt } from '../receipts/index';
+import { ensureWorkerInstanceForTile } from '../worker-instances/index';
 import type { CommandResult } from '../commands/types';
 import { assertTransition } from './state-machine';
 import {
@@ -170,8 +171,16 @@ function taskClaim(db: KernelDB, payload: Record<string, unknown>): CommandResul
 
   try {
     const now = Date.now();
+    // Resolve the owning worker: explicit ownerWorkerId wins; otherwise, if a
+    // tileId is supplied, ensure/derive the tile's default WorkerInstance so the
+    // claimed task surfaces on that tile's State Card (Goal 4 link).
+    let ownerWorkerId =
+      (payload['ownerWorkerId'] as string | null) ?? task.owner_worker_id ?? null;
+    if (!ownerWorkerId && typeof payload['tileId'] === 'string') {
+      ownerWorkerId = ensureWorkerInstanceForTile(db, payload['tileId'] as string);
+    }
     setStatus(db, id, 'claimed', {
-      owner_worker_id: (payload['ownerWorkerId'] as string | null) ?? task.owner_worker_id ?? null,
+      owner_worker_id: ownerWorkerId,
       claimed_at: now,
     });
     const updated = getTask(db, id)!;

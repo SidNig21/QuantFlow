@@ -21,7 +21,8 @@ All canonical state and the mutation/query boundary:
 - `tasks/index.ts` — Task command handlers (create/claim/start/submit/verify/reject/complete/block/fail) + task queries. Posts a receipt for every transition. (Goal 3)
 - `receipts/index.ts` — Append-only receipt store: `postReceipt`, `kernel.receipt.post`, `kernel.artifact.create`, receipt-chain query. (Goal 3)
 - Future: StateCard watchers (Goal 4).
-- Future: WorkerInstance registry (Goal 6).
+- `worker-instances/index.ts` — minimal Goal 4 link only: `ensureWorkerInstanceForTile` / `queryWorkerForTile` create/return a default WorkerInstance per tile so Kernel tasks claimed by tile surface on its State Card. role/harness/model are intentionally NULL. (Goal 4)
+- Future: full WorkerInstance registry — roles, harness, model, permissions, lifecycle (Goal 6).
 - Future: Harness registry — configuration only, not harness implementations (Goal 6).
 
 ## Authority Rules

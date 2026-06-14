@@ -60,7 +60,11 @@ export function registerKernelTaskRpc(registerMethod: RegisterMethod): void {
 
   registerMethod('kernel.taskClaim', command('kernel.task.claim'), {
     description: 'Claim a Kernel task (open → claimed). Stale claims are reclaimable.',
-    params: { taskId: 'Task id', ownerWorkerId: '(optional) claiming worker id' },
+    params: {
+      taskId: 'Task id',
+      ownerWorkerId: '(optional) claiming worker id',
+      tileId: '(optional) tile to claim for; ensures/derives its default worker so the task surfaces on that tile\'s State Card',
+    },
   });
 
   registerMethod('kernel.taskStart', command('kernel.task.start'), {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { KernelDB } from '../database';
 import { emitKernelEvent } from '../events/index';
+import { ensureWorkerInstanceForTile } from '../worker-instances/index';
 import type { CommandResult } from './types';
 
 export function handleTileCommand(
@@ -46,6 +47,13 @@ function tileCreate(db: KernelDB, payload: Record<string, unknown>): CommandResu
       now,
       now,
     );
+    // Ensure a default WorkerInstance for worker tiles so Kernel tasks can be
+    // claimed against the tile and surface on its State Card (Goal 4 link;
+    // full registry is Goal 6).
+    const tileKind = (payload['tileKind'] as string | undefined) ?? 'worker';
+    if (tileKind === 'worker') {
+      ensureWorkerInstanceForTile(db, id);
+    }
     emitKernelEvent({
       kind: 'tile.created',
       tileId: id,
