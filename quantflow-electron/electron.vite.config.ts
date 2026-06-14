@@ -18,6 +18,8 @@ export default defineConfig({
     resolve: {
       alias: {
         "@collab/shared": resolve(__dirname, "packages/shared/src"),
+        "@qf-kernel": resolve(__dirname, "../src/kernel"),
+        "@qf-v3-main": resolve(__dirname, "../src/main"),
       },
     },
     build: {

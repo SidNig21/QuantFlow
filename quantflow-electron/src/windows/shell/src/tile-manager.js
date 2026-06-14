@@ -151,6 +151,68 @@ export function createTileManager({
 		onReposition?.();
 	}
 
+	// -- Drag/resize commit: Kernel write gate --
+	// The live drag/resize in tile-interactions.js is provisional UI only. On
+	// mouseup the manager awaits Kernel acceptance before the new position/size
+	// is committed (repositioned + saved). On rejection the tile reverts to the
+	// previous Kernel-backed values.
+	// intent -> Kernel command -> Kernel write -> event -> renderer commit.
+	async function commitTileMoves(movedTiles) {
+		if (window.kernelApi) {
+			for (const m of movedTiles) {
+				const kr = await window.kernelApi.sendCommand("kernel.tile.move", {
+					id: m.tile.id, x: m.tile.x, y: m.tile.y,
+				});
+				if (kr && kr.ok === false) {
+					m.tile.x = m.prevX;
+					m.tile.y = m.prevY;
+				}
+			}
+		}
+		repositionAllTiles();
+		saveCanvasImmediate();
+	}
+
+	async function commitTileResize(tile, prev) {
+		if (window.kernelApi) {
+			let rejected = false;
+			// N/W resize also moves x/y. Gate the move first so Kernel never
+			// disagrees with saved renderer position.
+			const moved = tile.x !== prev.x || tile.y !== prev.y;
+			let moveAccepted = false;
+			if (moved) {
+				const km = await window.kernelApi.sendCommand("kernel.tile.move", {
+					id: tile.id, x: tile.x, y: tile.y,
+				});
+				if (km && km.ok === false) rejected = true;
+				else moveAccepted = true;
+			}
+			if (!rejected) {
+				const kr = await window.kernelApi.sendCommand("kernel.tile.resize", {
+					id: tile.id, width: tile.width, height: tile.height,
+				});
+				if (kr && kr.ok === false) rejected = true;
+			}
+			if (rejected) {
+				// Defensive: if the move was accepted but a later step failed,
+				// resync Kernel back to the prior position so neither store
+				// keeps a value the other rejected. (Both commands target the
+				// same row, so this partial case is not reachable in practice.)
+				if (moveAccepted) {
+					await window.kernelApi.sendCommand("kernel.tile.move", {
+						id: tile.id, x: prev.x, y: prev.y,
+					});
+				}
+				tile.x = prev.x;
+				tile.y = prev.y;
+				tile.width = prev.width;
+				tile.height = prev.height;
+			}
+		}
+		repositionAllTiles();
+		saveCanvasImmediate();
+	}
+
 	// -- Selection visuals --
 
 	function syncSelectionVisuals() {
@@ -546,8 +608,17 @@ export function createTileManager({
 
 	// -- Tile CRUD --
 
-	function createCanvasTile(type, cx, cy, extra = {}) {
+	// kernelMode:
+	//   'gate'    — manual/MCP intent. Kernel must accept the create before the
+	//               tile becomes canonical; on rejection the provisional tile is
+	//               rolled back (before any DOM/webview/save) and null returned.
+	//   'hydrate' — restore from saved JSON. Kernel create is awaited as an
+	//               idempotent hydration of already-canonical state; the tile is
+	//               kept regardless so a Kernel hiccup never drops a restore.
+	async function createCanvasTile(type, cx, cy, extra = {}, { kernelMode = "gate" } = {}) {
 		const size = defaultSize(type);
+		// Provisional local tile: snapped first so the Kernel record and the
+		// renderer agree on the committed position. Not yet rendered or saved.
 		const tile = addTile({
 			id: extra.id || generateId(),
 			type,
@@ -559,6 +630,25 @@ export function createTileManager({
 		});
 		ensureRouteHandle(tile, tiles);
 		snapToGrid(tile);
+
+		// Kernel write gate: intent -> Kernel command -> Kernel write -> event.
+		if (window.kernelApi) {
+			const kr = await window.kernelApi.sendCommand("kernel.tile.create", {
+				id: tile.id,
+				displayName: tile.userTitle || tile.type,
+				tileKind: "worker",
+				x: tile.x,
+				y: tile.y,
+				width: tile.width,
+				height: tile.height,
+			});
+			if (kernelMode === "gate" && kr && kr.ok === false) {
+				// Reliable rollback before any DOM/webview/save commits.
+				removeTile(tile.id);
+				return null;
+			}
+		}
+
 		window.shellApi.trackEvent("tile_created", { type });
 
 		const dom = createTileDOM(tile, {
@@ -596,15 +686,16 @@ export function createTileManager({
 				spawnBrowserWebview(t);
 				saveCanvasImmediate();
 			},
-			onDuplicate: (id) => {
+			onDuplicate: async (id) => {
 				const t = getTile(id);
 				if (!t) return;
 				const gap = 40;
-				const newTile = createCanvasTile("term", t.x + t.width + gap, t.y, {
+				const newTile = await createCanvasTile("term", t.x + t.width + gap, t.y, {
 					cwd: t.cwd,
 					width: t.width,
 					height: t.height,
 				});
+				if (!newTile) return; // Kernel rejected the create
 				spawnTerminalWebview(newTile, true);
 				saveCanvasImmediate();
 			},
@@ -666,6 +757,7 @@ export function createTileManager({
 			onFocus: (id, e) => focusCanvasTile(id, e),
 			isSpaceHeld,
 			contentOverlay: dom.contentOverlay,
+			onCommit: commitTileMoves,
 		});
 		attachResize(
 			dom.container, tile, viewport,
@@ -677,6 +769,7 @@ export function createTileManager({
 					onTerminalTileResized(t.width, t.height);
 				}
 			},
+			commitTileResize,
 		);
 
 		// Cable draw: intercept mousedown before drag fires
@@ -694,7 +787,22 @@ export function createTileManager({
 		return tile;
 	}
 
-	function closeCanvasTile(id) {
+	async function closeCanvasTile(id) {
+		// Kernel write gate: associated connections, then the tile, must be
+		// accepted as removed before canonical local state is torn down.
+		// intent -> Kernel command -> Kernel write -> event -> local removal.
+		if (window.kernelApi) {
+			for (const conn of getConnectionsForTile(id)) {
+				await window.kernelApi.sendCommand(
+					"kernel.connection.delete", { id: conn.id },
+				);
+			}
+			const kr = await window.kernelApi.sendCommand(
+				"kernel.tile.remove", { id },
+			);
+			if (kr && kr.ok === false) return false; // Kernel rejected — keep tile
+		}
+
 		const dom = tileDOMs.get(id);
 		if (dom) {
 			dom.container.remove();
@@ -732,8 +840,9 @@ export function createTileManager({
 		return closeCanvasTile(id);
 	}
 
-	function createFileTile(type, cx, cy, filePath, extra = {}) {
-		const tile = createCanvasTile(type, cx, cy, { ...extra, filePath });
+	async function createFileTile(type, cx, cy, filePath, extra = {}, opts = {}) {
+		const tile = await createCanvasTile(type, cx, cy, { ...extra, filePath }, opts);
+		if (!tile) return null; // Kernel rejected the create
 		const dom = tileDOMs.get(tile.id);
 		if (!dom) return tile;
 
@@ -781,19 +890,20 @@ export function createTileManager({
 		return tile;
 	}
 
-	function createGraphTile(cx, cy, folderPath, workspacePath) {
-		const tile = createCanvasTile("graph", cx, cy, {
+	async function createGraphTile(cx, cy, folderPath, workspacePath) {
+		const tile = await createCanvasTile("graph", cx, cy, {
 			folderPath, workspacePath,
 		});
+		if (!tile) return null; // Kernel rejected the create
 		spawnGraphWebview(tile);
 		saveCanvasImmediate();
 		return tile;
 	}
 
-	function clearCanvas(viewportObj) {
+	async function clearCanvas(viewportObj) {
 		const tileIds = tiles.map((t) => t.id);
 		for (const id of tileIds) {
-			closeCanvasTile(id);
+			await closeCanvasTile(id);
 		}
 		viewportState.panX = 0;
 		viewportState.panY = 0;
@@ -804,7 +914,7 @@ export function createTileManager({
 
 	// -- Canvas state restore --
 
-	function restoreCanvasState(savedTiles) {
+	async function restoreCanvasState(savedTiles) {
 		for (const saved of savedTiles) {
 			let cx = saved.x;
 			let cy = saved.y;
@@ -818,7 +928,7 @@ export function createTileManager({
 			}
 
 			if (saved.type === "term") {
-				const tile = createCanvasTile(
+				const tile = await createCanvasTile(
 					"term", cx, cy, {
 						id: saved.id,
 						width: saved.width,
@@ -848,10 +958,11 @@ export function createTileManager({
 						roleStartupSessionId: saved.roleStartupSessionId,
 						roleStartupPromptSessionId: saved.roleStartupPromptSessionId,
 					},
+					{ kernelMode: "hydrate" },
 				);
-				spawnTerminalWebview(tile);
+				if (tile) spawnTerminalWebview(tile);
 			} else if (saved.type === "graph" && saved.folderPath) {
-				const tile = createCanvasTile(
+				const tile = await createCanvasTile(
 					"graph", cx, cy, {
 						id: saved.id,
 						width: saved.width,
@@ -860,10 +971,11 @@ export function createTileManager({
 						folderPath: saved.folderPath,
 						workspacePath: saved.workspacePath,
 					},
+					{ kernelMode: "hydrate" },
 				);
-				spawnGraphWebview(tile);
+				if (tile) spawnGraphWebview(tile);
 			} else if (saved.type === "browser") {
-				const tile = createCanvasTile(
+				const tile = await createCanvasTile(
 					"browser", cx, cy, {
 						id: saved.id,
 						width: saved.width,
@@ -871,16 +983,18 @@ export function createTileManager({
 						zIndex: saved.zIndex,
 						url: saved.url,
 					},
+					{ kernelMode: "hydrate" },
 				);
-				spawnBrowserWebview(tile);
+				if (tile) spawnBrowserWebview(tile);
 			} else if (saved.filePath) {
-				createFileTile(
+				await createFileTile(
 					saved.type, cx, cy, saved.filePath, {
 						id: saved.id,
 						width: saved.width,
 						height: saved.height,
 						zIndex: saved.zIndex,
 					},
+					{ kernelMode: "hydrate" },
 				);
 			}
 		}
@@ -919,17 +1033,17 @@ export function createTileManager({
 		if (anyUpdated) saveCanvasDebounced();
 	}
 
-	function closeTilesForDeletedPaths(deletedPaths) {
+	async function closeTilesForDeletedPaths(deletedPaths) {
 		const deleted = new Set(deletedPaths);
 		for (const t of [...tiles]) {
 			if (t.filePath && deleted.has(t.filePath)) {
-				closeCanvasTile(t.id);
+				await closeCanvasTile(t.id);
 			}
 			if (
 				t.type === "graph" && t.folderPath &&
 				deleted.has(t.folderPath)
 			) {
-				closeCanvasTile(t.id);
+				await closeCanvasTile(t.id);
 			}
 		}
 	}

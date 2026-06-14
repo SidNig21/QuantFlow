@@ -2,4 +2,13 @@
 
 Superseded planning material. **Do not execute from here.**
 
-Active v2 docs live at the repo root: `CONCEPT.md` → `SCOPE.md` → `BUILD_PLAN_V2.md`.
+Current v3 execution lives at the repo root:
+
+```text
+AGENTS.md
+BUILD_PLAN_V3.md
+CONCEPT.md
+VAULT.md
+```
+
+Use archived v2 material only when `BUILD_PLAN_V3.md` explicitly asks for shipped-behavior or historical context.

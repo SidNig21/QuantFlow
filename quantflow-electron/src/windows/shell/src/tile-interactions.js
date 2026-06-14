@@ -39,6 +39,7 @@ export function attachDrag(titleBar, tile, {
   onFocus,
   isSpaceHeld,
   contentOverlay,
+  onCommit,
 }) {
   function startDrag(e, { deferFocus = false } = {}) {
     if (e.button !== 0) return;
@@ -124,15 +125,23 @@ export function attachDrag(titleBar, tile, {
       }
 
       container.classList.remove("tile-dragging");
+      // Snap is provisional UI; collect prev positions so the manager can
+      // revert if the Kernel rejects the committed move.
+      const committed = [];
       if (isGroupDrag) {
         for (const entry of groupCtx) {
           entry.container.classList.remove("tile-dragging");
           snapToGrid(entry.tile);
+          committed.push({
+            tile: entry.tile, prevX: entry.startX, prevY: entry.startY,
+          });
         }
       } else {
         snapToGrid(tile);
+        committed.push({ tile, prevX: startTX, prevY: startTY });
       }
       onUpdate();
+      if (moved && onCommit) onCommit(committed);
     }
 
     document.addEventListener("mousemove", onMove);
@@ -289,7 +298,7 @@ export function attachMarquee(canvasEl, {
  */
 export function attachResize(
   container, tile, viewport, onUpdate, getAllWebviews, onFocus,
-  onResizeEnd,
+  onResizeEnd, onResizeCommit,
 ) {
   const edges = ["n", "s", "e", "w"];
   const corners = ["nw", "ne", "sw", "se"];
@@ -364,6 +373,14 @@ export function attachResize(
         snapToGrid(tile);
         onUpdate();
         if (onResizeEnd) onResizeEnd(tile);
+        // Snap/resize was provisional UI; gate the full committed geometry
+        // through Kernel. N/W handles move x/y as well as size, so the commit
+        // gets the complete prior geometry to revert to on rejection.
+        if (onResizeCommit) {
+          onResizeCommit(tile, {
+            x: startX, y: startY, width: startW, height: startH,
+          });
+        }
         if (onFocus) onFocus();
       }
 

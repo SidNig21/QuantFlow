@@ -522,28 +522,32 @@ export function createCanvasRpc({
 
 					let tile;
 					if (tileType === "term") {
-						tile = tileManager.createCanvasTile(
+						tile = await tileManager.createCanvasTile(
 							"term", pos.x, pos.y,
 						);
-						tileManager.spawnTerminalWebview(tile);
+						if (tile) tileManager.spawnTerminalWebview(tile);
 					} else if (tileType === "browser") {
-						tile = tileManager.createCanvasTile(
+						tile = await tileManager.createCanvasTile(
 							"browser", pos.x, pos.y, { url: params.url },
 						);
-						tileManager.spawnBrowserWebview(tile, false);
+						if (tile) tileManager.spawnBrowserWebview(tile, false);
 					} else if (tileType === "pdf") {
-						tile = tileManager.createFileTile(
+						tile = await tileManager.createFileTile(
 							"pdf", pos.x, pos.y, params.filePath,
 						);
 					} else if (tileType === "graph") {
 						const wsPath = "";
-						tile = tileManager.createGraphTile(
+						tile = await tileManager.createGraphTile(
 							pos.x, pos.y, params.filePath, wsPath,
 						);
 					} else {
-						tile = tileManager.createFileTile(
+						tile = await tileManager.createFileTile(
 							tileType, pos.x, pos.y, params.filePath,
 						);
+					}
+					if (!tile) {
+						respondError(requestId, 5, "Kernel rejected tile.create");
+						return;
 					}
 					tileManager.saveCanvasImmediate();
 					result = { tileId: tile.id };
@@ -619,7 +623,7 @@ export function createCanvasRpc({
 				}
 				case "tileRemove": {
 					if (!requireTile(requestId, params.tileId)) return;
-					tileManager.closeCanvasTile(params.tileId);
+					await tileManager.closeCanvasTile(params.tileId);
 					result = {};
 					break;
 				}
@@ -710,8 +714,30 @@ export function createCanvasRpc({
 						return;
 					}
 					const now = Date.now();
+					const connId = generateConnectionId();
+					// Kernel write gate: Kernel must accept before the shell
+					// mutates/saves canonical connection state. The main-side
+					// canvas-rpc.ts dispatches the same id afterward, which is an
+					// idempotent no-op.
+					if (window.kernelApi) {
+						const kr = await window.kernelApi.sendCommand(
+							"kernel.connection.create", {
+								id: connId,
+								tileAId: validation.tileAId,
+								tileBId: validation.tileBId,
+								label: params.label ?? null,
+							},
+						);
+						if (kr && kr.ok === false) {
+							respondError(
+								requestId, 5,
+								`Kernel rejected connection.create: ${kr.error}`,
+							);
+							return;
+						}
+					}
 					result = addConnection({
-						id: generateConnectionId(),
+						id: connId,
 						tileAId: validation.tileAId,
 						tileBId: validation.tileBId,
 						label: params.label,

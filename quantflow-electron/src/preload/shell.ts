@@ -559,3 +559,18 @@ contextBridge.exposeInMainWorld("shellApi", {
   contextInjectToTile: (sessionId: string): Promise<unknown> =>
     ipcRenderer.invoke("context:inject-to-tile", sessionId),
 });
+
+// Kernel authority API — separate namespace from shellApi
+contextBridge.exposeInMainWorld("kernelApi", {
+  sendCommand: (type: string, payload: Record<string, unknown>) =>
+    ipcRenderer.invoke("kernel:command", type, payload),
+
+  sendQuery: (type: string, params?: Record<string, unknown>) =>
+    ipcRenderer.invoke("kernel:query", type, params ?? {}),
+
+  onEvent: (cb: (payload: unknown) => void) => {
+    const handler = (_event: unknown, payload: unknown) => cb(payload);
+    ipcRenderer.on("kernel:event", handler);
+    return () => ipcRenderer.removeListener("kernel:event", handler);
+  },
+});

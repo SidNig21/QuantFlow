@@ -29,6 +29,8 @@ import { registerHerdrSpawnHandlers } from "./ipc-herdr-spawn";
 import { registerOrchestrationHandlers } from "./ipc-orchestration";
 import { registerEnvoyHandlers } from "./ipc-envoy";
 import { registerWorkflowHandlers } from "./ipc-workflow";
+import { registerKernelIpcHandlers } from "@qf-v3-main/ipc/kernel-ipc";
+import { QUANTFLOW_DIR } from "./paths";
 
 const FS_CHANGE_DELETED = 3;
 
@@ -156,4 +158,5 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerOrchestrationHandlers();
   registerEnvoyHandlers();
   registerWorkflowHandlers();
+  registerKernelIpcHandlers(QUANTFLOW_DIR);
 }

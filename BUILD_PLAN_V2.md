@@ -1,8 +1,10 @@
 # QuantFlow v2 Build Plan
 
-This is the single working file for QuantFlow v2.
+V3 status: shipped-behavior reference only.
 
-Read `CONCEPT.md` first for the product definition. After that, work from this file only.
+Current v3 execution authority is `BUILD_PLAN_V3.md`.
+
+This file preserves the single working file for QuantFlow v2. Use it to understand shipped behavior, existing runtime facts, and old rejection context. Do not execute from this file on branch `quantflow-v3` unless `BUILD_PLAN_V3.md` explicitly points to a v2 detail.
 
 The archived 7-layer charters in `reference/archive/quantflow-v2-layer-charters/` are reference material, not an execution path. They are mapped below so useful thinking is not lost, but they do not control scope.
 
@@ -219,6 +221,8 @@ Full cross-map: repo `VAULT.md`. Vault archived: `Projects/QuantFlow/Build Plan.
 
 ## Operator Checklist Before Any Coding Session
 
+V3 note: do not use this checklist on branch `quantflow-v3`. Use `AGENTS.md`, `REPO_MAP.md`, and `BUILD_PLAN_V3.md`.
+
 1. Confirm branch is `quantflow-v2`.
 2. Read `CONCEPT.md`.
 3. Read this file — check **Build Path** order and **Current Slice**.
@@ -228,12 +232,14 @@ Full cross-map: repo `VAULT.md`. Vault archived: `Projects/QuantFlow/Build Plan.
 
 ## Agent Handoff
 
+V3 note: the block below is historical. For current work, read `AGENTS.md`, `REPO_MAP.md`, and `BUILD_PLAN_V3.md`; use this file only as shipped-behavior reference.
+
 Use this block for coding agents:
 
 ```text
-Branch quantflow-v2.
+Historical v2 branch: quantflow-v2.
 Read CONCEPT.md, then BUILD_PLAN_V2.md.
-BUILD_PLAN_V2.md is the only execution plan.
+For v3, BUILD_PLAN_V3.md is the only execution plan. BUILD_PLAN_V2.md is reference.
 Paired vault: C:\Users\rybow\Obsidian\Cursor Collab — see repo VAULT.md.
 Vault ladder: QuantFlow Goal Sessions.md. Tile agents: Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md.
 Vault Build Plan.md and Start Here.md are ARCHIVED — do not execute.

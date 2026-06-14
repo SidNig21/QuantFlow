@@ -194,7 +194,7 @@ async function main() {
       `Use targetTileId ${plannedCodexTileId}.`,
       `Use canvasId ${canvasId}.`,
       `Reuse correlation_id ${correlationId}.`,
-      "The child task should inspect BUILD_PLAN_V2.md and report the current slice in one short paragraph.",
+      "The child task should inspect BUILD_PLAN_V3.md and report the active v3 goal in one short paragraph.",
       "Spawn Codex with quantflow_role_spawn using workflowTaskId, workflowCorrelationId, and workflowEnvoySpaceId from the child task.",
       "Do not use quantflow_terminal_write or cable text for the handoff.",
       "After Codex completes, read qf_receipt_list and complete this parent task with the child task id and receipt count.",
@@ -217,18 +217,32 @@ async function main() {
   const hermesRole = await rpc("role.get", { id: "hermes" });
   if (!hermesRole?.id) throw new Error("Hermes role is unavailable");
 
-  const hermesSpawn = await rpc("canvas.roleSpawn", {
-    role: hermesRole,
-    tileId: hermesTileId,
-    canvasId,
-    workspaceId: canvasId,
-    workflowTaskId: parentTask.task_id,
-    workflowCorrelationId: correlationId,
-    workflowEnvoySpaceId: parentTask.envoy_space_id,
-    displayName: "Hermes phase-6 proof",
-    position: { x: 120, y: 120 },
-    size: { width: 620, height: 520 },
-  });
+  let hermesSpawn;
+  try {
+    hermesSpawn = await rpc("canvas.roleSpawn", {
+      role: hermesRole,
+      tileId: hermesTileId,
+      canvasId,
+      workspaceId: canvasId,
+      workflowTaskId: parentTask.task_id,
+      workflowCorrelationId: correlationId,
+      workflowEnvoySpaceId: parentTask.envoy_space_id,
+      displayName: "Hermes phase-6 proof",
+      position: { x: 120, y: 120 },
+      size: { width: 620, height: 520 },
+    });
+  } catch (err) {
+    // The relay's canvas RPC times out at 60s but the spawn keeps going
+    // (cold WSL/herdr start can exceed it). Confirm via tile registry
+    // instead of failing the whole trial on spawn RPC latency.
+    if (!/timed out|timeout/i.test(err instanceof Error ? err.message : String(err))) throw err;
+    hermesSpawn = await waitFor("Hermes tile to register after roleSpawn timeout", SLOW_RPC_TIMEOUT_MS, async () => {
+      const listed = await rpc("canvas.tileList");
+      const tiles = Array.isArray(listed?.tiles) ? listed.tiles : [];
+      const tile = tiles.find((item) => item.tileId === hermesTileId);
+      return tile ? { herdrPaneId: tile.herdrPaneId, terminalTarget: tile.raw?.terminalTarget } : null;
+    });
+  }
 
   const childTask = await waitFor("Hermes qf_task_create child task", timeoutMs, async () => {
     const listed = await rpc("envoy.taskList", { correlationId, status: "all" });

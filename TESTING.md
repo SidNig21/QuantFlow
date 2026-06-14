@@ -66,7 +66,7 @@ Key facts learned from live runs:
 Paste this to any agent:
 
 ```text
-QA-test QuantFlow (branch quantflow-v2, current slice: see BUILD_PLAN_V2.md).
+QA-test QuantFlow (branch quantflow-v3, active goal: see BUILD_PLAN_V3.md).
 
 App is running with CDP on 9222. Read TESTING.md first.
 

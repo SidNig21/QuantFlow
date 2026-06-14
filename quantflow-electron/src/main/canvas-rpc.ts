@@ -1,6 +1,8 @@
 import { ipcMain, type BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
 import { registerMethod } from "./json-rpc-server";
+import { dispatchKernelCommand } from "@qf-kernel/commands/index";
+import { subscribeWebContents } from "@qf-kernel/events/index";
 
 type PendingRequest = {
   resolve: (value: unknown) => void;
@@ -41,6 +43,7 @@ function sendToShell(
 
 export function registerCanvasRpc(win: BrowserWindow): void {
   shellWindow = win;
+  subscribeWebContents(win.webContents);
 
   ipcMain.on(
     "canvas:rpc-response",
@@ -74,7 +77,34 @@ export function registerCanvasRpc(win: BrowserWindow): void {
 
   registerMethod(
     "canvas.tileCreate",
-    (params) => sendToShell("canvas.tileCreate", params),
+    async (params) => {
+      // Renderer creates the tile first so we capture its assigned ID.
+      const result = await sendToShell("canvas.tileCreate", params) as Record<string, unknown> | null;
+      const tileId = (result?.['tileId'] ?? result?.['id']) as string | undefined;
+      if (!tileId) return result; // renderer returned no ID — no Kernel record
+
+      // Kernel write gate: must accept before this RPC call is treated as successful.
+      const p = params as Record<string, unknown>;
+      const pos = p['position'] as Record<string, number> | undefined;
+      const size = p['size'] as Record<string, number> | undefined;
+      const kernelResult = await dispatchKernelCommand('kernel.tile.create', {
+        id: tileId,
+        displayName: String(result['displayName'] ?? result['type'] ?? p['type'] ?? 'tile'),
+        tileKind: 'worker',
+        x: pos?.['x'] ?? 0,
+        y: pos?.['y'] ?? 0,
+        width: size?.['width'] ?? 320,
+        height: size?.['height'] ?? 240,
+      }, 'canvas-rpc');
+
+      if (!kernelResult.ok) {
+        // Kernel rejected — roll back the provisional renderer tile.
+        await sendToShell('canvas.tileRemove', { tileId }).catch(() => undefined);
+        throw new Error(`Kernel rejected tile.create: ${kernelResult.error}`);
+      }
+
+      return result;
+    },
     {
       description: "Create a new tile on the canvas",
       params: {
@@ -103,7 +133,21 @@ export function registerCanvasRpc(win: BrowserWindow): void {
 
   registerMethod(
     "canvas.tileRemove",
-    (params) => sendToShell("canvas.tileRemove", params),
+    async (params) => {
+      const p = params as Record<string, unknown>;
+      const tileId = p['tileId'] as string | undefined;
+
+      // Kernel write gate — removes record before visual removal.
+      if (tileId) {
+        const kernelResult = await dispatchKernelCommand('kernel.tile.remove', { id: tileId }, 'canvas-rpc');
+        if (!kernelResult.ok) {
+          throw new Error(`Kernel rejected tile.remove: ${kernelResult.error}`);
+        }
+      }
+
+      // Canvas visual removal.
+      return sendToShell('canvas.tileRemove', params);
+    },
     {
       description: "Remove a tile from the canvas",
       params: { tileId: "ID of the tile to remove" },
@@ -112,7 +156,26 @@ export function registerCanvasRpc(win: BrowserWindow): void {
 
   registerMethod(
     "canvas.tileMove",
-    (params) => sendToShell("canvas.tileMove", params),
+    async (params) => {
+      const p = params as Record<string, unknown>;
+      const pos = p['position'] as Record<string, number> | undefined;
+      const tileId = p['tileId'] as string | undefined;
+
+      // Kernel write gate — writes new position before visual update.
+      if (tileId && pos) {
+        const kernelResult = await dispatchKernelCommand('kernel.tile.move', {
+          id: tileId,
+          x: pos['x'] ?? 0,
+          y: pos['y'] ?? 0,
+        }, 'canvas-rpc');
+        if (!kernelResult.ok) {
+          throw new Error(`Kernel rejected tile.move: ${kernelResult.error}`);
+        }
+      }
+
+      // Canvas visual update.
+      return sendToShell('canvas.tileMove', params);
+    },
     {
       description: "Move a tile to a new position",
       params: {
@@ -124,7 +187,26 @@ export function registerCanvasRpc(win: BrowserWindow): void {
 
   registerMethod(
     "canvas.tileResize",
-    (params) => sendToShell("canvas.tileResize", params),
+    async (params) => {
+      const p = params as Record<string, unknown>;
+      const size = p['size'] as Record<string, number> | undefined;
+      const tileId = p['tileId'] as string | undefined;
+
+      // Kernel write gate — writes new dimensions before visual update.
+      if (tileId && size) {
+        const kernelResult = await dispatchKernelCommand('kernel.tile.resize', {
+          id: tileId,
+          width: size['width'] ?? 320,
+          height: size['height'] ?? 240,
+        }, 'canvas-rpc');
+        if (!kernelResult.ok) {
+          throw new Error(`Kernel rejected tile.resize: ${kernelResult.error}`);
+        }
+      }
+
+      // Canvas visual update.
+      return sendToShell('canvas.tileResize', params);
+    },
     {
       description: "Resize a tile",
       params: {
@@ -157,7 +239,34 @@ export function registerCanvasRpc(win: BrowserWindow): void {
 
   registerMethod(
     "canvas.connectionCreate",
-    (params) => sendToShell("canvas.connectionCreate", params),
+    async (params) => {
+      const p = params as Record<string, unknown>;
+      if (!p['tileAId'] || !p['tileBId']) {
+        return sendToShell('canvas.connectionCreate', params);
+      }
+
+      // Renderer creates connection first so we capture its assigned ID.
+      const result = await sendToShell('canvas.connectionCreate', params) as Record<string, unknown> | null;
+      const connId = result?.['id'] as string | undefined;
+
+      // Kernel write gate.
+      const kernelResult = await dispatchKernelCommand('kernel.connection.create', {
+        id: connId,
+        tileAId: p['tileAId'] as string,
+        tileBId: p['tileBId'] as string,
+        label: (p['label'] as string | null) ?? null,
+      }, 'canvas-rpc');
+
+      if (!kernelResult.ok) {
+        // Roll back provisional connection.
+        if (connId) {
+          await sendToShell('canvas.connectionRemove', { id: connId }).catch(() => undefined);
+        }
+        throw new Error(`Kernel rejected connection.create: ${kernelResult.error}`);
+      }
+
+      return result;
+    },
     {
       description: "Create a connection between two tiles",
       params: {
@@ -173,7 +282,21 @@ export function registerCanvasRpc(win: BrowserWindow): void {
 
   registerMethod(
     "canvas.connectionRemove",
-    (params) => sendToShell("canvas.connectionRemove", params),
+    async (params) => {
+      const p = params as Record<string, unknown>;
+      const id = p['id'] as string | undefined;
+
+      // Kernel write gate — removes record before visual removal.
+      if (id) {
+        const kernelResult = await dispatchKernelCommand('kernel.connection.delete', { id }, 'canvas-rpc');
+        if (!kernelResult.ok) {
+          throw new Error(`Kernel rejected connection.delete: ${kernelResult.error}`);
+        }
+      }
+
+      // Canvas visual removal.
+      return sendToShell('canvas.connectionRemove', params);
+    },
     {
       description: "Remove a canvas connection",
       params: { id: "ID of the connection to remove" },

@@ -1013,7 +1013,7 @@ async function init() {
 			);
 		}
 
-		function onUp(ev) {
+		async function onUp(ev) {
 			document.removeEventListener("mousemove", onMove);
 			document.removeEventListener("mouseup", onUp);
 
@@ -1057,6 +1057,29 @@ async function init() {
 					createdAt: now,
 					updatedAt: now,
 				};
+				// Kernel write gate: Kernel must accept the connection before it
+				// becomes canonical local state.
+				// intent -> Kernel command -> Kernel write -> event -> render.
+				if (window.kernelApi) {
+					const kr = await window.kernelApi.sendCommand(
+						"kernel.connection.create", {
+							id: conn.id,
+							tileAId: conn.tileAId,
+							tileBId: conn.tileBId,
+							label: conn.label ?? null,
+						},
+					);
+					if (kr && kr.ok === false) {
+						showCableHud(
+							`Connection rejected: ${kr.error}`, "warn", 1800,
+						);
+						clearCablePreview(cableLayerContent);
+						if (!cableHeld) {
+							canvasEl.classList.remove("cable-draw-mode");
+						}
+						return;
+					}
+				}
 				addConnection(conn);
 				operationalEvents.record({
 					type: "connection.created",
@@ -1566,19 +1589,21 @@ async function init() {
 		void spawnLegendRecipeAt(recipeId, position);
 	}
 
-	function spawnTerminalTileAt(x, y) {
+	async function spawnTerminalTileAt(x, y) {
 		const cwd = getTerminalCwd();
 		const size = getTerminalSize();
-		const tile = tileManager.createCanvasTile(
+		const tile = await tileManager.createCanvasTile(
 			"term", x, y, { cwd, ...size },
 		);
+		if (!tile) return null; // Kernel rejected the create
 		tileManager.spawnTerminalWebview(tile, true);
 		tileManager.saveCanvasImmediate();
 		return tile;
 	}
 
-	function spawnBrowserTileAt(x, y) {
-		const tile = tileManager.createCanvasTile("browser", x, y);
+	async function spawnBrowserTileAt(x, y) {
+		const tile = await tileManager.createCanvasTile("browser", x, y);
+		if (!tile) return null; // Kernel rejected the create
 		tileManager.spawnBrowserWebview(tile, true);
 		tileManager.saveCanvasImmediate();
 		return tile;
@@ -1819,13 +1844,7 @@ async function init() {
 		const cx = (screenX - viewportState.panX) / viewportState.zoom;
 		const cy = (screenY - viewportState.panY) / viewportState.zoom;
 
-		const cwd = getTerminalCwd();
-		const size = getTerminalSize();
-		const tile = tileManager.createCanvasTile(
-			"term", cx, cy, { cwd, ...size },
-		);
-		tileManager.spawnTerminalWebview(tile, true);
-		tileManager.saveCanvasImmediate();
+		void spawnTerminalTileAt(cx, cy);
 	});
 
 	// -- Right-click context menu --
@@ -2828,12 +2847,7 @@ async function init() {
 			const cy =
 				(rect.height / 2 - viewportState.panY) /
 				viewportState.zoom - size.height / 2;
-			const cwd = getTerminalCwd();
-			const tile = tileManager.createCanvasTile(
-				"term", cx, cy, { cwd, ...size },
-			);
-			tileManager.spawnTerminalWebview(tile, true);
-			tileManager.saveCanvasImmediate();
+			void spawnTerminalTileAt(cx, cy);
 		} else if (action === "close-tile") {
 			const focusedId = tileManager.getFocusedTileId();
 			if (focusedId) {
@@ -2902,7 +2916,7 @@ async function init() {
 	// -- IPC forwarding --
 
 	window.shellApi.onForwardToWebview(
-		(target, channel, ...args) => {
+		async (target, channel, ...args) => {
 			if (target === "settings") {
 				singletonWebviews.settings.send(channel, ...args);
 			} else if (target === "nav") {
@@ -2956,11 +2970,13 @@ async function init() {
 					const cy =
 						(rect.height / 2 - viewportState.panY) /
 						viewportState.zoom - size.height / 2;
-					const tile = tileManager.createCanvasTile(
+					const tile = await tileManager.createCanvasTile(
 						"term", cx, cy, { cwd, ...size },
 					);
-					tileManager.spawnTerminalWebview(tile, true);
-					tileManager.saveCanvasImmediate();
+					if (tile) {
+						tileManager.spawnTerminalWebview(tile, true);
+						tileManager.saveCanvasImmediate();
+					}
 				}
 				if (channel === "open-browser-tile") {
 					const url = args[0];
@@ -2982,11 +2998,13 @@ async function init() {
 						extra.width = srcTile.width;
 						extra.height = srcTile.height;
 					}
-					const newTile = tileManager.createCanvasTile(
+					const newTile = await tileManager.createCanvasTile(
 						"browser", x, y, extra,
 					);
-					tileManager.spawnBrowserWebview(newTile, true);
-					tileManager.saveCanvasImmediate();
+					if (newTile) {
+						tileManager.spawnBrowserWebview(newTile, true);
+						tileManager.saveCanvasImmediate();
+					}
 				}
 				if (channel === "create-graph-tile") {
 					const folderPath = args[0];
@@ -3000,7 +3018,7 @@ async function init() {
 						viewportState.zoom - size.height / 2;
 					const wsPath =
 						workspaceData.workspaces[0] ?? "";
-					tileManager.createGraphTile(
+					await tileManager.createGraphTile(
 						cx, cy, folderPath, wsPath,
 					);
 				}
@@ -3352,7 +3370,7 @@ async function init() {
 		for (let i = 0; i < filePaths.length; i++) {
 			const filePath = filePaths[i];
 			const type = inferTileType(filePath);
-			tileManager.createFileTile(
+			void tileManager.createFileTile(
 				type, cx + i * 30, cy + i * 30, filePath,
 			);
 		}
@@ -3384,11 +3402,22 @@ async function init() {
 			: 0;
 		viewport.updateCanvas();
 		syncViewportTransforms();
-		tileManager.restoreCanvasState(savedState.tiles);
+		// Hydrate tiles into Kernel first (awaited) so connection FKs resolve.
+		await tileManager.restoreCanvasState(savedState.tiles);
 		clearConnections();
 		for (const conn of savedState.connections ?? []) {
 			if (!conn.id || !conn.tileAId || !conn.tileBId) continue;
 			addConnection(conn);
+			// Hydrate the connection into Kernel (idempotent) so Kernel stays
+			// the source of truth for restored canonical state.
+			if (window.kernelApi) {
+				await window.kernelApi.sendCommand("kernel.connection.create", {
+					id: conn.id,
+					tileAId: conn.tileAId,
+					tileBId: conn.tileBId,
+					label: conn.label ?? null,
+				});
+			}
 		}
 		syncConnectionGraph();
 		viewport.redrawGrid();
@@ -3432,6 +3461,68 @@ async function init() {
 	});
 	for (const tile of tiles.filter((t) => t.herdrPaneId)) {
 		void window.shellApi.herdrLinkPane(tile.id, tile.herdrPaneId);
+	}
+
+	// -- Kernel event subscriber --
+	// The renderer reconciles from Kernel events for every Goal 2 action:
+	// move, resize, create, remove, connect, disconnect. Handlers are
+	// idempotent — for self-initiated actions the local state already matches
+	// the event, so reconciliation is a harmless no-op; for externally-driven
+	// Kernel writes the renderer updates to match Kernel.
+	if (window.kernelApi) {
+		window.kernelApi.onEvent((payload) => {
+			const data = payload.data ?? {};
+			const t = payload.tileId
+				? tiles.find((x) => x.id === payload.tileId)
+				: null;
+
+			if (payload.kind === "tile.moved" && t) {
+				t.x = data.x;
+				t.y = data.y;
+				tileManager.repositionAllTiles();
+				updateCables();
+			} else if (payload.kind === "tile.resized" && t) {
+				t.width = data.width;
+				t.height = data.height;
+				tileManager.repositionAllTiles();
+				updateCables();
+			} else if (payload.kind === "tile.removed") {
+				// Reconcile a Kernel-driven removal. No-op if already gone
+				// locally (self-initiated close removed it first).
+				if (t) void tileManager.closeCanvasTile(t.id);
+			} else if (payload.kind === "tile.created") {
+				// Self/MCP creates already built the tile locally before the
+				// event arrives → no-op. A faithful rebuild from a pure Kernel
+				// create needs tile-type/webview detail not in the v3 tile
+				// schema yet, so externally-created tiles only reconcile
+				// position here; full render-from-snapshot lands with the
+				// StateCard work (Goal 4).
+				if (t) {
+					if (Number.isFinite(data.x)) t.x = data.x;
+					if (Number.isFinite(data.y)) t.y = data.y;
+					tileManager.repositionAllTiles();
+				}
+			} else if (payload.kind === "connection.created" && data.id) {
+				const exists = connections.some((c) => c.id === data.id);
+				if (!exists && getTile(data.tileAId) && getTile(data.tileBId)) {
+					addConnection({
+						id: data.id,
+						tileAId: data.tileAId,
+						tileBId: data.tileBId,
+						label: data.label ?? undefined,
+					});
+					syncConnectionGraph();
+					updateCables();
+				}
+			} else if (payload.kind === "connection.deleted" && data.id) {
+				const exists = connections.some((c) => c.id === data.id);
+				if (exists) {
+					removeConnection(data.id);
+					syncConnectionGraph();
+					updateCables();
+				}
+			}
+		});
 	}
 
 	// -- beforeunload save --

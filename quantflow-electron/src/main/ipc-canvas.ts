@@ -15,7 +15,9 @@ export function registerCanvasHandlers(
 ): void {
   let pendingDragPaths: string[] = [];
 
-  // Canvas persistence
+  // Canvas persistence — legacy JSON hydration only.
+  // canvas:save-state is NOT an authority path. Tile positions are owned by
+  // Kernel commands routed through canvas-rpc.ts (MCP/RPC path).
   ipcMain.handle(
     "canvas:load-state",
     async () => canvasPersistence.loadState(),

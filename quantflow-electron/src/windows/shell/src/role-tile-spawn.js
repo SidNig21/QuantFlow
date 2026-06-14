@@ -56,7 +56,7 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 		return null;
 	}
 
-	const tile = tileManager.createCanvasTile("term", x, y, {
+	const tile = await tileManager.createCanvasTile("term", x, y, {
 		...buildRoleTileOptions(role, {
 			cwd,
 			size,
@@ -65,6 +65,13 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 			herdrSpawn: null,
 		}),
 	});
+
+	if (!tile) {
+		const message = `Kernel rejected tile.create for ${displayName}`;
+		onRoleSpawnFailed?.(createRoleSpawnFailureEvent(role, message));
+		toasts?.show?.({ message, tone: "error" });
+		return null;
+	}
 
 	if (shouldUseHerdr) {
 		tile.runtimeTarget = "herdr-wsl";

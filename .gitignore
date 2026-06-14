@@ -2,7 +2,9 @@
 *.swp
 *.swo
 *~
-docs/
+docs/*
+!docs/v3/
+!docs/v3/**
 .collaborator
 .superpowers
 .claude/

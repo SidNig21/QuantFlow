@@ -5,16 +5,37 @@ alwaysApply: true
 
 # QuantFlow routing
 
-**Branch:** `quantflow-v2`
+**Branch:** `quantflow-v3`
 
 **Read order:**
-1. `CONCEPT.md` — product definition
-2. `BUILD_PLAN_V2.md` — **only** execution plan (scope, gates, frozen, rejected, handoff)
 
-`SCOPE.md`, `RETIREMENT.md`, `ARCHITECTURE.md` are stubs — do not treat as second authorities.
+1. `AGENTS.md` - agent guardrails and source freshness
+2. `BUILD_PLAN_V3.md` - current v3 execution plan
+3. `CONCEPT.md` - product definition
+4. `BUILD_PLAN_V2.md` - shipped v2 behavior reference only
+5. `VAULT.md` - paired Obsidian vault paths
 
-**Ignore unless operator asks:** `reference/archive/` (incl. 7-layer charters). Vault `Projects/QuantFlow/Build Plan.md` and `Start Here.md` are **ARCHIVED**.
+**Vault:** `C:\Users\rybow\Obsidian\Cursor Collab`
 
-**Spine rule:** Canvas + herdr + interactive PTY. `pane.read` tile display = reject.
+Fresh root references:
 
-**Handoff:** commit before switching agents.
+- `V3 Official.md`
+- `Cursor Roadmap.md`
+- `QuantFlow_Integration_Map.md`
+- `Fable URL List.md`
+- `QuantFlow Constructor Theory.md`
+
+Older but still relevant context:
+
+- `Projects/QuantFlow/reference/`
+- repo `reference/`
+
+Do not execute from archived plans, old layer charters, or old vault build plans unless `BUILD_PLAN_V3.md` explicitly points to them.
+
+**v3 spine rule:** Kernel owns truth. Canvas renders truth. Conductor plans. Workers execute. Receipts prove. State Cards summarize. Harnesses adapt runtimes.
+
+**Keep:** infinite canvas, herdr-backed terminal tiles, Envoy task bus, Obsidian mirror, MCP as external adapter.
+
+**Do not drift into:** Cloudflare-first rewrite, RL training, A2A/Agent Cards, custom string relay revival, dashboard replacement, or bypassing Kernel commands.
+
+**Handoff:** commit before switching agents. Include branch, active v3 goal, files changed, proof commands, reference notes used, and risks.
