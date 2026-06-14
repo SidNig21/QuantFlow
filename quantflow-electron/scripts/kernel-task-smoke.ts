@@ -175,7 +175,38 @@ check('back to working after reject', queryTaskGet(kdb, 'task2')?.status === 'wo
 const chain2 = queryReceiptList(kdb, { taskId: 'task2' }).map((r) => r.type);
 check('reject posts verification_failed', chain2.includes('verification_failed'));
 
-console.log('\n— legacy compatibility path —');
+console.log('\n— legacy bypass is lifecycle-scoped (working/submitted/verifying only) —');
+
+// open → legacy complete must be rejected.
+handleTaskCommand(kdb, 'kernel.task.create', { id: 'task_open', workflowId: 'wf1', title: 'open', objective: 'o' });
+expectReject(
+  'legacy from open blocked',
+  handleTaskCommand(kdb, 'kernel.task.complete', { taskId: 'task_open', legacy: true }),
+);
+check('open stays open', queryTaskGet(kdb, 'task_open')?.status === 'open');
+
+// claimed → legacy complete must be rejected.
+handleTaskCommand(kdb, 'kernel.task.create', { id: 'task_claimed', workflowId: 'wf1', title: 'claimed', objective: 'o' });
+handleTaskCommand(kdb, 'kernel.task.claim', { taskId: 'task_claimed', ownerWorkerId: 'w_owner' });
+expectReject(
+  'legacy from claimed blocked',
+  handleTaskCommand(kdb, 'kernel.task.complete', { taskId: 'task_claimed', legacy: true }),
+);
+check('claimed stays claimed', queryTaskGet(kdb, 'task_claimed')?.status === 'claimed');
+
+// blocked → legacy complete must be rejected.
+handleTaskCommand(kdb, 'kernel.task.create', { id: 'task_blocked', workflowId: 'wf1', title: 'blocked', objective: 'o' });
+handleTaskCommand(kdb, 'kernel.task.claim', { taskId: 'task_blocked', ownerWorkerId: 'w_owner' });
+handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task_blocked' });
+handleTaskCommand(kdb, 'kernel.task.block', { taskId: 'task_blocked', reason: 'waiting' });
+check('blocked is blocked', queryTaskGet(kdb, 'task_blocked')?.status === 'blocked');
+expectReject(
+  'legacy from blocked blocked',
+  handleTaskCommand(kdb, 'kernel.task.complete', { taskId: 'task_blocked', legacy: true }),
+);
+check('blocked stays blocked', queryTaskGet(kdb, 'task_blocked')?.status === 'blocked');
+
+// working → legacy complete still passes and stays tagged.
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'task3', workflowId: 'wf1', title: 'T3', objective: 'o' });
 handleTaskCommand(kdb, 'kernel.task.claim', { taskId: 'task3', ownerWorkerId: 'w_owner' });
 handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task3' });

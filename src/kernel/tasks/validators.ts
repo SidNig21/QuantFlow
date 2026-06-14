@@ -59,11 +59,14 @@ export function validateComplete(
   legacy: boolean,
 ): ValidationResult {
   if (legacy) {
-    if (task.status === 'complete') {
-      return { ok: false, error: 'task already complete' };
-    }
-    if (task.status === 'failed') {
-      return { ok: false, error: "task is terminal ('failed')" };
+    // The legacy bypass only skips the verification requirement — it does not
+    // skip the lifecycle. It is valid only from the active execution states.
+    const LEGACY_COMPLETABLE: readonly TaskRow['status'][] = ['working', 'submitted', 'verifying'];
+    if (!LEGACY_COMPLETABLE.includes(task.status)) {
+      return {
+        ok: false,
+        error: `legacy complete is only allowed from working/submitted/verifying (task is '${task.status}')`,
+      };
     }
     return { ok: true };
   }
