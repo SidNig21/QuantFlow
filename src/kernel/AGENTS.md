@@ -15,9 +15,11 @@ All canonical state and the mutation/query boundary:
 - `commands/tile-commands.ts` — Tile CRUD: create, move, resize, rename, status_update, remove. (Goal 2)
 - `commands/connection-commands.ts` — Connection CRUD: create, delete. (Goal 2)
 - `commands/workflow-commands.ts` — Workflow CRUD: create, update. (Goal 2)
-- `queries/index.ts` — Read-only queries: canvas snapshot, tile list, tile get. (Goal 2)
-- Future: task state machine and transition enforcement (Goal 3).
-- Future: receipt store (append-only) (Goal 3).
+- `queries/index.ts` — Read-only queries: canvas snapshot, tile list/get, task list/get, receipt list. (Goal 2 + Goal 3)
+- `tasks/state-machine.ts` — Canonical task transition table + `canTransition`/`assertTransition`. (Goal 3)
+- `tasks/validators.ts` — Lifecycle guards: complete requires verifying + verification_passed receipt (or documented legacy bypass); self-verification refused. (Goal 3)
+- `tasks/index.ts` — Task command handlers (create/claim/start/submit/verify/reject/complete/block/fail) + task queries. Posts a receipt for every transition. (Goal 3)
+- `receipts/index.ts` — Append-only receipt store: `postReceipt`, `kernel.receipt.post`, `kernel.artifact.create`, receipt-chain query. (Goal 3)
 - Future: StateCard watchers (Goal 4).
 - Future: WorkerInstance registry (Goal 6).
 - Future: Harness registry — configuration only, not harness implementations (Goal 6).

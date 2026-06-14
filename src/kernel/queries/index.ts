@@ -1,4 +1,7 @@
 import { getKernelDb } from '../database';
+import type { TaskStatus } from '../schema/types';
+import { queryTaskList as taskList, queryTaskGet as taskGet, type TaskSnapshot } from '../tasks/index';
+import { queryReceiptList as receiptList, type ReceiptSnapshot } from '../receipts/index';
 
 export interface TileSnapshot {
   id: string;
@@ -88,4 +91,28 @@ export function queryTileGet(tileId: string): TileSnapshot | null {
   const db = getKernelDb();
   const row = db.prepare('SELECT * FROM tiles WHERE id = ?').get(tileId) as Record<string, unknown> | undefined;
   return row ? rowToTile(row) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Task + receipt queries (Goal 3)
+// ---------------------------------------------------------------------------
+
+export function queryTaskList(params: {
+  workflowId?: string;
+  status?: TaskStatus;
+  limit?: number;
+} = {}): TaskSnapshot[] {
+  return taskList(getKernelDb(), params);
+}
+
+export function queryTaskGet(taskId: string): TaskSnapshot | null {
+  return taskGet(getKernelDb(), taskId);
+}
+
+export function queryReceiptList(params: {
+  taskId?: string;
+  correlationId?: string;
+  limit?: number;
+} = {}): ReceiptSnapshot[] {
+  return receiptList(getKernelDb(), params);
 }

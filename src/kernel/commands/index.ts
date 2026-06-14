@@ -4,6 +4,8 @@ import type { KernelCommandType } from '../schema/types';
 import { handleTileCommand } from './tile-commands';
 import { handleConnectionCommand } from './connection-commands';
 import { handleWorkflowCommand } from './workflow-commands';
+import { handleTaskCommand } from '../tasks/index';
+import { handleReceiptCommand, handleArtifactCommand } from '../receipts/index';
 export type { CommandResult } from './types';
 
 export async function dispatchKernelCommand(
@@ -27,6 +29,12 @@ export async function dispatchKernelCommand(
       result = handleConnectionCommand(db, type as string, payload);
     } else if ((type as string).startsWith('kernel.workflow.')) {
       result = handleWorkflowCommand(db, type as string, payload);
+    } else if ((type as string).startsWith('kernel.task.')) {
+      result = handleTaskCommand(db, type as string, payload);
+    } else if ((type as string).startsWith('kernel.receipt.')) {
+      result = handleReceiptCommand(db, type as string, payload);
+    } else if ((type as string).startsWith('kernel.artifact.')) {
+      result = handleArtifactCommand(db, type as string, payload);
     } else {
       result = { ok: false, error: `Unknown command type: ${type}` };
     }

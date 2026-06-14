@@ -680,6 +680,66 @@ export const TOOL_DEFINITIONS = [
       })),
   },
   {
+    name: "qf_task_submit",
+    description:
+      "Submit a Kernel task result for verification (working → submitted). " +
+      "The worker submits; the system verifies. Use qf_task_verify to pass it.",
+    schema: {
+      taskId: { kind: "string" },
+      summary: { kind: "string", optional: true },
+      artifactRefsJson: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("kernel.taskSubmit", {
+        taskId: params.taskId,
+        ...(params.summary ? { summary: params.summary } : {}),
+        ...(params.artifactRefsJson
+          ? { artifactRefs: optionalJsonArray(params.artifactRefsJson) }
+          : {}),
+      })),
+  },
+  {
+    name: "qf_task_verify",
+    description:
+      "Verify a submitted Kernel task. verdict 'pass' (default) records a " +
+      "verification_passed receipt and completes the task; 'fail' returns it " +
+      "to working. A worker may not verify its own task.",
+    schema: {
+      taskId: { kind: "string" },
+      verdict: { kind: "string", optional: true },
+      verifierWorkerId: { kind: "string", optional: true },
+      summary: { kind: "string", optional: true },
+      operatorOverride: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("kernel.taskVerify", {
+        taskId: params.taskId,
+        ...(params.verdict ? { verdict: params.verdict } : {}),
+        ...(params.verifierWorkerId ? { verifierWorkerId: params.verifierWorkerId } : {}),
+        ...(params.summary ? { summary: params.summary } : {}),
+        operatorOverride: stringToBoolean(params.operatorOverride),
+      })),
+  },
+  {
+    name: "qf_task_reject",
+    description:
+      "Reject a submitted/verifying Kernel task. Records a verification_failed " +
+      "receipt and returns the task to working for rework.",
+    schema: {
+      taskId: { kind: "string" },
+      reason: { kind: "string", optional: true },
+      verifierWorkerId: { kind: "string", optional: true },
+      operatorOverride: { kind: "string", optional: true },
+    },
+    handle: (rpc) => async (params = {}) =>
+      jsonText(await rpc("kernel.taskReject", {
+        taskId: params.taskId,
+        ...(params.reason ? { reason: params.reason } : {}),
+        ...(params.verifierWorkerId ? { verifierWorkerId: params.verifierWorkerId } : {}),
+        operatorOverride: stringToBoolean(params.operatorOverride),
+      })),
+  },
+  {
     name: "qf_receipt_list",
     description: "List QuantFlow Envoy receipts",
     schema: {

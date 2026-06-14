@@ -30,6 +30,8 @@ import { registerOrchestrationHandlers } from "./ipc-orchestration";
 import { registerEnvoyHandlers } from "./ipc-envoy";
 import { registerWorkflowHandlers } from "./ipc-workflow";
 import { registerKernelIpcHandlers } from "@qf-v3-main/ipc/kernel-ipc";
+import { registerKernelTaskRpc } from "@qf-v3-main/ipc/task-ipc";
+import { registerMethod } from "./json-rpc-server";
 import { QUANTFLOW_DIR } from "./paths";
 
 const FS_CHANGE_DELETED = 3;
@@ -159,4 +161,6 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerEnvoyHandlers();
   registerWorkflowHandlers();
   registerKernelIpcHandlers(QUANTFLOW_DIR);
+  // Kernel task lifecycle + receipt chain over JSON-RPC (MCP gate tools).
+  registerKernelTaskRpc(registerMethod);
 }

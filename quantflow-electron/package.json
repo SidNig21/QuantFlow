@@ -25,6 +25,7 @@
 		"test:updater": "bun test src/main/updater/github-release-fetcher.test.ts && bun test src/main/updater/downloader.test.ts && bun test src/main/updater/update-manager.test.ts",
 		"smoke:herdr-spawn": "bun scripts/herdr-spawn-smoke.ts",
 		"smoke:envoy-task": "bun scripts/envoy-task-smoke.ts",
+		"smoke:kernel-task": "bun scripts/kernel-task-smoke.ts",
 		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",
 		"postinstall": "node scripts/postinstall.mjs"
 	},

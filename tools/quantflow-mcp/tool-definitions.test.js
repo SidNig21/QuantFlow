@@ -35,6 +35,9 @@ const REQUIRED_TOOLS = [
   "qf_task_complete",
   "qf_task_block",
   "qf_task_fail",
+  "qf_task_submit",
+  "qf_task_verify",
+  "qf_task_reject",
   "qf_receipt_list",
   "qf_envoy_watch",
   "quantflow_role_list",
@@ -256,6 +259,50 @@ test("maps Envoy task claim/update/complete and receipt tools to JSON-RPC", asyn
     },
     { method: "envoy.receiptList", params: { taskId: "task-1" } },
     { method: "envoy.watch", params: { correlationId: "corr-1" } },
+  ]);
+});
+
+test("maps Kernel task gate tools (submit/verify/reject) to Kernel JSON-RPC", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "kernel.taskSubmit": { ok: true },
+    "kernel.taskVerify": { ok: true, data: { status: "complete" } },
+    "kernel.taskReject": { ok: true, data: { status: "working" } },
+  });
+
+  await getToolDefinition("qf_task_submit").handle(rpc)({
+    taskId: "task-1",
+    summary: "result ready",
+    artifactRefsJson: "[\"artifact-1\"]",
+  });
+  await getToolDefinition("qf_task_verify").handle(rpc)({
+    taskId: "task-1",
+    verdict: "pass",
+    verifierWorkerId: "verifier-1",
+    operatorOverride: "false",
+  });
+  await getToolDefinition("qf_task_reject").handle(rpc)({
+    taskId: "task-2",
+    reason: "needs rework",
+  });
+
+  assert.deepEqual(calls, [
+    {
+      method: "kernel.taskSubmit",
+      params: { taskId: "task-1", summary: "result ready", artifactRefs: ["artifact-1"] },
+    },
+    {
+      method: "kernel.taskVerify",
+      params: {
+        taskId: "task-1",
+        verdict: "pass",
+        verifierWorkerId: "verifier-1",
+        operatorOverride: false,
+      },
+    },
+    {
+      method: "kernel.taskReject",
+      params: { taskId: "task-2", reason: "needs rework", operatorOverride: false },
+    },
   ]);
 });
 

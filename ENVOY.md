@@ -182,6 +182,95 @@ Roles carry `envoyProfile` and optional `envoyWrapCommand`.
 ENVOY_SPACE=<canvas_space_id> ENVOY_PROFILE=<profile> ./envoy-run.sh <command>
 ```
 
+## v3 Kernel Task Lifecycle (Goal 3) — Verified Completion
+
+v3 promotes the Kernel to the sole authority for task state. The Kernel task
+state machine enforces verified completion: a worker submits a result, and the
+system verifies it. This is the constitutional path (`KERNEL_CONSTITUTION.md`,
+`docs/v3/AUTHORITY_RULES.md`).
+
+### Canonical state machine
+
+```text
+open → claimed → working → submitted → verifying → complete
+
+working → blocked → working
+working / submitted / verifying → failed
+submitted / verifying → working      (verification rejected)
+claimed (stale) → open               (reclaimable after 5 min)
+```
+
+The hard rule: a task may not go `working → complete`. Completion requires the
+`submitted → verifying` gate **and** a `verification_passed` receipt. A worker
+may not verify its own task (self-verification is refused unless an operator
+override is supplied).
+
+### Kernel commands (authoritative)
+
+```text
+kernel.task.create   kernel.task.claim   kernel.task.start
+kernel.task.submit   kernel.task.verify  kernel.task.reject
+kernel.task.complete kernel.task.block   kernel.task.fail
+kernel.receipt.post  kernel.artifact.create
+```
+
+Receipt chain (append-only, one per transition):
+
+```text
+task_created → task_claimed → task_started → task_submitted
+→ artifact_created → verification_started → verification_passed → task_completed
+```
+
+`kernel.task.reject` / `verify verdict=fail` posts `verification_failed` and
+returns the task to `working`.
+
+### JSON-RPC methods (relay)
+
+```text
+kernel.taskCreate  kernel.taskClaim   kernel.taskStart
+kernel.taskSubmit  kernel.taskVerify  kernel.taskReject
+kernel.taskComplete kernel.taskBlock  kernel.taskFail
+kernel.taskList    kernel.taskGet     kernel.receiptList
+kernel.receiptPost kernel.artifactCreate
+```
+
+Registered by `src/main/ipc/task-ipc.ts` (`registerKernelTaskRpc`).
+
+### MCP gate tools (Goal 3 additions)
+
+```text
+qf_task_submit   → kernel.taskSubmit   (working → submitted)
+qf_task_verify   → kernel.taskVerify   (pass: completes; fail: returns to working)
+qf_task_reject   → kernel.taskReject   (verification_failed → working)
+```
+
+### Proof
+
+From `quantflow-electron`:
+
+```powershell
+bun run smoke:kernel-task
+```
+
+Drives the full lifecycle against the canonical schema in memory and asserts the
+receipt chain, the no-self-complete gate, the self-verification guard, the
+reject path, and the legacy bypass.
+
+### Legacy compatibility path
+
+The existing Envoy task bus (`inbox → ready → claimed → working → review → done`)
+and its MCP tools (`qf_task_create/claim/update/complete/block/fail`,
+`qf_receipt_list`, `qf_envoy_watch`) are **unchanged** and remain the documented
+legacy compatibility path. Phase-6 delegation and `smoke:envoy-task` continue to
+run against the Envoy bus.
+
+Within the Kernel state machine itself, `kernel.task.complete` accepts an
+explicit `legacy: true` flag that allows completion without the verification
+gate. Such completions are tagged on the `task_completed` receipt
+(`metadata.legacy = true`, `bypassedVerification = true`) so verified and legacy
+completions stay distinguishable in the evidence chain. The legacy bypass is a
+temporary compatibility affordance to be retired in a later goal.
+
 ## Out Of Scope
 
 - Live Hermes to Codex tile proof (Phase 6).

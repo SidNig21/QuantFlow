@@ -1,7 +1,15 @@
 import { ipcMain } from 'electron';
 import { initKernelDb } from '../../kernel/database';
 import { dispatchKernelCommand } from '../../kernel/commands/index';
-import { queryCanvasSnapshot, queryTileGet, queryTileList } from '../../kernel/queries/index';
+import {
+  queryCanvasSnapshot,
+  queryTileGet,
+  queryTileList,
+  queryTaskList,
+  queryTaskGet,
+  queryReceiptList,
+} from '../../kernel/queries/index';
+import type { TaskStatus } from '../../kernel/schema/types';
 
 export function registerKernelIpcHandlers(dataDir: string): void {
   initKernelDb(dataDir);
@@ -23,6 +31,20 @@ export function registerKernelIpcHandlers(dataDir: string): void {
           return queryTileList(params['workflowId'] as string | undefined);
         case 'kernel.tile.get':
           return queryTileGet(params['tileId'] as string);
+        case 'kernel.task.list':
+          return queryTaskList({
+            workflowId: params['workflowId'] as string | undefined,
+            status: params['status'] as TaskStatus | undefined,
+            limit: params['limit'] as number | undefined,
+          });
+        case 'kernel.task.get':
+          return queryTaskGet(params['taskId'] as string);
+        case 'kernel.receipt.list':
+          return queryReceiptList({
+            taskId: params['taskId'] as string | undefined,
+            correlationId: params['correlationId'] as string | undefined,
+            limit: params['limit'] as number | undefined,
+          });
         default:
           throw new Error(`Unknown kernel query: ${type}`);
       }

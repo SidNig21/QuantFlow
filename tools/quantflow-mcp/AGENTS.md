@@ -53,6 +53,20 @@ quantflow_route_task
 
 These tools remain as the external adapter interface. As the Kernel command boundary is hardened in Goal 2, these tools must route through Kernel commands rather than direct internal calls.
 
+## v3 Kernel Task Gate Tools (Goal 3)
+
+```text
+qf_task_submit  → kernel.taskSubmit   (working → submitted)
+qf_task_verify  → kernel.taskVerify   (pass completes; fail returns to working)
+qf_task_reject  → kernel.taskReject   (verification_failed → working)
+```
+
+These route to the authoritative Kernel task state machine via the JSON-RPC
+methods registered in `src/main/ipc/task-ipc.ts`. They enforce verified
+completion: a worker submits, the system verifies, and `complete` is gated on a
+`verification_passed` receipt. The legacy Envoy `qf_task_complete` path stays
+for compatibility (see `ENVOY.md`).
+
 ## Read Order Before Editing This Subtree
 
 1. Root `AGENTS.md`
