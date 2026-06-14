@@ -1,4 +1,5 @@
 import { splitDisplayPath } from "@collab/shared/path-utils";
+import { createStateCardBack } from "./tile-state-card.js";
 
 /**
  * Turns arbitrary input into a navigable URL.
@@ -337,6 +338,18 @@ export function createTileDOM(tile, callbacks) {
     btnGroup.appendChild(viewBtn);
   }
 
+  // Flip to State Card (back face). Available on every tile.
+  const flipBtn = document.createElement("button");
+  flipBtn.className = "tile-action-btn tile-flip-btn";
+  flipBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 0 1 10-4.5M14 8a6 6 0 0 1-10 4.5"/><path d="M12 2v3H9M4 14v-3h3"/></svg>`;
+  flipBtn.title = "Flip to State Card (F)";
+  flipBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+  flipBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    callbacks.onFlip?.(tile.id);
+  });
+  btnGroup.appendChild(flipBtn);
+
   const closeBtn = document.createElement("button");
   closeBtn.className = "tile-action-btn tile-close-btn";
   closeBtn.innerHTML = "&times;";
@@ -356,6 +369,7 @@ export function createTileDOM(tile, callbacks) {
       e.preventDefault();
       e.stopPropagation();
       const selected = await window.shellApi.showContextMenu([
+        { id: "view-state-card", label: "View State Card" },
         { id: "rename", label: "Rename" },
         { id: "duplicate", label: "Duplicate" },
         {
@@ -369,7 +383,9 @@ export function createTileDOM(tile, callbacks) {
         { id: "preview-context", label: "Preview shared context" },
         { id: "inject-context", label: "Inject shared context" },
       ]);
-      if (selected === "rename" && callbacks.onRename) {
+      if (selected === "view-state-card") {
+        callbacks.onFlip?.(tile.id);
+      } else if (selected === "rename" && callbacks.onRename) {
         callbacks.onRename(tile.id);
       } else if (selected === "duplicate" && callbacks.onDuplicate) {
         callbacks.onDuplicate(tile.id);
@@ -437,6 +453,10 @@ export function createTileDOM(tile, callbacks) {
   container.appendChild(contentArea);
   contentArea.appendChild(contentOverlay);
 
+  // State Card back face (hidden until the tile is flipped).
+  const stateCardBack = createStateCardBack();
+  container.appendChild(stateCardBack);
+
   if (tile.type === "term") {
     for (const side of CABLE_PORT_SIDES) {
       const metadata = getCablePortMetadata(tile, side);
@@ -459,7 +479,7 @@ export function createTileDOM(tile, callbacks) {
     }
   }
 
-  return { container, titleBar, titleText, contentArea, contentOverlay, closeBtn, urlInput, navBack, navForward, navReload, cablePorts, cablePort: cablePorts[1] ?? null };
+  return { container, titleBar, titleText, contentArea, contentOverlay, closeBtn, flipBtn, stateCardBack, urlInput, navBack, navForward, navReload, cablePorts, cablePort: cablePorts[1] ?? null };
 }
 
 export function getTileLabel(tile) {

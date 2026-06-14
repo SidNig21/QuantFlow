@@ -11,7 +11,14 @@ The renderer is a visual projector of Kernel state. It is not a database.
 - `state/kernel-client.ts` — Typed contract for `window.kernelApi`; wrappers for `sendKernelCommand`, `sendKernelQuery`, `onKernelEvent`. (Goal 2)
 - `canvas/kernel-canvas.ts` — Canvas action wrappers that route through Kernel commands: `spawnTile`, `moveTile`, `resizeTile`, `connectTiles`, `closeTile`. (Goal 2)
 - Workflow region overlay (Goal 7).
-- StateCard view component (Goal 4).
+- `components/StateCardView/state-card-view.ts` — pure projector: formats a Kernel State Card snapshot into the canonical display sections. (Goal 4)
+- `components/TileBack/tile-back.ts` — back-face model built from a State Card snapshot. (Goal 4)
+- `components/Tile/tile.ts` — tile flip-state contract (front = live content, back = State Card). (Goal 4)
+- `shortcuts/index.ts` — shared shortcut contract; `F` flips the focused tile. (Goal 4)
+
+These are framework-agnostic contracts shared with the live shell renderer
+(`quantflow-electron/src/windows/shell`) via the `@qf-renderer` build alias. They
+hold no canonical State Card state — the data comes from `kernel.state_card.get`.
 
 ## Authority Rules
 

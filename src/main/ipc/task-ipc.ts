@@ -19,6 +19,8 @@ import {
   queryTaskList,
   queryTaskGet,
   queryReceiptList,
+  queryStateCardList,
+  queryStateCardGet,
 } from '../../kernel/queries/index';
 import type { TaskStatus } from '../../kernel/schema/types';
 
@@ -160,5 +162,24 @@ export function registerKernelTaskRpc(registerMethod: RegisterMethod): void {
       description: 'Inspect the Kernel receipt chain for a task or correlation id',
       params: { taskId: '(optional) task id', correlationId: '(optional) correlation id' },
     },
+  );
+
+  // State Cards (Goal 4): Kernel-owned current reality per tile.
+  registerMethod('kernel.stateCardUpdate', command('kernel.state_card.update'), {
+    description: 'Upsert a tile State Card (patch fields)',
+    params: { tileId: 'Tile id', status: '(optional)', currentTaskId: '(optional)' },
+  });
+
+  registerMethod(
+    'kernel.stateCardList',
+    (params: unknown) =>
+      queryStateCardList({ workflowId: asRecord(params as RpcParams)['workflowId'] as string | undefined }),
+    { description: 'List tile State Cards', params: { workflowId: '(optional) workflow id' } },
+  );
+
+  registerMethod(
+    'kernel.stateCardGet',
+    (params: unknown) => queryStateCardGet(asRecord(params as RpcParams)['tileId'] as string),
+    { description: 'Get a tile State Card', params: { tileId: 'Tile id' } },
   );
 }

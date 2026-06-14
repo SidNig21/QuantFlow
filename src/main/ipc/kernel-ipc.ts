@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { initKernelDb } from '../../kernel/database';
+import { initKernelDb, getKernelDb } from '../../kernel/database';
 import { dispatchKernelCommand } from '../../kernel/commands/index';
 import {
   queryCanvasSnapshot,
@@ -8,11 +8,16 @@ import {
   queryTaskList,
   queryTaskGet,
   queryReceiptList,
+  queryStateCardList,
+  queryStateCardGet,
 } from '../../kernel/queries/index';
+import { startStateCardWatcher } from '../../kernel/watchers/index';
 import type { TaskStatus } from '../../kernel/schema/types';
 
 export function registerKernelIpcHandlers(dataDir: string): void {
   initKernelDb(dataDir);
+  // Maintain Kernel-owned State Cards from task/receipt/tile events.
+  startStateCardWatcher(getKernelDb());
 
   ipcMain.handle(
     'kernel:command',
@@ -45,6 +50,12 @@ export function registerKernelIpcHandlers(dataDir: string): void {
             correlationId: params['correlationId'] as string | undefined,
             limit: params['limit'] as number | undefined,
           });
+        case 'kernel.state_card.list':
+          return queryStateCardList({
+            workflowId: params['workflowId'] as string | undefined,
+          });
+        case 'kernel.state_card.get':
+          return queryStateCardGet(params['tileId'] as string);
         default:
           throw new Error(`Unknown kernel query: ${type}`);
       }

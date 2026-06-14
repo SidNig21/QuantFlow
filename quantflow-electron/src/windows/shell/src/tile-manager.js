@@ -17,6 +17,7 @@ import { shouldForwardCableDrawMouseDown } from "./cable-draw-mode.js";
 import { findAutoPlacement } from "./canvas-rpc.js";
 import { ensureRouteHandle } from "./tile-route-handles.js";
 import { getRoleStartupWrites } from "./role-startup.js";
+import { renderStateCardBack } from "./tile-state-card.js";
 
 /**
  * Tile lifecycle manager: creation, deletion, persistence, webview
@@ -149,6 +150,35 @@ export function createTileManager({
 			positionTile(dom.container, tile);
 		}
 		onReposition?.();
+	}
+
+	// -- State Card flip (Goal 4) --
+	// Front = live content (terminal/webview); back = the tile's Kernel State
+	// Card. Flipping toggles a CSS class; the terminal is hidden, never
+	// destroyed, so the live experience is preserved on flip back.
+	const flippedTiles = new Set();
+
+	function isTileFlipped(id) {
+		return flippedTiles.has(id);
+	}
+
+	function flipTile(id) {
+		const dom = tileDOMs.get(id);
+		if (!dom) return;
+		const nowFlipped = !flippedTiles.has(id);
+		if (nowFlipped) flippedTiles.add(id);
+		else flippedTiles.delete(id);
+		dom.container.classList.toggle("tile-flipped", nowFlipped);
+		if (nowFlipped) {
+			void renderStateCardBack(dom.stateCardBack, id);
+		}
+	}
+
+	// Live-refresh any flipped tile when its Kernel State Card changes.
+	function refreshFlippedStateCard(tileId) {
+		if (!flippedTiles.has(tileId)) return;
+		const dom = tileDOMs.get(tileId);
+		if (dom) void renderStateCardBack(dom.stateCardBack, tileId);
 	}
 
 	// -- Drag/resize commit: Kernel write gate --
@@ -714,6 +744,7 @@ export function createTileManager({
 				});
 			},
 			onCablePortMouseDown,
+			onFlip: (id) => flipTile(id),
 		});
 
 		// Double-click title bar → center tile in viewport
@@ -825,6 +856,7 @@ export function createTileManager({
 		for (const conn of getConnectionsForTile(id)) {
 			removeConnection(conn.id);
 		}
+		flippedTiles.delete(id);
 		removeTile(id);
 		onReposition?.();
 		saveCanvasImmediate();
@@ -1076,6 +1108,9 @@ export function createTileManager({
 		blurCanvasTileGuest,
 		clearTileFocusRing,
 		repositionAllTiles,
+		flipTile,
+		isTileFlipped,
+		refreshFlippedStateCard,
 		syncSelectionVisuals,
 		spawnTerminalWebview,
 		spawnGraphWebview,

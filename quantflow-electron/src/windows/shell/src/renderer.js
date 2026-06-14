@@ -98,6 +98,7 @@ import {
 	getLegendViewportCenterPlacement,
 	resolveLegendRecipeRole,
 } from "./legend-spawn.js";
+import { isFlipTileShortcut } from "@qf-renderer/shortcuts/index";
 import { updateCanvasWatermark } from "./canvas-watermark.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
@@ -2899,6 +2900,21 @@ async function init() {
 		}
 	});
 
+	// -- F: flip the focused tile to its State Card (and back) --
+	window.addEventListener("keydown", (event) => {
+		if (!isFlipTileShortcut(event)) return;
+		const el = document.activeElement;
+		const tag = el?.tagName;
+		if (
+			tag === "INPUT" || tag === "TEXTAREA" || tag === "WEBVIEW" ||
+			el?.isContentEditable
+		) return;
+		const focusedId = tileManager.getFocusedTileId();
+		if (!focusedId) return;
+		event.preventDefault();
+		tileManager.flipTile(focusedId);
+	});
+
 	// -- Browser tile Cmd+L focus URL --
 
 	window.shellApi.onBrowserTileFocusUrl((webContentsId) => {
@@ -3521,6 +3537,9 @@ async function init() {
 					syncConnectionGraph();
 					updateCables();
 				}
+			} else if (payload.kind === "state_card.updated" && payload.tileId) {
+				// Kernel State Card changed → refresh the back face if flipped.
+				tileManager.refreshFlippedStateCard(payload.tileId);
 			}
 		});
 	}

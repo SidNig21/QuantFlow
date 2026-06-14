@@ -6,6 +6,7 @@ import { handleConnectionCommand } from './connection-commands';
 import { handleWorkflowCommand } from './workflow-commands';
 import { handleTaskCommand } from '../tasks/index';
 import { handleReceiptCommand, handleArtifactCommand } from '../receipts/index';
+import { handleStateCardCommand } from '../state-cards/index';
 export type { CommandResult } from './types';
 
 export async function dispatchKernelCommand(
@@ -35,6 +36,8 @@ export async function dispatchKernelCommand(
       result = handleReceiptCommand(db, type as string, payload);
     } else if ((type as string).startsWith('kernel.artifact.')) {
       result = handleArtifactCommand(db, type as string, payload);
+    } else if ((type as string).startsWith('kernel.state_card.')) {
+      result = handleStateCardCommand(db, type as string, payload);
     } else {
       result = { ok: false, error: `Unknown command type: ${type}` };
     }

@@ -2111,6 +2111,58 @@ html.platform-win #panel-viewer::before {
 	border: none;
 }
 
+/* -- State Card back face (Goal 4) --
+ * Flipping hides (never destroys) the live front content and reveals the
+ * Kernel-owned State Card. The terminal/webview is preserved on flip back. */
+.tile-state-card {
+	display: none;
+	flex: 1;
+	flex-direction: column;
+	overflow: auto;
+	padding: 10px 12px;
+	gap: 8px;
+	background: var(--tile-bg);
+	color: var(--fg);
+}
+
+.canvas-tile.tile-flipped .tile-content {
+	display: none;
+}
+
+.canvas-tile.tile-flipped .tile-state-card {
+	display: flex;
+}
+
+.tile-state-card-header {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	opacity: 0.6;
+	margin-bottom: 2px;
+}
+
+.tile-state-card-row {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.tile-state-card-label {
+	font-size: 10px;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	opacity: 0.5;
+}
+
+.tile-state-card-value {
+	font-size: 12px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
 .canvas-tile[data-source-tile-type="term"] {
 	background: var(--tile-bg);
 }

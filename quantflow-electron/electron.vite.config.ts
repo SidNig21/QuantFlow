@@ -74,6 +74,8 @@ export default defineConfig({
           __dirname,
           "packages/components/src",
         ),
+        // v3 renderer projector contracts (shared with the live shell).
+        "@qf-renderer": resolve(__dirname, "../src/renderer"),
       },
     },
     build: {
