@@ -10,6 +10,17 @@ The Harness Layer is the worker/runtime adapter boundary for QuantFlow v3.
 - Worker spawn/send/stop contracts.
 - Per-adapter receipt and StateCard production logic.
 
+### Built (Goal 6A — configuration/contract only)
+
+- `types.ts` — `HarnessKind`, `HarnessDescriptor`, `SpawnWorkerInput`, `WorkerRuntimeIds`.
+- `local-shell/index.ts`, `herdr-shell/index.ts` — descriptors wrapping the two shipped runtimes (config only; the real PTY/herdr spawn stays in the Electron runtime).
+- `registry.ts` — `HARNESS_DESCRIPTORS`, `resolveHarnessKind(runtimeTarget)`.
+
+Goal 6A ships **configuration/contract only**. The full `WorkerHarness` execution
+interface (spawn/send/readState/collectReceipts/stop) and Pi/Codex/Claude-code
+adapters remain later Goal 6 work. The Kernel seeds the `harnesses` table from
+`HARNESS_DESCRIPTORS` and references harness ids — it never imports execution code.
+
 ## Authority Rules
 
 ```text

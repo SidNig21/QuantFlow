@@ -12,13 +12,18 @@ import {
   queryStateCardGet,
   queryConductorContext,
   queryWorkflowSnapshot,
+  queryWorkerList,
+  queryWorkerGet,
 } from '../../kernel/queries/index';
 import { startStateCardWatcher } from '../../kernel/watchers/index';
+import { seedHarnessRegistry } from '../../kernel/worker-instances/index';
 import type { TaskStatus } from '../../kernel/schema/types';
 
 export function registerKernelIpcHandlers(dataDir: string): void {
   initKernelDb(dataDir);
-  // Maintain Kernel-owned State Cards from task/receipt/tile events.
+  // Seed the minimal harness + default model registry (Goal 6A).
+  seedHarnessRegistry(getKernelDb());
+  // Maintain Kernel-owned State Cards from task/receipt/tile/worker events.
   startStateCardWatcher(getKernelDb());
 
   ipcMain.handle(
@@ -66,6 +71,10 @@ export function registerKernelIpcHandlers(dataDir: string): void {
           });
         case 'kernel.workflow.snapshot':
           return queryWorkflowSnapshot(params['workflowId'] as string);
+        case 'kernel.worker.list':
+          return queryWorkerList({ workflowId: params['workflowId'] as string | undefined });
+        case 'kernel.worker.get':
+          return queryWorkerGet(params['workerId'] as string);
         default:
           throw new Error(`Unknown kernel query: ${type}`);
       }

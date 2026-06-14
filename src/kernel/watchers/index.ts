@@ -14,7 +14,7 @@
  */
 
 import type { KernelDB } from '../database';
-import type { StateCardStatus, TaskStatus } from '../schema/types';
+import type { StateCardStatus, TaskStatus, WorkerInstanceStatus } from '../schema/types';
 import { onKernelEvent, type KernelEventPayload } from '../events/index';
 import { upsertStateCard } from '../state-cards/index';
 
@@ -56,6 +56,22 @@ const CAVEMAN: Record<StateCardStatus, string> = {
   blocked: 'STUCK. NEED HELP.',
   complete: 'WORK DONE. GOOD.',
   error: 'WORK BROKE.',
+};
+
+// Worker runtime status → State Card status (Goal 6A). The State Card reflects
+// Kernel-owned worker status when no task is actively driving the card.
+const WORKER_STATUS_TO_CARD: Record<WorkerInstanceStatus, StateCardStatus> = {
+  spawning: 'active',
+  active: 'active',
+  idle: 'idle',
+  stopped: 'idle',
+  error: 'error',
+};
+
+const WORKER_EVENT_SUMMARY: Record<string, string> = {
+  'worker.spawned': 'Worker spawning',
+  'worker.status_updated': 'Worker status updated',
+  'worker.stopped': 'Worker stopped',
 };
 
 interface TilePlacement {
@@ -135,6 +151,23 @@ export function applyEventToStateCards(db: KernelDB, payload: KernelEventPayload
       lastReceiptId: data.id ?? null,
       lastMeaningfulUpdate: data.summary || EVENT_SUMMARY[kind] || 'Update',
       artifacts: artifactsForTask(db, payload.taskId),
+    });
+    return;
+  }
+
+  // Worker lifecycle → reflect Kernel-owned worker status on the tile's card.
+  if (kind.startsWith('worker.') && payload.tileId) {
+    const row = db
+      .prepare('SELECT status FROM worker_instances WHERE tile_id = ? ORDER BY created_at ASC LIMIT 1')
+      .get(payload.tileId) as { status: WorkerInstanceStatus } | undefined;
+    const workerStatus = row?.status ?? 'idle';
+    const cardStatus = WORKER_STATUS_TO_CARD[workerStatus] ?? 'idle';
+    upsertStateCard(db, payload.tileId, {
+      workflowId: payload.workflowId ?? null,
+      status: cardStatus,
+      lastMeaningfulUpdate: WORKER_EVENT_SUMMARY[kind] ?? 'Worker update',
+      nextAction: NEXT_ACTION[cardStatus],
+      cavemanSummary: CAVEMAN[cardStatus],
     });
     return;
   }

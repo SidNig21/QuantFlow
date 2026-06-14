@@ -21,6 +21,8 @@ import {
   queryReceiptList,
   queryStateCardList,
   queryStateCardGet,
+  queryWorkerList,
+  queryWorkerGet,
 } from '../../kernel/queries/index';
 import type { TaskStatus } from '../../kernel/schema/types';
 
@@ -190,5 +192,29 @@ export function registerKernelTaskRpc(registerMethod: RegisterMethod): void {
     'kernel.stateCardGet',
     (params: unknown) => queryStateCardGet(asRecord(params as RpcParams)['tileId'] as string),
     { description: 'Get a tile State Card', params: { tileId: 'Tile id' } },
+  );
+
+  // Worker lifecycle (Goal 6A): Kernel-authoritative worker identity + status.
+  registerMethod('kernel.workerSpawn', command('kernel.worker.spawn'), {
+    description: 'Establish Kernel worker identity for a tile (role/harness/model, status=spawning)',
+    params: { tileId: 'Tile id', roleName: '(optional)', harnessKind: '(optional) local-shell|herdr-shell', runtimeTarget: '(optional)' },
+  });
+  registerMethod('kernel.workerStatusUpdate', command('kernel.worker.status_update'), {
+    description: 'Update worker status + runtime ids (herdr_pane_id / envoy_space_id)',
+    params: { tileId: '(or workerId)', status: 'spawning|active|idle|stopped|error', herdrPaneId: '(optional)', envoySpaceId: '(optional)' },
+  });
+  registerMethod('kernel.workerStop', command('kernel.worker.stop'), {
+    description: 'Mark a worker stopped (runtime teardown happens in the shell)',
+    params: { tileId: '(or workerId)' },
+  });
+  registerMethod(
+    'kernel.workerList',
+    (params: unknown) => queryWorkerList({ workflowId: asRecord(params as RpcParams)['workflowId'] as string | undefined }),
+    { description: 'List Kernel worker instances', params: { workflowId: '(optional)' } },
+  );
+  registerMethod(
+    'kernel.workerGet',
+    (params: unknown) => queryWorkerGet(asRecord(params as RpcParams)['workerId'] as string),
+    { description: 'Get a Kernel worker instance', params: { workerId: 'Worker id' } },
   );
 }

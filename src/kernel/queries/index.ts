@@ -13,6 +13,11 @@ import {
   type ConductorContext,
   type WorkflowSnapshot,
 } from '../conductor/index';
+import {
+  queryWorkerList as workerList,
+  queryWorkerGet as workerGet,
+  type WorkerSnapshot,
+} from '../worker-instances/index';
 
 export interface TileSnapshot {
   id: string;
@@ -150,4 +155,16 @@ export function queryConductorContext(params: {
 
 export function queryWorkflowSnapshot(workflowId: string): WorkflowSnapshot | null {
   return workflowSnapshot(getKernelDb(), workflowId);
+}
+
+// ---------------------------------------------------------------------------
+// Worker queries (Goal 6A)
+// ---------------------------------------------------------------------------
+
+export function queryWorkerList(params: { workflowId?: string } = {}): WorkerSnapshot[] {
+  return workerList(getKernelDb(), params);
+}
+
+export function queryWorkerGet(workerId: string): WorkerSnapshot | null {
+  return workerGet(getKernelDb(), workerId);
 }

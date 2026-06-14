@@ -307,6 +307,7 @@ export type KernelCommandType =
   | 'kernel.connection.create'
   | 'kernel.connection.delete'
   | 'kernel.worker.spawn'
+  | 'kernel.worker.status_update'
   | 'kernel.worker.stop'
   | 'kernel.task.create'
   | 'kernel.task.claim'
@@ -336,4 +337,5 @@ export type KernelQueryType =
   | 'kernel.state_card.list'
   | 'kernel.state_card.get'
   | 'kernel.worker.list'
+  | 'kernel.worker.get'
   | 'kernel.conductor.context';

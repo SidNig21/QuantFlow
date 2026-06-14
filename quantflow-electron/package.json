@@ -28,6 +28,7 @@
 		"smoke:kernel-task": "bun scripts/kernel-task-smoke.ts",
 		"smoke:state-card": "bun scripts/state-card-smoke.ts",
 		"smoke:conductor": "bun scripts/conductor-smoke.ts",
+		"smoke:worker-harness": "bun scripts/worker-harness-smoke.ts",
 		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",
 		"postinstall": "node scripts/postinstall.mjs"
 	},

@@ -1,5 +1,12 @@
 # Worker Reconciliation Spec
 
+> **Status: implemented in Goal 6A.** `kernel.worker.spawn` /
+> `kernel.worker.status_update` / `kernel.worker.stop` make `worker_instances`
+> the authoritative identity; the shell role-spawn + herdr status paths route
+> through them; the minimal harness registry (`local-shell`, `herdr-shell`) +
+> a default model are seeded; the State Card reflects Kernel worker status.
+> Proof: `bun run smoke:worker-harness`. Conductor actions (5C) remain gated.
+
 This spec binds the back half of v3 before Conductor actions begin.
 
 Goal 6A owns the reconciliation. Goal 5A may read worker state, but Goal 5C/5D may not spawn, assign, or manage workers until this spec is implemented and verified.

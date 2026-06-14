@@ -3468,6 +3468,18 @@ async function init() {
 	panelManager.applyVisibility();
 
 	// -- herdr status events (Gate 3: main-process events.subscribe) --
+	function mapHerdrStatusToWorker(status) {
+		switch (String(status ?? "").toLowerCase()) {
+			case "active": return "active";
+			case "waiting":
+			case "blocked": return "active";
+			case "idle":
+			case "quiet": return "idle";
+			case "exited": return "stopped";
+			case "error": return "error";
+			default: return "idle";
+		}
+	}
 	window.shellApi.onHerdrStatusChanged((payload) => {
 		const { paneId, status } = payload;
 		const tile = tiles.find((t) => t.herdrPaneId === paneId);
@@ -3476,6 +3488,12 @@ async function init() {
 		if (!dom) return;
 		const container = dom.container ?? dom;
 		updateHerdrBadge(container, paneId, status ?? "unknown");
+		// Kernel owns worker status — mirror the herdr runtime status onto the
+		// worker_instances row so State Cards/Conductor read it from the Kernel.
+		void window.kernelApi?.sendCommand("kernel.worker.status_update", {
+			tileId: tile.id,
+			status: mapHerdrStatusToWorker(status),
+		});
 	});
 	for (const tile of tiles.filter((t) => t.herdrPaneId)) {
 		void window.shellApi.herdrLinkPane(tile.id, tile.herdrPaneId);
