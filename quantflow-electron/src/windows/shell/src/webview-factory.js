@@ -23,7 +23,7 @@ export function isFocusSearchShortcut(input) {
 		return false;
 	}
 	if (!hasCommandModifier) return false;
-	return input.code === "KeyK" || normalizeShortcutKey(input.key) === "k";
+	return input.code === "KeyF" || normalizeShortcutKey(input.key) === "f";
 }
 
 export function createWebview(name, config, container, onDndMessage) {

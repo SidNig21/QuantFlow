@@ -260,10 +260,12 @@ const TOGGLE_SHORTCUTS: Record<string, ShortcutEntry[]> = {
   Backslash: [{ modifier: cmdOrCtrl, action: "sidebar-files" }],
   Comma: [{ modifier: cmdOrCtrl, action: "toggle-settings" }],
   KeyO: [{ modifier: shiftCmdOrCtrl, action: "add-workspace" }],
-  KeyK: [{ modifier: cmdOrCtrl, action: "focus-file-search" }],
+  KeyF: [
+    { modifier: cmdOrCtrl, action: "focus-file-search" },
+    { modifier: shiftOnly, action: "flip-state-card" },
+  ],
   KeyN: [{ modifier: cmdOrCtrl, action: "new-tile" }],
   KeyW: [{ modifier: cmdOrCtrl, action: "close-tile" }],
-  KeyF: [{ modifier: shiftOnly, action: "flip-state-card" }],
   ArrowRight: [{ modifier: altOnly, action: "focus-tile-right" }],
   ArrowLeft: [{ modifier: altOnly, action: "focus-tile-left" }],
   ArrowUp: [{ modifier: altOnly, action: "focus-tile-up" }],
@@ -273,11 +275,10 @@ const TOGGLE_SHORTCUTS: Record<string, ShortcutEntry[]> = {
 const TOGGLE_SHORTCUT_KEYS: Record<string, ShortcutEntry[]> = {
   ",": TOGGLE_SHORTCUTS.Comma!,
   o: TOGGLE_SHORTCUTS.KeyO!,
-  k: TOGGLE_SHORTCUTS.KeyK!,
+  f: TOGGLE_SHORTCUTS.KeyF!,
   b: TOGGLE_SHORTCUTS.KeyB!,
   n: TOGGLE_SHORTCUTS.KeyN!,
   w: TOGGLE_SHORTCUTS.KeyW!,
-  f: TOGGLE_SHORTCUTS.KeyF!,
 };
 
 function normalizeShortcutKey(key: string | undefined): string | null {
@@ -442,7 +443,7 @@ function buildAppMenu(): void {
         { type: "separator" },
         {
           label: "Find",
-          accelerator: "CommandOrControl+K",
+          accelerator: "CommandOrControl+F",
           registerAccelerator: false,
           click: () => sendShortcut("focus-file-search"),
         },

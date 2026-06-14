@@ -376,7 +376,7 @@ const ALT = IS_MAC ? "\u2325" : "Alt+";
 
 const SHORTCUTS: { label: string; keys: string }[] = [
   { label: "Settings", keys: `${MOD} ,` },
-  { label: "Find", keys: `${MOD} K` },
+  { label: "Find", keys: `${MOD} F` },
   { label: "Toggle Navigator", keys: `${MOD} \\` },
   { label: "Toggle Terminal List", keys: `${MOD} \`` },
   { label: "Open Workspace", keys: `${SHIFT} ${MOD} O` },

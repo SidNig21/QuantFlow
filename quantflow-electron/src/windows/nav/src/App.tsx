@@ -1348,7 +1348,7 @@ export default function App() {
 									cycleSortMode
 								}
 								searchPlaceholder="Search"
-								searchShortcut={PLATFORM === "darwin" ? "Cmd+K" : "Ctrl+K"}
+								searchShortcut={PLATFORM === "darwin" ? "Cmd+F" : "Ctrl+F"}
 								onArrowNav={
 									navigateItems
 								}

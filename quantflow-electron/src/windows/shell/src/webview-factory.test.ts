@@ -29,27 +29,27 @@ describe("normalizeShortcutKey", () => {
 // -- isFocusSearchShortcut --
 
 describe("isFocusSearchShortcut", () => {
-  test("returns true for Cmd+K (keyDown)", () => {
+  test("returns true for Cmd+F (keyDown)", () => {
     expect(isFocusSearchShortcut({
-      type: "keyDown", key: "k", code: "KeyK", meta: true,
+      type: "keyDown", key: "f", code: "KeyF", meta: true,
     })).toBe(true);
   });
 
-  test("returns true for Ctrl+K (keydown)", () => {
+  test("returns true for Ctrl+F (keydown)", () => {
     expect(isFocusSearchShortcut({
-      type: "keydown", key: "k", code: "KeyK", ctrlKey: true,
+      type: "keydown", key: "f", code: "KeyF", ctrlKey: true,
     })).toBe(true);
   });
 
-  test("returns true for Cmd+K with uppercase key", () => {
+  test("returns true for Cmd+F with uppercase key", () => {
     expect(isFocusSearchShortcut({
-      type: "keyDown", key: "K", code: "KeyK", metaKey: true,
+      type: "keyDown", key: "F", code: "KeyF", metaKey: true,
     })).toBe(true);
   });
 
   test("returns false without command modifier", () => {
     expect(isFocusSearchShortcut({
-      type: "keyDown", key: "k", code: "KeyK",
+      type: "keyDown", key: "f", code: "KeyF",
     })).toBe(false);
   });
 
@@ -61,20 +61,20 @@ describe("isFocusSearchShortcut", () => {
 
   test("returns false for keyUp events", () => {
     expect(isFocusSearchShortcut({
-      type: "keyUp", key: "k", code: "KeyK", meta: true,
+      type: "keyUp", key: "f", code: "KeyF", meta: true,
     })).toBe(false);
   });
 
   test("returns false for auto-repeat", () => {
     expect(isFocusSearchShortcut({
-      type: "keyDown", key: "k", code: "KeyK",
+      type: "keyDown", key: "f", code: "KeyF",
       meta: true, isAutoRepeat: true,
     })).toBe(false);
   });
 
   test("returns false for repeat", () => {
     expect(isFocusSearchShortcut({
-      type: "keydown", key: "k", code: "KeyK",
+      type: "keydown", key: "f", code: "KeyF",
       ctrlKey: true, repeat: true,
     })).toBe(false);
   });
@@ -88,16 +88,16 @@ describe("isFocusSearchShortcut", () => {
   });
 
   test("matches by code even if key differs", () => {
-    // On some layouts, key might differ but code is KeyK
+    // On some layouts, key might differ but code is KeyF
     expect(isFocusSearchShortcut({
-      type: "keyDown", key: "x", code: "KeyK", meta: true,
+      type: "keyDown", key: "x", code: "KeyF", meta: true,
     })).toBe(true);
   });
 
   test("matches by key even if code differs", () => {
-    // On some layouts, code might differ but key is "k"
+    // On some layouts, code might differ but key is "f"
     expect(isFocusSearchShortcut({
-      type: "keyDown", key: "k", code: "SomeOtherCode", meta: true,
+      type: "keyDown", key: "f", code: "SomeOtherCode", meta: true,
     })).toBe(true);
   });
 });

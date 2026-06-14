@@ -8,7 +8,7 @@ export const SHORTCUTS = [
 	{ actionId: "sidebar-files", keys: ["mod", "b"], when: "global", description: "Toggle Navigator" },
 	{ actionId: "sidebar-tiles", keys: ["mod", "shift", "b"], when: "shell", description: "Show Tiles sidebar" },
 	{ actionId: "toggle-agent", keys: ["mod", "alt", "b"], when: "global", description: "Toggle Agent" },
-	{ actionId: "focus-file-search", keys: ["mod", "k"], when: "webview", description: "Focus file search" },
+	{ actionId: "focus-file-search", keys: ["mod", "f"], when: "webview", description: "Focus file search" },
 	{ actionId: "add-workspace", keys: ["mod", "shift", "o"], when: "global", description: "Open workspace" },
 	{ actionId: "zoom-in", keys: ["mod", "="], when: "global", description: "Zoom in" },
 	{ actionId: "zoom-out", keys: ["mod", "-"], when: "global", description: "Zoom out" },
