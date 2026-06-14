@@ -15,12 +15,12 @@ All canonical state and the mutation/query boundary:
 - `commands/tile-commands.ts` — Tile CRUD: create, move, resize, rename, status_update, remove. (Goal 2)
 - `commands/connection-commands.ts` — Connection CRUD: create, delete. (Goal 2)
 - `commands/workflow-commands.ts` — Workflow CRUD: create, update. (Goal 2)
-- `queries/index.ts` — Read-only queries: canvas snapshot, tile list/get, task list/get, receipt list. (Goal 2 + Goal 3)
+- `queries/index.ts` — Read-only queries: canvas snapshot, tile list/get, task list/get, receipt list, state_card list/get. (Goal 2 + Goal 3 + Goal 4)
 - `tasks/state-machine.ts` — Canonical task transition table + `canTransition`/`assertTransition`. (Goal 3)
 - `tasks/validators.ts` — Lifecycle guards: complete requires verifying + verification_passed receipt (or documented legacy bypass); self-verification refused. (Goal 3)
 - `tasks/index.ts` — Task command handlers (create/claim/start/submit/verify/reject/complete/block/fail) + task queries. Posts a receipt for every transition. (Goal 3)
 - `receipts/index.ts` — Append-only receipt store: `postReceipt`, `kernel.receipt.post`, `kernel.artifact.create`, receipt-chain query. (Goal 3)
-- Future: StateCard watchers (Goal 4).
+- `state-cards/index.ts` and `watchers/index.ts` — Kernel-owned StateCard upserts/queries and the event watcher that promotes task, receipt, and tile events into current tile summaries. (Goal 4)
 - `worker-instances/index.ts` — minimal Goal 4 link only: `ensureWorkerInstanceForTile` / `queryWorkerForTile` create/return a default WorkerInstance per tile so Kernel tasks claimed by tile surface on its State Card. role/harness/model are intentionally NULL. (Goal 4)
 - Future: full WorkerInstance registry — roles, harness, model, permissions, lifecycle (Goal 6).
 - Future: Harness registry — configuration only, not harness implementations (Goal 6).

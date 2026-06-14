@@ -17,6 +17,7 @@ This section is the durable progress ledger for the v3 branch.
 | Goal 1 — Kernel Constitution and Canonical Schema | Complete / approved | Claude | Codex | 2026-06-13 | Constitutional schema docs created, authority rules expanded, TypeScript row types declared, v3 baseline SQL parses in SQLite. No runtime wiring performed. |
 | Goal 2 — Kernel Command Boundary and Canvas-as-Renderer Audit | Complete / approved | Claude | Codex | 2026-06-14 | Runtime command boundary wired for canvas actions. Manual spawn, move, resize, connect, and close now gate canonical commits through awaited Kernel commands; MCP connection path gates before shell mutation; build passes. |
 | Goal 3 — Task State Machine v3: Submitted and Verifying Gates | Complete / approved | Claude | Codex | 2026-06-14 | Kernel-native task lifecycle now enforces submitted/verifying gates, verification receipts, self-verification guard, receipt-chain queries, MCP submit/verify/reject tools, and a scoped legacy bypass only from working/submitted/verifying; smoke, MCP tests, and build pass. |
+| Goal 4 — State Cards and Flip Tile UI | Complete / approved | Claude | Codex | 2026-06-14 | Kernel-owned StateCards are maintained by an event watcher, seeded from tile creation, linked to tasks through default WorkerInstances, exposed through state_card list/get, and projected into the shell flip UI without replacing terminal state; state-card smoke, Goal 3 smoke, MCP tests, shell tests, and build pass. |
 
 Completion rule:
 
