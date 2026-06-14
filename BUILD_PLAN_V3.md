@@ -2119,5 +2119,5 @@ Do not:
 - let workers self-complete without verification receipts
 
 Work only on the current v3 goal.
-Commit before handoff.
+Commit locally before handoff. Do not push worker goal commits; the verifier reviews the local commit/diff, updates the ledger if approved, and pushes the approved branch state.
 ```
