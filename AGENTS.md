@@ -171,10 +171,9 @@ Repo docs win for code scope. Vault root reference files can inform decisions, b
 
 ## Current v3 State
 
-Goals 0-4 are complete and approved. Goal 5+ has been refined into smaller, verifier-sized steps:
+Goals 0-5A are complete and approved. The next step is the worker-spawn reconciliation gate:
 
 ```text
-Goal 5A - Conductor Read-Only MVP
 Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry
 Goal 5C - Conductor Native Actions
 Goal 5D - Conductor Loop
@@ -197,4 +196,4 @@ The following authority docs are installed for v3:
 - `src/vault/AGENTS.md` - knowledge mirror rail
 - DOX base contract incorporated into this file
 
-Next: Goal 5A - Conductor Read-Only MVP (do not start until operator approves).
+Next: Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry (do not start until operator approves).

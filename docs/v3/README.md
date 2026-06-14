@@ -42,12 +42,11 @@ Installed:
 
 ## Current Plan State
 
-Goals 0-4 are complete and approved.
+Goals 0-5A are complete and approved.
 
 The back half has been refined:
 
 ```text
-Goal 5A - Conductor Read-Only MVP
 Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry
 Goal 5C - Conductor Native Actions
 Goal 5D - Conductor Loop
