@@ -16,7 +16,7 @@ This section is the durable progress ledger for the v3 branch.
 | Goal 0 — Branch, v3 plan files, and DOX rails | Complete / approved | Claude | Codex | 2026-06-13 | Docs-only. Branch exists, v3 plan installed, DOX base contract incorporated, child `AGENTS.md` rails installed at durable boundaries, stale setup text removed. |
 | Goal 1 — Kernel Constitution and Canonical Schema | Complete / approved | Claude | Codex | 2026-06-13 | Constitutional schema docs created, authority rules expanded, TypeScript row types declared, v3 baseline SQL parses in SQLite. No runtime wiring performed. |
 | Goal 2 — Kernel Command Boundary and Canvas-as-Renderer Audit | Complete / approved | Claude | Codex | 2026-06-14 | Runtime command boundary wired for canvas actions. Manual spawn, move, resize, connect, and close now gate canonical commits through awaited Kernel commands; MCP connection path gates before shell mutation; build passes. |
-| Goal 3 — Task State Machine v3: Submitted and Verifying Gates | Next / not started | — | — | — | Do not start until the operator authorizes Goal 3. |
+| Goal 3 — Task State Machine v3: Submitted and Verifying Gates | Complete / approved | Claude | Codex | 2026-06-14 | Kernel-native task lifecycle now enforces submitted/verifying gates, verification receipts, self-verification guard, receipt-chain queries, MCP submit/verify/reject tools, and a scoped legacy bypass only from working/submitted/verifying; smoke, MCP tests, and build pass. |
 
 Completion rule:
 
@@ -1598,6 +1598,37 @@ Each worker can post or produce receipts through the same Kernel/Envoy path.
 ---
 
 # Goal 7 — Workflow Regions and Semantic Strings
+
+## Optional Canvas Layout Discipline / Smart Grid
+
+Parked Goal 7 enhancement/reference only. Do not implement before Goal 7, do not block Goal 3, and do not treat this as a new runtime authority.
+
+Reference: https://github.com/alexmcdonnell-airtable/hyperagent-public-skills
+
+The Muller-Brockmann grid-systems skill in that repo is inspiration only. The purpose is to keep QuantFlow workflow tiles organized on the infinite canvas without turning the app into a dashboard, rigid design tool, or mandatory layout system.
+
+Possible scope:
+
+```text
+snap grid
+grid overlay toggle
+workflow layout templates
+basic layout verification
+no overlapping tiles
+minimum readable terminal size
+predictable placement zones for Conductor / workers / verifier / artifacts
+```
+
+Non-goals:
+
+```text
+do not implement this before Goal 7
+do not block Goal 3
+do not make layout mandatory
+do not replace the infinite canvas
+do not add a complex graph layout engine
+do not make strings or grid layout into a new runtime authority
+```
 
 ## Goal
 
