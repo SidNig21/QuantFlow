@@ -1,8 +1,8 @@
 # QuantFlow v3 Build Scope Plan
 
-Branch: `quantflow-v3`  
-Base branch: `quantflow-v2`  
-Planning mode: Goal Sessions  
+Branch: `quantflow-v3`
+Base branch: `quantflow-v2`
+Planning mode: Goal Sessions
 Execution rule: one goal at a time; no parallel architecture tracks unless explicitly approved.
 
 ---
@@ -127,63 +127,63 @@ The canvas is a projector, never a database.
 ## Keep
 
 - Infinite canvas.
-    
+
 - Live terminal tiles.
-    
+
 - herdr-backed WSL panes.
-    
+
 - node-pty as display glass / Windows shell fallback.
-    
+
 - Envoy task bus and receipt chain.
-    
+
 - Obsidian mirror.
-    
+
 - Existing MCP tools as external agent interface.
-    
+
 - Current phase-6 autonomous delegation proof.
-    
+
 - Operator workflow: goal sessions, one active goal at a time.
-    
+
 
 ## Change
 
 - Promote Kernel/runtime SQLite/Envoy state into sole truth owner.
-    
+
 - Add canonical State Cards.
-    
+
 - Add task verification states: `submitted` and `verifying`.
-    
+
 - Add explicit `worker_instances`, `harnesses`, `models`, and `permissions`.
-    
+
 - Add Conductor as native in-process planner.
-    
+
 - Add Harness Layer for Pi / Codex / Claude Code / shell / future workers.
-    
+
 - Make canvas mutations go through Kernel commands.
-    
+
 
 ## Do Not Do Early
 
 - Do not replace herdr.
-    
+
 - Do not migrate tiles to Cloudflare Containers.
-    
+
 - Do not rebuild everything around Durable Objects.
-    
+
 - Do not make MCP the internal fast path.
-    
+
 - Do not build RL training.
-    
+
 - Do not build a full dashboard product.
-    
+
 - Do not redesign away from the canvas.
-    
+
 - Do not add A2A or Agent Cards.
-    
+
 - Do not reintroduce custom string relay.
-    
+
 - Do not add Cloudflare remote tier before local authority is correct.
-    
+
 
 ---
 
@@ -192,19 +192,19 @@ The canvas is a projector, never a database.
 A v3 goal should be:
 
 - Big enough to produce a meaningful product shift.
-    
+
 - Small enough to test and commit cleanly.
-    
+
 - Demoable on the canvas.
-    
+
 - Pass/fail checkable.
-    
+
 - Written before coding starts.
-    
+
 - Completed before moving to the next goal.
 
 - Submitted by the worker and approved by the verifier before the next goal begins.
-    
+
 
 Each goal must have:
 
@@ -774,72 +774,72 @@ metadata_json
 ## Out of Scope
 
 - No UI.
-    
+
 - No Conductor.
-    
+
 - No harness implementation.
-    
+
 - No behavior migration yet.
-    
+
 - No schema perfection beyond canonical authority.
-    
+
 
 ## Tool / URL Requirements
 
 - Existing v2 references:
-    
+
     - `BUILD_PLAN_V2.md`
-        
+
     - `ENVOY.md`
-        
+
     - existing runtime SQLite code
-        
+
     - existing Envoy task bus code
-        
+
     - existing MCP tool list
-        
+
 - Design references:
-    
+
     - Vercel AI SDK HarnessAgent page for role/harness/model separation.
-        
+
     - Pi docs for harness capability inventory.
-        
+
     - OKF article for future vault export shape.
-        
+
 
 ## Acceptance Test
 
 - `KERNEL_CONSTITUTION.md` exists and is short enough to be read before every v3 coding session.
-    
+
 - `KERNEL_SCHEMA_V1.md` defines canonical tables and relationships.
-    
+
 - Every v3 primitive has one name and one owner.
-    
+
 - A future coding agent can answer:
-    
+
     - Who owns truth?
-        
+
     - What is a tile?
-        
+
     - What is a worker?
-        
+
     - What is a harness?
-        
+
     - What is a receipt?
-        
+
     - What is a state card?
-        
+
 
 ## Failure Signals
 
 - Schema is written as generic database design instead of QuantFlow authority design.
-    
+
 - `WorkerInstance`, `Harness`, and `Model` are collapsed into one concept.
-    
+
 - State Cards are treated as receipt history.
-    
+
 - Canvas state remains undefined.
-    
+
 
 ---
 
@@ -914,28 +914,28 @@ Canvas re-renders from Kernel snapshot/event.
 ## Out of Scope
 
 - Do not implement Conductor.
-    
+
 - Do not add AI.
-    
+
 - Do not add new worker harnesses.
-    
+
 - Do not redesign visual layout.
-    
+
 - Do not remove existing MCP path yet.
-    
+
 
 ## Tool / URL Requirements
 
 - Electron IPC docs if needed.
-    
+
 - Existing `events.subscribe` implementation.
-    
+
 - Existing canvas tile state/store code.
-    
+
 - Existing herdr spawn IPC files.
-    
+
 - Existing Envoy task bus code.
-    
+
 
 ## Acceptance Test
 
@@ -961,13 +961,13 @@ Renderer update
 ## Failure Signals
 
 - Renderer still mutates canonical tile state directly.
-    
+
 - Kernel command API becomes a loose wrapper around old renderer state.
-    
+
 - Canvas updates before Kernel accepts the mutation.
-    
+
 - Multiple state stores disagree about tile position/status.
-    
+
 
 ---
 
@@ -1071,26 +1071,26 @@ task_failed
 ## Out of Scope
 
 - No Conductor.
-    
+
 - No automatic verifier agent yet.
-    
+
 - No full Watchtower redesign.
-    
+
 - No RL scoring.
-    
+
 - No live trading integration.
-    
+
 
 ## Tool / URL Requirements
 
 - Existing `ENVOY.md`.
-    
+
 - Existing `bun run smoke:envoy-task`.
-    
+
 - Existing `bun run smoke:phase6`.
-    
+
 - Existing qf task MCP tools.
-    
+
 
 ## Acceptance Test
 
@@ -1113,13 +1113,13 @@ The task cannot go straight from `working` to `complete` unless a compatibility 
 ## Failure Signals
 
 - Worker can still self-complete without evidence.
-    
+
 - Verification receipts are optional or skipped.
-    
+
 - State transitions are not enforced centrally.
-    
+
 - Existing smoke tests break without a compatibility note.
-    
+
 
 ---
 
@@ -1217,26 +1217,26 @@ It should promote only meaningful status.
 ## Out of Scope
 
 - No LLM summarizer required in first pass.
-    
+
 - No auto-caveman model call required in first pass.
-    
+
 - No full memory tile.
-    
+
 - No new dashboard.
-    
+
 
 ## Tool / URL Requirements
 
 - Current herdr `events.subscribe`.
-    
+
 - Existing renderer tile components.
-    
+
 - Existing Envoy receipts.
-    
+
 - CNVS/Maestri flip-tile reference as visual inspiration only.
-    
+
 - Claude Design for visual exploration only, not source of truth.
-    
+
 
 ## Acceptance Test
 
@@ -1260,23 +1260,23 @@ state_card.get(tileId)
 ## Failure Signals
 
 - State Card becomes a chat transcript.
-    
+
 - State Card requires reading the entire terminal log.
-    
+
 - Flip UI hides or degrades the terminal experience.
-    
+
 - State Card lives only in renderer state rather than Kernel state.
-    
+
 
 ---
 
-# Goal 5 — Conductor MVP: In-Process Hermes Prime Planner
+# Goal 5A - Conductor Read-Only MVP
 
 ## Goal
 
-Replace Hermes-in-a-PTY as the primary planner harness with an embedded Conductor running in Electron main.
+Add an embedded Conductor surface in Electron main that reads Kernel state and posts planning receipts.
 
-The Conductor reads Kernel state and uses native Kernel tools.
+Goal 5A is intentionally read-only except for `planning_receipt` writes. It proves the Conductor can understand the live Kernel world before it is allowed to mutate work.
 
 ## Why
 
@@ -1284,17 +1284,15 @@ MCP/PTY is too slow and indirect for the primary planner.
 
 The planner should not control the canvas through a terminal.
 
-It should call native functions:
+Before the Conductor can safely spawn or assign workers, it must prove that it can read the same Kernel truth the canvas renders:
 
 ```text
 getCanvasSnapshot
+getWorkflowSnapshot
 getStateCards
-taskCreate
-taskAssign
-taskBlock
-taskVerify
-spawnRole
-postReceipt
+getTaskList
+getReceiptChain
+postPlanningReceipt
 ```
 
 ## Direct Repo Scope
@@ -1303,8 +1301,8 @@ Create or update:
 
 ```text
 src/main/conductor/
-src/main/conductor/conductor-loop.ts
-src/main/conductor/conductor-tools.ts
+src/main/conductor/conductor-reader.ts
+src/main/conductor/conductor-tools-readonly.ts
 src/main/conductor/prompts/
 src/main/conductor/model-provider.ts
 src/renderer/components/ConductorTile/
@@ -1325,7 +1323,7 @@ Next action
 
 It is not a raw terminal.
 
-## Native Tool Surface
+## Native Tool Surface - Goal 5A
 
 Minimum tools:
 
@@ -1334,17 +1332,13 @@ get_canvas_snapshot
 get_workflow_snapshot
 get_state_cards
 get_task_list
-create_task
-assign_task
-submit_task
-verify_task
-block_task
+get_receipt_chain
 post_receipt
-spawn_role
-connect_tiles
 focus_tile
 request_human_approval
 ```
+
+`post_receipt` is limited to Conductor planning receipts in Goal 5A.
 
 ## Conductor Rules
 
@@ -1352,10 +1346,6 @@ The Conductor may:
 
 ```text
 read state
-create tasks
-assign work
-resolve blockers
-request verification
 post planning receipts
 ask human for approval
 ```
@@ -1365,6 +1355,9 @@ The Conductor may not:
 ```text
 own truth
 store private source-of-truth memory
+create or assign tasks yet
+spawn or activate workers yet
+verify, reject, complete, or block tasks yet
 complete tasks without verification evidence
 execute shell commands directly unless through a worker
 silently perform high-risk actions
@@ -1390,30 +1383,21 @@ direct API
 ## Out of Scope
 
 - Do not remove Hermes terminal tile entirely yet.
-    
 - Do not delete MCP tools.
-    
 - Do not implement multiple harnesses here.
-    
+- Do not implement worker spawn or `spawn_role` here; Goal 6A owns that reconciliation.
+- Do not implement autonomous loops here.
 - Do not build RL scoring.
-    
 - Do not use Cloudflare AI Gateway yet unless trivial.
-    
 
 ## Tool / URL Requirements
 
 - Vercel AI SDK core docs.
-    
 - Vercel HarnessAgent changelog as conceptual reference.
-    
 - Existing QuantFlow MCP tools as native tool equivalents.
-    
-- Existing Envoy task bus.
-    
+- Existing Envoy task bus as shipped-behavior reference only.
 - MiniMax provider docs/API docs.
-    
 - Optional later: Cloudflare AI Gateway.
-    
 
 ## Acceptance Test
 
@@ -1422,36 +1406,244 @@ On a canvas workflow:
 ```text
 User starts Conductor.
 Conductor reads state cards.
-Conductor creates task.
-Conductor spawns/activates worker tile.
+Conductor reads tasks and receipt chains.
+Conductor tile shows current plan/read model/tool reads/blockers/next action.
+Conductor posts a planning receipt through the Kernel.
+The receipt appears in the task/workflow receipt chain.
+```
+
+No `terminal_write` handoff should be needed for the planner read path.
+
+## Failure Signals
+
+- Conductor becomes a second source of truth.
+- Conductor requires MCP to call internal app functions.
+- Conductor only chats but does not use native tools.
+- Conductor tile becomes less informative than Hermes terminal.
+- Conductor mutates tasks, workers, strings, or workflow state before Goal 6A and Goal 5C.
+
+---
+
+# Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry
+
+## Goal
+
+Make Kernel worker identity authoritative before the Conductor can spawn, assign, or manage workers.
+
+The `worker_instances` row is the single identity tying a canvas tile, role, harness, model, PTY/herdr runtime, Envoy space, receipts, and State Card together.
+
+Full spec: `docs/v3/WORKER_RECONCILIATION.md`.
+
+## Why
+
+Goals 2-4 made tiles, tasks, receipts, and State Cards Kernel-owned. Actual runtime spawn still runs through shell-side role spawn, PTY/herdr, and legacy Envoy paths.
+
+The dual-authority gap is specific:
+
+```text
+PTY/herdr session + Envoy record do not yet have a Kernel-owned WorkerInstance identity.
+```
+
+Conductor actions cannot be reliable until worker spawn and status have one owner.
+
+## Direct Repo Scope
+
+Create or update:
+
+```text
+src/kernel/worker-instances/
+src/kernel/commands/worker-commands.ts
+src/harness/
+src/harness/types.ts
+src/harness/local-shell/
+src/harness/herdr-shell/
+src/harness/registry.ts
+quantflow-electron/src/windows/shell/src/role-tile-spawn.js
+quantflow-electron/src/main/
+docs/v3/WORKER_RECONCILIATION.md
+```
+
+## Required Ownership Model
+
+`kernel.worker.spawn` is the spawn authority:
+
+```text
+1. write worker_instances row with role_id/harness_id/model_id/status='spawning'
+2. delegate to harness adapter to start existing runtime
+3. record runtime ids back on the same worker_instances row
+4. emit Kernel worker/tile/state_card events
+```
+
+`kernel.worker.status_update` owns status:
+
+```text
+worker_instances.status = spawning | active | idle | stopped | error
+```
+
+The shell's herdr status event path must update Kernel status, not only renderer badges.
+
+Receipts flow through Kernel:
+
+```text
+harness collectReceipts -> kernel.receipt.post(worker_id, tile_id, task_id, ...)
+```
+
+Envoy is wrapped or explicitly bridged as a legacy transport detail. It is not a second task authority.
+
+## Minimal Harness Scope
+
+Implement only the contract needed to wrap current shipped runtimes:
+
+```text
+local-shell
+herdr-shell
+```
+
+Pi remains a Goal 6 follow-up unless the programmatic contract is stable enough and explicitly approved.
+
+## Out of Scope
+
+- No Conductor autonomous loop.
+- No Conductor task assignment/spawn tools until this passes.
+- No full agent marketplace.
+- No Claude Code or Codex adapter unless the local contract is already stable.
+- No remote containers.
+- Do not break existing phase-6 herdr/PTY behavior.
+
+## Acceptance Test
+
+From the live canvas path:
+
+```text
+spawn worker tile through Kernel worker spawn
+worker_instances row has tile_id, role_id, harness_id, model_id if available
+runtime ids are recorded: herdr_pane_id and/or envoy_space_id when present
+herdr/PTY status updates worker_instances.status
+State Card shows real worker status without reading terminal logs
+task claimed by tile/worker maps to the same worker_instances row
+worker close stops or detaches runtime and updates Kernel status
+```
+
+No manual pre-seeding of `worker_instances` is allowed in the proof.
+
+## Failure Signals
+
+- Shell calls `herdrSpawnRole` or PTY spawn directly without a Kernel worker identity.
+- Worker status exists only as a renderer badge.
+- Envoy task/receipt state competes with Kernel task/receipt state.
+- `role_id`, `harness_id`, `model_id`, `herdr_pane_id`, or `envoy_space_id` stay permanently unpopulated when the data exists.
+- Kernel mirrors legacy runtime state after the fact instead of authorizing spawn first.
+
+---
+
+# Goal 5C - Conductor Native Actions
+
+## Goal
+
+Allow the Conductor to mutate Kernel workflow state through native tools, after Goal 6A proves worker spawn/status ownership.
+
+## Native Tool Surface - Goal 5C
+
+Add mutation tools:
+
+```text
+create_task
+assign_task
+submit_task
+verify_task
+reject_task
+block_task
+spawn_role
+connect_tiles
+```
+
+## Rules
+
+The Conductor may create and assign work, request verification, resolve blockers, and post receipts.
+
+The Conductor still may not:
+
+```text
+execute shell commands directly
+complete tasks without verification evidence
+silently perform high-risk actions
+run an autonomous loop
+store private source-of-truth memory
+```
+
+## Acceptance Test
+
+Operator triggers one Conductor action at a time:
+
+```text
+Conductor reads Kernel state.
+Conductor creates a task.
+Conductor spawns or activates a worker through kernel.worker.spawn.
 Worker claims task.
 Worker submits result.
-Verification receipt appears.
-Conductor marks workflow step complete or asks for next action.
+Verifier posts verification receipt.
+Conductor marks the workflow step ready for next action.
 ```
 
 No `terminal_write` handoff should be needed for the planner path.
 
 ## Failure Signals
 
-- Conductor becomes a second source of truth.
-    
-- Conductor requires MCP to call internal app functions.
-    
-- Conductor only chats but does not use native tools.
-    
-- Conductor tile becomes less informative than Hermes terminal.
-    
-- Worker activation still relies on manual paste.
-    
+- Conductor bypasses Kernel tools.
+- Conductor writes through MCP instead of native app functions.
+- Worker activation relies on manual paste.
+- Conductor starts looping without operator authorization.
 
 ---
 
-# Goal 6 — Harness Interface and First Worker Adapters
+# Goal 5D - Conductor Loop
 
 ## Goal
 
-Define and implement the WorkerHarness interface, then add first adapters for local shell and Pi.
+Add an approval-gated Conductor loop after read-only planning, worker spawn reconciliation, and native actions are proven.
+
+## Scope
+
+The loop can:
+
+```text
+read current Kernel state
+select the next low-risk tool call
+ask for approval on high-risk actions
+post planning/action receipts
+pause on blockers or ambiguity
+```
+
+## Out of Scope
+
+- No live trading actions.
+- No cloud-required loop.
+- No self-completion or self-verification.
+- No hidden memory outside Kernel receipts/state.
+
+## Acceptance Test
+
+On a small workflow, the Conductor can perform multiple approved steps without terminal paste:
+
+```text
+plan -> create task -> assign/spawn -> wait for receipt -> request verification -> summarize next action
+```
+
+The operator can pause/stop the loop and inspect every decision through receipts and the Conductor tile.
+
+## Failure Signals
+
+- Loop acts faster than the UI/receipts can explain.
+- Loop repeats failed actions without new evidence.
+- Loop hides uncertainty instead of asking for approval.
+
+---
+
+# Goal 6 - Harness Interface and First Worker Adapters
+
+## Goal
+
+Expand the WorkerHarness interface after Goal 6A proves the minimal local/herdr registry.
 
 ## Why
 
@@ -1460,7 +1652,7 @@ QuantFlow must not become locked to Pi, Claude Code, Codex, Hermes profiles, or 
 The distinction must be permanent:
 
 ```text
-role ≠ harness ≠ model
+role != harness != model
 ```
 
 ## Direct Repo Scope
@@ -1509,11 +1701,11 @@ activation_prompt
 
 ### local-shell
 
-Used for safe manual/test harness.
+Introduced in Goal 6A; harden for workflow use.
 
 ### herdr-shell
 
-Wraps current WSL/herdr tile runtime.
+Introduced in Goal 6A; harden for workflow use.
 
 ### pi
 
@@ -1522,44 +1714,28 @@ Use Pi programmatic usage if stable enough; otherwise use RPC or JSON event stre
 ## Out of Scope
 
 - No Claude Code adapter unless local contract is stable.
-    
 - No Codex adapter unless existing Codex tile can be wrapped cleanly.
-    
 - No Vercel sandbox.
-    
 - No remote containers.
-    
-- No generic “agent marketplace.”
-    
+- No generic agent marketplace.
 
 ## Tool / URL Requirements
 
 - Pi docs:
-    
     - SDK
-        
     - RPC mode
-        
     - JSON event stream mode
-        
     - providers
-        
     - custom models
-        
     - skills
-        
     - extensions
-        
+
 - Vercel AI SDK HarnessAgent:
-    
     - conceptual reference for swappable harnesses
-        
     - do not hard-depend on experimental canary unless deliberately approved
-        
+
 - Existing herdr spawn code.
-    
 - Existing role spawn config.
-    
 
 ## Acceptance Test
 
@@ -1568,7 +1744,7 @@ From the same workflow/task:
 ```text
 spawn worker with harness=local-shell
 spawn worker with harness=herdr-shell
-spawn worker with harness=pi
+spawn worker with harness=pi if approved/stable
 ```
 
 Each worker gets:
@@ -1581,23 +1757,17 @@ workflow context
 activation prompt
 ```
 
-Each worker can post or produce receipts through the same Kernel/Envoy path.
+Each worker can post or produce receipts through the same Kernel path. Envoy participation must be wrapped/bridged, not parallel authority.
 
 ## Failure Signals
 
 - Harness and model are fused.
-    
 - Pi-specific assumptions leak into Kernel.
-    
 - Worker identity depends on display name.
-    
 - Harness implementation bypasses task/receipt system.
-    
 - The canvas cannot show harness/model/role separately.
-    
 
 ---
-
 # Goal 7 — Workflow Regions and Semantic Strings
 
 ## Optional Canvas Layout Discipline / Smart Grid
@@ -1691,32 +1861,32 @@ manual_connection
 ## Out of Scope
 
 - No full dashboard.
-    
+
 - No multi-workspace enterprise view.
-    
+
 - No 100-agent fleet view.
-    
+
 - No complex graph algorithm.
-    
+
 - No string relay revival.
-    
+
 
 ## Tool / URL Requirements
 
 - Existing canvas SVG/cable layer.
-    
+
 - Existing connection model.
-    
+
 - Claude Design for UI exploration:
-    
+
     - flip tile
-        
+
     - Conductor tile
-        
+
     - workflow region
-        
+
     - semantic strings
-        
+
 
 ## Acceptance Test
 
@@ -1734,13 +1904,13 @@ which task is blocked
 ## Failure Signals
 
 - Workflow region feels like a separate dashboard.
-    
+
 - Strings remain decorative only.
-    
+
 - Strings become PTY-to-PTY message transport again.
-    
+
 - Visual complexity increases without adding understanding.
-    
+
 
 ---
 
@@ -1815,24 +1985,28 @@ Open follow-ups
 ## Out of Scope
 
 - No live coordination through Markdown.
-    
+
 - No Obsidian as source of truth.
-    
+
 - No replacing SQLite with vault files.
-    
+
 - No automatic RL trajectory export yet.
-    
+
+- Do not revive or extend the legacy Envoy Obsidian mirror as a second exporter.
+
 
 ## Tool / URL Requirements
 
 - Google Cloud OKF article/spec.
-    
+
 - Existing Obsidian mirror.
-    
+
 - Existing Envoy receipts.
-    
+
+- Existing Envoy mirror as shipped-behavior reference only; Goal 8 exports Kernel receipt chains.
+
 - DuckDB/MotherDuck path later, not required here.
-    
+
 
 ## Acceptance Test
 
@@ -1852,17 +2026,24 @@ These documents are readable by humans and parseable by agents.
 ## Failure Signals
 
 - Vault becomes live state.
-    
+
 - Exported notes are too verbose to be useful.
-    
+
 - Receipt evidence is lost during summarization.
-    
+
 - Notes cannot be traced back to workflow/task/receipt IDs.
-    
+
+- Kernel receipt export and legacy Envoy mirror both write competing workflow summaries.
+
 
 ---
 
 # Goal 9 — Evaluation Layer: Workflow and Conductor Scoring
+
+
+## Spec Gate Before Implementation
+
+Goal 9 is blocked until `docs/v3/EVALS_SPEC.md` defines concrete rubrics, inputs, and scoring rules. Do not implement vague scores.
 
 ## Goal
 
@@ -1887,6 +2068,8 @@ src/evals/receipt-quality.ts
 docs/v3/EVALS_SPEC.md
 ```
 
+`docs/v3/EVALS_SPEC.md` must be created and approved before runtime scoring code.
+
 Score categories:
 
 ```text
@@ -1900,29 +2083,39 @@ time to completion
 artifact usefulness
 ```
 
+Each score must name:
+
+```text
+receipt inputs
+required evidence
+rubric scale
+failure conditions
+whether a human/verifier judgment is required
+```
+
 ## Out of Scope
 
 - No RL.
-    
+
 - No GRPO.
-    
+
 - No training pipeline.
-    
+
 - No model fine-tuning.
-    
+
 - No full Braintrust integration unless explicitly approved.
-    
+
 
 ## Tool / URL Requirements
 
 - Braintrust docs later.
-    
+
 - Existing receipts.
-    
+
 - Existing OKF/vault exports.
-    
+
 - Existing workflow summary format.
-    
+
 
 ## Acceptance Test
 
@@ -1940,13 +2133,13 @@ Scores attach to the workflow and optionally export to vault.
 ## Failure Signals
 
 - Scoring requires manual reading of terminal logs.
-    
+
 - Scoring happens before verification exists.
-    
+
 - Scores are vague and not tied to receipts.
-    
+
 - Evals become a separate product before core coordination works.
-    
+
 
 ---
 
@@ -1983,30 +2176,30 @@ Priority order:
 ## Out of Scope
 
 - No DO tile controller in early v3.
-    
+
 - No Container tile body in early v3.
-    
+
 - No replacing local PTYs.
-    
+
 - No cloud-first rewrite.
-    
+
 
 ## Tool / URL Requirements
 
 - [https://developers.cloudflare.com/ai-gateway/](https://developers.cloudflare.com/ai-gateway/)
-    
+
 - [https://developers.cloudflare.com/r2/](https://developers.cloudflare.com/r2/)
-    
+
 - Later:
-    
+
     - Cloudflare Durable Objects docs
-        
+
     - Cloudflare Containers docs
-        
+
     - Cloudflare Workflows docs
-        
+
     - Cloudflare Tunnel/Access docs
-        
+
 
 ## Acceptance Test
 
@@ -2017,30 +2210,33 @@ First allowed implementation is AI Gateway wrapper around model calls, with corr
 ## Failure Signals
 
 - Cloud tier changes local tile behavior.
-    
+
 - Cloud tier becomes required for core app.
-    
+
 - Cloud tier replaces herdr before local architecture is solid.
-    
+
 - Cloud migration starts before Conductor and Harness Layer are proven.
-    
+
 
 ---
 
 # Suggested v3 Goal Order
 
 ```text
-Goal 0 — Branch, v3 plan files, and DOX rails
-Goal 1 — Kernel Constitution and Canonical Schema
-Goal 2 — Kernel Command Boundary and Canvas-as-Renderer Audit
-Goal 3 — Task State Machine v3
-Goal 4 — State Cards and Flip Tile UI
-Goal 5 — Conductor MVP
-Goal 6 — Harness Interface and First Worker Adapters
-Goal 7 — Workflow Regions and Semantic Strings
-Goal 8 — Evidence and Vault OKF Export
-Goal 9 — Evaluation Layer
-Goal 10 — Cloud and Remote Tier
+Goal 0 - Branch, v3 plan files, and DOX rails
+Goal 1 - Kernel Constitution and Canonical Schema
+Goal 2 - Kernel Command Boundary and Canvas-as-Renderer Audit
+Goal 3 - Task State Machine v3
+Goal 4 - State Cards and Flip Tile UI
+Goal 5A - Conductor Read-Only MVP
+Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry
+Goal 5C - Conductor Native Actions
+Goal 5D - Conductor Loop
+Goal 6 - Harness Interface and First Worker Adapters
+Goal 7 - Workflow Regions and Semantic Strings
+Goal 8 - Evidence and Vault OKF Export
+Goal 9 - Evaluation Layer (blocked until EVALS_SPEC rubrics exist)
+Goal 10 - Cloud and Remote Tier
 ```
 
 ---
@@ -2129,7 +2325,7 @@ Keep:
 - infinite canvas
 - live terminal tiles
 - herdr-backed WSL panes
-- Envoy task bus
+- Envoy task bus as shipped behavior / wrapped legacy transport
 - Obsidian mirror
 - existing MCP tools as external adapter
 
@@ -2138,7 +2334,8 @@ Change:
 - canvas renders Kernel state
 - tasks require submitted/verifying gates
 - State Cards are first-class
-- Conductor is native in-process planner
+- Goal 5A Conductor is read-only except planning receipts
+- Goal 6A makes Kernel worker spawn/status authoritative before Conductor actions
 - worker role/harness/model are separate
 
 Do not:
@@ -2149,6 +2346,8 @@ Do not:
 - redesign away from the canvas
 - bypass Kernel commands
 - let workers self-complete without verification receipts
+- let Conductor spawn/assign workers before Goal 6A passes
+- let Envoy compete with Kernel task/receipt authority
 
 Work only on the current v3 goal.
 Commit locally before handoff. Do not push worker goal commits; the verifier reviews the local commit/diff, updates the ledger if approved, and pushes the approved branch state.

@@ -169,21 +169,32 @@ Current vault source:
 
 Repo docs win for code scope. Vault root reference files can inform decisions, but they are not execution authority.
 
-## Current Setup State
+## Current v3 State
 
-Goal 0 complete. The following were installed for v3:
+Goals 0-4 are complete and approved. Goal 5+ has been refined into smaller, verifier-sized steps:
 
-- `BUILD_PLAN_V3.md` — v3 execution plan
-- `KERNEL_CONSTITUTION.md` — authority rules
-- `V3_MIGRATION_NOTES.md` — v2→v3 vocabulary map
-- `docs/v3/GLOSSARY.md` — canonical v3 term definitions
-- `docs/v3/AGENTS.md` — DOX guard for v3 docs subtree
-- `src/kernel/AGENTS.md` — Kernel authority rail
-- `src/renderer/AGENTS.md` — renderer projector rail
-- `src/main/conductor/AGENTS.md` — Conductor planner rail
-- `src/harness/AGENTS.md` — harness adapter boundary rail
-- `tools/quantflow-mcp/AGENTS.md` — external adapter rail
-- `src/vault/AGENTS.md` — knowledge mirror rail
+```text
+Goal 5A - Conductor Read-Only MVP
+Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry
+Goal 5C - Conductor Native Actions
+Goal 5D - Conductor Loop
+Goal 6 - Harness Interface and First Worker Adapters
+```
+
+The following authority docs are installed for v3:
+
+- `BUILD_PLAN_V3.md` - v3 execution plan
+- `KERNEL_CONSTITUTION.md` - authority rules
+- `V3_MIGRATION_NOTES.md` - v2-to-v3 vocabulary map
+- `docs/v3/GLOSSARY.md` - canonical v3 term definitions
+- `docs/v3/WORKER_RECONCILIATION.md` - worker spawn/status authority spec for Goal 6A
+- `docs/v3/AGENTS.md` - DOX guard for v3 docs subtree
+- `src/kernel/AGENTS.md` - Kernel authority rail
+- `src/renderer/AGENTS.md` - renderer projector rail
+- `src/main/conductor/AGENTS.md` - Conductor planner rail
+- `src/harness/AGENTS.md` - harness adapter boundary rail
+- `tools/quantflow-mcp/AGENTS.md` - external adapter rail
+- `src/vault/AGENTS.md` - knowledge mirror rail
 - DOX base contract incorporated into this file
 
-Next: Goal 1 — Kernel Constitution and Canonical Schema (do not start until operator approves).
+Next: Goal 5A - Conductor Read-Only MVP (do not start until operator approves).

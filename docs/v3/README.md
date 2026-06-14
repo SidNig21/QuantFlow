@@ -40,8 +40,18 @@ Installed:
 - DOX base contract in root `AGENTS.md`
 - Child `AGENTS.md` rails at all durable repo boundaries
 
-## Next Goal
+## Current Plan State
 
-Goal 1 — Kernel Constitution and Canonical Schema.
+Goals 0-4 are complete and approved.
 
-See `BUILD_PLAN_V3.md` for scope. Do not start until the operator approves.
+The back half has been refined:
+
+```text
+Goal 5A - Conductor Read-Only MVP
+Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry
+Goal 5C - Conductor Native Actions
+Goal 5D - Conductor Loop
+Goal 6 - Harness Interface and First Worker Adapters
+```
+
+`WORKER_RECONCILIATION.md` is binding before Conductor spawn/assign actions. See `BUILD_PLAN_V3.md` for current scope. Do not start the next goal until the operator approves.

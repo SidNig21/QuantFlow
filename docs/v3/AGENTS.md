@@ -10,6 +10,7 @@ Durable v3 reference documents:
 - `GLOSSARY.md` — canonical v3 term definitions.
 - `KERNEL_SCHEMA_V1.md` — canonical table definitions, field lists, and relationships (Goal 1).
 - `AUTHORITY_RULES.md` — detailed mutation rules, invariants, and violation signals (Goal 1).
+- `WORKER_RECONCILIATION.md` — binding worker spawn/status authority spec for Goal 6A before Conductor actions.
 - Future (later goals): `VAULT_OKF_SPEC.md`, `EVALS_SPEC.md`, `CLOUDFLARE_ROADMAP.md`.
 
 ## What This Subtree Must Not Do
