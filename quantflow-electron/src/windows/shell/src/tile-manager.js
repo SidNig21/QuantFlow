@@ -162,16 +162,26 @@ export function createTileManager({
 		return flippedTiles.has(id);
 	}
 
-	function flipTile(id) {
+	function setTileFlipped(id, flipped) {
 		const dom = tileDOMs.get(id);
 		if (!dom) return;
-		const nowFlipped = !flippedTiles.has(id);
-		if (nowFlipped) flippedTiles.add(id);
+		if (flipped) flippedTiles.add(id);
 		else flippedTiles.delete(id);
-		dom.container.classList.toggle("tile-flipped", nowFlipped);
-		if (nowFlipped) {
+		dom.container.classList.toggle("tile-flipped", flipped);
+		if (flipped) {
 			void renderStateCardBack(dom.stateCardBack, id);
 		}
+	}
+
+	function flipTile(id) {
+		setTileFlipped(id, !flippedTiles.has(id));
+	}
+
+	// Shift+F: flip every tile together. If any tile is still showing its front,
+	// flip them all to the State Card; otherwise flip them all back.
+	function flipAllTiles() {
+		const target = tiles.some((t) => !flippedTiles.has(t.id));
+		for (const t of tiles) setTileFlipped(t.id, target);
 	}
 
 	// Live-refresh any flipped tile when its Kernel State Card changes.
@@ -1109,6 +1119,7 @@ export function createTileManager({
 		clearTileFocusRing,
 		repositionAllTiles,
 		flipTile,
+		flipAllTiles,
 		isTileFlipped,
 		refreshFlippedStateCard,
 		syncSelectionVisuals,

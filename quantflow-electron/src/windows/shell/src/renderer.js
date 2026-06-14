@@ -98,7 +98,6 @@ import {
 	getLegendViewportCenterPlacement,
 	resolveLegendRecipeRole,
 } from "./legend-spawn.js";
-import { isFlipTileShortcut } from "@qf-renderer/shortcuts/index";
 import { updateCanvasWatermark } from "./canvas-watermark.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
@@ -2860,8 +2859,7 @@ async function init() {
 				});
 			}
 		} else if (action === "flip-state-card") {
-			const focusedId = tileManager.getFocusedTileId();
-			if (focusedId) tileManager.flipTile(focusedId);
+			tileManager.flipAllTiles();
 		} else if (
 			action === "focus-tile-right" || action === "focus-tile-left" ||
 			action === "focus-tile-up" || action === "focus-tile-down"
@@ -2903,20 +2901,9 @@ async function init() {
 		}
 	});
 
-	// -- F: flip the focused tile to its State Card (and back) --
-	window.addEventListener("keydown", (event) => {
-		if (!isFlipTileShortcut(event)) return;
-		const el = document.activeElement;
-		const tag = el?.tagName;
-		if (
-			tag === "INPUT" || tag === "TEXTAREA" ||
-			el?.isContentEditable
-		) return;
-		const focusedId = tileManager.getFocusedTileId();
-		if (!focusedId) return;
-		event.preventDefault();
-		tileManager.flipTile(focusedId);
-	});
+	// Shift+F (flip all tiles) is handled by the main-process shortcut keymap
+	// (src/main/index.ts KeyF → "flip-state-card"), which preventDefaults the
+	// input so it works whether the canvas or a terminal webview is focused.
 
 	// -- Browser tile Cmd+L focus URL --
 

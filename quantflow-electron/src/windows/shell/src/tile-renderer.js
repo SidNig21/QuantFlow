@@ -342,7 +342,7 @@ export function createTileDOM(tile, callbacks) {
   const flipBtn = document.createElement("button");
   flipBtn.className = "tile-action-btn tile-flip-btn";
   flipBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 0 1 10-4.5M14 8a6 6 0 0 1-10 4.5"/><path d="M12 2v3H9M4 14v-3h3"/></svg>`;
-  flipBtn.title = "Flip to State Card (F)";
+  flipBtn.title = "Flip to State Card (Shift+F flips all)";
   flipBtn.addEventListener("mousedown", (e) => e.stopPropagation());
   flipBtn.addEventListener("click", (e) => {
     e.stopPropagation();
