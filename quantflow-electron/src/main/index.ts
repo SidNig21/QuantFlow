@@ -242,6 +242,8 @@ const ctrlOnly = (input: Electron.Input): boolean =>
   input.control && !input.meta;
 const altOnly = (input: Electron.Input): boolean =>
   input.alt && !input.meta && !input.control && !input.shift;
+const noModifier = (input: Electron.Input): boolean =>
+  !input.alt && !input.meta && !input.control && !input.shift;
 
 interface ShortcutEntry {
   modifier: (input: Electron.Input) => boolean;
@@ -259,6 +261,7 @@ const TOGGLE_SHORTCUTS: Record<string, ShortcutEntry[]> = {
   KeyK: [{ modifier: cmdOrCtrl, action: "focus-file-search" }],
   KeyN: [{ modifier: cmdOrCtrl, action: "new-tile" }],
   KeyW: [{ modifier: cmdOrCtrl, action: "close-tile" }],
+  KeyF: [{ modifier: noModifier, action: "flip-state-card" }],
   ArrowRight: [{ modifier: altOnly, action: "focus-tile-right" }],
   ArrowLeft: [{ modifier: altOnly, action: "focus-tile-left" }],
   ArrowUp: [{ modifier: altOnly, action: "focus-tile-up" }],
@@ -272,6 +275,7 @@ const TOGGLE_SHORTCUT_KEYS: Record<string, ShortcutEntry[]> = {
   b: TOGGLE_SHORTCUTS.KeyB!,
   n: TOGGLE_SHORTCUTS.KeyN!,
   w: TOGGLE_SHORTCUTS.KeyW!,
+  f: TOGGLE_SHORTCUTS.KeyF!,
 };
 
 function normalizeShortcutKey(key: string | undefined): string | null {

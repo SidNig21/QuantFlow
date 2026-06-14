@@ -107,6 +107,13 @@ check(
 console.log('\n— state_card.list returns the tiles —');
 check('list has all created tiles', queryStateCardList(kdb, {}).length === 3);
 
+console.log('\n— tile.remove closes a tile with its default WorkerInstance —');
+const remove = handleTileCommand(kdb, 'kernel.tile.remove', { id: 'tile_seed' });
+check('remove worker-linked tile ok', remove.ok === true);
+check('removed tile row gone', db.prepare('SELECT id FROM tiles WHERE id = ?').get('tile_seed') == null);
+check('removed default worker row gone', queryWorkerForTile(kdb, 'tile_seed') == null);
+check('removed state card row gone', queryStateCardGet(kdb, 'tile_seed') == null);
+
 console.log('\n— renderer projector (formatStateCard) —');
 const sections = formatStateCard(queryStateCardGet(kdb, 'tile1'));
 check('eight canonical sections in order',

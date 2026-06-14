@@ -2859,6 +2859,9 @@ async function init() {
 					noteSurfaceFocus("canvas");
 				});
 			}
+		} else if (action === "flip-state-card") {
+			const focusedId = tileManager.getFocusedTileId();
+			if (focusedId) tileManager.flipTile(focusedId);
 		} else if (
 			action === "focus-tile-right" || action === "focus-tile-left" ||
 			action === "focus-tile-up" || action === "focus-tile-down"
@@ -2906,7 +2909,7 @@ async function init() {
 		const el = document.activeElement;
 		const tag = el?.tagName;
 		if (
-			tag === "INPUT" || tag === "TEXTAREA" || tag === "WEBVIEW" ||
+			tag === "INPUT" || tag === "TEXTAREA" ||
 			el?.isContentEditable
 		) return;
 		const focusedId = tileManager.getFocusedTileId();

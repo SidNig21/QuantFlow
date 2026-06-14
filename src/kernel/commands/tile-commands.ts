@@ -130,7 +130,19 @@ function tileRemove(db: KernelDB, payload: Record<string, unknown>): CommandResu
   const id = payload['id'] as string | undefined;
   if (!id) return { ok: false, error: 'tile.remove: id required' };
   try {
+    const workerRows = db.prepare('SELECT id FROM worker_instances WHERE tile_id = ?').all(id) as Array<{ id: string }>;
+    for (const worker of workerRows) {
+      db.prepare('UPDATE tasks SET owner_worker_id = NULL WHERE owner_worker_id = ?').run(worker.id);
+      db.prepare('UPDATE tasks SET source_worker_id = NULL WHERE source_worker_id = ?').run(worker.id);
+      db.prepare('UPDATE tasks SET target_worker_id = NULL WHERE target_worker_id = ?').run(worker.id);
+      db.prepare('UPDATE receipts SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
+      db.prepare('UPDATE artifacts SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
+      db.prepare('UPDATE events SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
+    }
+    db.prepare('DELETE FROM worker_instances WHERE tile_id = ?').run(id);
     db.prepare('DELETE FROM state_cards WHERE tile_id = ?').run(id);
+    db.prepare('UPDATE artifacts SET tile_id = NULL WHERE tile_id = ?').run(id);
+    db.prepare('UPDATE events SET tile_id = NULL WHERE tile_id = ?').run(id);
     const info = db.prepare('DELETE FROM tiles WHERE id = ?').run(id);
     // DELETE is idempotent: a missing row means the desired end state (gone)
     // already holds. Still emit so renderers reconcile.

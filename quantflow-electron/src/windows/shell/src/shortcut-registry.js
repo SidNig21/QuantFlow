@@ -4,6 +4,7 @@ export const SHORTCUTS = [
 	{ actionId: "shortcuts-panel", keys: ["?"], when: "shell", description: "Open shortcuts" },
 	{ actionId: "new-tile", keys: ["mod", "n"], when: "shell", description: "New terminal tile" },
 	{ actionId: "close-tile", keys: ["mod", "w"], when: "shell", description: "Close focused tile" },
+	{ actionId: "flip-state-card", keys: ["f"], when: "canvas", description: "Flip focused tile State Card" },
 	{ actionId: "sidebar-files", keys: ["mod", "b"], when: "global", description: "Toggle Navigator" },
 	{ actionId: "sidebar-tiles", keys: ["mod", "shift", "b"], when: "shell", description: "Show Tiles sidebar" },
 	{ actionId: "toggle-agent", keys: ["mod", "alt", "b"], when: "global", description: "Toggle Agent" },
