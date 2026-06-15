@@ -90,16 +90,34 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 		tile.ptyStatus = "connecting";
 	}
 
-	// Kernel owns worker identity: establish it (role/harness/model, status
-	// 'spawning') before starting the runtime, instead of the shell owning it.
+	// Kernel owns worker identity and is the spawn authority: establish it
+	// (role/harness/model, status 'spawning') BEFORE starting the runtime. If
+	// the Kernel rejects, the shell must NOT start a live runtime — that would
+	// create a worker outside Kernel authority (the exact Goal 6A loophole).
 	const kapi = kernelApiRef();
 	if (kapi) {
-		await kapi.sendCommand("kernel.worker.spawn", {
-			tileId: tile.id,
-			workflowId: options.workflowId ?? null,
-			roleName: role.name,
-			runtimeTarget: shouldUseHerdr ? "herdr-wsl" : "local-shell",
-		});
+		let spawnResult;
+		try {
+			spawnResult = await kapi.sendCommand("kernel.worker.spawn", {
+				tileId: tile.id,
+				workflowId: options.workflowId ?? null,
+				roleName: role.name,
+				runtimeTarget: shouldUseHerdr ? "herdr-wsl" : "local-shell",
+			});
+		} catch (err) {
+			spawnResult = { ok: false, error: err instanceof Error ? err.message : String(err) };
+		}
+		if (spawnResult && spawnResult.ok === false) {
+			const message = `Kernel rejected worker spawn for ${displayName}: ${spawnResult.error ?? "unknown error"}`;
+			tile.terminalPending = false;
+			tile.ptyStatus = "error";
+			tile.ptyError = message;
+			updateRoleTileChrome?.(tile);
+			tileManager.saveCanvasImmediate();
+			onRoleSpawnFailed?.(createRoleSpawnFailureEvent(role, message));
+			toasts?.show?.({ message, tone: "error" });
+			return tile; // do NOT start herdrSpawnRole / spawnTerminalWebview
+		}
 	}
 
 	onRoleSpawned?.(createRoleSpawnedEvent(tile, role));
