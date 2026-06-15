@@ -42,12 +42,11 @@ Installed:
 
 ## Current Plan State
 
-Goals 0-6A are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens Conductor through the shell command palette, and the read-only panel live-refreshes from Kernel state after tile spawn. Goal 6A verified Kernel-owned worker spawn/status identity and shell runtime gating before PTY/herdr start.
+Goals 0-6A and 5C are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens Conductor through the shell command palette, and the read-only panel live-refreshes from Kernel state after tile spawn. Goal 6A verified Kernel-owned worker spawn/status identity and shell runtime gating before PTY/herdr start. Goal 5C added single-step Conductor native actions without starting the autonomous loop.
 
 The back half has been refined:
 
 ```text
-Goal 5C - Conductor Native Actions
 Goal 6 - Harness Interface and First Worker Adapters
 Goal 5D - Conductor Loop
 ```

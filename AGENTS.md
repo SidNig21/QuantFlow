@@ -171,10 +171,9 @@ Repo docs win for code scope. Vault root reference files can inform decisions, b
 
 ## Current v3 State
 
-Goals 0-6A are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens the shell command palette/Conductor path, and the read-only Conductor panel live-refreshes from Kernel state after tile spawn. Goal 6A verified Kernel-owned worker spawn/status identity before runtime start. The next step is Conductor native actions:
+Goals 0-6A and 5C are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens the shell command palette/Conductor path, and the read-only Conductor panel live-refreshes from Kernel state after tile spawn. Goal 6A verified Kernel-owned worker spawn/status identity before runtime start. Goal 5C added single-step Conductor native actions. The next step is the full Harness interface:
 
 ```text
-Goal 5C - Conductor Native Actions
 Goal 6 - Harness Interface and First Worker Adapters
 Goal 5D - Conductor Loop
 ```
@@ -195,4 +194,4 @@ The following authority docs are installed for v3:
 - `src/vault/AGENTS.md` - knowledge mirror rail
 - DOX base contract incorporated into this file
 
-Next: Goal 5C - Conductor Native Actions (do not start until operator approves).
+Next: Goal 6 - Harness Interface and First Worker Adapters (do not start until operator approves).
