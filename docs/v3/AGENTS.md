@@ -11,7 +11,9 @@ Durable v3 reference documents:
 - `KERNEL_SCHEMA_V1.md` — canonical table definitions, field lists, and relationships (Goal 1).
 - `AUTHORITY_RULES.md` — detailed mutation rules, invariants, and violation signals (Goal 1).
 - `WORKER_RECONCILIATION.md` — binding worker spawn/status authority spec for Goal 6A before Conductor actions.
-- Future (later goals): `VAULT_OKF_SPEC.md`, `EVALS_SPEC.md`, `CLOUDFLARE_ROADMAP.md`.
+- `VAULT_OKF_SPEC.md` — Kernel→Obsidian OKF export authority model, naming, frontmatter, and shapes (Goal 8).
+- `EVALS_SPEC.md` — evaluation-layer rubrics, evidence inputs, scoring scale, determinism/anti-gaming/human-review rules, and the storage/aggregation decisions still pending verifier approval (Goal 9 gate; spec only, no runtime).
+- Future (later goals): `CLOUDFLARE_ROADMAP.md`.
 
 ## What This Subtree Must Not Do
 
