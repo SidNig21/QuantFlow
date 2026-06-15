@@ -25,7 +25,7 @@ import { handleReceiptCommand, queryReceiptList } from '../../src/kernel/receipt
 import { handleConductorCommand, queryConductorContext } from '../../src/kernel/conductor/index';
 import { handleTileCommand } from '../../src/kernel/commands/tile-commands';
 import { startStateCardWatcher } from '../../src/kernel/watchers/index';
-import { seedHarnessRegistry, queryWorkerForTile, queryWorkerGet } from '../../src/kernel/worker-instances/index';
+import { seedHarnessRegistry, queryWorkerForTile } from '../../src/kernel/worker-instances/index';
 import { createConductorActions } from '../../src/main/conductor/conductor-actions';
 
 let failures = 0;
@@ -46,8 +46,11 @@ seedHarnessRegistry(kdb);
 startStateCardWatcher(kdb);
 
 // Inject a dispatch that routes to the DB-injected Kernel handlers — exactly the
-// command surface dispatchKernelCommand routes to in the live app.
+// command surface dispatchKernelCommand routes to in the live app. Record the
+// command types so we can prove spawn_role does NOT dispatch worker.spawn itself.
+const dispatched: string[] = [];
 const dispatch = async (type: string, payload: Record<string, unknown>) => {
+  dispatched.push(type);
   if (type.startsWith('kernel.task.')) return handleTaskCommand(kdb, type, payload);
   if (type.startsWith('kernel.worker.')) return handleWorkerCommand(kdb, type, payload);
   if (type.startsWith('kernel.connection.')) return handleConnectionCommand(kdb, type, payload);
@@ -55,7 +58,18 @@ const dispatch = async (type: string, payload: Record<string, unknown>) => {
   if (type.startsWith('kernel.conductor.')) return handleConductorCommand(kdb, type, payload);
   return { ok: false, error: `unhandled ${type}` };
 };
-const actions = createConductorActions(dispatch);
+
+// Spy for the approved shell role-spawn path. In the live app this is
+// canvas.roleSpawn → spawnRoleTileAt (which starts the runtime AND calls
+// kernel.worker.spawn as the 6A gate). Rejection-prevents-runtime is proven by
+// role-tile-spawn.test.ts; here we prove the action routes to this path.
+const spawnRoleCalls: Record<string, unknown>[] = [];
+const actions = createConductorActions(dispatch, {
+  spawnRole: async (args) => {
+    spawnRoleCalls.push(args);
+    return { ok: true, data: { tileId: (args as { tileId?: string }).tileId ?? 'tile_w' } };
+  },
+});
 
 // Setup: a worker tile and a distinct verifier tile (via Kernel tile.create).
 handleTileCommand(kdb, 'kernel.tile.create', { id: 'tile_w', workflowId: 'wf1', displayName: 'Coder', tileKind: 'worker' });
@@ -71,9 +85,10 @@ const created = await actions.runAction('create_task', { id: 'task1', workflowId
 check('create_task ok', created.ok === true);
 check('task is open', queryTaskGet(kdb, 'task1')?.status === 'open');
 
-const spawned = await actions.runAction('spawn_role', { tileId: 'tile_w', workflowId: 'wf1', roleName: 'Coder', runtimeTarget: 'local-shell' });
-check('spawn_role ok (kernel.worker.spawn gate)', spawned.ok === true);
-check('worker identity established (spawning)', queryWorkerGet(kdb, queryWorkerForTile(kdb, 'tile_w')!)?.status === 'spawning');
+const spawned = await actions.runAction('spawn_role', { roleId: 'coder', tileId: 'tile_w', workflowId: 'wf1' });
+check('spawn_role ok', spawned.ok === true);
+check('spawn_role routes to approved shell role-spawn path', spawnRoleCalls.length === 1 && spawnRoleCalls[0]!['roleId'] === 'coder');
+check('spawn_role does NOT dispatch kernel.worker.spawn directly', !dispatched.includes('kernel.worker.spawn'));
 
 const assigned = await actions.runAction('assign_task', { taskId: 'task1', tileId: 'tile_w' });
 check('assign_task ok (claim+start)', assigned.ok === true);
@@ -119,9 +134,11 @@ const blocked = await actions.runAction('block_task', { taskId: 'task2', reason:
 check('block_task ok', blocked.ok === true);
 check('task2 blocked', queryTaskGet(kdb, 'task2')?.status === 'blocked');
 
-console.log('\n— guards: no raw complete tool; unknown action rejected —');
+console.log('\n— guards: no raw complete tool; unknown action; spawn needs shell binding —');
 check('complete_task is not an exposed action', (await actions.runAction('complete_task', { taskId: 'task1' })).ok === false);
 check('unknown action rejected', (await actions.runAction('nonsense', {})).ok === false);
+const noShell = createConductorActions(dispatch);
+check('spawn_role without shell role-spawn binding is rejected', (await noShell.runAction('spawn_role', { roleId: 'coder' })).ok === false);
 
 console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} — ${failures} failure(s)`);
 process.exit(failures === 0 ? 0 : 1);

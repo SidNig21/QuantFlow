@@ -25,6 +25,20 @@ export type ConductorActionDispatch = (
   requestedBy?: string,
 ) => Promise<CommandResult>;
 
+/**
+ * Invoke the approved shell role-spawn path (canvas.roleSpawn → spawnRoleTileAt),
+ * which starts the shipped terminal/herdr runtime AND is gated by
+ * kernel.worker.spawn (Goal 6A). Injected by the wiring layer because it crosses
+ * into the Electron app; the Conductor never starts a runtime itself.
+ */
+export type ConductorSpawnRole = (
+  args: Record<string, unknown>,
+) => Promise<CommandResult>;
+
+export interface ConductorActionDeps {
+  spawnRole?: ConductorSpawnRole;
+}
+
 export const CONDUCTOR_ACTIONS = [
   'create_task',
   'assign_task',
@@ -54,6 +68,7 @@ export interface ConductorActions {
  */
 export function createConductorActions(
   dispatch: ConductorActionDispatch = dispatchKernelCommand,
+  deps: ConductorActionDeps = {},
 ): ConductorActions {
   const cmd = (type: string, payload: Record<string, unknown>) =>
     dispatch(type, payload, REQUESTED_BY);
@@ -88,10 +103,15 @@ export function createConductorActions(
         return cmd('kernel.task.block', args);
 
       case 'spawn_role':
-        // Authority gate only (Goal 6A). The shipped terminal/agent runtime is
-        // still started by the renderer role-spawn path (which is itself gated
-        // by kernel.worker.spawn); full harness send/read is Goal 6.
-        return cmd('kernel.worker.spawn', args);
+        // Trigger the approved shell role-spawn path, which creates the tile,
+        // starts the shipped terminal/herdr runtime, and is itself gated by
+        // kernel.worker.spawn (Goal 6A). The Conductor never starts a runtime
+        // directly, and must not fall back to marking a Kernel worker
+        // "spawning" with no runtime behind it.
+        if (!deps.spawnRole) {
+          return { ok: false, error: 'spawn_role unavailable: no shell role-spawn binding' };
+        }
+        return deps.spawnRole(args);
 
       case 'connect_tiles':
         return cmd('kernel.connection.create', args);

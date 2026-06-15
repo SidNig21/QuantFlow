@@ -33,6 +33,8 @@ import { registerKernelIpcHandlers } from "@qf-v3-main/ipc/kernel-ipc";
 import { registerKernelTaskRpc } from "@qf-v3-main/ipc/task-ipc";
 import { registerConductorIpc } from "@qf-v3-main/conductor/conductor-ipc";
 import { registerMethod } from "./json-rpc-server";
+import { spawnRoleViaShell } from "./canvas-rpc";
+import { getRole } from "./role-service";
 import { QUANTFLOW_DIR } from "./paths";
 
 const FS_CHANGE_DELETED = 3;
@@ -164,6 +166,29 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerKernelIpcHandlers(QUANTFLOW_DIR);
   // Kernel task lifecycle + receipt chain over JSON-RPC (MCP gate tools).
   registerKernelTaskRpc(registerMethod);
-  // Embedded read-only Conductor (Goal 5A): read view + planning receipt.
-  registerConductorIpc();
+  // Conductor IPC (Goal 5A read view + 5C actions). spawn_role routes through the
+  // approved shell role-spawn path (canvas.roleSpawn → spawnRoleTileAt), which
+  // starts the shipped runtime and is gated by kernel.worker.spawn (Goal 6A).
+  registerConductorIpc({
+    spawnRole: async (args) => {
+      const roleId = String((args as { roleId?: unknown }).roleId ?? "");
+      if (!roleId) return { ok: false, error: "spawn_role: roleId required" };
+      const role = await getRole(roleId);
+      if (!role) return { ok: false, error: `spawn_role: role not found: ${roleId}` };
+      try {
+        const a = args as Record<string, unknown>;
+        const result = await spawnRoleViaShell({
+          role,
+          ...(a["tileId"] ? { tileId: a["tileId"] } : {}),
+          ...(a["cwd"] ? { cwd: a["cwd"] } : {}),
+          ...(a["position"] ? { position: a["position"] } : {}),
+          ...(a["size"] ? { size: a["size"] } : {}),
+          ...(a["workflowEnvoySpaceId"] ? { workflowEnvoySpaceId: a["workflowEnvoySpaceId"] } : {}),
+        });
+        return { ok: true, data: result };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+  });
 }

@@ -20,12 +20,15 @@ The Conductor is the native in-process planner for QuantFlow v3.
 
 ### Built (Goal 5C — single-step operator-triggered actions)
 
-- `conductor-actions.ts` — `createConductorActions(dispatch)` exposing thin native
-  bindings over Kernel authority: `create_task`/`assign_task`(claim+start)/
+- `conductor-actions.ts` — `createConductorActions(dispatch, deps)` exposing thin
+  native bindings over Kernel authority: `create_task`/`assign_task`(claim+start)/
   `submit_task`/`verify_task`/`reject_task`/`block_task` → Kernel task commands;
-  `spawn_role` → `kernel.worker.spawn` (Goal 6A gate); `connect_tiles` →
-  `kernel.connection.create`. No raw `complete_task` — completion only via the
-  verified `verify_task` path. `dispatch` is injectable for testing.
+  `connect_tiles` → `kernel.connection.create`; `spawn_role` → the injected
+  approved shell role-spawn path (`canvas.roleSpawn` → `spawnRoleTileAt`), which
+  starts the shipped runtime and is itself gated by `kernel.worker.spawn` (Goal
+  6A) — the Conductor never starts a runtime nor marks a Kernel worker "spawning"
+  with no runtime behind it. No raw `complete_task` — completion only via the
+  verified `verify_task` path. `dispatch` and `deps.spawnRole` are injectable.
 - The conductor panel exposes one-action-at-a-time buttons; there is no
   autonomous loop (that is Goal 5D).
 
@@ -65,7 +68,8 @@ spawn_role, connect_tiles
 ```
 
 Operator-triggered one at a time; thin bindings over Kernel authority (task
-commands, `kernel.worker.spawn`, `kernel.connection.create`). No autonomous loop
+commands, `kernel.connection.create`) and the approved shell role-spawn path for
+`spawn_role` (runtime start, gated by `kernel.worker.spawn`). No autonomous loop
 (Goal 5D), no raw `complete_task`, no generic harness send/read/collectReceipts
 (Goal 6).
 

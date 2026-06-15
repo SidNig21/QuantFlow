@@ -11,9 +11,14 @@
 
 import { ipcMain } from 'electron';
 import { readConductorView, runConductorPlan } from './conductor-reader';
-import { createConductorActions } from './conductor-actions';
+import { createConductorActions, type ConductorSpawnRole } from './conductor-actions';
 
-export function registerConductorIpc(): void {
+export interface ConductorIpcOptions {
+  /** Approved shell role-spawn binding (starts runtime; gated by kernel.worker.spawn). */
+  spawnRole?: ConductorSpawnRole;
+}
+
+export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
   ipcMain.handle(
     'conductor:read-view',
     async (_event, params: { workflowId?: string } = {}) =>
@@ -27,7 +32,8 @@ export function registerConductorIpc(): void {
   );
 
   // Goal 5C: operator-triggered single Conductor action (one at a time).
-  const actions = createConductorActions();
+  // spawnRole routes to the approved shell role-spawn path (runtime + 6A gate).
+  const actions = createConductorActions(undefined, { spawnRole: options.spawnRole });
   ipcMain.handle(
     'conductor:action',
     async (_event, payload: { action: string; args?: Record<string, unknown> } = { action: '' }) =>

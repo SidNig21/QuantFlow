@@ -41,6 +41,16 @@ function sendToShell(
   });
 }
 
+/**
+ * Invoke the approved shell role-spawn path (canvas.roleSpawn → spawnRoleTileAt),
+ * which starts the shipped terminal/herdr runtime and is gated by
+ * kernel.worker.spawn. Used by the embedded Conductor's spawn_role action so it
+ * triggers the real runtime path instead of only touching Kernel worker state.
+ */
+export function spawnRoleViaShell(params: unknown): Promise<unknown> {
+  return sendToShell("canvas.roleSpawn", params);
+}
+
 export function registerCanvasRpc(win: BrowserWindow): void {
   shellWindow = win;
   subscribeWebContents(win.webContents);
