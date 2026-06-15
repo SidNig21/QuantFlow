@@ -25,6 +25,7 @@ This section is the durable progress ledger for the v3 branch.
 | Goal 5D — Conductor Loop | Complete / approved | Claude + Codex fix pass | Codex | 2026-06-15 | Conductor now has an operator-advanced loop over the approved 5A read model, 5C native actions, and Goal 6 WorkerHarness seam. High-risk actions return an approval `proposalToken`; approve/deny must send that token, the latest Kernel planning receipt for the token must still be `awaiting-approval`, and stale/forged/replayed/drifted approvals run no high-risk action. Loop smokes, conductor/harness/task/state-card regressions, MCP tests, harness-ops test, and build pass. |
 | Goal 7 — Workflow Regions and Semantic Strings | Complete / approved | Claude | Codex | 2026-06-15 | Kernel-owned workflow regions now aggregate workflow tiles, task/receipt/blocker counts, blocked task ids, and semantic-string counts; live connections inherit workflow scope from same-workflow endpoint tiles; the canvas renders soft workflow boundaries with objective and blocked-task detail; semantic string type/label edits route through Kernel connection updates; product/design rails were added as docs-only UI guidance with Efecto parked as optional external sandboxing. Workflow-region smoke, focused shell tests, conductor/harness/task/state-card regressions, MCP tests, and build pass. |
 | Goal 8 — Evidence and Vault: OKF-Style Knowledge Export | Complete / approved | Claude | Codex | 2026-06-15 | Kernel receipt chains and workflow outcomes now export to deterministic OKF-style Markdown through `src/vault`: Kernel collection, pure renderers, and an injectable file-write boundary. Exports preserve workflow/task/receipt/artifact ids, write workflow summary, task summaries, artifact index, decision log, receipt chain, and State Card snapshot, and explicitly avoid Envoy mirror, vault-as-truth, raw logs, eval scoring, RL, or cloud paths. Vault export smoke, conductor/workflow/harness/task/state-card regressions, MCP tests, harness-ops test, and build pass. |
+| Goal 9 Spec Gate — `docs/v3/EVALS_SPEC.md` | Complete / approved | Claude | Codex | 2026-06-15 | Docs-only gate approved. `EVALS_SPEC.md` defines evaluation units, required Kernel evidence inputs, concrete rubric dimensions, fixed 0–4 scoring with separate confidence, output shape, determinism, anti-gaming, human-review rules, acceptance scenarios, and failure signals. No runtime scoring code was added. Storage home, aggregation rule, model-assisted dimensions, and run timing remain explicit verifier/operator decisions before Goal 9 implementation begins. |
 
 Completion rule:
 
@@ -2075,7 +2076,7 @@ These documents are readable by humans and parseable by agents.
 
 ## Spec Gate Before Implementation
 
-Goal 9 is blocked until `docs/v3/EVALS_SPEC.md` defines concrete rubrics, inputs, and scoring rules. Do not implement vague scores.
+`docs/v3/EVALS_SPEC.md` is complete/approved as the docs-only Goal 9 gate. Runtime Goal 9 work remains blocked until the operator/verifier explicitly approves the storage home, aggregation rule, model-assisted dimensions, and run timing decisions named in that spec. Do not implement vague scores.
 
 ## Goal
 
@@ -2100,7 +2101,7 @@ src/evals/receipt-quality.ts
 docs/v3/EVALS_SPEC.md
 ```
 
-`docs/v3/EVALS_SPEC.md` must be created and approved before runtime scoring code.
+`docs/v3/EVALS_SPEC.md` is the binding runtime implementation contract. Re-read it before any scoring code.
 
 Score categories:
 
