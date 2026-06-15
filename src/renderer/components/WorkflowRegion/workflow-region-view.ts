@@ -49,6 +49,8 @@ export interface WorkflowRegionModel {
   status: string;
   /** True when the workflow has at least one blocked task (region reads as alert). */
   hasBlockers: boolean;
+  /** Ids of the currently-blocked tasks (so the canvas can name which is blocked). */
+  blockedTaskIds: string[];
   /** One-line summary, e.g. "3 tiles · 5 tasks · 12 receipts · 1 blocked". */
   summary: string;
   bounds: RegionBoundsLike | null;
@@ -88,6 +90,7 @@ export function formatWorkflowRegion(region: WorkflowRegionLike | null): Workflo
       objective: EMPTY,
       status: EMPTY,
       hasBlockers: false,
+      blockedTaskIds: [],
       summary: EMPTY,
       bounds: null,
       tileIds: [],
@@ -111,6 +114,7 @@ export function formatWorkflowRegion(region: WorkflowRegionLike | null): Workflo
     objective: region.objective || EMPTY,
     status: region.status || EMPTY,
     hasBlockers,
+    blockedTaskIds: region.blockedTaskIds,
     summary: summaryLine(region),
     bounds: region.bounds,
     tileIds: region.tileIds,

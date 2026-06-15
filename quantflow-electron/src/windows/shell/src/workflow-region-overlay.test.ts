@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
+	blockedLine,
 	getRegionRenderModels,
 	renderWorkflowRegions,
 } from "./workflow-region-overlay.js";
@@ -68,6 +69,7 @@ function matches(node: any, selector: string): boolean {
 	const classMatch = selector.match(/\.([\w-]+)/);
 	const attrMatch = selector.match(/\[data-([\w-]+)(?:="([^"]*)")?\]/);
 	const gAttrMatch = selector.match(/^g\[data-([\w-]+)="([^"]*)"\]/);
+	const tagOnly = selector.match(/^([a-z][\w-]*)$/i);
 	if (gAttrMatch) {
 		return (
 			node.tagName === "G" &&
@@ -81,6 +83,9 @@ function matches(node: any, selector: string): boolean {
 		const v = node.getAttribute(`data-${attrMatch[1]}`);
 		if (attrMatch[2] !== undefined) return v === attrMatch[2];
 		return v !== null;
+	}
+	if (tagOnly) {
+		return node.tagName === tagOnly[1].toUpperCase();
 	}
 	return false;
 }
@@ -148,7 +153,7 @@ describe("renderWorkflowRegions", () => {
 		expect(group.querySelector(".region-label").textContent).toBe("WF wf1");
 	});
 
-	test("blocked region gets the alert class", () => {
+	test("blocked region gets the alert class and names the blocked task", () => {
 		const g = createElement("g");
 		renderWorkflowRegions(g, [
 			region("wf1", { x: 0, y: 0, width: 100, height: 100 }, {
@@ -158,7 +163,36 @@ describe("renderWorkflowRegions", () => {
 		], viewport);
 		const group = g.querySelector('g[data-region-id="wf1"]');
 		expect(String(group.className)).toContain("region-blocked");
-		expect(group.querySelector(".region-sub").textContent).toContain("blocked");
+		// Which task is blocked is named on its own line (Goal 7 acceptance).
+		const blocked = group.querySelector(".region-blocked-line");
+		expect(blocked.textContent).toContain("k2");
+		// Full detail (objective + blocked) is in the hover <title>.
+		expect(group.querySelector("title").textContent).toContain("k2");
+	});
+
+	test("renders the objective line and full objective in the tooltip", () => {
+		const g = createElement("g");
+		renderWorkflowRegions(g, [
+			region("wf1", { x: 0, y: 0, width: 100, height: 100 }, {
+				objective: "Load and verify replays end to end",
+			}),
+		], viewport);
+		const group = g.querySelector('g[data-region-id="wf1"]');
+		expect(group.querySelector(".region-objective").textContent).toContain("Load and verify");
+		expect(group.querySelector("title").textContent).toContain("Objective: Load and verify replays end to end");
+	});
+
+	test("no blocked line when nothing is blocked", () => {
+		const g = createElement("g");
+		renderWorkflowRegions(g, [region("wf1", { x: 0, y: 0, width: 100, height: 100 })], viewport);
+		const group = g.querySelector('g[data-region-id="wf1"]');
+		expect(group.querySelector(".region-blocked-line").textContent).toBe("");
+	});
+
+	test("blockedLine truncates long lists", () => {
+		expect(blockedLine([])).toBe("");
+		expect(blockedLine(["k1"])).toBe("⚠ blocked: k1");
+		expect(blockedLine(["k1", "k2", "k3", "k4", "k5"])).toBe("⚠ blocked: k1, k2, k3 +2");
 	});
 
 	test("reconciles: removes regions that disappear", () => {

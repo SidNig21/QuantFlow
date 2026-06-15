@@ -13,8 +13,9 @@ Read in order before editing:
 3. `KERNEL_CONSTITUTION.md` — authority rules
 4. Current goal scope from `BUILD_PLAN_V3.md`
 5. Relevant repo files (`CONCEPT.md`, `REPO_MAP.md`, `VAULT.md`, `ENVOY.md`)
-6. `BUILD_PLAN_V2.md` for shipped behavior only, when v3 explicitly references it
-7. Old vault notes as context only, never as marching orders
+6. For UI/UX work: `PRODUCT.md` (product taste) and `DESIGN.md` (visual rails) — shared taste rails, not runtime deps; they never override the build plan or Kernel Constitution
+7. `BUILD_PLAN_V2.md` for shipped behavior only, when v3 explicitly references it
+8. Old vault notes as context only, never as marching orders
 
 Do not build from loose vault notes. Do not execute old v2 goal ladders unless `BUILD_PLAN_V3.md` explicitly points to them.
 

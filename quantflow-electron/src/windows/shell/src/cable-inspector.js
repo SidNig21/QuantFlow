@@ -11,6 +11,10 @@ import {
 	getRetryCableRelayRequest,
 	shouldSubmitCableMessage,
 } from "./cable-overlay.js";
+import {
+	SEMANTIC_STRING_STYLES,
+	SEMANTIC_STRING_TYPES,
+} from "@qf-renderer/components/StringOverlay/semantic-string-view";
 
 export function createCableInspector({
 	containerEl,
@@ -22,6 +26,8 @@ export function createCableInspector({
 	onFocusTile,
 	onRemoveConnection,
 	onUpdateLabel,
+	onSetSemanticType,
+	getSemanticType,
 	onGetFocusedTileId,
 	onStateChanged,
 }) {
@@ -496,6 +502,30 @@ export function createCableInspector({
 
 		contextMenuEl.appendChild(removeItem);
 		contextMenuEl.appendChild(labelItem);
+
+		// Semantic string type (Goal 7): set what the string MEANS. The choice
+		// is written to Kernel truth via kernel.connection.update; the active
+		// type is read back from Kernel, not local canvas-state.
+		const currentType = getSemanticType?.(conn.id) ?? "manual_connection";
+		const typeHeader = document.createElement("div");
+		typeHeader.className = "cable-menu-section";
+		typeHeader.textContent = "String type";
+		contextMenuEl.appendChild(typeHeader);
+		for (const type of SEMANTIC_STRING_TYPES) {
+			const item = document.createElement("div");
+			item.className = "cable-menu-item cable-menu-type";
+			item.dataset.semanticType = type;
+			if (type === currentType) item.dataset.active = "true";
+			const mark = type === currentType ? "● " : "○ ";
+			item.textContent = `${mark}${SEMANTIC_STRING_STYLES[type].label}`;
+			item.addEventListener("click", (e) => {
+				e.stopPropagation();
+				removeContextMenu();
+				if (type !== currentType) onSetSemanticType?.(conn.id, type);
+			});
+			contextMenuEl.appendChild(item);
+		}
+
 		document.body.appendChild(contextMenuEl);
 
 		setTimeout(() => {

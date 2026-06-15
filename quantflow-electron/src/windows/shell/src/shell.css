@@ -1426,13 +1426,21 @@ html.platform-win #panel-viewer::before {
 	font-weight: 600;
 }
 
+#region-layer .region-objective {
+	fill: var(--text-tertiary, #8b93a7);
+	font-size: 11px;
+	font-style: italic;
+}
+
 #region-layer .region-sub {
 	fill: var(--text-tertiary, #8b93a7);
 	font-size: 11px;
 }
 
-#region-layer .region-group.region-blocked .region-sub {
+#region-layer .region-blocked-line {
 	fill: var(--coral, #ff6b6b);
+	font-size: 11px;
+	font-weight: 600;
 }
 
 /* ── Cable layer (SVG overlay between tile-layer and edge-indicators) ── */
@@ -3050,6 +3058,22 @@ html.platform-win #panel-viewer::before {
 .cable-menu-item:hover {
 	background: color-mix(in srgb, var(--accent) 15%, transparent);
 	color: var(--fg);
+}
+
+/* Goal 7: semantic string type picker in the cable context menu. */
+.cable-menu-section {
+	padding: 6px 12px 2px;
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-tertiary, #8b93a7);
+	border-top: 1px solid color-mix(in srgb, var(--fg, #fff) 10%, transparent);
+	margin-top: 4px;
+}
+
+.cable-menu-type[data-active="true"] {
+	color: var(--accent, #6ea8fe);
+	font-weight: 600;
 }
 
 /* V2 cable inspector */

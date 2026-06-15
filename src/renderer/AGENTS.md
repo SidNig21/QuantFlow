@@ -58,8 +58,9 @@ Not: renderer moves tile locally and syncs later.
 2. `BUILD_PLAN_V3.md`
 3. `KERNEL_CONSTITUTION.md`
 4. `docs/v3/GLOSSARY.md`
-5. This file
-6. Relevant renderer source files
+5. `PRODUCT.md` + `DESIGN.md` — product/visual taste rails for any UI work (not runtime deps)
+6. This file
+7. Relevant renderer source files
 
 ## DOX Rule
 

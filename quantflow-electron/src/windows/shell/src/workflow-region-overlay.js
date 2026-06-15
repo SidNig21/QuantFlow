@@ -20,7 +20,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
  * (null bounds) are dropped — an empty workflow has nothing to outline.
  *
  * @param {Array<object>} regions - kernel.workflow.region_list result
- * @returns {Array<{id:string,title:string,summary:string,objective:string,status:string,hasBlockers:boolean,bounds:{x:number,y:number,width:number,height:number}}>}
+ * @returns {Array<{id:string,title:string,summary:string,objective:string,status:string,hasBlockers:boolean,blockedTaskIds:string[],bounds:{x:number,y:number,width:number,height:number}}>}
  */
 export function getRegionRenderModels(regions) {
 	if (!Array.isArray(regions)) return [];
@@ -35,10 +35,26 @@ export function getRegionRenderModels(regions) {
 			objective: model.objective,
 			status: model.status,
 			hasBlockers: model.hasBlockers,
+			blockedTaskIds: model.blockedTaskIds,
 			bounds: model.bounds,
 		});
 	}
 	return models;
+}
+
+/** Truncate a string for the compact on-canvas line; full text lives in <title>. */
+function truncate(text, max) {
+	const value = String(text ?? "");
+	return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
+/** Compact "which task is blocked" line, e.g. "⚠ blocked: k2, k7". */
+export function blockedLine(blockedTaskIds) {
+	const ids = Array.isArray(blockedTaskIds) ? blockedTaskIds : [];
+	if (ids.length === 0) return "";
+	const shown = ids.slice(0, 3).join(", ");
+	const extra = ids.length > 3 ? ` +${ids.length - 3}` : "";
+	return `⚠ blocked: ${shown}${extra}`;
 }
 
 /**
@@ -86,13 +102,27 @@ function createRegionGroup(id) {
 	box.setAttribute("ry", "18");
 	g.appendChild(box);
 
+	// Hover tooltip carries the full objective + blocked task ids when the
+	// on-canvas text is truncated to stay compact/soft.
+	const titleEl = document.createElementNS(SVG_NS, "title");
+	titleEl.setAttribute("class", "region-title");
+	g.appendChild(titleEl);
+
 	const label = document.createElementNS(SVG_NS, "text");
 	label.setAttribute("class", "region-label");
 	g.appendChild(label);
 
+	const objective = document.createElementNS(SVG_NS, "text");
+	objective.setAttribute("class", "region-objective");
+	g.appendChild(objective);
+
 	const sub = document.createElementNS(SVG_NS, "text");
 	sub.setAttribute("class", "region-sub");
 	g.appendChild(sub);
+
+	const blocked = document.createElementNS(SVG_NS, "text");
+	blocked.setAttribute("class", "region-blocked-line");
+	g.appendChild(blocked);
 
 	return g;
 }
@@ -112,7 +142,20 @@ function updateRegionGroup(group, model) {
 		box.setAttribute("height", String(Math.max(0, height)));
 	}
 
-	// Header sits just inside the top-left of the soft box.
+	const blocked = blockedLine(model.blockedTaskIds);
+	const objective = model.objective && model.objective !== "—" ? model.objective : "";
+
+	// Full detail on hover so the on-canvas text can stay short and soft.
+	const titleEl = group.querySelector(".region-title");
+	if (titleEl) {
+		const lines = [model.title];
+		if (objective) lines.push(`Objective: ${objective}`);
+		lines.push(`${model.status} · ${model.summary}`);
+		if (blocked) lines.push(blocked);
+		titleEl.textContent = lines.join("\n");
+	}
+
+	// Header block sits just inside the top-left of the soft box.
 	const label = group.querySelector(".region-label");
 	if (label) {
 		label.setAttribute("x", String(x + 16));
@@ -120,12 +163,26 @@ function updateRegionGroup(group, model) {
 		label.textContent = model.title;
 	}
 
+	const objectiveEl = group.querySelector(".region-objective");
+	if (objectiveEl) {
+		objectiveEl.setAttribute("x", String(x + 16));
+		objectiveEl.setAttribute("y", String(y + 41));
+		objectiveEl.textContent = truncate(objective, 48);
+	}
+
 	const sub = group.querySelector(".region-sub");
 	if (sub) {
 		sub.setAttribute("x", String(x + 16));
-		sub.setAttribute("y", String(y + 42));
-		const blockers = model.hasBlockers ? "  ⚠ blocked" : "";
-		sub.textContent = `${model.status} · ${model.summary}${blockers}`;
+		sub.setAttribute("y", String(y + 57));
+		sub.textContent = `${model.status} · ${model.summary}`;
+	}
+
+	// Name which task is blocked (Goal 7 acceptance), only when blocked.
+	const blockedEl = group.querySelector(".region-blocked-line");
+	if (blockedEl) {
+		blockedEl.setAttribute("x", String(x + 16));
+		blockedEl.setAttribute("y", String(y + 73));
+		blockedEl.textContent = blocked;
 	}
 }
 

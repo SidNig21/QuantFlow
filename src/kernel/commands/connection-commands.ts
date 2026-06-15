@@ -28,13 +28,18 @@ function connectionCreate(db: KernelDB, payload: Record<string, unknown>): Comma
     const existing = db.prepare('SELECT id FROM connections WHERE id = ?').get(id);
     if (existing) return { ok: true, id };
 
+    // A string belongs to a workflow so its region can count it. Callers (manual
+    // cable drop, shell RPC, main RPC) rarely pass workflowId, so derive it from
+    // the endpoints: when both tiles share a workflow, the string inherits it.
+    const workflowId = resolveConnectionWorkflowId(db, payload['workflowId'], tileAId, tileBId);
+
     db.prepare(`
       INSERT INTO connections
         (id, workflow_id, tile_a_id, tile_b_id, from_tile_id, to_tile_id, semantic_type, label, status, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
-      (payload['workflowId'] as string | null) ?? null,
+      workflowId,
       tileAId,
       tileBId,
       (payload['fromTileId'] as string | null) ?? tileAId,
@@ -48,13 +53,38 @@ function connectionCreate(db: KernelDB, payload: Record<string, unknown>): Comma
     );
     emitKernelEvent({
       kind: 'connection.created',
-      workflowId: payload['workflowId'] as string | undefined,
-      data: { id, tileAId, tileBId, label: payload['label'] },
+      workflowId: workflowId ?? undefined,
+      data: { id, tileAId, tileBId, workflowId, label: payload['label'] },
     });
     return { ok: true, id };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * Resolve the workflow a connection belongs to. An explicit payload value wins;
+ * otherwise, when both endpoint tiles belong to the same (non-null) workflow,
+ * the connection inherits it. Cross-workflow or unknown tiles yield null (a
+ * loose, workflow-agnostic link).
+ */
+function resolveConnectionWorkflowId(
+  db: KernelDB,
+  explicit: unknown,
+  tileAId: string,
+  tileBId: string,
+): string | null {
+  if (typeof explicit === 'string' && explicit.length > 0) return explicit;
+  const a = db.prepare('SELECT workflow_id FROM tiles WHERE id = ?').get(tileAId) as
+    | { workflow_id: string | null }
+    | undefined;
+  const b = db.prepare('SELECT workflow_id FROM tiles WHERE id = ?').get(tileBId) as
+    | { workflow_id: string | null }
+    | undefined;
+  if (a?.workflow_id && b?.workflow_id && a.workflow_id === b.workflow_id) {
+    return a.workflow_id;
+  }
+  return null;
 }
 
 /**

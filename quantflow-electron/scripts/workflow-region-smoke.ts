@@ -53,7 +53,10 @@ db.prepare(
   `INSERT INTO workflows (id, name, objective, status, created_at, updated_at) VALUES ('wf1','Build Replay Loader','Load and verify replays','active',?,?)`,
 ).run(now, now);
 db.prepare(
-  `INSERT INTO workflows (id, name, objective, status, created_at, updated_at) VALUES ('wf2','Empty Mission','nothing yet','active',?,?)`,
+  `INSERT INTO workflows (id, name, objective, status, created_at, updated_at) VALUES ('wf2','Sibling Mission','one tile','active',?,?)`,
+).run(now, now);
+db.prepare(
+  `INSERT INTO workflows (id, name, objective, status, created_at, updated_at) VALUES ('wf3','Empty Mission','nothing yet','active',?,?)`,
 ).run(now, now);
 // deno-lint-ignore no-explicit-any
 const kdb = db as any;
@@ -100,6 +103,19 @@ const after = db.prepare('SELECT semantic_type, label FROM connections WHERE id 
 check('update set context_flow + label', after.semantic_type === 'context_flow' && after.label === 'shared plan');
 check('update unknown id rejected', handleConnectionCommand(kdb, 'kernel.connection.update', { id: 'nope', semanticType: 'blocker' }).ok === false);
 
+console.log('\n— connection inherits workflow from its endpoints (no explicit workflowId) —');
+// Both endpoints in wf1, caller omits workflowId (the real cable-drop path).
+handleConnectionCommand(kdb, 'kernel.connection.create', {
+  id: 'c_inherit', tileAId: 't_cond', tileBId: 't_verify', semanticType: 'receipt_handoff',
+});
+const inherited = db.prepare('SELECT workflow_id FROM connections WHERE id = ?').get('c_inherit') as { workflow_id: string | null };
+check('string inherits wf1 from its tiles', inherited.workflow_id === 'wf1');
+// A tile in wf2 → cross-workflow link inherits no workflow.
+handleTileCommand(kdb, 'kernel.tile.create', { id: 't_other', workflowId: 'wf2', displayName: 't_other', tileKind: 'worker', x: 0, y: 0, width: 100, height: 100 });
+handleConnectionCommand(kdb, 'kernel.connection.create', { id: 'c_cross', tileAId: 't_cond', tileBId: 't_other' });
+const cross = db.prepare('SELECT workflow_id FROM connections WHERE id = ?').get('c_cross') as { workflow_id: string | null };
+check('cross-workflow string has null workflow', cross.workflow_id === null);
+
 console.log('\n— tasks: one blocked through the real lifecycle —');
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'k1', workflowId: 'wf1', title: 'Open task', objective: 'o' });
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'k2', workflowId: 'wf1', title: 'Blocked task', objective: 'o' });
@@ -122,11 +138,12 @@ check('receipt count > 0', region.receiptCount > 0);
 check('semantic counts: delegation 1', region.connectionTypeCounts.delegation === 1);
 check('semantic counts: verification 1', region.connectionTypeCounts.verification === 1);
 check('semantic counts: context_flow 1', region.connectionTypeCounts.context_flow === 1);
+check('semantic counts: inherited receipt_handoff 1', region.connectionTypeCounts.receipt_handoff === 1);
 
 console.log('\n— region list includes empty workflow (null bounds) —');
 const list = queryWorkflowRegionList(kdb);
-check('two regions', list.length === 2);
-const empty = list.find((r) => r.id === 'wf2')!;
+check('three regions', list.length === 3);
+const empty = list.find((r) => r.id === 'wf3')!;
 check('empty workflow has null bounds', empty.bounds === null && empty.tileCount === 0);
 check('missing workflow → null', queryWorkflowRegion(kdb, 'nope') === null);
 
@@ -150,8 +167,10 @@ check('normalizeStringType unknown → manual', normalizeStringType('zzz') === '
 
 console.log('\n— shell overlay: render models drop empty regions —');
 const models = getRegionRenderModels(list);
-check('only the 3-tile workflow is drawable', models.length === 1 && models[0].id === 'wf1');
-check('drawable model carries bounds + summary', !!models[0].bounds && models[0].summary.length > 0);
+const drawableIds = models.map((m) => m.id).sort();
+check('only workflows with tiles are drawable (wf1, wf2)', drawableIds.length === 2 && drawableIds[0] === 'wf1' && drawableIds[1] === 'wf2');
+const wf1Model = models.find((m) => m.id === 'wf1')!;
+check('drawable model carries bounds + summary', !!wf1Model.bounds && wf1Model.summary.length > 0);
 check('non-array input safe', getRegionRenderModels(null as unknown as []).length === 0);
 
 console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} — ${failures} failure(s)`);

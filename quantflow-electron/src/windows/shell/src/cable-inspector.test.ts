@@ -203,9 +203,14 @@ function setupInspector(options: Record<string, any> = {}) {
 	const notifications: any[] = [];
 	const removedConnections: string[] = [];
 	const states: any[] = [];
+	const labelUpdates: any[] = [];
+	const semanticUpdates: any[] = [];
 	const inspector = createCableInspector({
 		containerEl: container,
 		viewportState: { panX: 0, panY: 0, zoom: 1 },
+		onUpdateLabel: (id: string, label: string) => labelUpdates.push({ id, label }),
+		onSetSemanticType: (id: string, type: string) => semanticUpdates.push({ id, type }),
+		getSemanticType: options.getSemanticType ?? (() => "manual_connection"),
 		onSendMessage: options.onSendMessage ?? (async (request: any) => {
 			sendRequests.push(request);
 			return { ok: true };
@@ -215,7 +220,6 @@ function setupInspector(options: Record<string, any> = {}) {
 		onFocusTile: () => {},
 		onInjectContext: async () => ({ ok: true }),
 		onRemoveConnection: (id: string) => removedConnections.push(id),
-		onUpdateLabel: () => {},
 		onGetFocusedTileId: () => null,
 		onStateChanged: (state: any) => states.push(state),
 	});
@@ -226,6 +230,8 @@ function setupInspector(options: Record<string, any> = {}) {
 		removedConnections,
 		sendRequests,
 		states,
+		labelUpdates,
+		semanticUpdates,
 	};
 }
 
@@ -313,5 +319,48 @@ describe("createCableInspector", () => {
 		const [removeItem] = menu.querySelectorAll(".cable-menu-item");
 		removeItem.dispatchEvent(createMouseEvent("click"));
 		expect(removedConnections).toEqual(["conn-ab"]);
+	});
+
+	test("context menu lists all semantic types and marks the active one", () => {
+		const { inspector } = setupInspector({ getSemanticType: () => "verification" });
+		inspector.openContextMenu("conn-ab", 120, 90);
+		const menu = document.body.querySelector(".cable-context-menu");
+		const typeItems = menu.querySelectorAll(".cable-menu-type");
+		// All 7 canonical types are offered.
+		expect(typeItems.length).toBe(7);
+		const active = typeItems.filter((i: any) => i.dataset.active === "true");
+		expect(active.length).toBe(1);
+		expect(active[0].dataset.semanticType).toBe("verification");
+	});
+
+	test("choosing a semantic type routes through onSetSemanticType (Kernel authority)", () => {
+		const { inspector, semanticUpdates } = setupInspector({ getSemanticType: () => "manual_connection" });
+		inspector.openContextMenu("conn-ab", 120, 90);
+		const menu = document.body.querySelector(".cable-context-menu");
+		const delegation = menu.querySelectorAll(".cable-menu-type")
+			.find((i: any) => i.dataset.semanticType === "delegation");
+		delegation.dispatchEvent(createMouseEvent("click"));
+		expect(semanticUpdates).toEqual([{ id: "conn-ab", type: "delegation" }]);
+	});
+
+	test("re-selecting the active type is a no-op", () => {
+		const { inspector, semanticUpdates } = setupInspector({ getSemanticType: () => "delegation" });
+		inspector.openContextMenu("conn-ab", 120, 90);
+		const menu = document.body.querySelector(".cable-context-menu");
+		const delegation = menu.querySelectorAll(".cable-menu-type")
+			.find((i: any) => i.dataset.semanticType === "delegation");
+		delegation.dispatchEvent(createMouseEvent("click"));
+		expect(semanticUpdates).toEqual([]);
+	});
+
+	test("context-menu label edit routes through onUpdateLabel", () => {
+		const { inspector, labelUpdates } = setupInspector();
+		(globalThis as any).prompt = () => "delegate to worker";
+		inspector.openContextMenu("conn-ab", 120, 90);
+		const menu = document.body.querySelector(".cable-context-menu");
+		const labelItem = menu.querySelectorAll(".cable-menu-item")
+			.find((i: any) => i.textContent === "Label...");
+		labelItem.dispatchEvent(createMouseEvent("click"));
+		expect(labelUpdates).toEqual([{ id: "conn-ab", label: "delegate to worker" }]);
 	});
 });

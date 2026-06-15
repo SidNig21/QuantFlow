@@ -1306,8 +1306,28 @@ async function init() {
 				"cable-inspector",
 			));
 		}
+		// Kernel owns the label too (Goal 7): persist it as connection authority,
+		// not only in local canvas-state. The connection.updated event refreshes
+		// the projection.
+		void window.kernelApi?.sendCommand?.("kernel.connection.update", { id, label });
 		tileManager.saveCanvasImmediate();
 		updateCables();
+	}
+
+	// Goal 7: set a string's semantic meaning through the Kernel. We do not
+	// mutate local canvas-state — the kernel.connection.update + connection.updated
+	// event drives refreshWorkflowProjection(), which re-reads the type and
+	// re-renders the cable.
+	async function setCableSemanticType(id, semanticType) {
+		const result = await window.kernelApi?.sendCommand?.(
+			"kernel.connection.update",
+			{ id, semanticType },
+		);
+		if (result?.ok === false) {
+			toasts.show({ message: `Could not set string type: ${result.error ?? "unknown"}`, tone: "error" });
+			return;
+		}
+		await refreshWorkflowProjection();
 	}
 
 	const cableInspector = createCableInspector({
@@ -1320,6 +1340,8 @@ async function init() {
 		onFocusTile: focusCableTile,
 		onRemoveConnection: removeConnectionById,
 		onUpdateLabel: updateCableLabel,
+		onSetSemanticType: setCableSemanticType,
+		getSemanticType: (id) => connectionSemanticTypes.get(id) ?? "manual_connection",
 		onGetFocusedTileId: () => tileManager.getFocusedTileId(),
 		onStateChanged: () => updateCables(),
 	});
