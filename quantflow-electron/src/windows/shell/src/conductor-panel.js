@@ -142,13 +142,20 @@ export function createConductorPanel() {
     },
     spawn: async () => {
       // Spawn through the approved shell role-spawn path (creates the tile +
-      // runtime, gated by kernel.worker.spawn). Operator picks the role.
+      // runtime, gated by kernel.worker.spawn). Operator picks the role; the
+      // active workflow id is threaded so the worker is tied to the workflow.
       const roles = (await window.shellApi?.rolesList?.()) ?? [];
       if (!roles.length) { foot.textContent = "Spawn: no roles available."; return; }
       const names = roles.map((r) => r.id).join(", ");
       const roleId = window.prompt?.(`Role to spawn (${names}):`, roles[0].id);
       if (!roleId) return;
-      await doAction("spawn_role", { roleId }, `Spawn ${roleId}`);
+      const ctx = await kernelContext();
+      const workflowId = ctx?.workflow?.id ?? null;
+      await doAction(
+        "spawn_role",
+        { roleId, ...(workflowId ? { workflowId } : {}) },
+        `Spawn ${roleId}`,
+      );
     },
     assign: async () => {
       const ctx = await kernelContext();

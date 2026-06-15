@@ -101,4 +101,19 @@ describe("spawnRoleTileAt honors Kernel worker.spawn as the authority gate", () 
     expect(calls.onRoleSpawned).toBe(1);
     expect(calls.onRoleSpawnFailed).toBe(0);
   });
+
+  test("workflowId is forwarded into kernel.worker.spawn", async () => {
+    const sent: { method: string; payload: Record<string, unknown> }[] = [];
+    setKernelApi((method, payload) => {
+      sent.push({ method, payload: payload as Record<string, unknown> });
+      return { ok: true };
+    });
+    const { deps } = makeDeps();
+
+    await spawnRoleTileAt(deps, localRole, 0, 0, { workflowId: "wf-123" });
+
+    const spawnCall = sent.find((c) => c.method === "kernel.worker.spawn");
+    expect(spawnCall).toBeDefined();
+    expect(spawnCall?.payload.workflowId).toBe("wf-123");
+  });
 });

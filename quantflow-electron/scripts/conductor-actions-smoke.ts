@@ -88,6 +88,7 @@ check('task is open', queryTaskGet(kdb, 'task1')?.status === 'open');
 const spawned = await actions.runAction('spawn_role', { roleId: 'coder', tileId: 'tile_w', workflowId: 'wf1' });
 check('spawn_role ok', spawned.ok === true);
 check('spawn_role routes to approved shell role-spawn path', spawnRoleCalls.length === 1 && spawnRoleCalls[0]!['roleId'] === 'coder');
+check('spawn_role forwards workflowId to the shell path', spawnRoleCalls[0]!['workflowId'] === 'wf1');
 check('spawn_role does NOT dispatch kernel.worker.spawn directly', !dispatched.includes('kernel.worker.spawn'));
 
 const assigned = await actions.runAction('assign_task', { taskId: 'task1', tileId: 'tile_w' });

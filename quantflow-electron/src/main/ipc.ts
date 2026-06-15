@@ -183,7 +183,13 @@ export function registerIpcHandlers(config: AppConfig): void {
           ...(a["cwd"] ? { cwd: a["cwd"] } : {}),
           ...(a["position"] ? { position: a["position"] } : {}),
           ...(a["size"] ? { size: a["size"] } : {}),
+          // Thread workflow context so the worker is tied to the active workflow.
+          ...(a["workflowId"] ? { workflowId: a["workflowId"] } : {}),
+          ...(a["workflowTaskId"] ? { workflowTaskId: a["workflowTaskId"] } : {}),
+          ...(a["workflowCorrelationId"] ? { workflowCorrelationId: a["workflowCorrelationId"] } : {}),
           ...(a["workflowEnvoySpaceId"] ? { workflowEnvoySpaceId: a["workflowEnvoySpaceId"] } : {}),
+          ...(a["canvasId"] ? { canvasId: a["canvasId"] } : {}),
+          ...(a["workspaceId"] ? { workspaceId: a["workspaceId"] } : {}),
         });
         return { ok: true, data: result };
       } catch (err) {

@@ -606,6 +606,7 @@ export function createCanvasRpc({
 						id: tileId,
 						cwd: params.cwd,
 						size: requestedSize,
+						workflowId: params.workflowId,
 						canvasId: params.canvasId,
 						workspaceId: params.workspaceId,
 						workflowTaskId: params.workflowTaskId,
