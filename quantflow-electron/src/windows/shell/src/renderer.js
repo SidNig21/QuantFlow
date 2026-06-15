@@ -310,7 +310,6 @@ async function init() {
 	const settingsModal = document.getElementById("settings-modal");
 	const newTileBtn = document.getElementById("new-tile-btn");
 	const settingsBtn = document.getElementById("settings-btn");
-	const updatePill = document.getElementById("update-pill");
 	const dragDropOverlay =
 		document.getElementById("drag-drop-overlay");
 	const loadingOverlay =
@@ -3173,73 +3172,6 @@ async function init() {
 		focusSurface(lastNonModalSurface);
 	});
 
-	// -- Update pill --
-
-	let updateState = { status: "idle" };
-	const isDevMode = import.meta.env.DEV;
-
-	function renderUpdatePill() {
-		if (updateState.status === "downloading") {
-			updatePill.style.display = "inline-block";
-			updatePill.classList.add("is-downloading");
-			updatePill.classList.remove("is-error");
-			updatePill.textContent =
-				`Updating ${Math.round(updateState.progress ?? 0)}%`;
-			updatePill.title = "Downloading update...";
-		} else if (updateState.status === "installing") {
-			updatePill.style.display = "inline-block";
-			updatePill.classList.add("is-downloading");
-			updatePill.classList.remove("is-error");
-			updatePill.textContent = "Installing…";
-			updatePill.title =
-				"Extracting and verifying update...";
-		} else if (updateState.status === "available") {
-			updatePill.style.display = "inline-block";
-			updatePill.classList.remove("is-downloading");
-			updatePill.classList.remove("is-error");
-			updatePill.textContent = "Download & Update";
-			updatePill.title =
-				`Click to download v${updateState.version}`;
-		} else if (updateState.status === "ready") {
-			updatePill.style.display = "inline-block";
-			updatePill.classList.remove("is-downloading");
-			updatePill.classList.remove("is-error");
-			updatePill.textContent = "Update & Restart";
-			updatePill.title =
-				`Click to install v${updateState.version}`;
-		} else if (updateState.status === "error") {
-			updatePill.style.display = "inline-block";
-			updatePill.classList.remove("is-downloading");
-			updatePill.classList.add("is-error");
-			updatePill.textContent = "Update failed — retry";
-			updatePill.title =
-				updateState.error || "Update failed";
-		} else if (isDevMode) {
-			updatePill.style.display = "inline-block";
-			updatePill.classList.remove("is-downloading");
-			updatePill.classList.remove("is-error");
-			updatePill.textContent =
-				updateState.status === "checking"
-					? "Checking…"
-					: "Check for Update";
-			updatePill.title = "Click to check for updates";
-		} else {
-			updatePill.style.display = "none";
-			updatePill.classList.remove("is-downloading");
-			updatePill.classList.remove("is-error");
-		}
-	}
-
-	window.shellApi.updateGetStatus().then((s) => {
-		updateState = s;
-		renderUpdatePill();
-	}).catch(() => {});
-
-	window.shellApi.onUpdateStatus((s) => {
-		updateState = s;
-		renderUpdatePill();
-	});
-
 	newTileBtn.addEventListener("click", async () => {
 		const selected = await window.shellApi.showContextMenu([
 			{ id: "new-terminal", label: "New terminal tile" },
@@ -3258,28 +3190,6 @@ async function init() {
 
 	settingsBtn.addEventListener("click", () => {
 		window.shellApi.toggleSettings();
-	});
-
-	updatePill.addEventListener("click", () => {
-		if (
-			updateState.status === "downloading" ||
-			updateState.status === "installing"
-		) return;
-		if (updateState.status === "available") {
-			window.shellApi.updateDownload();
-		} else if (updateState.status === "ready") {
-			window.shellApi.updateInstall();
-		} else if (updateState.status === "error") {
-			updateState = { status: "idle" };
-			renderUpdatePill();
-			window.shellApi.updateCheck();
-		} else if (
-			isDevMode &&
-			(updateState.status === "idle" ||
-				updateState.status === "checking")
-		) {
-			window.shellApi.updateCheck();
-		}
 	});
 
 	// -- Loading --

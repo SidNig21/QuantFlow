@@ -748,50 +748,6 @@ html.platform-win #panel-viewer::before {
 	transform: scale(0.94);
 }
 
-#update-pill {
-	position: absolute;
-	top: 8px;
-	right: 42px;
-	z-index: 101;
-	-webkit-app-region: no-drag;
-	padding: 2px 9px;
-	border-radius: 9999px;
-	border: 1.5px solid var(--primary, #1d76dc);
-	background: transparent;
-	color: var(--primary, #1d76dc);
-	font-family: var(--font-sans);
-	font-size: 12px;
-	font-weight: 500;
-	cursor: pointer;
-	transition: background 0.15s ease, transform 0.1s ease;
-	white-space: nowrap;
-}
-
-#update-pill:hover {
-	background: color-mix(in srgb, var(--primary, #1d76dc) 10%, transparent);
-}
-
-#update-pill:active {
-	transform: scale(0.98);
-}
-
-#update-pill.is-downloading {
-	border-color: transparent;
-	background: transparent;
-	color: var(--muted, rgba(0, 0, 0, 0.5));
-	cursor: default;
-	pointer-events: none;
-}
-
-#update-pill.is-error {
-	border-color: var(--destructive, #e5484d);
-	color: var(--destructive, #e5484d);
-}
-
-#update-pill.is-error:hover {
-	background: color-mix(in srgb, var(--destructive, #e5484d) 10%, transparent);
-}
-
 /* ── Resize ── */
 
 .resize-handle {
