@@ -55,6 +55,7 @@ db.prepare(`INSERT INTO worker_instances (id,tile_id,workflow_id,status,created_
 db.prepare(`INSERT INTO worker_instances (id,tile_id,workflow_id,status,created_at,updated_at) VALUES ('w_verifier','tile_v','wf1','active',?,?)`).run(t0, t0);
 
 const dim = (result: any, name: string) => result.dimensions.find((d: any) => d.dimension === name);
+const evalRowCount = () => (db.prepare('SELECT COUNT(*) AS n FROM evaluations').get() as any).n as number;
 
 // ── Scenario setup ─────────────────────────────────────────────────────────
 
@@ -183,6 +184,53 @@ check('blocked task still blocked after eval', (db.prepare("SELECT status FROM t
 console.log('\n— eval.create rejects empty input —');
 check('rejects no dimensions', (handleEvalCommand(kdb, 'kernel.eval.create', { evalType: 'task_eval', dimensions: [] } as any) as any).ok === false);
 check('rejects unknown command', (handleEvalCommand(kdb, 'kernel.eval.frobnicate', {} as any) as any).ok === false);
+
+console.log('\n— eval.create validates the persisted contract before writing —');
+const validDimension = {
+  dimension: 'task_completion_correctness',
+  applicable: true,
+  score: 3,
+  confidence: 0.8,
+  evidenceRefs: ['task_happy'],
+  rationale: 'Task task_happy is supported by Kernel evidence task_happy.',
+};
+function rejectedWithoutInsert(label: string, payload: any): void {
+  const beforeRows = evalRowCount();
+  const res = handleEvalCommand(kdb, 'kernel.eval.create', payload) as any;
+  check(`${label} rejected`, res.ok === false);
+  check(`${label} inserted no rows`, evalRowCount() === beforeRows);
+}
+rejectedWithoutInsert('invalid score > 4', {
+  evalType: 'task_eval',
+  dimensions: [{ ...validDimension, score: 99 }],
+});
+rejectedWithoutInsert('invalid confidence > 1', {
+  evalType: 'task_eval',
+  dimensions: [{ ...validDimension, confidence: 2 }],
+});
+rejectedWithoutInsert('empty applicable evidence refs', {
+  evalType: 'task_eval',
+  dimensions: [{ ...validDimension, evidenceRefs: [] }],
+});
+rejectedWithoutInsert('unknown dimension', {
+  evalType: 'task_eval',
+  dimensions: [{ ...validDimension, dimension: 'vibes' }],
+});
+rejectedWithoutInsert('unknown evalType', {
+  evalType: 'vibes_eval',
+  dimensions: [validDimension],
+});
+rejectedWithoutInsert('not_applicable with score', {
+  evalType: 'task_eval',
+  dimensions: [{
+    dimension: 'workflow_efficiency',
+    applicable: false,
+    score: 2,
+    confidence: 1,
+    evidenceRefs: [],
+    rationale: 'Not applicable for this unit.',
+  }],
+});
 
 console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} — ${failures} failure(s)`);
 process.exit(failures === 0 ? 0 : 1);

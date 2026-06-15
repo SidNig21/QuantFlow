@@ -37,6 +37,25 @@ export interface CreateEvaluationInput {
   evalId?: string;
 }
 
+const VALID_EVAL_TYPES = new Set([
+  'workflow_eval',
+  'task_eval',
+  'worker_eval',
+  'conductor_decision_eval',
+  'verification_eval',
+]);
+
+const VALID_DIMENSIONS = new Set([
+  'task_completion_correctness',
+  'verification_integrity',
+  'evidence_completeness',
+  'delegation_quality',
+  'blocker_handling',
+  'artifact_usefulness',
+  'conductor_decision_quality',
+  'workflow_efficiency',
+]);
+
 export function handleEvalCommand(
   db: KernelDB,
   type: string,
@@ -48,18 +67,70 @@ export function handleEvalCommand(
   return evalCreate(db, payload as unknown as CreateEvaluationInput);
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function validateDimension(d: EvaluationDimensionInput, index: number): string | null {
+  const prefix = `eval.create: dimension[${index}]`;
+  if (!d || typeof d !== 'object') return `${prefix} must be an object`;
+  if (!VALID_DIMENSIONS.has(d.dimension)) return `${prefix}.dimension unknown: ${d.dimension}`;
+  if (typeof d.applicable !== 'boolean') return `${prefix}.applicable must be boolean`;
+  if (!isFiniteNumber(d.confidence) || d.confidence < 0 || d.confidence > 1) {
+    return `${prefix}.confidence must be between 0.0 and 1.0`;
+  }
+  if (!isNonEmptyString(d.rationale)) return `${prefix}.rationale required`;
+
+  if (!d.applicable) {
+    if (d.score !== null && d.score !== undefined) {
+      return `${prefix}.score must be null when not_applicable`;
+    }
+    return null;
+  }
+
+  if (!Number.isInteger(d.score) || d.score < 0 || d.score > 4) {
+    return `${prefix}.score must be an integer 0..4`;
+  }
+  if (
+    !Array.isArray(d.evidenceRefs) ||
+    d.evidenceRefs.length === 0 ||
+    d.evidenceRefs.some((ref) => !isNonEmptyString(ref))
+  ) {
+    return `${prefix}.evidenceRefs must contain at least one Kernel id`;
+  }
+  return null;
+}
+
+function validateEvaluationInput(input: CreateEvaluationInput): string | null {
+  if (!input || typeof input.evalType !== 'string' || !input.evalType) {
+    return 'eval.create: evalType required';
+  }
+  if (!VALID_EVAL_TYPES.has(input.evalType)) {
+    return `eval.create: evalType unknown: ${input.evalType}`;
+  }
+  if (!Array.isArray(input.dimensions) || input.dimensions.length === 0) {
+    return 'eval.create: at least one dimension required';
+  }
+  for (let i = 0; i < input.dimensions.length; i += 1) {
+    const error = validateDimension(input.dimensions[i], i);
+    if (error) return error;
+  }
+  return null;
+}
+
 /**
  * Persist one evaluation as a set of per-dimension rows. Create-only: there is
  * no update/delete path (evals are append-only derived records in v1). Returns
  * the shared `eval_id`.
  */
 function evalCreate(db: KernelDB, input: CreateEvaluationInput): CommandResult {
-  if (!input || typeof input.evalType !== 'string' || !input.evalType) {
-    return { ok: false, error: 'eval.create: evalType required' };
-  }
-  if (!Array.isArray(input.dimensions) || input.dimensions.length === 0) {
-    return { ok: false, error: 'eval.create: at least one dimension required' };
-  }
+  const validationError = validateEvaluationInput(input);
+  if (validationError) return { ok: false, error: validationError };
+
   const evalId = input.evalId ?? randomUUID();
   const now = Date.now();
   try {
