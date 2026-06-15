@@ -36,7 +36,7 @@ Do not make Pi, Codex, Claude Code, or Hermes profiles mandatory for the core ar
 - Bypass the task `submitted → verifying` gate.
 - Fuse role, harness, and model into a single profile object.
 - Make any one harness a required dependency for the core app.
-- Post receipts outside the Kernel/Envoy path.
+- Post receipts outside the Kernel receipt path. Envoy may be wrapped/bridged only as legacy transport, not as a second authority.
 - Import renderer state.
 
 ## Interface Shape (Goal 6)

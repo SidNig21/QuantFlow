@@ -175,8 +175,8 @@ Goals 0-6A are complete and approved. Goal 5A was manually verified in-app: `Ctr
 
 ```text
 Goal 5C - Conductor Native Actions
-Goal 5D - Conductor Loop
 Goal 6 - Harness Interface and First Worker Adapters
+Goal 5D - Conductor Loop
 ```
 
 The following authority docs are installed for v3:

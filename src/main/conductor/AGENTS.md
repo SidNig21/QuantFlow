@@ -13,7 +13,7 @@ The Conductor is the native in-process planner for QuantFlow v3.
 ### Built (Goal 5A — read-only)
 
 - `conductor-reader.ts` — embedded reader: gathers Kernel context via the read tools, runs the model provider, assembles the Conductor view; `runConductorPlan` appends one planning receipt (its only write).
-- `conductor-tools-readonly.ts` — in-process native tool surface (read tools + `postPlanningReceipt` + `focusTile` nav + `requestHumanApproval`). No spawn/assign/verify/block tools exist until Goal 6A/5C.
+- `conductor-tools-readonly.ts` — in-process native tool surface (read tools + `postPlanningReceipt` + `focusTile` nav + `requestHumanApproval`). No spawn/assign/verify/block tools exist until Goal 5C.
 - `model-provider.ts` — `ConductorModelProvider` interface + deterministic, no-network `manualModelProvider`. Real MiniMax/OpenRouter providers plug in at Goal 5C+.
 - `prompts/planning.ts` — planning prompt contract.
 - `conductor-ipc.ts` — `conductor:read-view` / `conductor:run` IPC to the renderer tile.
@@ -45,12 +45,13 @@ get_receipt_chain, post_receipt (planning only), focus_tile, request_human_appro
 ```
 
 `post_receipt` is limited to `planning` receipts. Mutating tools below are
-deferred — they must NOT be added before Goal 6A (worker spawn) and Goal 5C.
+deferred — they must NOT be added before Goal 5C. Goal 6A is complete, so any
+future spawn tool must use the approved `kernel.worker.spawn` authority gate.
 
 ## Full Native Tool Surface (Goal 5C+, not yet)
 
 ```text
-create_task, assign_task, submit_task, verify_task, block_task,
+create_task, assign_task, submit_task, verify_task, reject_task, block_task,
 spawn_role, connect_tiles
 ```
 

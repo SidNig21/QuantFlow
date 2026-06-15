@@ -1544,6 +1544,8 @@ No manual pre-seeding of `worker_instances` is allowed in the proof.
 
 Allow the Conductor to mutate Kernel workflow state through native tools, after Goal 6A proves worker spawn/status ownership.
 
+Goal 5C is a single-step, operator-triggered action surface. It is not the autonomous loop, and it is not the full WorkerHarness send/read/collectReceipts interface.
+
 ## Native Tool Surface - Goal 5C
 
 Add mutation tools:
@@ -1559,6 +1561,21 @@ spawn_role
 connect_tiles
 ```
 
+Each tool must be a thin native binding over existing Kernel authority:
+
+```text
+create_task / assign_task / submit_task / verify_task / reject_task / block_task
+  -> Kernel task commands and receipt writes
+
+spawn_role
+  -> approved shell role-spawn path gated by kernel.worker.spawn
+
+connect_tiles
+  -> kernel.connection.create
+```
+
+The Conductor may choose the action and propose arguments, but the operator triggers one action at a time in Goal 5C.
+
 ## Rules
 
 The Conductor may create and assign work, request verification, resolve blockers, and post receipts.
@@ -1571,6 +1588,7 @@ complete tasks without verification evidence
 silently perform high-risk actions
 run an autonomous loop
 store private source-of-truth memory
+implement generic harness send/read/collectReceipts
 ```
 
 ## Acceptance Test
@@ -1589,12 +1607,15 @@ Conductor marks the workflow step ready for next action.
 
 No `terminal_write` handoff should be needed for the planner path.
 
+This means the Conductor must not use terminal paste or MCP as an internal app-control path. Worker execution may still happen through the shipped terminal/agent runtime until Goal 6 hardens harness send/read/receipt collection.
+
 ## Failure Signals
 
 - Conductor bypasses Kernel tools.
 - Conductor writes through MCP instead of native app functions.
 - Worker activation relies on manual paste.
 - Conductor starts looping without operator authorization.
+- Conductor implements an ad hoc harness protocol instead of waiting for Goal 6.
 
 ---
 
@@ -1602,7 +1623,9 @@ No `terminal_write` handoff should be needed for the planner path.
 
 ## Goal
 
-Add an approval-gated Conductor loop after read-only planning, worker spawn reconciliation, and native actions are proven.
+Add an approval-gated Conductor loop after read-only planning, worker spawn reconciliation, native actions, and the full Goal 6 harness contract are proven.
+
+Goal 5D should run after Goal 6 unless the operator explicitly approves a minimal pre-harness loop with reduced scope.
 
 ## Scope
 
@@ -1646,6 +1669,8 @@ The operator can pause/stop the loop and inspect every decision through receipts
 ## Goal
 
 Expand the WorkerHarness interface after Goal 6A proves the minimal local/herdr registry.
+
+Goal 6 should land before Goal 5D so the Conductor loop has a stable worker send/read/receipt contract instead of relying on terminal paste or role-specific hacks.
 
 ## Why
 
@@ -2233,8 +2258,8 @@ Goal 4 - State Cards and Flip Tile UI
 Goal 5A - Conductor Read-Only MVP
 Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry
 Goal 5C - Conductor Native Actions
-Goal 5D - Conductor Loop
 Goal 6 - Harness Interface and First Worker Adapters
+Goal 5D - Conductor Loop
 Goal 7 - Workflow Regions and Semantic Strings
 Goal 8 - Evidence and Vault OKF Export
 Goal 9 - Evaluation Layer (blocked until EVALS_SPEC rubrics exist)
@@ -2269,7 +2294,7 @@ Each tile flips to show its State Card.
 No raw terminal reading is required to understand the workflow.
 ```
 
-That is the foundation for the Conductor.
+That foundation is now in place through Goal 6A. The next product proof is Conductor native actions, then a stable harness contract, then the approval-gated loop.
 
 ---
 

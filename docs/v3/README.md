@@ -48,8 +48,8 @@ The back half has been refined:
 
 ```text
 Goal 5C - Conductor Native Actions
-Goal 5D - Conductor Loop
 Goal 6 - Harness Interface and First Worker Adapters
+Goal 5D - Conductor Loop
 ```
 
 `WORKER_RECONCILIATION.md` remains binding for worker spawn/status behavior. See `BUILD_PLAN_V3.md` for current scope. Do not start the next goal until the operator approves.

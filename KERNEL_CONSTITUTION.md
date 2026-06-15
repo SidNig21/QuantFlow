@@ -14,7 +14,7 @@ Everything else derives from that rule.
 | --- | --- |
 | Kernel | Sole source of truth. All state writes go here. |
 | Canvas | Projector. Renders Kernel state. Never a database. |
-| Conductor | Planner. Reads Kernel and posts planning receipts (Goal 5A, read-only). Creating/assigning tasks and spawning workers is gated until Goal 6A (worker-spawn reconciliation) then Goal 5C. Never owns truth. |
+| Conductor | Planner and, after Goal 5C, operator-triggered action coordinator. Reads/mutates only through Kernel commands. Worker spawn/status uses the approved Goal 6A `kernel.worker.*` path. Never owns truth. |
 | Workers | Executors. Claim tasks, do work, submit results. Never self-complete. |
 | Receipts | Evidence. Append-only proof of what happened. |
 | State Cards | Current compressed reality per tile/worker. Not history. |

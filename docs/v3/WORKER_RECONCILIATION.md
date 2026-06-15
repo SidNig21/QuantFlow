@@ -5,13 +5,14 @@
 > the authoritative identity; the shell role-spawn + herdr status paths route
 > through them; the minimal harness registry (`local-shell`, `herdr-shell`) +
 > a default model are seeded; the State Card reflects Kernel worker status.
-> Proof: `bun run smoke:worker-harness`. Conductor actions (5C) remain gated.
+> Proof: `bun run smoke:worker-harness`. Conductor actions (5C) may now build
+> on this path when the operator authorizes Goal 5C.
 
 This spec binds the back half of v3 before Conductor actions begin.
 
-Goal 6A owns the reconciliation. Goal 5A may read worker state, but Goal 5C/5D may not spawn, assign, or manage workers until this spec is implemented and verified.
+Goal 6A owns the reconciliation. Goal 5A may read worker state. Goal 5C/5D may spawn, assign, or manage workers only through this implemented and verified Kernel worker path.
 
-## Current Gap
+## Original Gap Closed In Goal 6A
 
 Goals 2-4 made these Kernel-owned:
 
@@ -20,12 +21,12 @@ Goals 2-4 made these Kernel-owned:
 - receipts
 - State Cards
 
-The live app still starts actual runtimes through shell-side role spawn, PTY/herdr, and legacy Envoy paths.
+The live app still starts actual runtimes through shell-side role spawn, PTY/herdr, and legacy Envoy paths, but Goal 6A now gates that runtime start through Kernel worker identity first.
 
 The specific dual-authority gap is:
 
 ```text
-PTY/herdr session + Envoy record do not yet have a Kernel-owned WorkerInstance identity.
+PTY/herdr session + Envoy record must never drift away from the Kernel-owned WorkerInstance identity.
 ```
 
 The `worker_instances` row must become the single identity that ties together:
