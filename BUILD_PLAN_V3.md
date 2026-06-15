@@ -21,6 +21,7 @@ This section is the durable progress ledger for the v3 branch.
 | Goal 5A — Conductor Read-Only MVP | Complete / approved | Claude | Codex | 2026-06-14 | Embedded Conductor reads Kernel-owned workflow/tile/task/StateCard/receipt context, projects a read-only Conductor panel, and posts only append-only planning receipts; workflow-scoped receipt isolation is covered by smoke tests. Manual app check confirmed `Ctrl+K` opens Conductor and the panel live-refreshes after tile spawn. Follow-up pushed through `0cae304` reserves `Ctrl+K` for the command palette and moves Find/file search to `Ctrl+F`. |
 | Goal 6A — Worker Spawn Reconciliation and Minimal Harness Registry | Complete / approved | Claude | Codex | 2026-06-15 | Kernel now owns worker spawn/status identity through `worker_instances`, `kernel.worker.spawn/status_update/stop`, seeded local/herdr harness descriptors, runtime-id recording, State Card worker-status projection, and shell role spawn gating before PTY/herdr runtime start. Fix pass `dcc54dc` closes the worker.spawn rejection loophole; smoke, MCP tests, focused shell tests, and build pass. |
 | Goal 5C — Conductor Native Actions | Complete / approved | Claude | Codex | 2026-06-15 | Conductor now exposes single-step, operator-triggered native actions for task create/assign/submit/verify/reject/block, role spawn, and tile connection. Task actions route through Kernel task commands, `spawn_role` routes through the approved shell role-spawn path gated by `kernel.worker.spawn` with workflow context preserved, and no raw completion, MCP internal path, terminal_write handoff, Goal 5D loop, or Goal 6 harness send/read work was added. Smoke/regression tests and build pass. |
+| Goal 6 — Harness Interface and First Worker Adapters | Complete / approved | Claude | Codex | 2026-06-15 | WorkerHarness now exposes spawn/send/readState/collectReceipts/stop for local-shell and herdr-shell through Electron-free adapters, plus a live app-side HarnessRuntimeOps seam for Goal 5D. The live seam routes spawn through the approved shell role-spawn path, sends through PTY/herdr input, reads Kernel State Cards, avoids parallel receipt authority, and stops runtimes before `kernel.worker.stop`; focused live-ops tests, harness smokes, Goal 5C/6A regressions, MCP tests, and build pass. |
 
 Completion rule:
 
@@ -2295,7 +2296,7 @@ Each tile flips to show its State Card.
 No raw terminal reading is required to understand the workflow.
 ```
 
-That foundation is now in place through Goal 6A. The next product proof is Conductor native actions, then a stable harness contract, then the approval-gated loop.
+That foundation is now in place through Goal 6. The next product proof is the approval-gated Conductor loop, using the stable WorkerHarness seam instead of terminal paste or role-specific runtime hacks.
 
 ---
 
