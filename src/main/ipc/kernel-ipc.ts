@@ -14,6 +14,8 @@ import {
   queryWorkflowSnapshot,
   queryWorkerList,
   queryWorkerGet,
+  queryWorkflowRegion,
+  queryWorkflowRegionList,
 } from '../../kernel/queries/index';
 import { startStateCardWatcher } from '../../kernel/watchers/index';
 import { seedHarnessRegistry } from '../../kernel/worker-instances/index';
@@ -71,6 +73,10 @@ export function registerKernelIpcHandlers(dataDir: string): void {
           });
         case 'kernel.workflow.snapshot':
           return queryWorkflowSnapshot(params['workflowId'] as string);
+        case 'kernel.workflow.region':
+          return queryWorkflowRegion(params['workflowId'] as string);
+        case 'kernel.workflow.region_list':
+          return queryWorkflowRegionList();
         case 'kernel.worker.list':
           return queryWorkerList({ workflowId: params['workflowId'] as string | undefined });
         case 'kernel.worker.get':

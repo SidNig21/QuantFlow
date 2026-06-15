@@ -1392,6 +1392,49 @@ html.platform-win #panel-viewer::before {
 	overflow: hidden;
 }
 
+/* ── Workflow region layer (Goal 7) ──
+   Soft, canvas-native boundaries drawn BEHIND tiles (above grid/watermark).
+   Not a dashboard or modal — a labelled zone showing which tiles belong to a
+   workflow plus its status/counts/blockers. World-transformed like cables. */
+
+#region-layer {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 2;
+	overflow: visible;
+}
+
+#region-layer .region-box {
+	fill: color-mix(in srgb, var(--accent, #6ea8fe) 6%, transparent);
+	stroke: color-mix(in srgb, var(--accent, #6ea8fe) 38%, transparent);
+	stroke-width: 1.5;
+	rx: 18;
+	stroke-dasharray: 10 8;
+}
+
+#region-layer .region-group.region-blocked .region-box {
+	fill: color-mix(in srgb, var(--coral, #ff6b6b) 6%, transparent);
+	stroke: color-mix(in srgb, var(--coral, #ff6b6b) 48%, transparent);
+}
+
+#region-layer .region-label {
+	fill: var(--text-secondary, #cdd6f4);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+#region-layer .region-sub {
+	fill: var(--text-tertiary, #8b93a7);
+	font-size: 11px;
+}
+
+#region-layer .region-group.region-blocked .region-sub {
+	fill: var(--coral, #ff6b6b);
+}
+
 /* ── Cable layer (SVG overlay between tile-layer and edge-indicators) ── */
 
 #cable-layer {
@@ -1426,6 +1469,25 @@ html.platform-win #panel-viewer::before {
 
 #cable-layer .cable-kind--trigger {
 	--cable-kind: var(--cable-trigger);
+}
+
+/* Goal 7: semantic string types. Color the string by what it means (per the
+   Kernel), so delegation/verification/context/etc. read at a glance. A declared
+   semantic type colors the main stroke even when the cable is idle. */
+#cable-layer .cable-semantic--delegation { --cable-semantic: #6ea8fe; }
+#cable-layer .cable-semantic--context-flow { --cable-semantic: #74c0fc; }
+#cable-layer .cable-semantic--artifact-dependency { --cable-semantic: #ffd43b; }
+#cable-layer .cable-semantic--verification { --cable-semantic: #51cf66; }
+#cable-layer .cable-semantic--receipt-handoff { --cable-semantic: #b197fc; }
+#cable-layer .cable-semantic--blocker { --cable-semantic: var(--coral, #ff6b6b); }
+
+#cable-layer .cable-root:not(.cable-semantic--manual-connection) path.cable-main {
+	stroke: var(--cable-semantic, var(--cable-idle));
+}
+
+#cable-layer .cable-blocker path.cable-main {
+	stroke: var(--cable-semantic, var(--coral, #ff6b6b));
+	stroke-dasharray: 7 5;
 }
 
 #cable-layer path.cable-glow {

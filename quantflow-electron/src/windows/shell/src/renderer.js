@@ -56,6 +56,7 @@ import {
 import { formatCableContextRelay } from "./cable-overlay.js";
 import { createCableInspector } from "./cable-inspector.js";
 import { clearCablePreview, renderCablePreview, renderCables } from "./cable-renderer.js";
+import { renderWorkflowRegions } from "./workflow-region-overlay.js";
 import {
 	shouldCancelCableDrawMode,
 	shouldEnterCableDrawMode,
@@ -1325,6 +1326,10 @@ async function init() {
 
 	// -- Cable layer (SVG renderer + inspector) --
 	const cableLayerContent = document.getElementById("cable-layer-content");
+	// Goal 7: Kernel-owned semantic type per connection id (delegation,
+	// verification, …). Cables read their meaning from the Kernel, not local
+	// canvas-state, so the string carries what the Kernel says it carries.
+	const connectionSemanticTypes = new Map();
 	function updateCables() {
 		if (cableLayerContent) {
 			renderCables(cableLayerContent, connections, tiles, viewportState, {
@@ -1342,8 +1347,39 @@ async function init() {
 					cableInspector.openContextMenu(id, event.clientX, event.clientY),
 				selectedConnectionId: cableInspector.getSelectedConnectionId(),
 				getRelayState: (id) => cableInspector.getRelayState(id),
+				getSemanticType: (id) => connectionSemanticTypes.get(id) ?? null,
 			});
 		}
+	}
+
+	// -- Workflow region layer (Goal 7) --
+	// Soft boundaries + semantic string types are a read-only projection of
+	// Kernel truth. We cache the last Kernel read and re-render on viewport
+	// changes; we re-fetch on Kernel events that can change membership/counts.
+	const regionLayerContent = document.getElementById("region-layer-content");
+	let workflowRegions = [];
+	function renderRegions() {
+		if (regionLayerContent) {
+			renderWorkflowRegions(regionLayerContent, workflowRegions, viewportState);
+		}
+	}
+	async function refreshWorkflowProjection() {
+		if (!window.kernelApi?.sendQuery) return;
+		try {
+			const [regions, snapshot] = await Promise.all([
+				window.kernelApi.sendQuery("kernel.workflow.region_list", {}),
+				window.kernelApi.sendQuery("kernel.canvas.snapshot", {}),
+			]);
+			workflowRegions = Array.isArray(regions) ? regions : [];
+			connectionSemanticTypes.clear();
+			for (const conn of snapshot?.connections ?? []) {
+				if (conn?.id) connectionSemanticTypes.set(conn.id, conn.semanticType ?? null);
+			}
+		} catch {
+			// Read-only projection: a failed read just leaves the last frame.
+		}
+		renderRegions();
+		updateCables();
 	}
 
 	// -- Edge indicators --
@@ -1649,6 +1685,9 @@ async function init() {
 				`scale(${viewportState.zoom})`,
 			);
 		}
+		// Region boxes share the world transform; re-render from the cache
+		// (cheap reconcile, no Kernel re-fetch on pan/zoom).
+		renderRegions();
 	}
 
 	let viewportChromePending = false;
@@ -1673,6 +1712,7 @@ async function init() {
 	edgeIndicators.update();
 	updateCables();
 	updateCables();
+	void refreshWorkflowProjection();
 
 	// -- Agent panel init (after tileManager, since getAllWebviews references it) --
 
@@ -3470,6 +3510,19 @@ async function init() {
 			} else if (payload.kind === "state_card.updated" && payload.tileId) {
 				// Kernel State Card changed → refresh the back face if flipped.
 				tileManager.refreshFlippedStateCard(payload.tileId);
+			}
+
+			// Goal 7: re-project workflow regions + semantic strings whenever
+			// the Kernel reports a change to membership, counts, or string types.
+			const kind = String(payload.kind ?? "");
+			if (
+				kind.startsWith("tile.") ||
+				kind.startsWith("task.") ||
+				kind.startsWith("connection.") ||
+				kind.startsWith("workflow.") ||
+				kind === "receipt.posted"
+			) {
+				void refreshWorkflowProjection();
 			}
 		});
 	}

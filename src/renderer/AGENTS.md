@@ -10,7 +10,8 @@ The renderer is a visual projector of Kernel state. It is not a database.
 - Conductor tile display.
 - `state/kernel-client.ts` — Typed contract for `window.kernelApi`; wrappers for `sendKernelCommand`, `sendKernelQuery`, `onKernelEvent`. (Goal 2)
 - `canvas/kernel-canvas.ts` — Canvas action wrappers that route through Kernel commands: `spawnTile`, `moveTile`, `resizeTile`, `connectTiles`, `closeTile`. (Goal 2)
-- Workflow region overlay (Goal 7).
+- `components/WorkflowRegion/workflow-region-view.ts` — pure projector: formats a Kernel workflow region into a soft region model + ordered display sections (workflow / objective / status / tiles / tasks / receipts / blockers / strings). (Goal 7)
+- `components/StringOverlay/semantic-string-view.ts` — pure projector: maps a connection's `semantic_type` to presentation (label / class hook / directional / alert) via `SEMANTIC_STRING_STYLES` + `resolveSemanticString` + `normalizeStringType`. (Goal 7)
 - `components/StateCardView/state-card-view.ts` — pure projector: formats a Kernel State Card snapshot into the canonical display sections. (Goal 4)
 - `components/TileBack/tile-back.ts` — back-face model built from a State Card snapshot. (Goal 4)
 - `components/Tile/tile.ts` — tile flip-state contract (front = live content, back = State Card). (Goal 4)

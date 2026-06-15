@@ -157,14 +157,26 @@ describe("cable render grouping", () => {
 	});
 
 	test("derives V2 cable root classes", () => {
+		// No semantic type → defaults to the manual-connection class hook.
 		expect(getCableClasses({
 			active: true,
 			kind: "context",
 			relayState: "queued",
 			selected: true,
-		})).toBe("cable-root cable-kind--context cable-live cable-selected cable-queued");
+		})).toBe("cable-root cable-kind--context cable-semantic--manual-connection cable-live cable-selected cable-queued");
 		expect(getCableClasses({ kind: "pipe", relayState: "failed" }))
-			.toBe("cable-root cable-kind--pipe cable-error cable-failed");
+			.toBe("cable-root cable-kind--pipe cable-semantic--manual-connection cable-error cable-failed");
+	});
+
+	test("derives semantic string classes (Goal 7)", () => {
+		expect(getCableClasses({ kind: "pipe", semanticType: "delegation" }))
+			.toBe("cable-root cable-kind--pipe cable-semantic--delegation");
+		const blocker = getCableClasses({ kind: "pipe", semanticType: "blocker" });
+		expect(blocker).toContain("cable-semantic--blocker");
+		expect(blocker).toContain("cable-blocker");
+		// Unknown semantic types fall back to manual.
+		expect(getCableClasses({ kind: "pipe", semanticType: "nonsense" }))
+			.toBe("cable-root cable-kind--pipe cable-semantic--manual-connection");
 	});
 
 	test("groups by tile pair and side pair regardless of direction", () => {

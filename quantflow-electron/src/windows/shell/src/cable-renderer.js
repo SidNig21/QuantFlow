@@ -1,4 +1,5 @@
 import { bezierPath, portPosition } from "./cable-math.js";
+import { normalizeStringType } from "@qf-renderer/components/StringOverlay/semantic-string-view";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const DEFAULT_CABLE_WIDTH = 1.6;
@@ -148,10 +149,18 @@ export function renderCables(contentG, connections, tiles, viewport, options = {
 		const relayState = info.connections
 			.map((conn) => options.getRelayState?.(conn.id) ?? "")
 			.find(Boolean) ?? "";
+		// Goal 7: the bundle's semantic type is the first declared (non-manual)
+		// type among its connections, per the Kernel; default manual.
+		const semanticType = normalizeStringType(
+			info.connections
+				.map((conn) => options.getSemanticType?.(conn.id))
+				.find((type) => normalizeStringType(type) !== "manual_connection"),
+		);
 		desired.set(info.id, {
 			...info,
 			selected: info.connections.some((conn) => conn.id === options.selectedConnectionId),
 			relayState,
+			semanticType,
 		});
 	}
 
@@ -269,11 +278,13 @@ function updateCableGroup(group, info) {
 	group.setAttribute("data-cable-count", String(info.count));
 	group.setAttribute("data-cable-delete-id", info.deleteId);
 	group.setAttribute("data-cable-kind", info.kind);
+	if (info.semanticType) group.setAttribute("data-cable-semantic", info.semanticType);
 	group.setAttribute("class", getCableClasses({
 		active: info.active,
 		kind: info.kind,
 		relayState: info.relayState,
 		selected: info.selected,
+		semanticType: info.semanticType,
 	}));
 
 	const hit = group.querySelector(".cable-hit");
@@ -324,8 +335,11 @@ function updateCableGroup(group, info) {
 	}
 }
 
-export function getCableClasses({ active = false, kind = "pipe", relayState = "", selected = false } = {}) {
+export function getCableClasses({ active = false, kind = "pipe", relayState = "", selected = false, semanticType = "" } = {}) {
 	const classes = ["cable-root", `cable-kind--${normalizeCableKind(kind)}`];
+	const semantic = normalizeStringType(semanticType);
+	classes.push(`cable-semantic--${semantic.replace(/_/g, "-")}`);
+	if (semantic === "blocker") classes.push("cable-blocker");
 	if (active) classes.push("cable-live");
 	if (selected) classes.push("cable-selected");
 	if (relayState === "sending") classes.push("cable-sending");

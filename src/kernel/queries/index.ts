@@ -18,6 +18,11 @@ import {
   queryWorkerGet as workerGet,
   type WorkerSnapshot,
 } from '../worker-instances/index';
+import {
+  queryWorkflowRegion as workflowRegion,
+  queryWorkflowRegionList as workflowRegionList,
+  type WorkflowRegion,
+} from '../workflows/index';
 
 export interface TileSnapshot {
   id: string;
@@ -168,3 +173,17 @@ export function queryWorkerList(params: { workflowId?: string } = {}): WorkerSna
 export function queryWorkerGet(workerId: string): WorkerSnapshot | null {
   return workerGet(getKernelDb(), workerId);
 }
+
+// ---------------------------------------------------------------------------
+// Workflow regions (Goal 7) — read-only canvas projection
+// ---------------------------------------------------------------------------
+
+export function queryWorkflowRegion(workflowId: string): WorkflowRegion | null {
+  return workflowRegion(getKernelDb(), workflowId);
+}
+
+export function queryWorkflowRegionList(): WorkflowRegion[] {
+  return workflowRegionList(getKernelDb());
+}
+
+export type { WorkflowRegion };
