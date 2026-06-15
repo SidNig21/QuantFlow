@@ -30,6 +30,7 @@
 		"smoke:conductor": "bun scripts/conductor-smoke.ts",
 		"smoke:conductor-actions": "bun scripts/conductor-actions-smoke.ts",
 		"smoke:worker-harness": "bun scripts/worker-harness-smoke.ts",
+		"smoke:harness-interface": "bun scripts/harness-interface-smoke.ts",
 		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",
 		"postinstall": "node scripts/postinstall.mjs"
 	},

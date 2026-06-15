@@ -10,16 +10,35 @@ The Harness Layer is the worker/runtime adapter boundary for QuantFlow v3.
 - Worker spawn/send/stop contracts.
 - Per-adapter receipt and StateCard production logic.
 
-### Built (Goal 6A — configuration/contract only)
+### Built (Goal 6A — minimal registry/config)
 
-- `types.ts` — `HarnessKind`, `HarnessDescriptor`, `SpawnWorkerInput`, `WorkerRuntimeIds`.
-- `local-shell/index.ts`, `herdr-shell/index.ts` — descriptors wrapping the two shipped runtimes (config only; the real PTY/herdr spawn stays in the Electron runtime).
-- `registry.ts` — `HARNESS_DESCRIPTORS`, `resolveHarnessKind(runtimeTarget)`.
+- `local-shell/index.ts`, `herdr-shell/index.ts` descriptors; `registry.ts`
+  `HARNESS_DESCRIPTORS` + `resolveHarnessKind`. The Kernel seeds the `harnesses`
+  table from these descriptors and references harness ids — never execution code.
 
-Goal 6A ships **configuration/contract only**. The full `WorkerHarness` execution
-interface (spawn/send/readState/collectReceipts/stop) and Pi/Codex/Claude-code
-adapters remain later Goal 6 work. The Kernel seeds the `harnesses` table from
-`HARNESS_DESCRIPTORS` and references harness ids — it never imports execution code.
+### Built (Goal 6 — full WorkerHarness contract)
+
+- `types.ts` — full `WorkerHarness` (spawn/send/readState/collectReceipts/stop),
+  `SpawnWorkerInput` (role/harness/model + permissions/skills/env/cwd/activation,
+  all separate), `WorkerHandle`, `WorkerMessage`, `PartialStateCard`,
+  `ReceiptDraft`, and `HarnessRuntimeOps` — the single injected runtime seam.
+- `shell-harness.ts` — `createShellHarness(kind, ops)`: one implementation of the
+  contract for both shell kinds, parameterized by kind; differences live in ops.
+- `local-shell/index.ts`, `herdr-shell/index.ts` — `createLocalShellHarness(ops)`
+  / `createHerdrShellHarness(ops)` factories over the shared impl.
+- `registry.ts` — `createHarness(kind, ops)` builds a live adapter; throws for
+  unknown/deferred kinds.
+
+Adapters import NO Electron/renderer code: the live ops wrap the approved shell
+role-spawn path (gated by `kernel.worker.spawn`), PTY/herdr send, and Kernel
+queries/commands; tests inject fakes (see `scripts/harness-interface-smoke.ts`).
+`readState` reads the Kernel State Card (never log scraping); `collectReceipts`
+returns drafts the caller posts via `kernel.receipt.post`.
+
+**Pi is deferred.** A stable, approved Pi programmatic spawn/send/read contract
+is not available in this increment, so `pi` is NOT registered (no `src/harness/pi`).
+Adding it later must not make Pi mandatory for the core app. Codex/Claude-code
+adapters remain out of scope until their local contracts are stable.
 
 ## Authority Rules
 
