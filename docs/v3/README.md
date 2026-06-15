@@ -42,15 +42,14 @@ Installed:
 
 ## Current Plan State
 
-Goals 0-5A are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens Conductor through the shell command palette, and the read-only panel live-refreshes from Kernel state after tile spawn.
+Goals 0-6A are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens Conductor through the shell command palette, and the read-only panel live-refreshes from Kernel state after tile spawn. Goal 6A verified Kernel-owned worker spawn/status identity and shell runtime gating before PTY/herdr start.
 
 The back half has been refined:
 
 ```text
-Goal 6A - Worker Spawn Reconciliation and Minimal Harness Registry
 Goal 5C - Conductor Native Actions
 Goal 5D - Conductor Loop
 Goal 6 - Harness Interface and First Worker Adapters
 ```
 
-`WORKER_RECONCILIATION.md` is binding before Conductor spawn/assign actions. See `BUILD_PLAN_V3.md` for current scope. Do not start the next goal until the operator approves.
+`WORKER_RECONCILIATION.md` remains binding for worker spawn/status behavior. See `BUILD_PLAN_V3.md` for current scope. Do not start the next goal until the operator approves.
