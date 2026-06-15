@@ -31,6 +31,7 @@
 		"smoke:conductor-actions": "bun scripts/conductor-actions-smoke.ts",
 		"smoke:conductor-loop": "bun scripts/conductor-loop-smoke.ts",
 		"smoke:workflow-region": "bun scripts/workflow-region-smoke.ts",
+		"smoke:vault-export": "bun scripts/vault-export-smoke.ts",
 		"smoke:worker-harness": "bun scripts/worker-harness-smoke.ts",
 		"smoke:harness-interface": "bun scripts/harness-interface-smoke.ts",
 		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",

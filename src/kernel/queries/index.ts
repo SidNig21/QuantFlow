@@ -1,7 +1,12 @@
 import { getKernelDb } from '../database';
 import type { TaskStatus } from '../schema/types';
 import { queryTaskList as taskList, queryTaskGet as taskGet, type TaskSnapshot } from '../tasks/index';
-import { queryReceiptList as receiptList, type ReceiptSnapshot } from '../receipts/index';
+import {
+  queryReceiptList as receiptList,
+  queryArtifactList as artifactList,
+  type ReceiptSnapshot,
+  type ArtifactSnapshot,
+} from '../receipts/index';
 import {
   queryStateCardList as stateCardList,
   queryStateCardGet as stateCardGet,
@@ -138,6 +143,12 @@ export function queryReceiptList(params: {
 } = {}): ReceiptSnapshot[] {
   return receiptList(getKernelDb(), params);
 }
+
+export function queryArtifactList(params: { workflowId?: string; taskId?: string } = {}): ArtifactSnapshot[] {
+  return artifactList(getKernelDb(), params);
+}
+
+export type { ArtifactSnapshot };
 
 export function queryStateCardList(params: { workflowId?: string } = {}): StateCardSnapshot[] {
   return stateCardList(getKernelDb(), params);

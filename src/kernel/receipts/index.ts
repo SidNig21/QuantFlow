@@ -229,6 +229,71 @@ export function queryReceiptList(
   return rows.map(rowToReceipt);
 }
 
+// ---------------------------------------------------------------------------
+// Artifact queries (Goal 8 vault export reads these; artifacts are owned here)
+// ---------------------------------------------------------------------------
+
+export interface ArtifactSnapshot {
+  id: string;
+  workflowId: string | null;
+  taskId: string | null;
+  workerId: string | null;
+  tileId: string | null;
+  receiptId: string | null;
+  kind: string;
+  uri: string | null;
+  summary: string | null;
+  contentHash: string | null;
+  mediaType: string | null;
+  sizeBytes: number | null;
+  createdAt: number;
+  metadata: Record<string, unknown>;
+}
+
+function rowToArtifact(r: Record<string, unknown>): ArtifactSnapshot {
+  return {
+    id: r['id'] as string,
+    workflowId: (r['workflow_id'] as string | null) ?? null,
+    taskId: (r['task_id'] as string | null) ?? null,
+    workerId: (r['worker_id'] as string | null) ?? null,
+    tileId: (r['tile_id'] as string | null) ?? null,
+    receiptId: (r['receipt_id'] as string | null) ?? null,
+    kind: r['kind'] as string,
+    uri: (r['uri'] as string | null) ?? null,
+    summary: (r['summary'] as string | null) ?? null,
+    contentHash: (r['content_hash'] as string | null) ?? null,
+    mediaType: (r['media_type'] as string | null) ?? null,
+    sizeBytes: (r['size_bytes'] as number | null) ?? null,
+    createdAt: r['created_at'] as number,
+    metadata: safeJsonObject((r['metadata_json'] as string) ?? '{}'),
+  };
+}
+
+/**
+ * Artifacts for a workflow or task, oldest first (deterministic: created_at then
+ * rowid). Read-only; the vault exporter consumes this.
+ */
+export function queryArtifactList(
+  db: KernelDB,
+  params: { workflowId?: string; taskId?: string } = {},
+): ArtifactSnapshot[] {
+  let rows: Record<string, unknown>[];
+  if (params.taskId) {
+    rows = db
+      .prepare('SELECT * FROM artifacts WHERE task_id = ? ORDER BY created_at ASC, rowid ASC')
+      .all(params.taskId) as Record<string, unknown>[];
+  } else if (params.workflowId) {
+    rows = db
+      .prepare('SELECT * FROM artifacts WHERE workflow_id = ? ORDER BY created_at ASC, rowid ASC')
+      .all(params.workflowId) as Record<string, unknown>[];
+  } else {
+    rows = db
+      .prepare('SELECT * FROM artifacts ORDER BY created_at ASC, rowid ASC')
+      .all() as Record<string, unknown>[];
+  }
+  return rows.map(rowToArtifact);
+}
+
 function safeJsonArray(s: string): unknown[] {
   try {
     const v = JSON.parse(s);

@@ -9,6 +9,25 @@ The vault integration is the knowledge mirror layer for QuantFlow v3.
 - Export templates and frontmatter schemas.
 - Vault path resolution (mapping Kernel IDs to vault note paths).
 
+### Implemented (Goal 8)
+
+Three layers, kept separate so formatting stays pure and testable:
+
+- `index.ts` — `collectVaultExport(db, workflowId)` (Kernel read → bundle),
+  `renderVaultExport(bundle)` (pure → `VaultExportFile[]`),
+  `writeVaultExports(files, outDir, ops, join)` (thin, injectable fs boundary),
+  and the `exportWorkflowToVault` convenience. `types.ts` defines the bundle +
+  export types (Kernel snapshots imported type-only).
+- `okf/frontmatter.ts` — deterministic YAML frontmatter + ISO/cell/one-line
+  helpers. No clock: timestamps are Kernel-derived so exports are byte-stable.
+- `exporters/` — pure formatters: `workflow-summary`, `task-summary`,
+  `artifact-index`, `decision-log`, `receipt-chain`, `state-card-snapshot`,
+  plus `shared.ts` (receipt classification). 
+- Spec: `docs/v3/VAULT_OKF_SPEC.md`. Proof: `bun run smoke:vault-export`.
+
+The exporter reads the Kernel only; it does **not** read from, depend on, or
+extend the legacy Envoy Obsidian mirror.
+
 ## Authority Rules
 
 ```text
