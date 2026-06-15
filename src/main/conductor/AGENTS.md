@@ -4,7 +4,7 @@ The Conductor is the native in-process planner for QuantFlow v3.
 
 ## What This Subtree Owns
 
-- Conductor planning loop (Goal 5D — not yet built).
+- Conductor loop (Goal 5D — built; see below).
 - Native Kernel tool bindings used by the Conductor.
 - Conductor prompt templates.
 - Model provider abstraction (routes to Cloudflare AI Gateway, OpenRouter, direct API, local, etc.).
@@ -16,7 +16,20 @@ The Conductor is the native in-process planner for QuantFlow v3.
 - `conductor-tools-readonly.ts` — in-process native tool surface (read tools + `postPlanningReceipt` + `focusTile` nav + `requestHumanApproval`). No spawn/assign/verify/block tools exist until Goal 5C.
 - `model-provider.ts` — `ConductorModelProvider` interface + deterministic, no-network `manualModelProvider`. Real MiniMax/OpenRouter providers plug in at Goal 5C+.
 - `prompts/planning.ts` — planning prompt contract.
-- `conductor-ipc.ts` — `conductor:read-view` / `conductor:run` / `conductor:action` IPC to the renderer tile.
+- `conductor-ipc.ts` — `conductor:read-view` / `conductor:run` / `conductor:action` / `conductor:loop-step` IPC to the renderer tile.
+
+### Built (Goal 5D — approval-gated loop)
+
+- `conductor-planner.ts` — `proposeNextAction(context)`: deterministic, no-memory
+  policy → one `ActionProposal` (or pause). Flags high-risk actions
+  (spawn_role/verify_task/reject_task/block_task) for approval; pauses on
+  blockers/ambiguity.
+- `conductor-loop.ts` — `createConductorLoop(deps).step({approve,override})`:
+  read context → propose → approval gate → execute one action via the 5C/6
+  seams → decision receipt → pause/continue. STATELESS (reads the Kernel each
+  step; no hidden memory). Default is operator-advanced, not autonomous; only a
+  low-risk success reports `canContinue`. Approve/deny/pause paths each post a
+  planning receipt (metadata.phase) so every decision is provable.
 
 ### Built (Goal 5C — single-step operator-triggered actions)
 

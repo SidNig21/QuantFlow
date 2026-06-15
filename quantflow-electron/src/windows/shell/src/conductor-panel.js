@@ -36,6 +36,11 @@ export function createConductorPanel() {
       <button data-act="verify" type="button">Verify</button>
       <button data-act="ready" type="button">Mark ready</button>
     </div>
+    <div class="cdr-loop-bar" aria-label="Conductor loop (approval-gated)">
+      <button data-loop="step" type="button">Loop step</button>
+      <button data-loop="approve" type="button" disabled>Approve</button>
+      <button data-loop="deny" type="button" disabled>Deny</button>
+    </div>
     <div class="cdr-foot"></div>
   `;
   document.body.appendChild(el);
@@ -182,6 +187,31 @@ export function createConductorPanel() {
   for (const btn of el.querySelectorAll(".cdr-action-bar button")) {
     btn.addEventListener("click", () => void actionHandlers[btn.dataset.act]?.());
   }
+
+  // -- Goal 5D: approval-gated loop controls --
+  const approveBtn = el.querySelector('[data-loop="approve"]');
+  const denyBtn = el.querySelector('[data-loop="deny"]');
+
+  async function loopStep(approve) {
+    if (!window.conductorApi?.loopStep) { foot.textContent = "Loop API unavailable."; return; }
+    foot.textContent = approve === undefined ? "Loop step…" : (approve ? "Approving…" : "Denying…");
+    try {
+      const r = await window.conductorApi.loopStep(approve === undefined ? {} : { approve });
+      const what = r?.proposal?.action ?? "pause";
+      foot.textContent = `[${r?.status}] ${what} — ${r?.proposal?.rationale ?? ""}`;
+      // Approve/Deny only enabled while a high-risk proposal awaits approval.
+      const awaiting = r?.status === "awaiting-approval";
+      approveBtn.disabled = !awaiting;
+      denyBtn.disabled = !awaiting;
+    } catch (err) {
+      foot.textContent = `Loop step failed: ${err?.message || err}`;
+    }
+    await refresh();
+  }
+
+  el.querySelector('[data-loop="step"]').addEventListener("click", () => void loopStep(undefined));
+  approveBtn.addEventListener("click", () => void loopStep(true));
+  denyBtn.addEventListener("click", () => void loopStep(false));
 
   function show() {
     visible = true;

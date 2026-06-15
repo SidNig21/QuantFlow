@@ -2283,6 +2283,31 @@ html.platform-win #panel-viewer::before {
 	background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+.cdr-loop-bar {
+	display: flex;
+	gap: 6px;
+	padding: 0 10px 8px;
+}
+
+.cdr-loop-bar button {
+	font-size: 11px;
+	padding: 4px 8px;
+	border-radius: 5px;
+	border: 1px solid var(--tile-border);
+	background: transparent;
+	color: var(--fg);
+	cursor: pointer;
+}
+
+.cdr-loop-bar button:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.cdr-loop-bar button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
 .cdr-foot {
 	padding: 6px 10px;
 	font-size: 10px;

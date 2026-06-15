@@ -138,6 +138,9 @@ function conductorPlan(db: KernelDB, payload: Record<string, unknown>): CommandR
         nextAction: payload['nextAction'] ?? null,
         toolCalls: payload['toolCalls'] ?? null,
         requestApproval: payload['requestApproval'] === true,
+        // Goal 5D loop decision context (proposed/executed/denied/paused/…).
+        phase: payload['phase'] ?? null,
+        proposedAction: payload['proposedAction'] ?? null,
         source: 'conductor',
       },
     });
