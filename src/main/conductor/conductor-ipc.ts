@@ -11,6 +11,7 @@
 
 import { ipcMain } from 'electron';
 import { readConductorView, runConductorPlan } from './conductor-reader';
+import { createConductorActions } from './conductor-actions';
 
 export function registerConductorIpc(): void {
   ipcMain.handle(
@@ -23,5 +24,13 @@ export function registerConductorIpc(): void {
     'conductor:run',
     async (_event, params: { workflowId?: string } = {}) =>
       runConductorPlan(params?.workflowId),
+  );
+
+  // Goal 5C: operator-triggered single Conductor action (one at a time).
+  const actions = createConductorActions();
+  ipcMain.handle(
+    'conductor:action',
+    async (_event, payload: { action: string; args?: Record<string, unknown> } = { action: '' }) =>
+      actions.runAction(payload?.action, payload?.args ?? {}),
   );
 }

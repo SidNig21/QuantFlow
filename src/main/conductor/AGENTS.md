@@ -16,7 +16,18 @@ The Conductor is the native in-process planner for QuantFlow v3.
 - `conductor-tools-readonly.ts` — in-process native tool surface (read tools + `postPlanningReceipt` + `focusTile` nav + `requestHumanApproval`). No spawn/assign/verify/block tools exist until Goal 5C.
 - `model-provider.ts` — `ConductorModelProvider` interface + deterministic, no-network `manualModelProvider`. Real MiniMax/OpenRouter providers plug in at Goal 5C+.
 - `prompts/planning.ts` — planning prompt contract.
-- `conductor-ipc.ts` — `conductor:read-view` / `conductor:run` IPC to the renderer tile.
+- `conductor-ipc.ts` — `conductor:read-view` / `conductor:run` / `conductor:action` IPC to the renderer tile.
+
+### Built (Goal 5C — single-step operator-triggered actions)
+
+- `conductor-actions.ts` — `createConductorActions(dispatch)` exposing thin native
+  bindings over Kernel authority: `create_task`/`assign_task`(claim+start)/
+  `submit_task`/`verify_task`/`reject_task`/`block_task` → Kernel task commands;
+  `spawn_role` → `kernel.worker.spawn` (Goal 6A gate); `connect_tiles` →
+  `kernel.connection.create`. No raw `complete_task` — completion only via the
+  verified `verify_task` path. `dispatch` is injectable for testing.
+- The conductor panel exposes one-action-at-a-time buttons; there is no
+  autonomous loop (that is Goal 5D).
 
 ## Authority Rules
 
@@ -44,16 +55,19 @@ get_canvas_snapshot, get_workflow_snapshot, get_state_cards, get_task_list,
 get_receipt_chain, post_receipt (planning only), focus_tile, request_human_approval
 ```
 
-`post_receipt` is limited to `planning` receipts. Mutating tools below are
-deferred — they must NOT be added before Goal 5C. Goal 6A is complete, so any
-future spawn tool must use the approved `kernel.worker.spawn` authority gate.
+`post_receipt` is limited to `planning` receipts.
 
-## Full Native Tool Surface (Goal 5C+, not yet)
+## Native Tool Surface — Goal 5C (single-step actions, built)
 
 ```text
 create_task, assign_task, submit_task, verify_task, reject_task, block_task,
 spawn_role, connect_tiles
 ```
+
+Operator-triggered one at a time; thin bindings over Kernel authority (task
+commands, `kernel.worker.spawn`, `kernel.connection.create`). No autonomous loop
+(Goal 5D), no raw `complete_task`, no generic harness send/read/collectReceipts
+(Goal 6).
 
 ## Read Order Before Editing This Subtree
 

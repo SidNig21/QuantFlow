@@ -582,4 +582,7 @@ contextBridge.exposeInMainWorld("conductorApi", {
     ipcRenderer.invoke("conductor:read-view", params ?? {}),
   run: (params?: { workflowId?: string }) =>
     ipcRenderer.invoke("conductor:run", params ?? {}),
+  // Goal 5C: operator triggers one Conductor action at a time.
+  action: (action: string, args?: Record<string, unknown>) =>
+    ipcRenderer.invoke("conductor:action", { action, args: args ?? {} }),
 });

@@ -19,7 +19,7 @@ export function createConductorPanel() {
   el.innerHTML = `
     <div class="cdr-header">
       <span class="cdr-title">Conductor</span>
-      <span class="cdr-mode">read-only</span>
+      <span class="cdr-mode">single-step</span>
       <div class="cdr-actions">
         <button class="cdr-run" type="button" title="Generate plan + post planning receipt">Generate plan</button>
         <button class="cdr-refresh" type="button" title="Refresh from Kernel">Refresh</button>
@@ -28,6 +28,14 @@ export function createConductorPanel() {
     </div>
     <div class="cdr-workflow"></div>
     <div class="cdr-body"></div>
+    <div class="cdr-action-bar" aria-label="Conductor actions (one at a time)">
+      <button data-act="create-task" type="button">Create task</button>
+      <button data-act="spawn" type="button">Spawn worker</button>
+      <button data-act="assign" type="button">Assign next</button>
+      <button data-act="submit" type="button">Submit</button>
+      <button data-act="verify" type="button">Verify</button>
+      <button data-act="ready" type="button">Mark ready</button>
+    </div>
     <div class="cdr-foot"></div>
   `;
   document.body.appendChild(el);
@@ -96,6 +104,78 @@ export function createConductorPanel() {
   el.querySelector(".cdr-run").addEventListener("click", () => void run());
   el.querySelector(".cdr-refresh").addEventListener("click", () => void refresh());
   el.querySelector(".cdr-close").addEventListener("click", () => hide());
+
+  // -- Goal 5C: operator-triggered single-step actions --
+  async function kernelContext() {
+    return (await window.kernelApi?.sendQuery?.("kernel.conductor.context", {})) ?? null;
+  }
+
+  async function doAction(action, args, label) {
+    if (!window.conductorApi?.action) return;
+    foot.textContent = `${label}…`;
+    try {
+      const result = await window.conductorApi.action(action, args);
+      foot.textContent = result?.ok
+        ? `${label} ok${result.id ? ` (${result.id})` : ""}`
+        : `${label} rejected: ${result?.error ?? "unknown"}`;
+    } catch (err) {
+      foot.textContent = `${label} failed: ${err?.message || err}`;
+    }
+    await refresh();
+  }
+
+  const firstTask = (ctx, ...statuses) =>
+    ctx?.tasks?.find((t) => statuses.includes(t.status)) ?? null;
+  const firstWorkerTile = (ctx) =>
+    ctx?.tiles?.find((t) => t.tileKind === "worker") ?? ctx?.tiles?.[0] ?? null;
+
+  const actionHandlers = {
+    "create-task": async () => {
+      const title = window.prompt?.("New task title:");
+      if (!title) return;
+      const ctx = await kernelContext();
+      await doAction("create_task", {
+        workflowId: ctx?.workflow?.id ?? null,
+        title,
+        objective: title,
+      }, "Create task");
+    },
+    spawn: async () => {
+      const ctx = await kernelContext();
+      const tile = firstWorkerTile(ctx);
+      if (!tile) { foot.textContent = "Spawn: no worker tile to attach."; return; }
+      await doAction("spawn_role", {
+        tileId: tile.id,
+        workflowId: ctx?.workflow?.id ?? null,
+        roleName: tile.displayName,
+        runtimeTarget: "local-shell",
+      }, "Spawn worker");
+    },
+    assign: async () => {
+      const ctx = await kernelContext();
+      const task = firstTask(ctx, "open");
+      const tile = firstWorkerTile(ctx);
+      if (!task || !tile) { foot.textContent = "Assign: need an open task and a tile."; return; }
+      await doAction("assign_task", { taskId: task.id, tileId: tile.id }, "Assign task");
+    },
+    submit: async () => {
+      const ctx = await kernelContext();
+      const task = firstTask(ctx, "working");
+      if (!task) { foot.textContent = "Submit: no working task."; return; }
+      await doAction("submit_task", { taskId: task.id, summary: "submitted via Conductor" }, "Submit task");
+    },
+    verify: async () => {
+      const ctx = await kernelContext();
+      const task = firstTask(ctx, "submitted", "verifying");
+      if (!task) { foot.textContent = "Verify: no submitted task."; return; }
+      await doAction("verify_task", { taskId: task.id, verdict: "pass", operatorOverride: true }, "Verify task");
+    },
+    ready: () => run(),
+  };
+
+  for (const btn of el.querySelectorAll(".cdr-action-bar button")) {
+    btn.addEventListener("click", () => void actionHandlers[btn.dataset.act]?.());
+  }
 
   function show() {
     visible = true;
