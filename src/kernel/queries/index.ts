@@ -28,6 +28,11 @@ import {
   queryWorkflowRegionList as workflowRegionList,
   type WorkflowRegion,
 } from '../workflows/index';
+import {
+  queryEvaluationList as evalList,
+  queryEvaluationGet as evalGet,
+  type EvaluationRowSnapshot,
+} from '../evals/index';
 
 export interface TileSnapshot {
   id: string;
@@ -198,3 +203,19 @@ export function queryWorkflowRegionList(): WorkflowRegion[] {
 }
 
 export type { WorkflowRegion };
+
+// ---------------------------------------------------------------------------
+// Evaluation queries (Goal 9) — read-only derived analysis
+// ---------------------------------------------------------------------------
+
+export function queryEvaluationList(
+  params: { workflowId?: string; taskId?: string; workerId?: string; receiptId?: string; evalId?: string } = {},
+): EvaluationRowSnapshot[] {
+  return evalList(getKernelDb(), params);
+}
+
+export function queryEvaluationGet(evalId: string): EvaluationRowSnapshot[] {
+  return evalGet(getKernelDb(), evalId);
+}
+
+export type { EvaluationRowSnapshot };

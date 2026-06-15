@@ -376,6 +376,34 @@ Audit log of Kernel operation requests. Append-only in practice.
 
 ---
 
+### `evaluations` (migration 002, Goal 9)
+
+Derived analysis of Kernel evidence — **not truth, not a receipt.** One row per
+scored rubric dimension; rows sharing `eval_id` form one evaluation of one unit.
+Evals never mutate other Kernel state and no runtime path reads them to decide
+task/workflow state. See `docs/v3/EVALS_SPEC.md`.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | TEXT PK | UUID (one rubric dimension) |
+| `eval_id` | TEXT | Groups the dimensions of one evaluation |
+| `eval_type` | TEXT | `workflow_eval`/`task_eval`/`worker_eval`/`conductor_decision_eval`/`verification_eval` |
+| `workflow_id` | TEXT FK → workflows | Nullable |
+| `task_id` | TEXT FK → tasks | Nullable |
+| `worker_id` | TEXT FK → worker_instances | Nullable |
+| `receipt_id` | TEXT FK → receipts | Nullable |
+| `dimension` | TEXT | Rubric dimension (EVALS_SPEC §4) |
+| `score` | INTEGER | 0–4, NULL when `not_applicable` |
+| `applicable` | INTEGER | 1 applicable, 0 `not_applicable` (distinct from score 0) |
+| `confidence` | REAL | 0.0–1.0, reported separately from score |
+| `evidence_refs_json` | TEXT | Cited Kernel ids |
+| `rationale` | TEXT | References evidence ids |
+| `limitations` | TEXT | Nullable |
+| `created_at` | INTEGER | ms since epoch |
+| `metadata_json` | TEXT | `{}` |
+
+---
+
 ## Relationships Overview
 
 ```text

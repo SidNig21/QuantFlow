@@ -9,6 +9,7 @@ import { handleReceiptCommand, handleArtifactCommand } from '../receipts/index';
 import { handleStateCardCommand } from '../state-cards/index';
 import { handleConductorCommand } from '../conductor/index';
 import { handleWorkerCommand } from './worker-commands';
+import { handleEvalCommand } from '../evals/index';
 export type { CommandResult } from './types';
 
 export async function dispatchKernelCommand(
@@ -44,6 +45,8 @@ export async function dispatchKernelCommand(
       result = handleConductorCommand(db, type as string, payload);
     } else if ((type as string).startsWith('kernel.worker.')) {
       result = handleWorkerCommand(db, type as string, payload);
+    } else if ((type as string).startsWith('kernel.eval.')) {
+      result = handleEvalCommand(db, type as string, payload);
     } else {
       result = { ok: false, error: `Unknown command type: ${type}` };
     }
