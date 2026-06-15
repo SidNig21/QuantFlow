@@ -13,7 +13,7 @@ import { readConductorView, runConductorPlan } from './conductor-reader';
 import { createConductorActions, type ConductorSpawnRole } from './conductor-actions';
 import { createConductorLoop, proposeNextAction } from './conductor-loop';
 import { dispatchKernelCommand } from '../../kernel/commands/index';
-import { queryConductorContext } from '../../kernel/queries/index';
+import { queryConductorContext, queryReceiptList } from '../../kernel/queries/index';
 
 export interface ConductorIpcOptions {
   /** Approved shell role-spawn binding (starts runtime; gated by kernel.worker.spawn). */
@@ -49,7 +49,15 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
     readContext: (workflowId) => queryConductorContext(workflowId ? { workflowId } : {}),
     propose: proposeNextAction,
     runAction: (action, args) => actions.runAction(action, args),
-    postDecision: ({ workflowId, summary, phase, proposal, requestApproval }) =>
+    hasPendingApproval: ({ workflowId, proposalToken }) => {
+      const receipts = queryReceiptList(workflowId ? { workflowId, limit: 100 } : { limit: 100 });
+      const latestForToken = receipts.find(
+        (r) => r.type === 'planning' && r.metadata?.['proposalToken'] === proposalToken,
+      );
+      return latestForToken?.metadata?.['phase'] === 'awaiting-approval'
+        && latestForToken?.metadata?.['requestApproval'] === true;
+    },
+    postDecision: ({ workflowId, summary, phase, proposal, proposalToken, requestApproval }) =>
       dispatchKernelCommand(
         'kernel.conductor.plan',
         {
@@ -57,6 +65,7 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
           summary,
           phase,
           proposedAction: proposal.kind === 'action' ? proposal.action : 'pause',
+          proposalToken: proposalToken ?? null,
           nextAction: proposal.rationale,
           requestApproval: requestApproval === true,
         },
@@ -65,6 +74,9 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
   });
   ipcMain.handle(
     'conductor:loop-step',
-    async (_event, input: { workflowId?: string; approve?: boolean } = {}) => loop.step(input),
+    async (
+      _event,
+      input: { workflowId?: string; approve?: boolean; proposalToken?: string } = {},
+    ) => loop.step(input),
   );
 }

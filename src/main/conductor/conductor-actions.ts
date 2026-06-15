@@ -8,7 +8,8 @@
  *
  *   create_task / assign_task / submit_task / verify_task / reject_task /
  *   block_task   -> Kernel task commands (which post the canonical receipts)
- *   spawn_role    -> kernel.worker.spawn (the approved Goal 6A authority gate)
+ *   spawn_role    -> the approved shell role-spawn path (deps.spawnRole), which
+ *                    starts the runtime and is itself gated by kernel.worker.spawn
  *   connect_tiles -> kernel.connection.create
  *
  * assign_task = claim + start: it both assigns the task to a worker/tile and

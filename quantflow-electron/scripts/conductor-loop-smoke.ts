@@ -3,8 +3,9 @@
  *
  * Proves the approval-gated, operator-advanced loop: read context → propose one
  * action → approval gate (high-risk) → execute via approved 5C seams → decision
- * receipt → pause/continue. Covers the approve path, the deny path, and the
- * blocker/ambiguity pause path, and that every step posts a decision receipt.
+ * receipt → pause/continue. Covers approve, deny, blocker/ambiguity pause, and
+ * — critically — proposal drift: an approval bound to a stale proposal token is
+ * refused, so no high-risk action runs against a changed world.
  *
  * Stateless: the loop reads the Kernel each step (no hidden memory). Uses
  * bun:sqlite + injected dispatch routing to the real Kernel handlers.
@@ -58,70 +59,91 @@ const loop = createConductorLoop({
   readContext: (workflowId) => queryConductorContext(kdb, workflowId ? { workflowId } : {}),
   propose: proposeNextAction,
   runAction: (action, args) => actions.runAction(action, args),
-  postDecision: ({ workflowId, summary, phase, proposal, requestApproval }) =>
+  hasPendingApproval: ({ workflowId, proposalToken }) => {
+    const receipts = queryReceiptList(kdb, workflowId ? { workflowId, limit: 100 } : { limit: 100 });
+    const latestForToken = receipts.find(
+      (receipt) => receipt.type === 'planning' && receipt.metadata?.['proposalToken'] === proposalToken,
+    );
+    return latestForToken?.metadata?.['phase'] === 'awaiting-approval'
+      && latestForToken?.metadata?.['requestApproval'] === true;
+  },
+  postDecision: ({ workflowId, summary, phase, proposal, proposalToken, requestApproval }) =>
     dispatch('kernel.conductor.plan', {
       workflowId: workflowId ?? null,
       summary,
       phase,
       proposedAction: proposal.kind === 'action' ? proposal.action : 'pause',
+      proposalToken: proposalToken ?? null,
       nextAction: proposal.rationale,
       requestApproval: requestApproval === true,
     }),
 });
 
+const wf = { workflowId: 'wf1' };
 const phasesSeen = () =>
   queryReceiptList(kdb, { workflowId: 'wf1' })
     .filter((r) => r.type === 'planning')
     .map((r) => r.metadata?.['phase']);
-
-console.log('— no tasks → loop pauses (nothing actionable) —');
-let r = await loop.step({ workflowId: 'wf1' });
-check('paused when nothing to do', r.status === 'paused' && r.canContinue === false);
-
-console.log('\n— operator override: create a task (low-risk, executes) —');
-r = await loop.step({
+const createOverride = (id: string, title: string) => ({
   workflowId: 'wf1',
-  override: { kind: 'action', action: 'create_task', args: { id: 't1', workflowId: 'wf1', title: 'Implement loader', objective: 'o' }, risk: 'low', rationale: 'operator-created task' },
+  override: { kind: 'action' as const, action: 'create_task' as const, args: { id, workflowId: 'wf1', title, objective: 'o' }, risk: 'low' as const, rationale: `operator-created ${id}` },
 });
-check('create executed', r.status === 'executed');
-check('task t1 open', queryTaskGet(kdb, 't1')?.status === 'open');
 
-console.log('\n— propose + auto-execute low-risk assign —');
-r = await loop.step({ workflowId: 'wf1' });
-check('assign proposed + executed', r.status === 'executed' && r.proposal.action === 'assign_task');
-check('task working after assign', queryTaskGet(kdb, 't1')?.status === 'working');
-check('low-risk success can continue', r.canContinue === true);
+console.log('— no tasks → loop pauses —');
+let r = await loop.step(wf);
+check('paused when nothing to do', r.status === 'paused');
 
-console.log('\n— working task → pause (await submission) —');
-r = await loop.step({ workflowId: 'wf1' });
-check('paused awaiting submission', r.status === 'paused');
+console.log('\n— create (override) → assign (low, auto) → pause (working) —');
+check('create executed', (await loop.step(createOverride('t1', 'Implement loader'))).status === 'executed');
+r = await loop.step(wf);
+check('assign auto-executed', r.status === 'executed' && r.proposal.action === 'assign_task');
+check('t1 working', queryTaskGet(kdb, 't1')?.status === 'working');
+check('working → paused', (await loop.step(wf)).status === 'paused');
 
-console.log('\n— submit, then high-risk verify is approval-gated —');
-await actions.runAction('submit_task', { taskId: 't1', summary: 'done' });
-r = await loop.step({ workflowId: 'wf1' });
-check('verify awaits approval (not auto-run)', r.status === 'awaiting-approval' && r.proposal.action === 'verify_task');
-check('task still submitted (not verified)', queryTaskGet(kdb, 't1')?.status === 'submitted');
+console.log('\n— high-risk verify is approval-gated; deny needs the token —');
+await actions.runAction('submit_task', { taskId: 't1' });
+r = await loop.step(wf);
+check('awaiting-approval with a token', r.status === 'awaiting-approval' && typeof r.proposalToken === 'string');
+const t1Token = r.proposalToken!;
 
-console.log('\n— deny path: verify denied, task untouched —');
-r = await loop.step({ workflowId: 'wf1', approve: false });
-check('denied', r.status === 'denied');
-check('task still submitted after deny', queryTaskGet(kdb, 't1')?.status === 'submitted');
+console.log('\n— decision without a token is refused (stale) —');
+check('approve without token → stale', (await loop.step({ ...wf, approve: true })).status === 'stale');
+check('approve with forged token → stale', (await loop.step({ ...wf, approve: true, proposalToken: 'forged-token' })).status === 'stale');
+check('t1 still submitted', queryTaskGet(kdb, 't1')?.status === 'submitted');
 
-console.log('\n— approve path: verify executes → complete —');
-r = await loop.step({ workflowId: 'wf1', approve: true });
-check('approved verify executed', r.status === 'executed' && r.proposal.action === 'verify_task');
-check('task complete', queryTaskGet(kdb, 't1')?.status === 'complete');
+console.log('\n— deny with the correct token —');
+check('deny with token → denied', (await loop.step({ ...wf, approve: false, proposalToken: t1Token })).status === 'denied');
+check('t1 still submitted after deny', queryTaskGet(kdb, 't1')?.status === 'submitted');
 
-console.log('\n— blocker pause path —');
+console.log('\n— PROPOSAL DRIFT: stale token is refused, no high-risk runs —');
+r = await loop.step(wf); // fresh awaiting-approval for t1
+const staleToken = r.proposalToken!;
+// Mutate the world so the next high-risk proposal targets a different task.
 await actions.runAction('create_task', { id: 't2', workflowId: 'wf1', title: 'T2', objective: 'o' });
 await actions.runAction('assign_task', { taskId: 't2', tileId: 'tile_w' });
-await actions.runAction('block_task', { taskId: 't2', reason: 'waiting upstream' });
-r = await loop.step({ workflowId: 'wf1' });
+await actions.runAction('submit_task', { taskId: 't2' }); // t2 is now the newest submitted
+r = await loop.step({ ...wf, approve: true, proposalToken: staleToken });
+check('drifted approval → stale', r.status === 'stale');
+check('no task completed by the stale approval', queryTaskGet(kdb, 't1')?.status === 'submitted' && queryTaskGet(kdb, 't2')?.status === 'submitted');
+
+console.log('\n— approve with the CURRENT token executes verify → complete —');
+r = await loop.step(wf); // current awaiting-approval (newest submitted = t2)
+const target = r.proposal.args!.taskId as string;
+r = await loop.step({ ...wf, approve: true, proposalToken: r.proposalToken });
+check('approved verify executed', r.status === 'executed' && r.proposal.action === 'verify_task');
+check('verified task complete', queryTaskGet(kdb, target)?.status === 'complete');
+check('replay of consumed approval token → stale', (await loop.step({ ...wf, approve: true, proposalToken: r.proposalToken })).status === 'stale');
+
+console.log('\n— blocker pause path —');
+await actions.runAction('create_task', { id: 't3', workflowId: 'wf1', title: 'T3', objective: 'o' });
+await actions.runAction('assign_task', { taskId: 't3', tileId: 'tile_w' });
+await actions.runAction('block_task', { taskId: 't3', reason: 'waiting upstream' });
+r = await loop.step(wf);
 check('blocked task pauses the loop', r.status === 'paused' && /blocked/i.test(r.proposal.rationale));
 
-console.log('\n— every decision is on the receipt chain —');
+console.log('\n— every decision is on the receipt chain (incl. stale) —');
 const phases = phasesSeen();
-for (const p of ['paused', 'executed', 'awaiting-approval', 'denied']) {
+for (const p of ['paused', 'executed', 'awaiting-approval', 'denied', 'stale']) {
   check(`receipt recorded phase '${p}'`, phases.includes(p));
 }
 

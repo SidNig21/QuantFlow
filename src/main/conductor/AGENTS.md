@@ -24,11 +24,14 @@ The Conductor is the native in-process planner for QuantFlow v3.
   policy → one `ActionProposal` (or pause). Flags high-risk actions
   (spawn_role/verify_task/reject_task/block_task) for approval; pauses on
   blockers/ambiguity.
-- `conductor-loop.ts` — `createConductorLoop(deps).step({approve,override})`:
+- `conductor-loop.ts` — `createConductorLoop(deps).step({approve,proposalToken,override})`:
   read context → propose → approval gate → execute one action via the 5C/6
   seams → decision receipt → pause/continue. STATELESS (reads the Kernel each
   step; no hidden memory). Default is operator-advanced, not autonomous; only a
-  low-risk success reports `canContinue`. Approve/deny/pause paths each post a
+  low-risk success reports `canContinue`. High-risk approvals are bound to the
+  exact proposal shown by a `proposalToken`; the latest Kernel planning receipt
+  for that token must still be `awaiting-approval`, or the loop returns `stale`
+  and runs no high-risk action. Approve/deny/pause/stale paths each post a
   planning receipt (metadata.phase) so every decision is provable.
 
 ### Built (Goal 5C — single-step operator-triggered actions)
@@ -42,8 +45,8 @@ The Conductor is the native in-process planner for QuantFlow v3.
   6A) — the Conductor never starts a runtime nor marks a Kernel worker "spawning"
   with no runtime behind it. No raw `complete_task` — completion only via the
   verified `verify_task` path. `dispatch` and `deps.spawnRole` are injectable.
-- The conductor panel exposes one-action-at-a-time buttons; there is no
-  autonomous loop (that is Goal 5D).
+- The conductor panel exposes one-action-at-a-time buttons; Goal 5D adds a
+  separate operator-advanced loop control with token-bound high-risk approval.
 
 ## Authority Rules
 
@@ -82,9 +85,9 @@ spawn_role, connect_tiles
 
 Operator-triggered one at a time; thin bindings over Kernel authority (task
 commands, `kernel.connection.create`) and the approved shell role-spawn path for
-`spawn_role` (runtime start, gated by `kernel.worker.spawn`). No autonomous loop
-(Goal 5D), no raw `complete_task`, no generic harness send/read/collectReceipts
-(Goal 6).
+`spawn_role` (runtime start, gated by `kernel.worker.spawn`). No raw
+`complete_task`; generic harness send/read/collectReceipts lives behind the Goal
+6 `WorkerHarness` seam.
 
 ## Read Order Before Editing This Subtree
 

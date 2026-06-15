@@ -191,16 +191,25 @@ export function createConductorPanel() {
   // -- Goal 5D: approval-gated loop controls --
   const approveBtn = el.querySelector('[data-loop="approve"]');
   const denyBtn = el.querySelector('[data-loop="deny"]');
+  // The token of the high-risk proposal currently awaiting approval. Approve/
+  // Deny send it back so the decision binds to the exact proposal shown; if the
+  // world drifted, the loop returns 'stale' and nothing high-risk runs.
+  let pendingToken = null;
 
   async function loopStep(approve) {
     if (!window.conductorApi?.loopStep) { foot.textContent = "Loop API unavailable."; return; }
     foot.textContent = approve === undefined ? "Loop step…" : (approve ? "Approving…" : "Denying…");
     try {
-      const r = await window.conductorApi.loopStep(approve === undefined ? {} : { approve });
+      const input = approve === undefined
+        ? {}
+        : { approve, ...(pendingToken ? { proposalToken: pendingToken } : {}) };
+      const r = await window.conductorApi.loopStep(input);
       const what = r?.proposal?.action ?? "pause";
       foot.textContent = `[${r?.status}] ${what} — ${r?.proposal?.rationale ?? ""}`;
-      // Approve/Deny only enabled while a high-risk proposal awaits approval.
+      // Approve/Deny only enabled while a high-risk proposal awaits approval;
+      // remember its token so the decision is bound to that exact proposal.
       const awaiting = r?.status === "awaiting-approval";
+      pendingToken = awaiting ? (r?.proposalToken ?? null) : null;
       approveBtn.disabled = !awaiting;
       denyBtn.disabled = !awaiting;
     } catch (err) {

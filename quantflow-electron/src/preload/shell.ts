@@ -585,7 +585,9 @@ contextBridge.exposeInMainWorld("conductorApi", {
   // Goal 5C: operator triggers one Conductor action at a time.
   action: (action: string, args?: Record<string, unknown>) =>
     ipcRenderer.invoke("conductor:action", { action, args: args ?? {} }),
-  // Goal 5D: advance the approval-gated loop by one step (approve high-risk).
-  loopStep: (input?: { workflowId?: string; approve?: boolean }) =>
+  // Goal 5D: advance the approval-gated loop by one step. approve/deny must
+  // carry the proposalToken from the awaiting-approval result (binds the
+  // decision to the exact proposal shown).
+  loopStep: (input?: { workflowId?: string; approve?: boolean; proposalToken?: string }) =>
     ipcRenderer.invoke("conductor:loop-step", input ?? {}),
 });
