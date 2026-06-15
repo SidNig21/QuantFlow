@@ -23,6 +23,7 @@ This section is the durable progress ledger for the v3 branch.
 | Goal 5C — Conductor Native Actions | Complete / approved | Claude | Codex | 2026-06-15 | Conductor now exposes single-step, operator-triggered native actions for task create/assign/submit/verify/reject/block, role spawn, and tile connection. Task actions route through Kernel task commands, `spawn_role` routes through the approved shell role-spawn path gated by `kernel.worker.spawn` with workflow context preserved, and no raw completion, MCP internal path, terminal_write handoff, Goal 5D loop, or Goal 6 harness send/read work was added. Smoke/regression tests and build pass. |
 | Goal 6 — Harness Interface and First Worker Adapters | Complete / approved | Claude | Codex | 2026-06-15 | WorkerHarness now exposes spawn/send/readState/collectReceipts/stop for local-shell and herdr-shell through Electron-free adapters, plus a live app-side HarnessRuntimeOps seam for Goal 5D. The live seam routes spawn through the approved shell role-spawn path, sends through PTY/herdr input, reads Kernel State Cards, avoids parallel receipt authority, and stops runtimes before `kernel.worker.stop`; focused live-ops tests, harness smokes, Goal 5C/6A regressions, MCP tests, and build pass. |
 | Goal 5D — Conductor Loop | Complete / approved | Claude + Codex fix pass | Codex | 2026-06-15 | Conductor now has an operator-advanced loop over the approved 5A read model, 5C native actions, and Goal 6 WorkerHarness seam. High-risk actions return an approval `proposalToken`; approve/deny must send that token, the latest Kernel planning receipt for the token must still be `awaiting-approval`, and stale/forged/replayed/drifted approvals run no high-risk action. Loop smokes, conductor/harness/task/state-card regressions, MCP tests, harness-ops test, and build pass. |
+| Goal 7 — Workflow Regions and Semantic Strings | Complete / approved | Claude | Codex | 2026-06-15 | Kernel-owned workflow regions now aggregate workflow tiles, task/receipt/blocker counts, blocked task ids, and semantic-string counts; live connections inherit workflow scope from same-workflow endpoint tiles; the canvas renders soft workflow boundaries with objective and blocked-task detail; semantic string type/label edits route through Kernel connection updates; product/design rails were added as docs-only UI guidance with Efecto parked as optional external sandboxing. Workflow-region smoke, focused shell tests, conductor/harness/task/state-card regressions, MCP tests, and build pass. |
 
 Completion rule:
 
@@ -2297,7 +2298,7 @@ Each tile flips to show its State Card.
 No raw terminal reading is required to understand the workflow.
 ```
 
-That foundation is now in place through Goal 5D. The next product proof is Goal 7 workflow regions and semantic strings, keeping canvas organization Kernel-backed without replacing the infinite canvas.
+That foundation is now in place through Goal 7. The next product proof is Goal 8 evidence and vault export, turning Kernel receipt chains into durable Obsidian knowledge without making the vault a source of truth.
 
 ---
 
