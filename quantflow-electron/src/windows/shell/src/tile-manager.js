@@ -856,6 +856,20 @@ export function createTileManager({
 				"tile_closed", { type: tile.type },
 			);
 			if (tile.type === "term" && tile.ptySessionId) {
+				// For herdr-backed tiles the terminal PTY is only a display
+				// bridge into the herdr pane. Killing the bridge alone leaves the
+				// pane/agent running (it stays in herdr's space list). Mirror the
+				// manual Ctrl+C: interrupt the agent through the PTY so the pane
+				// actually stops, unlink status tracking, then detach.
+				if (tile.runtimeTarget === "herdr-wsl") {
+					try {
+						window.shellApi.ptyWrite(tile.ptySessionId, "\x03");
+					} catch (err) {
+						console.warn("[herdr] interrupt-on-close failed:", err);
+					}
+					window.shellApi.herdrUnlinkPane?.(tile.id);
+					await new Promise((resolve) => setTimeout(resolve, 200));
+				}
 				window.shellApi.ptyKillSession(tile.ptySessionId);
 				window.shellApi.stringUnregisterTileSession?.(tile.id);
 				if (onTerminalTileClosed) {
