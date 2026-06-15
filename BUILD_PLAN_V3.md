@@ -22,6 +22,7 @@ This section is the durable progress ledger for the v3 branch.
 | Goal 6A — Worker Spawn Reconciliation and Minimal Harness Registry | Complete / approved | Claude | Codex | 2026-06-15 | Kernel now owns worker spawn/status identity through `worker_instances`, `kernel.worker.spawn/status_update/stop`, seeded local/herdr harness descriptors, runtime-id recording, State Card worker-status projection, and shell role spawn gating before PTY/herdr runtime start. Fix pass `dcc54dc` closes the worker.spawn rejection loophole; smoke, MCP tests, focused shell tests, and build pass. |
 | Goal 5C — Conductor Native Actions | Complete / approved | Claude | Codex | 2026-06-15 | Conductor now exposes single-step, operator-triggered native actions for task create/assign/submit/verify/reject/block, role spawn, and tile connection. Task actions route through Kernel task commands, `spawn_role` routes through the approved shell role-spawn path gated by `kernel.worker.spawn` with workflow context preserved, and no raw completion, MCP internal path, terminal_write handoff, Goal 5D loop, or Goal 6 harness send/read work was added. Smoke/regression tests and build pass. |
 | Goal 6 — Harness Interface and First Worker Adapters | Complete / approved | Claude | Codex | 2026-06-15 | WorkerHarness now exposes spawn/send/readState/collectReceipts/stop for local-shell and herdr-shell through Electron-free adapters, plus a live app-side HarnessRuntimeOps seam for Goal 5D. The live seam routes spawn through the approved shell role-spawn path, sends through PTY/herdr input, reads Kernel State Cards, avoids parallel receipt authority, and stops runtimes before `kernel.worker.stop`; focused live-ops tests, harness smokes, Goal 5C/6A regressions, MCP tests, and build pass. |
+| Goal 5D — Conductor Loop | Complete / approved | Claude + Codex fix pass | Codex | 2026-06-15 | Conductor now has an operator-advanced loop over the approved 5A read model, 5C native actions, and Goal 6 WorkerHarness seam. High-risk actions return an approval `proposalToken`; approve/deny must send that token, the latest Kernel planning receipt for the token must still be `awaiting-approval`, and stale/forged/replayed/drifted approvals run no high-risk action. Loop smokes, conductor/harness/task/state-card regressions, MCP tests, harness-ops test, and build pass. |
 
 Completion rule:
 
@@ -2296,7 +2297,7 @@ Each tile flips to show its State Card.
 No raw terminal reading is required to understand the workflow.
 ```
 
-That foundation is now in place through Goal 6. The next product proof is the approval-gated Conductor loop, using the stable WorkerHarness seam instead of terminal paste or role-specific runtime hacks.
+That foundation is now in place through Goal 5D. The next product proof is Goal 7 workflow regions and semantic strings, keeping canvas organization Kernel-backed without replacing the infinite canvas.
 
 ---
 
