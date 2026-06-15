@@ -357,7 +357,9 @@ function App() {
             <circle className="tile-empty-signal" cx="87" cy="33" r="4.2" />
           </svg>
           <strong>No tiles yet</strong>
-          <span>Spawn from the dock or press {PLATFORM === "darwin" ? "Cmd+K" : "Ctrl+K"}</span>
+          <span>
+            Spawn from the dock or press {PLATFORM === "darwin" ? "Cmd+K" : "Ctrl+K"} for commands
+          </span>
         </div>
       )}
       {entries.length > 0 && visibleEntries.length === 0 && (

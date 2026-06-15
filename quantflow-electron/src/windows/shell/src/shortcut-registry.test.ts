@@ -24,6 +24,10 @@ describe("shortcut registry", () => {
 			section: "Shortcuts",
 			subtitle: "Ctrl+,",
 		});
+		expect(shortcutToCommand(SHORTCUTS.find((shortcut) => shortcut.actionId === "sidebar-files")!, { platform: "win32" })).toMatchObject({
+			id: "shortcut:sidebar-files",
+			subtitle: "Ctrl+B / Ctrl+\\",
+		});
 	});
 
 	test("opens help on question mark outside editable targets", () => {

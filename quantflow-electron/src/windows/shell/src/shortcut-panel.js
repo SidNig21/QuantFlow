@@ -1,6 +1,6 @@
 import {
 	SHORTCUTS,
-	formatShortcutKeys,
+	formatShortcutChordList,
 } from "./shortcut-registry.js";
 
 function escapeHtml(value) {
@@ -29,7 +29,7 @@ export function renderShortcutPanel(shortcuts = SHORTCUTS, { platform = "linux" 
 			${group.items.map((item) => `
 				<div class="shortcut-panel-row">
 					<span>${escapeHtml(item.description)}</span>
-					<kbd>${escapeHtml(formatShortcutKeys(item.keys, { platform }))}</kbd>
+					<kbd>${escapeHtml(formatShortcutChordList(item, { platform }))}</kbd>
 				</div>
 			`).join("")}
 		</section>

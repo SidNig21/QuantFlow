@@ -29,6 +29,7 @@ import {
 } from "./config";
 import { registerIpcHandlers, setMainWindow } from "./ipc";
 import { registerCanvasRpc } from "./canvas-rpc";
+import { resolveShellShortcut } from "./shortcut-map";
 import { registerIntegrationsIpc } from "./integrations";
 import {
   registerMethod,
@@ -232,75 +233,11 @@ function sendShortcut(action: string): void {
   mainWindow?.webContents.send("shell:shortcut", action);
 }
 
-const cmdOrCtrl = (input: Electron.Input): boolean =>
-  input.meta || input.control;
-const shiftCmdOrCtrl = (input: Electron.Input): boolean =>
-  input.shift && (input.meta || input.control);
-const altCmdOrCtrl = (input: Electron.Input): boolean =>
-  input.alt && (input.meta || input.control);
-const ctrlOnly = (input: Electron.Input): boolean =>
-  input.control && !input.meta;
-const altOnly = (input: Electron.Input): boolean =>
-  input.alt && !input.meta && !input.control && !input.shift;
-const noModifier = (input: Electron.Input): boolean =>
-  !input.alt && !input.meta && !input.control && !input.shift;
-const shiftOnly = (input: Electron.Input): boolean =>
-  input.shift && !input.alt && !input.meta && !input.control;
-
-interface ShortcutEntry {
-  modifier: (input: Electron.Input) => boolean;
-  action: string;
-}
-
-const TOGGLE_SHORTCUTS: Record<string, ShortcutEntry[]> = {
-  KeyB: [
-    { modifier: altCmdOrCtrl, action: "toggle-agent" },
-    { modifier: cmdOrCtrl, action: "sidebar-files" },
-  ],
-  Backslash: [{ modifier: cmdOrCtrl, action: "sidebar-files" }],
-  Comma: [{ modifier: cmdOrCtrl, action: "toggle-settings" }],
-  KeyO: [{ modifier: shiftCmdOrCtrl, action: "add-workspace" }],
-  KeyF: [
-    { modifier: cmdOrCtrl, action: "focus-file-search" },
-    { modifier: shiftOnly, action: "flip-state-card" },
-  ],
-  KeyN: [{ modifier: cmdOrCtrl, action: "new-tile" }],
-  KeyW: [{ modifier: cmdOrCtrl, action: "close-tile" }],
-  ArrowRight: [{ modifier: altOnly, action: "focus-tile-right" }],
-  ArrowLeft: [{ modifier: altOnly, action: "focus-tile-left" }],
-  ArrowUp: [{ modifier: altOnly, action: "focus-tile-up" }],
-  ArrowDown: [{ modifier: altOnly, action: "focus-tile-down" }],
-};
-
-const TOGGLE_SHORTCUT_KEYS: Record<string, ShortcutEntry[]> = {
-  ",": TOGGLE_SHORTCUTS.Comma!,
-  o: TOGGLE_SHORTCUTS.KeyO!,
-  f: TOGGLE_SHORTCUTS.KeyF!,
-  b: TOGGLE_SHORTCUTS.KeyB!,
-  n: TOGGLE_SHORTCUTS.KeyN!,
-  w: TOGGLE_SHORTCUTS.KeyW!,
-};
-
-function normalizeShortcutKey(key: string | undefined): string | null {
-  if (!key) return null;
-  return key.length === 1 ? key.toLowerCase() : key;
-}
-
-function resolveToggleShortcut(
-  input: Electron.Input,
-): ShortcutEntry | undefined {
-  const candidates = TOGGLE_SHORTCUTS[input.code]
-    ?? (normalizeShortcutKey(input.key)
-      ? TOGGLE_SHORTCUT_KEYS[normalizeShortcutKey(input.key)!]
-      : undefined);
-  return candidates?.find((s) => s.modifier(input));
-}
-
 function attachShortcutListener(target: WebContents): void {
   target.on("before-input-event", (event, input) => {
     if (input.type !== "keyDown") return;
 
-    const toggle = resolveToggleShortcut(input);
+    const toggle = resolveShellShortcut(input);
     if (toggle) {
       event.preventDefault();
       if (!input.isAutoRepeat) sendShortcut(toggle.action);

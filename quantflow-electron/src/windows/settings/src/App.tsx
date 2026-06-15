@@ -37,6 +37,13 @@ import {
   type LaunchTraceSummary,
   type TailLogsResult,
 } from "./diagnostics-panels-model";
+import {
+  SHORTCUTS as REGISTRY_SHORTCUTS,
+  findDuplicateShortcuts,
+  formatShortcutChordList,
+  type ShortcutContext,
+  type ShortcutDefinition,
+} from "../../shared/shortcut-registry";
 
 type ThemeMode = "light" | "dark" | "system" | "high-contrast";
 type DensityMode = "comfortable" | "compact";
@@ -369,30 +376,8 @@ function AppearancePane() {
 
 const IS_MAC = api.getPlatform() === "darwin";
 
-const MOD = IS_MAC ? "\u2318" : "Ctrl+";
 const SHIFT = IS_MAC ? "\u21E7" : "Shift+";
 const CTRL = IS_MAC ? "\u2303" : "Ctrl+";
-const ALT = IS_MAC ? "\u2325" : "Alt+";
-
-const SHORTCUTS: { label: string; keys: string }[] = [
-  { label: "Settings", keys: `${MOD} ,` },
-  { label: "Find", keys: `${MOD} F` },
-  { label: "Toggle Navigator", keys: `${MOD} \\` },
-  { label: "Toggle Terminal List", keys: `${MOD} \`` },
-  { label: "Open Workspace", keys: `${SHIFT} ${MOD} O` },
-  { label: "Zoom In", keys: `${MOD} =` },
-  { label: "Zoom Out", keys: `${MOD} -` },
-  { label: "Actual Size", keys: `${MOD} 0` },
-  {
-    label: "Toggle Full Screen",
-    keys: IS_MAC ? "\u2303 \u2318 F" : "F11",
-  },
-  { label: "Focus Tile Left", keys: `${ALT} ←` },
-  { label: "Focus Tile Right", keys: `${ALT} →` },
-  { label: "Focus Tile Up", keys: `${ALT} ↑` },
-  { label: "Focus Tile Down", keys: `${ALT} ↓` },
-];
-
 const MOUSE_INPUTS: { label: string; keys: string }[] = [
   { label: "Pan Canvas", keys: "Two-Finger Swipe" },
   { label: "Pan Canvas", keys: "Middle Click + Drag" },
@@ -401,7 +386,7 @@ const MOUSE_INPUTS: { label: string; keys: string }[] = [
   { label: "Scroll Canvas Horizontally", keys: `${SHIFT} Scroll` },
   { label: "Zoom", keys: `${CTRL} Scroll` },
   ...(IS_MAC
-    ? [{ label: "Zoom", keys: `${MOD} Scroll` }]
+    ? [{ label: "Zoom", keys: "\u2318 Scroll" }]
     : []),
 ];
 
@@ -436,6 +421,43 @@ function ShortcutList({ items }: { items: { label: string; keys: string }[] }) {
           <Kbd>{keys}</Kbd>
         </div>
       ))}
+    </div>
+  );
+}
+
+const SHORTCUT_CONTEXT_LABELS: Record<ShortcutContext, string> = {
+  global: "System",
+  shell: "Canvas",
+  webview: "Files",
+  canvas: "Tile canvas",
+};
+
+function ShortcutRegistryList({
+  shortcuts,
+}: {
+  shortcuts: ShortcutDefinition[];
+}) {
+  return (
+    <div className="space-y-4">
+      {(Object.keys(SHORTCUT_CONTEXT_LABELS) as ShortcutContext[]).map((context) => {
+        const items = shortcuts.filter((shortcut) => shortcut.when === context);
+        if (items.length === 0) return null;
+        return (
+          <section key={context} className="space-y-1">
+            <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+              {SHORTCUT_CONTEXT_LABELS[context]}
+            </h3>
+            <ShortcutList
+              items={items.map((shortcut) => ({
+                label: shortcut.description,
+                keys: formatShortcutChordList(shortcut, {
+                  platform: IS_MAC ? "darwin" : "win32",
+                }),
+              }))}
+            />
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -618,12 +640,29 @@ function TerminalPane() {
 }
 
 function ControlsPane() {
+  const duplicateCount = findDuplicateShortcuts(REGISTRY_SHORTCUTS).length;
+
   return (
     <div className="space-y-6 p-6">
       <div className="space-y-1">
         <h2 className="text-base font-semibold">Keyboard Shortcuts</h2>
       </div>
-      <ShortcutList items={SHORTCUTS} />
+      {duplicateCount > 0 && (
+        <div
+          role="alert"
+          className="rounded-md px-3 py-2 text-sm"
+          style={{
+            border:
+              "1px solid color-mix(in srgb, var(--destructive) 45%, transparent)",
+            backgroundColor:
+              "color-mix(in srgb, var(--destructive) 8%, transparent)",
+          }}
+        >
+          {duplicateCount} duplicate shortcut binding
+          {duplicateCount === 1 ? "" : "s"} detected.
+        </div>
+      )}
+      <ShortcutRegistryList shortcuts={REGISTRY_SHORTCUTS} />
 
       <div className="space-y-1 pt-2">
         <h2 className="text-base font-semibold">Mouse Controls</h2>
