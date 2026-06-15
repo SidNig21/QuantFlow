@@ -23,7 +23,9 @@
       "@qf-kernel": ["../src/kernel"],
       "@qf-kernel/*": ["../src/kernel/*"],
       "@qf-v3-main": ["../src/main"],
-      "@qf-v3-main/*": ["../src/main/*"]
+      "@qf-v3-main/*": ["../src/main/*"],
+      "@qf-harness": ["../src/harness"],
+      "@qf-harness/*": ["../src/harness/*"]
     }
   },
   "include": ["src/main/**/*", "src/preload/**/*", "../src/kernel/**/*", "../src/main/**/*", "electron.vite.config.ts"]

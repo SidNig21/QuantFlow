@@ -35,6 +35,9 @@ import { registerConductorIpc } from "@qf-v3-main/conductor/conductor-ipc";
 import { registerMethod } from "./json-rpc-server";
 import { spawnRoleViaShell } from "./canvas-rpc";
 import { getRole } from "./role-service";
+import { getWorkerHarness } from "./harness-service";
+import { HARNESS_DESCRIPTORS } from "@qf-harness/registry";
+import type { HarnessKind } from "@qf-harness/types";
 import { QUANTFLOW_DIR } from "./paths";
 
 const FS_CHANGE_DELETED = 3;
@@ -169,6 +172,16 @@ export function registerIpcHandlers(config: AppConfig): void {
   // Conductor IPC (Goal 5A read view + 5C actions). spawn_role routes through the
   // approved shell role-spawn path (canvas.roleSpawn → spawnRoleTileAt), which
   // starts the shipped runtime and is gated by kernel.worker.spawn (Goal 6A).
+  // Goal 6: the live worker-harness seam. Goal 5D will call getWorkerHarness(kind)
+  // to spawn/send/readState/collectReceipts/stop workers. These read-only probes
+  // prove the live app can construct/use the seam now (no spawn here).
+  ipcMain.handle("harness:list", () =>
+    HARNESS_DESCRIPTORS.map((d) => ({ kind: d.kind, description: d.description })),
+  );
+  ipcMain.handle("harness:probe", (_event, kind: HarnessKind) => ({
+    kind: getWorkerHarness(kind).kind,
+  }));
+
   registerConductorIpc({
     spawnRole: async (args) => {
       const roleId = String((args as { roleId?: unknown }).roleId ?? "");

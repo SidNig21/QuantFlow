@@ -32,6 +32,11 @@ The Harness Layer is the worker/runtime adapter boundary for QuantFlow v3.
 Adapters import NO Electron/renderer code: the live ops wrap the approved shell
 role-spawn path (gated by `kernel.worker.spawn`), PTY/herdr send, and Kernel
 queries/commands; tests inject fakes (see `scripts/harness-interface-smoke.ts`).
+
+The live `HarnessRuntimeOps` binding lives in the app layer, not here:
+`quantflow-electron/src/main/harness-ops.ts` (`createLiveHarnessOps(deps)`, pure
+DI) + `harness-service.ts` (`getWorkerHarness(kind)` wiring the real bindings).
+Goal 5D calls `getWorkerHarness(kind)`; routing is proven by `harness-ops.test.ts`.
 `readState` reads the Kernel State Card (never log scraping); `collectReceipts`
 returns drafts the caller posts via `kernel.receipt.post`.
 

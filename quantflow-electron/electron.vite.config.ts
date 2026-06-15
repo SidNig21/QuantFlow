@@ -20,6 +20,7 @@ export default defineConfig({
         "@collab/shared": resolve(__dirname, "packages/shared/src"),
         "@qf-kernel": resolve(__dirname, "../src/kernel"),
         "@qf-v3-main": resolve(__dirname, "../src/main"),
+        "@qf-harness": resolve(__dirname, "../src/harness"),
       },
     },
     build: {
