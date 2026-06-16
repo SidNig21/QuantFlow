@@ -158,7 +158,7 @@ The smoke uses the real Envoy CLI boundary and a test runtime database.
 
 ## Obsidian Live Mirror
 
-Vault path comes from `vault-config.json` (default: `Obsidian/Cursor Collab`).
+Vault path comes from `vault-config.json` (default: `Obsidian/QuantFlow`).
 
 Mirror directory:
 

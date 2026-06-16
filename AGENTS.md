@@ -152,7 +152,7 @@ If the branch is not `quantflow-v3`, stop and ask the operator before editing.
 This repo is paired with the Obsidian vault at:
 
 ```text
-C:\Users\rybow\Obsidian\Cursor Collab
+C:\Users\rybow\Obsidian\QuantFlow
 ```
 
 Current vault source:

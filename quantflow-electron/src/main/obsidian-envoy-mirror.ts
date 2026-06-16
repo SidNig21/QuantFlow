@@ -6,7 +6,7 @@ import type { NormalizedEnvoyPacket } from "./envoy-listener";
 import { getEnvoyService } from "./envoy-service";
 import { listEnvoyTasks } from "./runtime-state/envoy-repo";
 
-const DEFAULT_VAULT_PATH = "C:\\Users\\rybow\\Obsidian\\Cursor Collab";
+const DEFAULT_VAULT_PATH = "C:\\Users\\rybow\\Obsidian\\QuantFlow";
 const POLL_INTERVAL_MS = 2000;
 const LIVE_MAX_LINES = 500;
 

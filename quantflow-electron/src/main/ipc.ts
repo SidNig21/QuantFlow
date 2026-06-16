@@ -1,4 +1,4 @@
-import { type BrowserWindow } from "electron";
+import { ipcMain, type BrowserWindow } from "electron";
 import type { FileFilter } from "./file-filter";
 import type { AppConfig } from "./config";
 import { invalidateImageCache } from "./image-service";

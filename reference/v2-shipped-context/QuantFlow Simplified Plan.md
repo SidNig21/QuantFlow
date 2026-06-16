@@ -342,7 +342,7 @@ You need to see the whole board, add context, and review what happened. Agents n
 Vault location:
 
 ```text
-C:\Users\rybow\Obsidian\Cursor Collab\
+C:\Users\rybow\Obsidian\QuantFlow\
 ```
 
 Recommended board structure:
@@ -534,7 +534,7 @@ You are working in C:\Users\rybow\QuantFlow on branch quantflow-v2.
 
 Read CONCEPT.md first.
 Read BUILD_PLAN_V2.md second.
-Use C:\Users\rybow\Obsidian\Cursor Collab\QuantFlow Simplified Plan.md only as the operator simplification guide.
+Use C:\Users\rybow\Obsidian\QuantFlow\QuantFlow Simplified Plan.md only as the operator simplification guide.
 
 Current slice: delegation-phase-6 (see Build Path in BUILD_PLAN_V2.md).
 Do not skip to spawn-ux, snappiness, or moat until phase 6 passes.

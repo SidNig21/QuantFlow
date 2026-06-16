@@ -15,7 +15,7 @@ import {
 import { appendEvent } from "./runtime-state/events-repo";
 import { readVaultConfig } from "./vault-config";
 
-const DEFAULT_VAULT_PATH = "C:\\Users\\rybow\\Obsidian\\Cursor Collab";
+const DEFAULT_VAULT_PATH = "C:\\Users\\rybow\\Obsidian\\QuantFlow";
 const DEFAULT_REPO_ROOT = "C:\\Users\\rybow\\QuantFlow";
 
 export const CANVAS_SKILL_RELATIVE_PATH = join(

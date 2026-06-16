@@ -62,12 +62,12 @@ describe("vault memory scope helpers", () => {
   test("allows configured path roots across Windows and WSL forms", () => {
     const scope = {
       mode: "paths" as const,
-      paths: ["C:\\Users\\rybow\\Obsidian\\Cursor Collab"],
+      paths: ["C:\\Users\\rybow\\Obsidian\\QuantFlow"],
     };
 
     expect(isPathAllowedByVaultMemoryScope(
       scope,
-      "/mnt/c/Users/rybow/Obsidian/Cursor Collab/GoalBuddy.md",
+      "/mnt/c/Users/rybow/Obsidian/QuantFlow/GoalBuddy.md",
     )).toBe(true);
     expect(isPathAllowedByVaultMemoryScope(
       scope,

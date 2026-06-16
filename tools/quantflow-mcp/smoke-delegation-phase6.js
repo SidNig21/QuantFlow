@@ -23,7 +23,7 @@ const DEFAULT_TIMEOUT_MS = Number.parseInt(
   10,
 );
 const POLL_MS = Number.parseInt(process.env.QF_PHASE6_POLL_MS || "5000", 10);
-const VAULT_PATH = process.env.QF_VAULT_PATH || "C:\\Users\\rybow\\Obsidian\\Cursor Collab";
+const VAULT_PATH = process.env.QF_VAULT_PATH || "C:\\Users\\rybow\\Obsidian\\QuantFlow";
 const TASK_BOARD = path.join(VAULT_PATH, "Projects", "QuantFlow", "Envoy", "task-board.md");
 
 let rpcId = 1;

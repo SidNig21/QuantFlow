@@ -142,10 +142,10 @@ describe("createWorkflowTask", () => {
 describe("buildSkillCatCommand", () => {
   test("prints the skill with a single-line cat command in WSL", () => {
     const command = buildSkillCatCommand(
-      "C:\\Users\\rybow\\Obsidian\\Cursor Collab\\Projects\\QuantFlow\\QUANTFLOW_CANVAS_SKILL.md",
+      "C:\\Users\\rybow\\Obsidian\\QuantFlow\\Projects\\QuantFlow\\QUANTFLOW_CANVAS_SKILL.md",
     );
     expect(command).toBe(
-      "cat '/mnt/c/Users/rybow/Obsidian/Cursor Collab/Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md'",
+      "cat '/mnt/c/Users/rybow/Obsidian/QuantFlow/Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md'",
     );
   });
 
@@ -156,7 +156,7 @@ describe("buildSkillCatCommand", () => {
 });
 
 describe("worker activation prompts", () => {
-  const skillPath = "C:\\Users\\rybow\\Obsidian\\Cursor Collab\\Projects\\QuantFlow\\QUANTFLOW_CANVAS_SKILL.md";
+  const skillPath = "C:\\Users\\rybow\\Obsidian\\QuantFlow\\Projects\\QuantFlow\\QUANTFLOW_CANVAS_SKILL.md";
 
   test("includes Envoy space and worker tile id in workflow activation lines", () => {
     const line = buildWorkflowActivationLine({
@@ -173,7 +173,7 @@ describe("worker activation prompts", () => {
     expect(line).toContain("canvas_id=canvas-1");
     expect(line).toContain("envoy_space_id=space-1");
     expect(line).toContain("claiming_tile_id=tile-codex");
-    expect(line).toContain("/mnt/c/Users/rybow/Obsidian/Cursor Collab/Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md");
+    expect(line).toContain("/mnt/c/Users/rybow/Obsidian/QuantFlow/Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md");
   });
 
   test("builds a Codex command that carries task context as the launch prompt", () => {

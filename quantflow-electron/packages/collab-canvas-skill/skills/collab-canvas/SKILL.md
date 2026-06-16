@@ -149,7 +149,7 @@ qf context inject <tileId> [--max-chars N]
 **Examples:**
 ```bash
 # Pin the active hardening spec and preview what will be sent
-qf context pin "/mnt/c/Users/rybow/Obsidian/Cursor Collab/Specs/QuantFlow-phase-9-hardening-spec.md" --mode summary-header
+qf context pin "/mnt/c/Users/rybow/Obsidian/QuantFlow/Specs/QuantFlow-phase-9-hardening-spec.md" --mode summary-header
 qf context preview --max-chars 12000
 
 # Record an inspectable decision and inject the current pack to a terminal tile

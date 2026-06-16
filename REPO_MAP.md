@@ -43,15 +43,15 @@ reference/v2-shipped-context/QuantFlow Simplified Plan.md
 The fresh vault root files are relevant reference, but repo docs win for implementation scope:
 
 ```text
-C:\Users\rybow\Obsidian\Cursor Collab\V3 Official.md
-C:\Users\rybow\Obsidian\Cursor Collab\Cursor Roadmap.md
-C:\Users\rybow\Obsidian\Cursor Collab\Fable URL List.md
-C:\Users\rybow\Obsidian\Cursor Collab\QuantFlow_Integration_Map.md
-C:\Users\rybow\Obsidian\Cursor Collab\QuantFlow Constructor Theory.md
+C:\Users\rybow\Obsidian\QuantFlow\V3 Official.md
+C:\Users\rybow\Obsidian\QuantFlow\Cursor Roadmap.md
+C:\Users\rybow\Obsidian\QuantFlow\Fable URL List.md
+C:\Users\rybow\Obsidian\QuantFlow\QuantFlow_Integration_Map.md
+C:\Users\rybow\Obsidian\QuantFlow\QuantFlow Constructor Theory.md
 ```
 
 Older vault context remains useful but dated:
 
 ```text
-C:\Users\rybow\Obsidian\Cursor Collab\Projects\QuantFlow\reference
+C:\Users\rybow\Obsidian\QuantFlow\Projects\QuantFlow\reference
 ```

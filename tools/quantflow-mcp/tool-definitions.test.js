@@ -178,7 +178,7 @@ test("maps role spawn workflow context to canvas.roleSpawn", async () => {
   await tool.handle(rpc)({
     roleId: "codex",
     tileId: "tile-codex-worker",
-    cwd: "/mnt/c/Users/rybow/Obsidian/Cursor Collab",
+    cwd: "/mnt/c/Users/rybow/Obsidian/QuantFlow",
     workflowTaskId: "task-child",
     workflowCorrelationId: "corr-parent",
     workflowEnvoySpaceId: "space-main",
@@ -199,7 +199,7 @@ test("maps role spawn workflow context to canvas.roleSpawn", async () => {
           runtimeTarget: "herdr-wsl",
         },
         tileId: "tile-codex-worker",
-        cwd: "/mnt/c/Users/rybow/Obsidian/Cursor Collab",
+        cwd: "/mnt/c/Users/rybow/Obsidian/QuantFlow",
         workflowTaskId: "task-child",
         workflowCorrelationId: "corr-parent",
         workflowEnvoySpaceId: "space-main",

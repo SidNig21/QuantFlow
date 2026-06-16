@@ -215,7 +215,7 @@ Repo code and Obsidian vault are **two workspaces**; agents with both should use
 | Workspace | Root | Authority |
 | --- | --- | --- |
 | **Repo** | `C:\Users\rybow\QuantFlow` | This file + `CONCEPT.md` + `ENVOY.md` + `TESTING.md` |
-| **Vault** | `C:\Users\rybow\Obsidian\Cursor Collab` | `QuantFlow Goal Sessions.md`, canvas skill, Envoy mirror, vision docs |
+| **Vault** | `C:\Users\rybow\Obsidian\QuantFlow` | `QuantFlow Goal Sessions.md`, canvas skill, Envoy mirror, vision docs |
 
 Full cross-map: repo `VAULT.md`. Vault archived: `Projects/QuantFlow/Build Plan.md`, `Start Here.md`.
 
@@ -240,7 +240,7 @@ Use this block for coding agents:
 Historical v2 branch: quantflow-v2.
 Read CONCEPT.md, then BUILD_PLAN_V2.md.
 For v3, BUILD_PLAN_V3.md is the only execution plan. BUILD_PLAN_V2.md is reference.
-Paired vault: C:\Users\rybow\Obsidian\Cursor Collab — see repo VAULT.md.
+Paired vault: C:\Users\rybow\Obsidian\QuantFlow — see repo VAULT.md.
 Vault ladder: QuantFlow Goal Sessions.md. Tile agents: Projects/QuantFlow/QUANTFLOW_CANVAS_SKILL.md.
 Vault Build Plan.md and Start Here.md are ARCHIVED — do not execute.
 Current slice: delegation-phase-6 (see Build Path — do not skip to moat or polish).
