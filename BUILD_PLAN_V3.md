@@ -26,6 +26,7 @@ This section is the durable progress ledger for the v3 branch.
 | Goal 7 — Workflow Regions and Semantic Strings | Complete / approved | Claude | Codex | 2026-06-15 | Kernel-owned workflow regions now aggregate workflow tiles, task/receipt/blocker counts, blocked task ids, and semantic-string counts; live connections inherit workflow scope from same-workflow endpoint tiles; the canvas renders soft workflow boundaries with objective and blocked-task detail; semantic string type/label edits route through Kernel connection updates; product/design rails were added as docs-only UI guidance with Efecto parked as optional external sandboxing. Workflow-region smoke, focused shell tests, conductor/harness/task/state-card regressions, MCP tests, and build pass. |
 | Goal 8 — Evidence and Vault: OKF-Style Knowledge Export | Complete / approved | Claude | Codex | 2026-06-15 | Kernel receipt chains and workflow outcomes now export to deterministic OKF-style Markdown through `src/vault`: Kernel collection, pure renderers, and an injectable file-write boundary. Exports preserve workflow/task/receipt/artifact ids, write workflow summary, task summaries, artifact index, decision log, receipt chain, and State Card snapshot, and explicitly avoid Envoy mirror, vault-as-truth, raw logs, eval scoring, RL, or cloud paths. Vault export smoke, conductor/workflow/harness/task/state-card regressions, MCP tests, harness-ops test, and build pass. |
 | Goal 9 Spec Gate — `docs/v3/EVALS_SPEC.md` | Complete / approved | Claude | Codex | 2026-06-15 | Docs-only gate approved. `EVALS_SPEC.md` defines evaluation units, required Kernel evidence inputs, concrete rubric dimensions, fixed 0–4 scoring with separate confidence, output shape, determinism, anti-gaming, human-review rules, acceptance scenarios, and failure signals. No runtime scoring code was added. Storage home, aggregation rule, model-assisted dimensions, and run timing remain explicit verifier/operator decisions before Goal 9 implementation begins. |
+| Goal 9 — Evaluation Layer v1 | Complete / approved | Claude + Codex fix pass | Cursor | 2026-06-15 | Runtime eval layer now stores derived analysis in a Kernel-owned `evaluations` table, with pure deterministic evaluators over Kernel evidence, create-only `kernel.eval.create`, eval list/get queries, and smoke coverage for the EVALS_SPEC acceptance scenarios. Codex fix pass `dcae541` added command-boundary validation for canonical eval types/dimensions, score 0–4, confidence 0.0–1.0, evidence refs, rationale, and `not_applicable` semantics; Cursor verified the fix plus full regressions and build. Evals remain non-authoritative and do not mutate tasks, receipts, workers, State Cards, vault exports, or runtime behavior. |
 
 Completion rule:
 
@@ -2076,11 +2077,15 @@ These documents are readable by humans and parseable by agents.
 
 ## Spec Gate Before Implementation
 
-`docs/v3/EVALS_SPEC.md` is complete/approved as the docs-only Goal 9 gate. Runtime Goal 9 work remains blocked until the operator/verifier explicitly approves the storage home, aggregation rule, model-assisted dimensions, and run timing decisions named in that spec. Do not implement vague scores.
+`docs/v3/EVALS_SPEC.md` is complete/approved as the docs-only Goal 9 gate.
+
+Runtime Goal 9 v1 is now complete/approved. The approved storage home is a new Kernel-owned `evaluations` table in `kernel.db`; the approved aggregation rule for v1 is no global truth score, only per-dimension 0–4 scores with separate confidence. Model-assisted dimensions and automatic run timing remain deferred until explicitly approved. Do not implement vague scores.
 
 ## Goal
 
 Add lightweight evaluation after receipts and state cards exist.
+
+Status: complete/approved for v1.
 
 ## Why
 
@@ -2095,9 +2100,11 @@ Create or update:
 ```text
 src/evals/
 src/evals/rubrics/
-src/evals/workflow-score.ts
-src/evals/conductor-score.ts
-src/evals/receipt-quality.ts
+src/evals/evidence.ts
+src/evals/evaluator.ts
+src/evals/rubrics/index.ts
+src/kernel/evals/
+src/kernel/migrations/002-evaluations.sql
 docs/v3/EVALS_SPEC.md
 ```
 
@@ -2160,6 +2167,8 @@ Conductor decision score
 receipt quality score
 verification score
 ```
+
+Goal 9 v1 acceptance was proven by `bun run smoke:eval`, which covers the EVALS_SPEC scenarios: happy path, legacy bypass, missing artifact, blocked task, poor delegation, high/low confidence, self-verification cap, determinism, create-only persistence, no task/receipt/State-Card mutation, and invalid persisted-eval payload rejection.
 
 Scores attach to the workflow and optionally export to vault.
 
@@ -2236,7 +2245,7 @@ Priority order:
 
 ## Acceptance Test
 
-Planning-only until Goal 9 passes.
+Planning-only until explicitly authorized after local v3 Goal 9 approval.
 
 First allowed implementation is AI Gateway wrapper around model calls, with correlation IDs attached.
 
@@ -2268,8 +2277,8 @@ Goal 6 - Harness Interface and First Worker Adapters
 Goal 5D - Conductor Loop
 Goal 7 - Workflow Regions and Semantic Strings
 Goal 8 - Evidence and Vault OKF Export
-Goal 9 - Evaluation Layer (blocked until EVALS_SPEC rubrics exist)
-Goal 10 - Cloud and Remote Tier
+Goal 9 - Evaluation Layer
+Goal 10 - Cloud and Remote Tier (parked/planning-only until explicitly authorized)
 ```
 
 ---
@@ -2300,7 +2309,7 @@ Each tile flips to show its State Card.
 No raw terminal reading is required to understand the workflow.
 ```
 
-That foundation is now in place through Goal 8. The next actionable step is a docs-only Goal 9 gate: create and approve `docs/v3/EVALS_SPEC.md` with concrete rubrics before any evaluation runtime or scoring code begins.
+That foundation is now in place through Goal 9. The remaining ladder rung is Goal 10, which is parked as planning-only until explicitly authorized.
 
 ---
 
