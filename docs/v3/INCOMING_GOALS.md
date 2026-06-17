@@ -80,6 +80,13 @@ path. Gaps found:
 - **Proposed scope:** fix the WSL working-directory handling in the role-spawn/herdr path (normalize UNC → drive path, or set a valid cwd before launch).
 - **Layer(s):** harness/herdr, main spawn path — **Priority:** high — **Status:** captured
 
+### Dogfooding findings — session 2 (2026-06-17)
+
+- **Electron `window.prompt()` is dead → operator inputs silently no-op (PARTIALLY FIXED).** Conductor Create task / Spawn worker did nothing because `window.prompt()` returns null in Electron. Fixed in `conductor-panel.js` with an inline input (`83b0c1d`). **Remaining:** the same dead pattern is still in `cable-inspector.js`, `cable-overlay.js`, and `tile-renderer.js` (cable label, tile excerpt). Scope: replace all remaining `prompt()` calls with the inline-input helper. Priority: medium. Status: partially fixed.
+- **MCP-spawned tiles do not survive a window reload (MEDIUM).** Tiles created via `quantflow_role_spawn` (Coder/Verifier) vanished after Ctrl+R — they weren't in the persisted canvas state, so "Assign next" found no tile. Scope: persist MCP-spawned tiles into canvas state (or restore from Kernel on reload). Priority: medium.
+- **Positive:** Conductor "Spawn worker" → `spawn_role` spawned a real herdr-wsl Hermes agent that came up `running`. So WSL agent spawn is NOT universally broken (revises the earlier UNC finding — that failure looks codex-spawn/intermittent specific, not all WSL). The blocker for *real autonomous work* is now agent-side: CLI auth (codex) + operator usage limits, not the spawn path.
+- **Note:** proving the v3 Kernel task spine does not require a working agent — Create/Assign/Submit/Verify are operator-driven Kernel commands. Real-agent execution is a separate axis (auth + usage + herdr).
+
 ## Promotion checklist (when an item graduates)
 
 1. Operator decides it's worth a goal.
