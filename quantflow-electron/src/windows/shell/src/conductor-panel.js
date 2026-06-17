@@ -129,6 +129,46 @@ export function createConductorPanel() {
     await refresh();
   }
 
+  // Electron disables window.prompt(), so operator inputs use a small inline
+  // prompt rendered inside the panel. Resolves the trimmed value, or null on
+  // empty/Cancel/Escape.
+  function askText(label, defaultValue = "") {
+    return new Promise((resolve) => {
+      const row = document.createElement("div");
+      row.className = "cdr-prompt";
+      const lbl = document.createElement("div");
+      lbl.className = "cdr-prompt-label";
+      lbl.textContent = label;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "cdr-prompt-input";
+      input.value = defaultValue;
+      const actions = document.createElement("div");
+      actions.className = "cdr-prompt-actions";
+      const ok = document.createElement("button");
+      ok.type = "button";
+      ok.textContent = "OK";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      actions.appendChild(ok);
+      actions.appendChild(cancel);
+      row.appendChild(lbl);
+      row.appendChild(input);
+      row.appendChild(actions);
+      el.appendChild(row);
+      input.focus();
+      const done = (value) => { row.remove(); resolve(value); };
+      ok.addEventListener("click", () => done(input.value.trim() || null));
+      cancel.addEventListener("click", () => done(null));
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); done(input.value.trim() || null); }
+        else if (e.key === "Escape") { e.preventDefault(); done(null); }
+        e.stopPropagation();
+      });
+    });
+  }
+
   const firstTask = (ctx, ...statuses) =>
     ctx?.tasks?.find((t) => statuses.includes(t.status)) ?? null;
   const firstWorkerTile = (ctx) =>
@@ -136,7 +176,7 @@ export function createConductorPanel() {
 
   const actionHandlers = {
     "create-task": async () => {
-      const title = window.prompt?.("New task title:");
+      const title = await askText("New task title:");
       if (!title) return;
       const ctx = await kernelContext();
       await doAction("create_task", {
@@ -152,7 +192,7 @@ export function createConductorPanel() {
       const roles = (await window.shellApi?.rolesList?.()) ?? [];
       if (!roles.length) { foot.textContent = "Spawn: no roles available."; return; }
       const names = roles.map((r) => r.id).join(", ");
-      const roleId = window.prompt?.(`Role to spawn (${names}):`, roles[0].id);
+      const roleId = await askText(`Role to spawn (${names}):`, roles[0].id);
       if (!roleId) return;
       const ctx = await kernelContext();
       const workflowId = ctx?.workflow?.id ?? null;

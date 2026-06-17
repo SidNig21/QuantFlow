@@ -2341,6 +2341,59 @@ html.platform-win #panel-viewer::before {
 	border-top: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
+/* Inline operator prompt (Electron has no window.prompt). */
+.cdr-prompt {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px;
+	border-top: 1px solid color-mix(in srgb, var(--accent, #6ea8fe) 30%, transparent);
+	background: color-mix(in srgb, var(--accent, #6ea8fe) 8%, transparent);
+}
+
+.cdr-prompt-label {
+	font-size: 11px;
+	color: var(--text-secondary, #cdd6f4);
+}
+
+.cdr-prompt-input {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-family: var(--font-sans);
+	color: var(--fg);
+	background: color-mix(in srgb, var(--bg) 70%, transparent);
+	border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
+	border-radius: 6px;
+}
+
+.cdr-prompt-input:focus {
+	outline: none;
+	border-color: var(--accent, #6ea8fe);
+}
+
+.cdr-prompt-actions {
+	display: flex;
+	gap: 6px;
+	justify-content: flex-end;
+}
+
+.cdr-prompt-actions button {
+	padding: 4px 12px;
+	font-size: 11px;
+	font-family: var(--font-sans);
+	cursor: pointer;
+	color: var(--fg);
+	background: color-mix(in srgb, var(--fg) 8%, transparent);
+	border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+	border-radius: 6px;
+}
+
+.cdr-prompt-actions button:hover {
+	background: color-mix(in srgb, var(--accent, #6ea8fe) 22%, transparent);
+}
+
 .canvas-tile[data-source-tile-type="term"] {
 	background: var(--tile-bg);
 }
