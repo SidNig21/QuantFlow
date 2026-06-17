@@ -51,6 +51,35 @@ wishlist. Use this shape:
 - **Status:** captured — **do NOT install SpatialClaw as a dependency**; pattern-only. Aligns with Goal 7's parked Smart Grid / layout-verification ideas.
 - **Hard rails (carry into any promotion):** screenshots are never source of truth; visual reasoning never mutates canvas/Kernel state; high-risk proposals still go through Conductor approval; no GPU/3D/segmentation stack for v3.
 
+### Dogfooding findings — first live session (2026-06-16)
+
+Validated live with the running app + QuantFlow MCP. **Positive:** MCP `role_spawn`
+tiles register in the v3 Kernel — the embedded Conductor's "Generate plan" read
+`2 tiles · 2 state cards`, so Goal 6A reconciliation holds even on the MCP spawn
+path. Gaps found:
+
+#### Live task delegation runs on v2 Envoy, not the v3 Kernel (HIGH)
+- **Problem:** `qf_task_*` MCP tools and the live delegation flow create/track **Envoy** tasks; the v3 Kernel task lifecycle (Goals 3/5C/5D) is separate. The Conductor (reads Kernel) showed `0 tasks` while `qf_task_list` had ~18 Envoy tasks on other canvases. So external agents / the live flow do not exercise v3 task truth, gates, or receipts.
+- **Evidence:** Conductor "Generate plan" = 0 tasks; `qf_task_list` all `envoy_task_id`/`envoy_space_id` on `Cursor Collab` + `phase6-*` canvases.
+- **Proposed scope:** decide the bridge — either route the Envoy task ops through Kernel task commands, or expose Kernel tasks via MCP (`kernel.task.*` adapter), so one task authority drives the live app. Likely the next major build plan.
+- **Layer(s):** kernel, mcp adapter, conductor — **Priority:** high — **Status:** captured
+
+#### MCP surface exposes no v3 Kernel reads (MEDIUM-HIGH)
+- **Problem:** MCP has no `kernel.canvas.snapshot` / `state_card` / `workflow.region` / `eval` read. An external agent can't see v3 truth via MCP — only Envoy + raw canvas/tile ops.
+- **Proposed scope:** add read-only Kernel query tools to `tools/quantflow-mcp` (snapshot, state cards, regions, receipts, evals).
+- **Layer(s):** mcp adapter, kernel/queries — **Priority:** medium-high — **Status:** captured
+
+#### MCP cable create sets legacy kind, not v3 semantic_type (MEDIUM)
+- **Problem:** `quantflow_cable_create` returns `"kind":"relay"` (v2), not a Goal 7 `semantic_type`. Semantic strings are only settable in the in-app cable inspector. So agents can't create delegation/verification/etc. strings via MCP.
+- **Proposed scope:** add `semanticType` to `quantflow_cable_create` (+ an update tool) routing through `kernel.connection.create/update`.
+- **Layer(s):** mcp adapter, kernel/connections — **Priority:** medium — **Status:** captured
+
+#### herdr-wsl worker spawn fails with UNC cwd error (HIGH for real agents)
+- **Problem:** spawning real Codex/Claude WSL workers fails — *"windows-node-proxy UNC current-directory error from WSL"* — blocking the intended "Conductor delegates to a real agent" path. Only `shell` (windows-pty) workers spawn reliably.
+- **Evidence:** multiple past Envoy task `result_summary`s report the UNC roleSpawn failure; this session used `shell` to avoid it.
+- **Proposed scope:** fix the WSL working-directory handling in the role-spawn/herdr path (normalize UNC → drive path, or set a valid cwd before launch).
+- **Layer(s):** harness/herdr, main spawn path — **Priority:** high — **Status:** captured
+
 ## Promotion checklist (when an item graduates)
 
 1. Operator decides it's worth a goal.
