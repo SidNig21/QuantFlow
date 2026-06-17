@@ -172,20 +172,33 @@ Repo docs win for code scope. Vault root reference files can inform decisions, b
 
 ## Current v3 State
 
-Goals 0-6A and 5C are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens the shell command palette/Conductor path, and the read-only Conductor panel live-refreshes from Kernel state after tile spawn. Goal 6A verified Kernel-owned worker spawn/status identity before runtime start. Goal 5C added single-step Conductor native actions. The next step is the full Harness interface:
+**The v3 build ladder is functionally complete (Goals 0–9).** Goal 10
+(cloud/remote tier) is intentionally parked — planning-only until explicitly
+authorized. The project is in the **dogfooding** phase: run the product, capture
+gaps in `docs/v3/INCOMING_GOALS.md`, then promote them into `BUILD_PLAN_V3.md`.
 
-```text
-Goal 6 - Harness Interface and First Worker Adapters
-Goal 5D - Conductor Loop
-```
+For full current state + per-goal history, read **`docs/v3/STATUS.md`** first.
+Authoritative completion/approval status is the `BUILD_PLAN_V3.md` ledger
+(verifier-owned).
+
+Do not start new build work from `docs/v3/INCOMING_GOALS.md` — it is intake, not
+authority. A candidate becomes real only when promoted into `BUILD_PLAN_V3.md`
+and authorized (one goal at a time).
 
 The following authority docs are installed for v3:
 
 - `BUILD_PLAN_V3.md` - v3 execution plan
 - `KERNEL_CONSTITUTION.md` - authority rules
 - `V3_MIGRATION_NOTES.md` - v2-to-v3 vocabulary map
+- `docs/v3/STATUS.md` - current state + per-goal history (read first for orientation)
+- `docs/v3/INCOMING_GOALS.md` - dogfooding backlog/intake (not authority)
 - `docs/v3/GLOSSARY.md` - canonical v3 term definitions
-- `docs/v3/WORKER_RECONCILIATION.md` - worker spawn/status authority spec for Goal 6A
+- `docs/v3/KERNEL_SCHEMA_V1.md` - canonical table definitions
+- `docs/v3/AUTHORITY_RULES.md` - mutation rules, invariants, violation signals
+- `docs/v3/WORKER_RECONCILIATION.md` - worker spawn/status authority spec (Goal 6A)
+- `docs/v3/VAULT_OKF_SPEC.md` - Kernel→Obsidian OKF export spec (Goal 8)
+- `docs/v3/EVALS_SPEC.md` - evaluation-layer rubrics/scoring spec (Goal 9)
+- `PRODUCT.md` / `DESIGN.md` - product + visual taste rails for UI work
 - `docs/v3/AGENTS.md` - DOX guard for v3 docs subtree
 - `src/kernel/AGENTS.md` - Kernel authority rail
 - `src/renderer/AGENTS.md` - renderer projector rail
@@ -195,4 +208,4 @@ The following authority docs are installed for v3:
 - `src/vault/AGENTS.md` - knowledge mirror rail
 - DOX base contract incorporated into this file
 
-Next: Goal 6 - Harness Interface and First Worker Adapters (do not start until operator approves).
+Next: dogfooding — no active build goal. Capture findings in `docs/v3/INCOMING_GOALS.md`; do not start new goals until the operator promotes one into `BUILD_PLAN_V3.md` and approves it.

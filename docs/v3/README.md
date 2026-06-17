@@ -42,13 +42,23 @@ Installed:
 
 ## Current Plan State
 
-Goals 0-6A and 5C are complete and approved. Goal 5A was manually verified in-app: `Ctrl+K` opens Conductor through the shell command palette, and the read-only panel live-refreshes from Kernel state after tile spawn. Goal 6A verified Kernel-owned worker spawn/status identity and shell runtime gating before PTY/herdr start. Goal 5C added single-step Conductor native actions without starting the autonomous loop.
+**The v3 build ladder (Goals 0–9) is functionally complete.** Goal 10
+(cloud/remote tier) is intentionally parked. The project is dogfooding, capturing
+gaps in `INCOMING_GOALS.md` for promotion into `BUILD_PLAN_V3.md`.
 
-The back half has been refined:
+Read **`STATUS.md`** for current state + per-goal history. The `BUILD_PLAN_V3.md`
+ledger is the authoritative completion record. `WORKER_RECONCILIATION.md`,
+`VAULT_OKF_SPEC.md`, and `EVALS_SPEC.md` remain binding for their layers. Do not
+start new build work until the operator promotes a candidate and approves it.
 
-```text
-Goal 6 - Harness Interface and First Worker Adapters
-Goal 5D - Conductor Loop
-```
+## v3 docs in this directory
 
-`WORKER_RECONCILIATION.md` remains binding for worker spawn/status behavior. See `BUILD_PLAN_V3.md` for current scope. Do not start the next goal until the operator approves.
+- `STATUS.md` — current state + per-goal history (orientation)
+- `INCOMING_GOALS.md` — dogfooding backlog/intake (not authority)
+- `GLOSSARY.md` — canonical v3 terms
+- `KERNEL_SCHEMA_V1.md` — canonical tables/fields
+- `AUTHORITY_RULES.md` — mutation rules + invariants
+- `WORKER_RECONCILIATION.md` — worker spawn/status authority (Goal 6A)
+- `VAULT_OKF_SPEC.md` — Kernel→Obsidian export spec (Goal 8)
+- `EVALS_SPEC.md` — evaluation-layer spec (Goal 9)
+- `AGENTS.md` — DOX guard for this subtree

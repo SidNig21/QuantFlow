@@ -7,6 +7,8 @@ This directory contains v3 authority and planning documents.
 Durable v3 reference documents:
 
 - `README.md` — v3 index and build discipline pointer.
+- `STATUS.md` — current state + per-goal history; agent orientation (read first).
+- `INCOMING_GOALS.md` — dogfooding backlog/intake; candidates, NOT authority until promoted into `BUILD_PLAN_V3.md`.
 - `GLOSSARY.md` — canonical v3 term definitions.
 - `KERNEL_SCHEMA_V1.md` — canonical table definitions, field lists, and relationships (Goal 1).
 - `AUTHORITY_RULES.md` — detailed mutation rules, invariants, and violation signals (Goal 1).
