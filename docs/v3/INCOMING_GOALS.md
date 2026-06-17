@@ -92,6 +92,32 @@ path. Gaps found:
 - **Misleading "Assign" message (LOW, quick fix).** Conductor "Assign next" shows *"Assign: need an open task and a tile"* even when the task is already assigned/working — because the handler only looks for an `open` task and reports the generic message when none is found. It reads as a failure. Fix: distinguish "no open task (current task already working — use Submit)" from "no worker tile". Confirmed live: receipts showed `task_created/claimed/started` (task was working) while the message implied assign failed. Layer: shell/conductor-panel. Priority: low.
 - **New role request: Antigravity CLI (`agy`) transcriber (MEDIUM, operator-requested).** Add Antigravity (Gemini-backed, herdr-wsl) as a spawn-rail role. Purpose: transcribe YouTube/"alpha" videos into vault files that other agents then process. Scope: add a role definition (id `antigravity`, command `agy`/`antigravity`, runtimeTarget herdr-wsl, icon/color, startup prompt) to the role registry so it appears in the QF Dock spawn rail; optionally a vault output convention for transcripts. Layer: role registry/config (+ optional vault path). Priority: medium. Status: captured.
 
+### HEADLINE candidate — wire the Kernel task to real worker execution ("make it real")
+
+This is the gap between "process proven" and "job actually done", confirmed by
+the first live end-to-end run (2026-06-17): the Conductor drove a task through
+`task_created → claimed → started → submitted → verification_passed → completed`
+(full receipt chain in `kernel.db`), but **no actual work happened** — the operator
+clicked Submit/Verify; the worker agent sat idle and produced no artifact.
+
+To make a Conductor-led task do the work, wire three things:
+1. **Task → worker delivery:** assign must bind a real `worker_instance` to the
+   task (live run left `tasks.owner_worker_id = null`; only the State Card linked
+   the tile) AND hand the instruction to the agent via the Goal 6 WorkerHarness
+   `send` seam — not terminal paste.
+2. **Worker executes:** a real authed agent (Antigravity/Codex/Claude) runs the
+   instruction through the harness; `readState`/`collectReceipts` report progress.
+3. **Report with proof:** worker submits with the produced **artifact** (e.g. the
+   vault file path) → verify. Today Submit/Verify carry no artifact.
+
+This subsumes the "Envoy vs Kernel task" finding (pick Kernel as the one task
+authority and drive workers through the harness). Likely the **first promoted
+goal** when build resumes. Priority: high. Status: captured.
+
+Smaller nuances from the same run:
+- `tasks.owner_worker_id` not set by Conductor assign (only tile/State-Card link). Fix as part of (1).
+- Eval layer is not auto-invoked — `evaluations` had 0 rows after the run (expected; Goal 9 has no trigger). A future trigger (on task complete) would populate it.
+
 ## Promotion checklist (when an item graduates)
 
 1. Operator decides it's worth a goal.
