@@ -87,6 +87,11 @@ path. Gaps found:
 - **Positive:** Conductor "Spawn worker" → `spawn_role` spawned a real herdr-wsl Hermes agent that came up `running`. So WSL agent spawn is NOT universally broken (revises the earlier UNC finding — that failure looks codex-spawn/intermittent specific, not all WSL). The blocker for *real autonomous work* is now agent-side: CLI auth (codex) + operator usage limits, not the spawn path.
 - **Note:** proving the v3 Kernel task spine does not require a working agent — Create/Assign/Submit/Verify are operator-driven Kernel commands. Real-agent execution is a separate axis (auth + usage + herdr).
 
+### Dogfooding findings — session 2 (cont.)
+
+- **Misleading "Assign" message (LOW, quick fix).** Conductor "Assign next" shows *"Assign: need an open task and a tile"* even when the task is already assigned/working — because the handler only looks for an `open` task and reports the generic message when none is found. It reads as a failure. Fix: distinguish "no open task (current task already working — use Submit)" from "no worker tile". Confirmed live: receipts showed `task_created/claimed/started` (task was working) while the message implied assign failed. Layer: shell/conductor-panel. Priority: low.
+- **New role request: Antigravity CLI (`agy`) transcriber (MEDIUM, operator-requested).** Add Antigravity (Gemini-backed, herdr-wsl) as a spawn-rail role. Purpose: transcribe YouTube/"alpha" videos into vault files that other agents then process. Scope: add a role definition (id `antigravity`, command `agy`/`antigravity`, runtimeTarget herdr-wsl, icon/color, startup prompt) to the role registry so it appears in the QF Dock spawn rail; optionally a vault output convention for transcripts. Layer: role registry/config (+ optional vault path). Priority: medium. Status: captured.
+
 ## Promotion checklist (when an item graduates)
 
 1. Operator decides it's worth a goal.
