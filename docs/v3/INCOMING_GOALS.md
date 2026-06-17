@@ -29,7 +29,27 @@ wishlist. Use this shape:
 
 ## Candidates
 
-_None yet — add as you dogfood._
+### Canvas layout diagnostics (deterministic, Kernel-data only)
+- **Problem / friction:** the Kernel knows tile geometry, but an agent/operator can still miss *visual* problems — a tile hidden behind another (z-index), a blocked worker scrolled offscreen, a verification string with a missing/!visible endpoint, a workflow region too cluttered to read.
+- **Evidence:** not yet observed in real use — captured from the SpatialClaw discussion (2026-06-16). **Confirm during dogfooding before promoting.**
+- **Proposed scope (cheap, do this first if promoted):**
+  - Pure geometry helpers over the existing `CanvasSnapshot` + workflow regions + viewport: `detectOverlaps`, `findOffscreenTiles(viewport)`, `tilesInRegion`, `connectionsMissingEndpoint`, `layoutScore`. No screenshot, no ML, no code sandbox.
+  - Surface as a Conductor read-tool (`diagnose_canvas_layout`) and/or a `visual_diagnosis` receipt. Diagnose + propose only — never mutates; proposals route through Conductor → Kernel commands.
+- **Layer(s):** kernel/queries (read), conductor (read-tool), maybe evals-style pure module
+- **Priority:** medium (high value, low cost — but gated on real dogfooding evidence)
+- **Status:** captured
+
+### Canvas Perception Kernel — screenshot + code-reasoning loop (SpatialClaw-inspired, heavier)
+- **Problem / friction:** the deterministic helpers above can't judge truly pixel-level questions (text unreadable at current zoom, a browser tile showing an error, strings visually crossing badly). SpatialClaw's lesson: give the agent a *composable* workspace (write code cell → inspect intermediate vars/images → revise) instead of one screenshot or rigid tool calls.
+- **Evidence:** SpatialClaw (NVlabs) — https://spatialclaw.github.io/ , https://github.com/NVlabs/SpatialClaw. Reference for the **action-interface pattern only**, not the 3D/SAM3/Depth stack.
+- **Proposed scope (deferred — separate, larger goal):**
+  - New `canvas.captureViewport` RPC (PNG of current viewport / fit-to-workflow). Browser tiles already screenshot; the infinite canvas does not.
+  - Persistent reasoning sandbox (TS `vm` or subprocess) preloaded with snapshot/regions/state-cards/viewport (+ optional screenshot) and the geometry helpers; agent composes/inspects/revises; returns a diagnosis/proposal.
+  - Ship as a `canvas-perception` harness/plugin (diagnostic/verifier role) and/or MCP external tool — NOT the Conductor internal fast path.
+- **Layer(s):** harness/plugin, kernel RPC (screenshot), conductor (consume proposals)
+- **Priority:** low (real risk: agent-written code in a sandbox; only build if Phase-0 helpers prove insufficient)
+- **Status:** captured — **do NOT install SpatialClaw as a dependency**; pattern-only. Aligns with Goal 7's parked Smart Grid / layout-verification ideas.
+- **Hard rails (carry into any promotion):** screenshots are never source of truth; visual reasoning never mutates canvas/Kernel state; high-risk proposals still go through Conductor approval; no GPU/3D/segmentation stack for v3.
 
 ## Promotion checklist (when an item graduates)
 
