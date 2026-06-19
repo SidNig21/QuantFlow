@@ -1663,6 +1663,19 @@ quantflow-electron/src/windows/shell/src/legend-spawn.js   (custom recipe → ro
 BUILD_PLAN_V4.md                                           (ledger update on approval — verifier only)
 ```
 
+### Design coherence — the legend bar IS the product spine
+
+The QF Dock already splits into **Spawn** (agent recipes) and **Templates**
+(saved runs). Keep that split and treat it as the architecture made visible:
+- **Top half = agents** → owned by **R8** (+ the role registry). Stocking the
+  bar = making workers available.
+- **Bottom half = templates** → owned by **R6** (Scout/Research/Deep = a DAG +
+  roles + budgets + attention profile). Arming a template = wiring stocked agents
+  into a run.
+
+A workflow is composed by *stocking the top half, then arming the bottom half*.
+R8 must not blur these — it adds **agents**, not templates.
+
 ### What "one-click add" means
 
 - The dock renders recipes from a **registry list** (`listRoles()` + user-added),
