@@ -42,4 +42,4 @@ Do not execute from archived plans, old layer charters, or old vault build plans
 
 **Do not drift into:** Cloudflare-first rewrite, RL training, A2A/Agent Cards, custom string relay revival, dashboard replacement, or bypassing Kernel commands.
 
-**Handoff:** commit before switching agents. Include branch, active v3 goal, files changed, proof commands, reference notes used, and risks.
+**Handoff:** commit before switching agents. Include branch, active v4 rung (R0–R7 from `BUILD_PLAN_V4.md`), files changed, proof commands (the rung's cumulative regression stack), reference notes used, and risks.

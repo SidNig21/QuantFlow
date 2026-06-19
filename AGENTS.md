@@ -16,7 +16,8 @@ base; v4 only adds the three constitutional lines documented in `BUILD_PLAN_V4.m
 
 ## v3 Authority
 
-Current branch: `quantflow-v3`
+Constitutional base for all branches (current working branch: `quantflow-v4`,
+which extends — does not replace — everything in this section).
 
 QuantFlow v3 is an authority refactor, not a rewrite.
 
@@ -136,6 +137,7 @@ Durable `AGENTS.md` boundaries in this repo:
 ```text
 AGENTS.md                        ← this file (root)
 docs/v3/AGENTS.md                ← v3 authority/planning docs
+docs/v4/AGENTS.md                ← v4 territory + per-rung plan (BUILD_PLAN_V4.md)
 src/kernel/AGENTS.md             ← sole truth owner; all state mutations
 src/renderer/AGENTS.md           ← visual projector; no canonical state
 src/main/conductor/AGENTS.md     ← in-process planner; native Kernel tools only
@@ -222,4 +224,4 @@ The following authority docs are installed for v3:
 - `src/vault/AGENTS.md` - knowledge mirror rail
 - DOX base contract incorporated into this file
 
-Next: dogfooding — no active build goal. Capture findings in `docs/v3/INCOMING_GOALS.md`; do not start new goals until the operator promotes one into `BUILD_PLAN_V3.md` and approves it.
+Next (on `quantflow-v4`): the v4 rung ladder (R0–R7) is scoped in `BUILD_PLAN_V4.md`; build one rung at a time, only after the operator promotes and authorizes it. On `quantflow-v3`: dogfooding — capture findings in `docs/v3/INCOMING_GOALS.md`; do not start v3 goals until promoted into `BUILD_PLAN_V3.md` and approved.

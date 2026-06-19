@@ -477,8 +477,10 @@ multi-worker, no semantic judgment. Just the atom.
 
 From the first live end-to-end run (`docs/v3/INCOMING_GOALS.md`, headline
 candidate): the Conductor drove a task through the full receipt chain, but
-`tasks.owner_worker_id` was left `null`, the worker sat idle, no artifact was
-produced, and Submit/Verify carried no artifact. The territory map names three
+`tasks.owner_worker_id` was left `null` **on that path** (not because the Kernel
+can't bind it — `taskClaim` already binds from `tileId`; that assign path simply
+didn't carry one — see F17 in Direct Repo Scope), the worker sat idle, no artifact
+was produced, and Submit/Verify carried no artifact. The territory map names three
 fixes — task→worker delivery, worker executes, report-with-proof — and makes them
 the keystone "everything else is multiplication."
 
@@ -775,11 +777,18 @@ Goal R1 is the keystone: make ONE Conductor task do real work with proof, on two
 tracks (deterministic mock harness in CI; one real authed worker in dogfood).
 
 Three pieces:
-1. Bind + send — assign sets tasks.owner_worker_id AND worker_instances.assigned_task_id,
-   and delivers the instruction through getWorkerHarness(kind).send(...) — NEVER paste.
-2. Worker executes — add a registered `mock` harness (deterministic, produces a
-   real artifact file + kernel.artifact.create); the real local-shell/herdr path
-   does the same via the same WorkerHarness contract.
+1. Bind + send — AUDIT every assign path (taskClaim already binds owner_worker_id
+   from tileId; the live null was a path without tileId), guarantee a non-null
+   owner_worker_id, set worker_instances.assigned_task_id, and deliver the
+   instruction through getWorkerHarness(kind).send(...) — NEVER paste. The REAL
+   send is approval-gated / explicit operator step (NOT a low-risk auto-action);
+   only the mock send may auto-run in CI.
+2. Worker executes — add a registered `mock` harness (deterministic). The harness
+   writes a real artifact FILE and returns a ReceiptDraft + file path from
+   collectReceipts; it must NOT call kernel.artifact.create or any kernel.*. One
+   canonical orchestration path (send → poll collectReceipts → CALLER posts
+   kernel.artifact.create → kernel.task.submit) is shared by mock and the real
+   local-shell/herdr path.
 3. Artifact-gated verify — submit is REJECTED without an artifact; taskVerify runs
    the structural checklist (record linked, uri under artifact_root, file exists +
    non-empty, sha256 matches if provided, verification receipt emitted) and FAILS
@@ -996,7 +1005,7 @@ pre-empted.
 docs/v3/GLOSSARY.md + KERNEL_SCHEMA_V1.md  (record the Run-vs-Workflow decision)
 src/kernel/runs/ (NEW if Run is a primitive) OR src/kernel/workflows/ (extension)
 src/kernel/migrations/00X-r3-run.sql       (runs table OR workflow instance columns; backfill artifacts.run_id — nullable)
-src/main/conductor/conductor-loop.ts + conductor-planner.ts (extend single-action → DAG walk over task_dependencies kind='blocks')
+src/main/conductor/dag-scheduler.ts (NEW — returns schedulable tasks over task_dependencies kind='blocks'; the loop stays one-action-per-step and does NOT inline the graph walk — see DAG executor section / F9)
 src/kernel/tasks/index.ts                  (a task is claimable only when all blocks-deps are complete+verified)
 Envoy consolidation:
   quantflow-electron/src/main/envoy-task-service.ts (route through Kernel task commands OR make Envoy a read-only mirror)
@@ -1033,6 +1042,13 @@ writes state outside Kernel commands.
 A downstream task becomes claimable only when **every** upstream dependency is
 `complete` with a `verification_passed` receipt; independent branches are eligible
 concurrently but each executes through the existing gate.
+
+> **Concurrency surface — decide at R3 promotion.** The scheduler returns the
+> *eligible set*; how parallelism is realized — sequential loop steps over the
+> eligible set vs an explicit batch step that dispatches independent branches —
+> is an R3b implementation decision. The plan fixes the *module* (`dag-scheduler`)
+> and the *invariant* (every action through the gate + Kernel boundary); the
+> concrete scheduling model is recorded in the R3 goal result.
 
 ### Decomposition mandate + sub-milestones (F9/F10)
 
