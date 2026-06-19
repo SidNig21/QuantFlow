@@ -36,7 +36,11 @@ queries/commands; tests inject fakes (see `scripts/harness-interface-smoke.ts`).
 The live `HarnessRuntimeOps` binding lives in the app layer, not here:
 `quantflow-electron/src/main/harness-ops.ts` (`createLiveHarnessOps(deps)`, pure
 DI) + `harness-service.ts` (`getWorkerHarness(kind)` wiring the real bindings).
-Goal 5D calls `getWorkerHarness(kind)`; routing is proven by `harness-ops.test.ts`.
+The `getWorkerHarness(kind)` seam is **wired and unit-proven** by
+`harness-ops.test.ts`, but no Conductor action path calls `send` yet —
+`conductor-actions.ts` only does Kernel task transitions. **v4 Goal R1 is what
+actually wires `assign → harness.send`.** Until then, treat the send seam as
+available-but-uncalled (do not assume the live delegation flow uses it).
 `readState` reads the Kernel State Card (never log scraping); `collectReceipts`
 returns drafts the caller posts via `kernel.receipt.post`.
 

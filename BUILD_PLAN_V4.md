@@ -82,6 +82,12 @@ map (the authority), e.g. `Goal R0`, `Goal R1`. (This avoids the off-by-one trap
 of "Goal 1 = Rung 0".) Detailed goal shapes are promoted **one rung at a time**;
 they are written here, not in the territory map.
 
+> **Name collision warning (F28):** territory map §9 labels the deferred
+> distribution axis "**Distribution / R0**". That "R0" is **not** this rung
+> **R0 (auth/capability preflight)**. In this build plan, `R0` always means the
+> preflight rung; the deferred distribution work is called the **"distribution
+> axis"** (never "R0"). Keep them separate when reading §9 alongside this file.
+
 ---
 
 ## The rung spine (orientation only — territory map §8 is authoritative)
@@ -195,7 +201,7 @@ quantflow-electron/src/main/credentials/credential-accessor.test.ts (NEW)
 quantflow-electron/src/main/role-service.ts                  (reuse/export getRoleCommandName + commandExists; do not duplicate)
 quantflow-electron/src/main/ipc-*.ts (or existing diagnostics IPC)  (expose preflight:run / preflight:snapshot, read-only)
 quantflow-electron/src/windows/shell/...                     (a minimal read-only preflight report view/panel)
-cli/qf.mjs (and wiring)                                      (OPTIONAL: `qf preflight` prints the capability matrix)
+cli/qf.mjs (and wiring)                                      (OPTIONAL: `qf capability` prints the matrix — do NOT reuse the `preflight` name)
 docs/v4/V4_TERRITORY_MAP.md                                  (no change — reference only)
 BUILD_PLAN_V4.md                                             (ledger update on approval — verifier only)
 ```
@@ -263,9 +269,27 @@ levels. A capability probe's `detail` block carries the structured status:
   (green/amber/red mapped from `healthy|degraded|down`), the one-line message, and
   `remediation`. This is a *report*, not configuration — no credential editing,
   no provider setup forms.
-- OPTIONAL but recommended: `qf preflight` CLI subcommand (the `qf` wrapper
+- OPTIONAL but recommended: a `qf capability` CLI subcommand (the `qf` wrapper
   already ships via `cli-installer.ts`) that prints the same matrix — the
   cheapest operator-visible, scriptable report.
+
+> **Naming guard (F21):** `quantflow-electron/package.json` already has a
+> `"preflight"` npm script (the native-lock check). Do **not** reuse `preflight`.
+> The new smoke is `smoke:capability-preflight`; the CLI verb is `qf capability`;
+> the IPC channel is `capability:run` / `capability:snapshot`.
+
+> **role ≠ harness (F34):** probes target **spawn-rail roles** (the CLI agents in
+> `role-service.ts` — `codex`/`claude`/`opencode`/`hermes`) and, separately, the
+> **harness descriptors** (`local-shell`/`herdr-shell` only). Do **not** register
+> a CLI (e.g. `codex`) as a new harness kind — that fuses role and harness and
+> violates the v3 separation. `capabilityId` namespacing (`role:` / `harness:` /
+> `provider:`) is for the report only, not the harness registry.
+
+> **Credential single-path (F20):** an audit confirms there is no existing
+> credential/`safeStorage`/`keytar` read path in `quantflow-electron/src`, so
+> `getCredential()` is genuinely the first and only accessor. Keep it that way —
+> if any provider key is later read inline elsewhere, route it through this
+> accessor instead of adding a second path.
 
 ## Out of Scope (defer to the R0 / distribution axis — territory map §9)
 
@@ -334,6 +358,13 @@ R0 is complete only when **all** of the following hold.
   (`isAgentPromptReady` true), and its capability probe flips to
   `ready / healthy` in the report. Capture a screenshot/printout of the report
   before (amber) and after (green) auth.
+
+> **Product-proof flexibility (F22):** product proof is satisfied by **any** one
+> spawn rail reaching `ready` — the herdr-wsl agent is the *recommended* target,
+> not a hard requirement. If the herdr UNC reachability issue blocks the chosen
+> agent, fixing it is **optional** for R0 (the probe must still *report* it
+> correctly); R0 is not a herdr-spawn-repair goal. The `local-shell` baseline
+> reaching green is an acceptable product proof on its own.
 
 ### Regression Guard (do not break v3 — this is the "doesn't mess anything up" check)
 
@@ -491,27 +522,60 @@ BUILD_PLAN_V4.md                          (ledger update on approval — verifie
 ### The three pieces (territory map §4 Band A)
 
 **1. Task → worker delivery (bind + send).**
-- `assign_task` (`conductor-actions.ts`) must result in a **non-null
-  `tasks.owner_worker_id`** (today it arrives null because nothing supplies the
-  binding) — pass `tileId`/`ownerWorkerId` so `taskClaim` binds the tile's
-  `worker_instance`, and set the reverse link `worker_instances.assigned_task_id`.
+- **Audit the assign paths first (F17).** `taskClaim` **already** sets
+  `tasks.owner_worker_id` from `tileId` via `ensureWorkerInstanceForTile`, and the
+  Conductor planner already passes `tileId` — so the live-run `null` was a
+  *specific* path (a manual/Conductor assign that did not carry `tileId`), not a
+  missing Kernel mechanism. R1's job is to **audit every assign path** (Conductor
+  action, planner, any manual/UI path) and guarantee a non-null `owner_worker_id`,
+  then add and set the reverse link `worker_instances.assigned_task_id`.
 - The task **instruction is delivered through `getWorkerHarness(kind).send(handle,
   { text })`** (`harness-service.ts` + the Goal 6 contract) — **never** terminal
   paste, `terminal_write`, or MCP. The send payload is the task objective plus
   minimal context (full structured context is R2's Context Envelope — keep it a
   plain instruction here).
+- **Real `send` is not a low-risk auto-action (F23).** `conductor-planner.ts`
+  marks `assign_task` as `risk: 'low'` (auto-executes in the loop). Delivering a
+  real instruction to a live, paid agent is **not** low-risk. R1 must gate the
+  **real** send behind approval or an explicit operator step (treat assign-that-
+  sends as high-risk, or split "bind" from "send"); the **mock** path may stay
+  low-risk/auto for CI. Do not let the loop auto-send real work without an
+  approval token.
 
 **2. Worker executes (two harnesses, same contract).**
 - **Mock harness (NEW, registered `mock` kind)** — deterministic, CI-safe, no
   auth, no cost. `spawn` returns a fake handle; `send` records the instruction;
-  the mock **produces a real artifact file** at a deterministic path under the
-  artifact root and calls `kernel.artifact.create`; `collectReceipts` returns a
-  `ReceiptDraft` carrying the `artifactId`; `readState` reports a scripted
-  `working → done`; `stop` is a no-op. It implements the **same** `WorkerHarness`
-  interface so it is a true drop-in (territory map §7).
+  the mock **writes a real artifact file** at a deterministic path under the
+  artifact root and **returns a `ReceiptDraft` (+ the artifact file path) from
+  `collectReceipts`**; `readState` reports a scripted `working → done`; `stop` is
+  a no-op. It implements the **same** `WorkerHarness` interface so it is a true
+  drop-in (territory map §7).
+- **Harness boundary (F4): the harness never writes Kernel state.** The mock (and
+  the real adapters) must **not** call `kernel.artifact.create` or any
+  `kernel.*` command — that violates the Goal 6A rule (`src/harness/AGENTS.md`:
+  *harness `collectReceipts` → caller posts via Kernel*). The harness produces an
+  artifact **file** and **draft**; the **orchestration layer** (below) posts to
+  the Kernel.
 - **Real harness** — the existing `local-shell` / `herdr-shell`, driven via
   `send`, with the R0-authed worker producing a real artifact (e.g. a vault
   markdown file). `readState`/`collectReceipts` report progress.
+
+**2b. One canonical orchestration path (F3) — mock and real share it.**
+There must be **exactly one** code path that turns "a worker did the work" into
+Kernel truth, so implementers do not scatter one-off bridges. In
+`harness-service` / `conductor-actions`:
+
+```text
+assign(bind) → harness.send(instruction)
+            → poll harness.readState / collectReceipts
+            → caller posts kernel.artifact.create (from the draft + file path)
+            → caller posts kernel.task.submit (carrying the artifactId)
+            → verify (structural, below)
+```
+
+The mock harness exercises this *same* path in CI (it just produces its draft
+deterministically); the real worker exercises it in dogfood. No second
+submit/artifact path is permitted.
 
 **3. Report with proof (artifact-gated verify).**
 - **No submit without an artifact.** `taskSubmit` must reject a submit that
@@ -538,17 +602,31 @@ BUILD_PLAN_V4.md                          (ledger update on approval — verifie
 ### artifact_root convention (open decision §10.3 — pick the smallest)
 
 R1 introduces one **allowed artifact write root** used by structural
-verification. Smallest version: a single resolved root (e.g. the workflow's
-`vault_path` when set, else a configured `<QUANTFLOW_DIR>/artifacts` dir), with
-`uri` required to resolve **under** it. Document the chosen convention in the
-goal result. Do **not** build a per-worker/per-run policy matrix — that is Band C.
+verification. **Decide this FIRST, before writing the verify code (F31)** — the
+structural checklist depends on it, and choosing it late forces rework. Smallest
+version: a single resolved root (e.g. the workflow's `vault_path` when set, else a
+configured `<QUANTFLOW_DIR>/artifacts` dir), with `uri` required to resolve
+**under** it. Record the chosen convention in the goal result up front. Do **not**
+build a per-worker/per-run policy matrix — that is Band C.
 
 ### Idempotency seam (open decision §10.5 — design now, enforce later)
 
-Give `submit`/`verify` an optional **attempt key** (e.g. `attemptId` on the
-payload) so a retried submit/verify can later be made exactly-once. R1 only
-**threads the field through**; full exactly-once enforcement is R4. Do not add a
-dedup table here.
+Give `submit`/`verify` an optional **attempt key** so a retried submit/verify can
+later be made exactly-once. **Lock the field name + semantics now (F32)** to avoid
+churn at R4: the field is `attemptId` (string, optional) on the
+`kernel.task.submit` / `kernel.task.verify` payloads, semantically "a stable id
+the caller reuses across retries of the same logical attempt." R1 only
+**threads the field through and records it on the receipt metadata**; full
+exactly-once enforcement (dedup) is R4. Do not add a dedup table here.
+
+### Receipt-primary timeline obligation (F2 — pays off at R7)
+
+R7's Run Replay is **receipt-primary** (the `events` table is not persisted — see
+R7/F1). For Replay to be cheap later, R1 must guarantee the **receipt chain is
+self-sufficient**: every transition posts its receipt (already true), the
+`correlation_id` chain stays intact end-to-end, and `artifact_refs` are recorded
+on `task_submitted` and `verification_passed`. This is an explicit R1 acceptance
+item below — not a vague future obligation.
 
 ## Out of Scope
 
@@ -602,6 +680,14 @@ task_created → task_claimed → task_started → artifact_created → task_sub
   - empty artifact file → `verification_failed`;
   - `content_hash` provided but sha256 mismatch → `verification_failed`.
 - A worker may not verify its own task (`validateVerifierDistinct` still holds).
+- **Receipt chain self-sufficiency (F2):** the full chain is queryable by
+  `correlation_id` alone, and `task_submitted` + `verification_passed` carry
+  `artifact_refs`. (This is what makes R7 receipt-primary Replay cheap.)
+- **No legacy bypass in the atom (F30):** the atom smokes (and the real product
+  proof) must reach `complete` via the structural `verification_passed` path —
+  **never** via `kernel.task.complete` with `legacy: true`. (The legacy bypass
+  stays in the codebase for v3 compat per the Regression Guard, but the atom must
+  not use it.)
 - `artifacts/verify.test.ts` covers the checklist over an injected fs;
   `mock/index.test.ts` covers the mock contract. Deterministic (no
   timestamps/uuids in compared bodies).
@@ -611,6 +697,13 @@ task_created → task_claimed → task_started → artifact_created → task_sub
 > The real worker is started manually via the normal worker path (as in R0). The
 > Kernel atom and structural verify do the gating; the machine proof above does
 > **not** depend on this real run.
+
+> **Honesty scope — Envoy duality persists until R3 (F5):** the live canvas/
+> `workflow-service` path still creates tasks via the Envoy task bus. R1 proves
+> the **Conductor→Kernel** atom; it does **not** make the app's default operator
+> flow run on Kernel tasks. Do not claim "real work works" for the whole app on
+> R1 — that honesty waits for R3's authority consolidation. The R1 product proof
+> is scoped to the Conductor/Kernel path explicitly.
 
 - Using an R0-green real worker, the operator runs the atom once: the Conductor
   assigns a task, the instruction is delivered to the real agent **via
@@ -777,6 +870,17 @@ instrumentation{context_tokens_estimate, raw_receipt_count}
   but implements the exclusion hook so turning it on later is not a retrofit.
 - The `instrumentation` block is the densification **measurement** (capture now,
   build densifiers only if measured pain appears — territory map §3).
+- **Builder purity (F19):** `src/kernel/context/envelope.ts` is a **pure query
+  projection** — it imports only `kernel/queries`, issues no mutation, and has
+  **no imports from `conductor/` or `renderer/`**. Add this as an explicit scope
+  rule so envelope logic can't drift into mutation helpers.
+- **Assignment gate is weak until R3 (F18):** R2 does not yet block *assigning*
+  task B before A is verified — the full claimable-only-when-upstream-verified
+  gate is R3. R2's guarantee is narrower: the **envelope** only marks an upstream
+  `verified` when its task truly completed via `verification_passed` (and excludes
+  unverified upstreams). If cheap, R2 may add a minimal "warn/refuse to build a
+  `verified` envelope from an unverified upstream" check; otherwise this is an
+  acknowledged R2 limitation closed by R3, and must be stated in the handoff.
 
 ## Out of Scope
 
@@ -865,12 +969,26 @@ DAG executor and consolidates task authority onto the Kernel.
 
 ## RESOLVE FIRST (territory map §10.1)
 
-Before any code: decide **Run vs Workflow** against the vocab lock. Either
-`Run` is a new primitive (new `runs` table) **or** the existing `Workflow` is the
-instance (extended with `mode`/`objective`/`budget`/`checkpoint_state`). Record
-the decision and rationale in the goal result, `docs/v3/GLOSSARY.md`, and
-`KERNEL_SCHEMA_V1.md`. The atom (R1) and R2 deliberately left `run_id` nullable so
-this decision was not pre-empted.
+**Gate zero — a one-page decision memo before any migration SQL (F6).** Decide
+**Run vs Workflow** against the vocab lock and write the memo into the goal result
++ `docs/v3/GLOSSARY.md` + `KERNEL_SCHEMA_V1.md`. Either `Run` is a new primitive
+(new `runs` table) **or** the existing `Workflow` is the instance (extended with
+`mode`/`budget`/`checkpoint_state`).
+
+Decision heuristics (the memo must address these):
+- **Workflow already carries instance-ish semantics** — `objective`, `status`
+  (`active|paused|complete|archived`), `vault_path`, `active_correlation_id`. The
+  territory-map Run fields (`mode`, `budget`, `checkpoint_state`) overlap heavily.
+- **The real question:** is "the persistent mission" (Workflow) the same thing as
+  "one execution instance" (Run), or distinct? If a mission can have *many* runs
+  over time, Run is a new primitive. If each mission = one run, extend Workflow.
+- **Avoid two mission containers.** A new `runs` table that mostly duplicates
+  Workflow is the failure mode; so is overloading Workflow until "mission" and
+  "instance" blur. Pick the one that keeps a single clear owner for each concept.
+- Whatever is chosen, the Run/instance **aggregates references only** (see below).
+
+The atom (R1) and R2 deliberately left `run_id` nullable so this decision was not
+pre-empted.
 
 ## Direct Repo Scope
 
@@ -897,13 +1015,37 @@ task_ids[] · artifact_ids[] · receipt_ids[] · cost(rollup)
 The Run holds **references + instance fields only**. It must never duplicate
 task/artifact/receipt truth, or it becomes a second store.
 
-### DAG executor
+### DAG executor — a NEW module, NOT inlined into the loop (F9)
 
-Extend the stateless, approval-gated loop (`conductor-loop.ts`): walk the task
-graph via `task_dependencies` (`kind='blocks'`); a downstream task becomes
-claimable only when **every** upstream dependency is `complete` with a
-`verification_passed` receipt; independent branches may run in parallel (each
-action still routes through the approval gate and Kernel command boundary).
+`conductor-loop.ts` is explicitly **one action per step**, operator-advanced, and
+stateless (156 lines). A graph walk + parallel scheduling does **not** compose by
+adding `if (dagMode)` branches inside it — that is exactly the spaghetti to avoid.
+
+Extract a dedicated **`src/main/conductor/dag-scheduler.ts`** with an explicit
+scheduling model: given the Kernel task graph (`task_dependencies` `kind='blocks'`)
+it returns the set of **schedulable** tasks (every upstream `complete` +
+`verification_passed`). The loop stays the executor of *one* approved action; the
+scheduler decides *which* actions are eligible (possibly several independent
+branches). Each scheduled action still routes through the **same approval gate and
+Kernel command boundary** — no second orchestrator, no background executor that
+writes state outside Kernel commands.
+
+A downstream task becomes claimable only when **every** upstream dependency is
+`complete` with a `verification_passed` receipt; independent branches are eligible
+concurrently but each executes through the existing gate.
+
+### Decomposition mandate + sub-milestones (F9/F10)
+
+R3 bundles four hard things; build them as ordered sub-milestones with separate
+smokes so the review surface stays bounded:
+- **R3a** — Run-vs-Workflow decision memo + the Run/instance schema migration
+  (references only; `run_id` backfill).
+- **R3b** — `dag-scheduler.ts` + claim-gating on `verification_passed`
+  (`smoke:dag`).
+- **R3c** — Envoy consolidation + MCP Kernel reads (`smoke:authority`).
+
+Before R3, also extract `run-budget.ts` (R4) and `checkpoint-controller.ts` (R5)
+as their own modules rather than growing `conductor-loop.ts` in place.
 
 ### Authority consolidation (Kernel decides; Envoy mirrors)
 
@@ -911,6 +1053,12 @@ Resolve Envoy (bridge / migrate / retire — §10.2): Envoy task ops must route
 through Kernel task commands, or Envoy becomes a read-only mirror of Kernel task
 state — there is exactly **one** task authority. MCP gains read-only Kernel
 queries (the gap from `INCOMING_GOALS.md`).
+
+> **MCP stays external-only (F25):** the new `kernel.canvas.snapshot` /
+> `state_card` / `workflow.region` / `eval` reads are for **external agents**. The
+> Conductor must keep using its native in-process `conductor-tools-readonly` —
+> MCP must not become the Conductor's internal read path (v3 rule: MCP is an
+> external adapter, not the internal fast path).
 
 ## Out of Scope
 
@@ -1001,9 +1149,22 @@ src/harness/sim/ (NEW)                      (simulation harness: fakes the failu
 src/kernel/tasks/index.ts + commands        (attempt-keyed submit/verify/complete — enforce the R1 idempotency seam; stale-task recovery → open)
 src/main/conductor/conductor-loop.ts        (DAG executor checks Run budgets / stop conditions; pauses on budget exhaustion)
 quantflow-electron/src/main/canvas-persistence.ts + worker restore (reload survival: worker/task/run state restored from Kernel; persist/restore spawned tiles)
-run-template attention profile attribute    (phase touch level — plan-layer attribute, NOT a primitive)
 quantflow-electron/scripts/smoke-pod.* + package.json (smoke:pod)
+# NOTE (F36): the attention-profile attribute is R6 scope (run templates), NOT R4 — moved out.
 ```
+
+### Worker status reconciliation — extend the v3 enum deliberately (F7)
+
+Shipped v3 `WorkerInstanceStatus` is `spawning | active | idle | stopped | error`.
+The territory map's R4 list (`spawning | idle | assigned | working | blocked |
+stale | stopped | failed` + `auth_status`) **collides** with it — `active` vs
+`working` vs `assigned`, `error` vs `failed`. Before the migration, write a
+**reconciliation map** in the goal result and `KERNEL_SCHEMA_V1.md`, e.g.:
+`assigned` = worker has a non-null `assigned_task_id`; keep `active` for
+"runtime up"; map `failed` as a terminal error distinct from transient `error`;
+do **not** put task-like states (`working`/`blocked`) on the worker — those belong
+to the **task**, not the worker. Extend the existing enum; do not fork a parallel
+worker state machine.
 
 ### Worker Runtime Manager (control layer, NOT a truth store)
 
@@ -1011,6 +1172,13 @@ Tracks many workers and drives harness verbs (timeout / cancel / restart /
 mark-stale / recover-task). **Worker status truth stays in the Kernel** (State
 Cards / `worker_instances.status`); the manager reports and drives, it does not
 own truth.
+
+> **No shadow authority (F12):** the Runtime Manager is a pure control plane. It
+> mutates state **only** through Kernel commands — `kernel.worker.status_update`
+> for stale/cancel/restart and `kernel.task.*` (e.g. return a recovered task to
+> `open`) — **never** direct SQL. R4 must name exactly which commands implement
+> mark-stale and recover-task (add them to `kernel.worker.*` / `kernel.task.*` if
+> missing) rather than letting the manager write rows itself.
 
 ### Budgets / stop conditions
 
@@ -1023,6 +1191,12 @@ Implements the same `WorkerHarness` contract and fakes the full catalog
 (territory map §7): `worker succeeds · submits bad artifact · times out · is
 rate-limited · returns a blocker · verifier rejects · human checkpoint waits ·
 downstream receives a missing artifact · app reloads mid-run`.
+
+> **One fake-harness lineage (F11):** the R4 `sim` harness **extends/wraps the R1
+> `mock`** base (shared spawn/handle/draft plumbing) and adds the failure catalog
+> — it is not a second, independently-drifting fake. If `mock` already covers the
+> happy path, `sim` = `mock` + injectable failure modes. State this relationship
+> in the R4 goal result.
 
 ### Idempotency / exactly-once + write-concurrency
 
@@ -1118,11 +1292,19 @@ proven Goal 5D approval-binding (token-bound, auditable in Kernel receipts).
 ```text
 src/kernel/runs/ (or workflows)            (checkpoint_state transitions: running → awaiting-selection → resumed)
 src/kernel/migrations/00X-r5-checkpoint.sql (additive: run checkpoint_state if not already present)
-artifact kind 'candidate'                  (the candidate set is a typed artifact — kind already reserved in R1's enum)
+artifact with kind = "candidate"           (the candidate set is a typed artifact; artifact.kind is free TEXT today — the kind ENUM/migration is R7, so no enum work here — F24)
 src/main/conductor/conductor-loop.ts        (at a checkpoint: pause → surface candidate set → take token-bound selection → spawn deepening tasks → resume)
 src/kernel/tasks/index.ts                   (deepening tasks created from the selected candidate, linked via task_dependencies)
 quantflow-electron/scripts/smoke-checkpoint.* + package.json (smoke:checkpoint)
 ```
+
+> **Three "pause" concepts — name the owner (F13):** `workflows.status` already
+> has `paused`; the run gets `checkpoint_state` (`awaiting-selection`); the
+> Conductor loop has its own `paused` phase. R5 must state explicitly which field
+> owns checkpoint pausing (the run's `checkpoint_state`) vs a workflow-level pause
+> vs a loop step pause, so the executor and UI don't special-case all three.
+> Recommended: `checkpoint_state` is the run-instance pause; `workflows.status`
+> stays the mission-level pause; the loop phase is transient per-step.
 
 ### Checkpoint mechanics (reuse the 5D approval binding)
 
@@ -1213,11 +1395,18 @@ high-attention phases** (the human is the bottleneck, not agent count).
 
 ```text
 run templates as plan-layer config (NOT a Kernel primitive) — e.g. <QUANTFLOW_DIR>/run-templates/*.json, like roles/*.json
-src/main/conductor/ (template runner)      (instantiate a Run from a template; drive it through the DAG executor + runtime manager + checkpoints)
+src/main/conductor/ (template runner)      (compile a template → DAG + phase metadata, then run it through the SAME dag-scheduler/executor — F14)
 three templates: scout.json / research.json / deep.json (DAG depth, roles, budgets, stop conditions, artifact expectations, per-phase attention profile high|medium|low)
 attention-profile enforcement              (serialize high-attention phases; allow parallelism only in low-attention phases)
 quantflow-electron/scripts/smoke-run-template.* + package.json (smoke:run-template)
 ```
+
+> **One executor, not three (F14):** by R6 there are three potential orchestration
+> entry points (the Conductor loop, the template runner, the runtime manager). A
+> template must **compile to a DAG + phase metadata** and execute through the
+> **same `dag-scheduler`** (R3) + runtime manager (R4) + checkpoint controller
+> (R5) — it must not re-implement gating/scheduling logic. The template runner is
+> a *compiler/driver*, not a second orchestrator.
 
 ### Attention Profile (plan-layer attribute, NOT a primitive)
 
@@ -1298,13 +1487,14 @@ evaluation layer.
 When 8 agents run for 4 hours you must be able to see, debug, and trust what
 happened, and the system must get smarter each run. This is the other heavy rung —
 trust and the learning loop. The day-one implication seeded back at R1 pays off
-here: events/receipts must be **timeline-reconstructable** (ordered, linked,
-complete) for Replay to be cheap now.
+here: the **receipt chain** must be **timeline-reconstructable** (ordered by
+`correlation_id`, linked, complete) for Replay to be cheap now — events are
+ephemeral and not persisted (F1).
 
 ## Direct Repo Scope
 
 ```text
-Run Replay (projection — renderer + conductor, derived; NOT truth) over events/receipts
+Run Replay (projection — renderer + conductor, derived; NOT truth) over the durable receipt chain + artifact rows + task timestamps (NOT events — see F1)
 src/main/conductor/ (verifier role) + src/evals/  (semantic verification: escalate from structural; judged via the verifier role + evals)
 src/kernel/migrations/00X-r7-typed-artifacts.sql  (additive: artifact kind enum += evidence|candidate|skeptic_note|thesis|decision_log|outcome|lesson; provenance fields source_refs|observed_at|source_kind|confidence|quote_or_snapshot_ref|sensitivity)
 src/kernel/schema/types.ts + KERNEL_SCHEMA_V1.md
@@ -1317,13 +1507,29 @@ quantflow-electron/scripts/smoke-judgment.* + package.json (smoke:judgment)
 
 ### Authority guards (Band D)
 
-- **Run Replay is a projection, not truth** (like State Cards). Build it over the
-  existing append-only events/receipts; verify they are ordered/linked/complete.
+- **Run Replay is RECEIPT-PRIMARY (F1/F8).** The `events` table is **not
+  persisted** — `emitKernelEvent` is an in-memory `EventEmitter` + `webContents.send`
+  only (this also matches `AUTHORITY_RULES.md`: "events are ephemeral coordination
+  signals"). So Replay must reconstruct the timeline from **durable** Kernel
+  evidence: the **receipt chain** (by `correlation_id`) + **artifact rows** + task
+  **lifecycle timestamps**. Treat events as renderer-only forever. Do **not** bolt
+  on a second timeline store by starting to write the `events` table — unless the
+  goal explicitly decides to persist events at the transition seam, which is a
+  larger change than R7 needs. Replay is a **projection, not truth** (like State
+  Cards). The R1 receipt-chain obligation (F2) is what makes this cheap.
 - **Semantic verification** escalates from structural (R1): it never mutates state
   outside the verification-receipt / eval path; high-risk proposals still go
   through human approval.
-- **Evals stay non-authoritative** — no runtime path reads evals to decide task/
-  workflow state (the Goal 9 invariant holds).
+- **Keep `taskVerify` an orchestrator, not a god function (F15).** `tasks/index.ts`
+  is already ~542 lines. Structural verification lives in `artifacts/verify.ts`
+  (R1); semantic verification is its **own stage/module** invoked by the verify
+  pipeline. `taskVerify` calls stages — it must not inline structural + semantic +
+  eval logic in one function block.
+- **Evals stay non-authoritative + fire-and-forget (F16).** The auto-trigger on
+  task/run complete is **fire-and-forget**: it must not be read back into any
+  `claim`/`verify`/`complete` decision path. Add an explicit regression assertion
+  that task progression does not gate on eval presence or score (the Goal 9
+  invariant holds).
 - **RL is schema preparation only** until runs produce real traces — no training,
   no GRPO, no fine-tuning.
 - Typed evidence artifacts **extend** the base Artifact record with the reserved
@@ -1340,7 +1546,8 @@ quantflow-electron/scripts/smoke-judgment.* + package.json (smoke:judgment)
 ### Machine proof (sim harness, CI)
 
 `bun run smoke:judgment`: a completed run produces a **deterministic Run Replay**
-over its events/receipts (ordered, linked, complete), a `decision_log` artifact, an
+over its **receipt chain + artifact rows + task timestamps** (ordered by
+`correlation_id`, linked, complete — not events), a `decision_log` artifact, an
 `outcome` artifact, and a `lesson` artifact mirrored to the vault; a **semantic
 verification** escalates from structural and is recorded as a verification/eval
 receipt; an **evaluation is auto-produced** on run/task complete (rows present —
@@ -1391,13 +1598,89 @@ full Regression Guard incl. smoke:judgment.
 ## Night Shift (composition target — not a separate rung)
 
 Night Shift = Rungs 1–7 **plus** unattended reliability (R4 recovery + R6
-budgets) **plus** a morning-briefing artifact. It is the proof that the whole
-spine holds overnight: many real agents, recoverable, budget-bounded, producing a
-briefing the human decides on — never an auto-placed action. Compose it only
-after R7; do not build it as a parallel track.
+budgets) **plus** a morning-briefing artifact, **on top of R0** as the operational
+prerequisite (an overnight run needs reliably authed workers — F37). It is the
+proof that the whole spine holds overnight: many real agents, recoverable,
+budget-bounded, producing a briefing the human decides on — never an auto-placed
+action. Compose it only after R7; do not build it as a parallel track.
 
 ---
 
-*All eight rungs (R0–R7) are now scoped. They are promoted and authorized one at
-a time per the Promotion discipline above; future edits are expected as each rung
-meets reality.*
+# Appendix A — Cumulative Regression Guard (F26)
+
+Each rung's regression guard is **cumulative**: a worker on rung N runs the
+smokes for R0…N plus the v3 base. Run from `quantflow-electron/` unless noted.
+
+**v3 base (every rung):**
+```text
+bun run smoke:kernel-task · smoke:state-card · smoke:conductor ·
+smoke:conductor-actions · smoke:conductor-loop · smoke:worker-harness ·
+smoke:harness-interface · smoke:workflow-region · smoke:vault-export · smoke:eval
+bun test src/main/harness-ops.test.ts
+bun test src/main/diagnostics/health-runner.test.ts
+bun run build
+(cd ../tools/quantflow-mcp && node --test)
+```
+
+**Added per rung (cumulative):**
+| Rung | New smoke(s) to add to the stack |
+| --- | --- |
+| R0 | `smoke:capability-preflight` |
+| R1 | `smoke:task-atom` |
+| R2 | `smoke:context-flow` |
+| R3 | `smoke:dag` + `smoke:authority` |
+| R4 | `smoke:pod` |
+| R5 | `smoke:checkpoint` |
+| R6 | `smoke:run-template` |
+| R7 | `smoke:judgment` |
+
+A rung is not done until **its** stack (v3 base + R0…N) is green.
+
+---
+
+# Appendix B — Review dispositions (Cursor thermo-nuclear pass)
+
+Findings verified against shipped code and folded into the goals above. Items
+marked *resolve-at-rung* are captured in the relevant goal text and decided when
+that rung is promoted (per the review's own guidance).
+
+| ID | Disposition |
+| --- | --- |
+| F1/F8 | **Accepted.** Verified: `events` not persisted (`emitKernelEvent` in-memory). R7 Replay reworded **receipt-primary**; events stay renderer-only. |
+| F2 | **Accepted.** R1 now carries an explicit receipt-chain self-sufficiency acceptance item (correlation_id intact, artifact_refs on submit/verify). |
+| F3 | **Accepted.** R1 specifies **one canonical orchestration path** (send → poll collectReceipts → caller posts artifact.create → submit), shared mock+real. |
+| F4 | **Accepted.** R1 harness boundary fixed: harness returns a `ReceiptDraft` + file path; the **caller** posts to Kernel. Mock never calls `kernel.*`. |
+| F5 | **Accepted.** R1/R2 product proofs explicitly scoped to the Conductor/Kernel path; Envoy duality persists until R3. |
+| F6 | **Accepted.** R3 gate-zero decision memo + heuristics (Workflow already has instance-ish fields). |
+| F7 | **Accepted.** R4 worker-status reconciliation map (extend the v3 enum; no task-like states on workers). |
+| F9/F10 | **Accepted.** R3 extracts `dag-scheduler.ts` (no inlining into the 156-line loop) + R3a/R3b/R3c sub-milestones. |
+| F11 | **Accepted.** R4 `sim` extends the R1 `mock` base. |
+| F12 | **Accepted.** R4 Runtime Manager mutates only via `kernel.worker.*`/`kernel.task.*` — no direct SQL. |
+| F13 | **Accepted.** R5 names checkpoint-pause ownership vs workflow pause vs loop pause. |
+| F14 | **Accepted.** R6 templates compile to DAG + phase metadata, run through the one executor. |
+| F15 | **Accepted.** R7 keeps `taskVerify` an orchestrator; semantic verify is its own stage. |
+| F16 | **Accepted.** R7 eval auto-trigger is fire-and-forget with a no-read-back regression assertion. |
+| F17 | **Accepted.** R1 diagnosis softened — audit assign paths (taskClaim already binds via tileId). |
+| F18/F19 | **Accepted.** R2 envelope is a pure projection (no conductor/renderer imports); assignment gate is an acknowledged R2 limitation closed by R3. |
+| F20 | **Accepted.** Audit confirms no existing credential store; `getCredential()` is the single accessor. |
+| F21 | **Accepted.** R0 uses `qf capability` / `smoke:capability-preflight` — not the existing `preflight` script. |
+| F22 | **Accepted.** R0 product proof satisfied by any rail reaching ready; herdr fix optional. |
+| F23 | **Accepted.** R1 real `send` is approval-gated/explicit; only mock assign stays low-risk/auto. |
+| F24 | **Accepted.** R5 wording fixed — `artifact.kind` is free TEXT; the kind enum is R7. |
+| F25 | **Accepted.** R3 MCP Kernel reads are external-only; Conductor keeps native tools. |
+| F26 | **Accepted.** Appendix A cumulative regression stack added. |
+| F27 | **Accepted.** `docs/v4/AGENTS.md` added; root `AGENTS.md` + `.cursor` rule updated to v4. |
+| F28 | **Accepted.** Naming guard added — rung R0 ≠ "distribution axis" (§9). |
+| F29 | **Accepted.** `src/harness/AGENTS.md` drift note corrected (5D defined the seam; `conductor-actions` does not yet call `send` — R1 wires it). |
+| F30 | **Accepted.** R1 atom must not use the `legacy: true` bypass. |
+| F31/F32 | **Accepted.** R1 decides `artifact_root` first; locks the `attemptId` field name/semantics. |
+| F34 | **Accepted.** R0 probes map to spawn-rail roles + harness descriptors separately; no CLI-as-harness-kind. |
+| F36 | **Accepted.** Attention-profile attribute moved from R4 to R6. |
+| F37 | **Accepted.** Night Shift notes R0 as operational prerequisite. |
+| F33 | **Noted.** Editor line-count metadata is cosmetic; ignored. |
+
+---
+
+*All eight rungs (R0–R7) are now scoped and patched against the thermo-nuclear
+review. They are promoted and authorized one at a time per the Promotion
+discipline above; future edits are expected as each rung meets reality.*

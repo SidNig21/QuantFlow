@@ -5,15 +5,19 @@ alwaysApply: true
 
 # QuantFlow routing
 
-**Branch:** `quantflow-v3`
+**Branch:** `quantflow-v4` (extends v3; v3 docs remain binding authority)
 
-**Read order:**
+**Read order (on `quantflow-v4`):**
 
-1. `AGENTS.md` - agent guardrails and source freshness
-2. `BUILD_PLAN_V3.md` - current v3 execution plan
-3. `CONCEPT.md` - product definition
-4. `BUILD_PLAN_V2.md` - shipped v2 behavior reference only
-5. `VAULT.md` - paired Obsidian vault paths
+1. `AGENTS.md` - agent guardrails and active-branch routing
+2. `docs/v4/V4_TERRITORY_MAP.md` - v4 territory + open decisions (locked reference)
+3. `BUILD_PLAN_V4.md` - current v4 rung goal shape (R0–R7) + cumulative regression guard
+4. `docs/v4/AGENTS.md` - v4 subtree contract
+5. `KERNEL_CONSTITUTION.md` + `docs/v3/AUTHORITY_RULES.md` + `docs/v3/KERNEL_SCHEMA_V1.md` + `docs/v3/GLOSSARY.md` - still binding
+6. `BUILD_PLAN_V3.md` - shipped v3 ladder + goal-shape convention (reference)
+7. `CONCEPT.md` / `VAULT.md` - product definition / paired vault paths
+
+On `quantflow-v3`, use `BUILD_PLAN_V3.md` as the execution plan instead (steps 3–4 above).
 
 **Vault:** `C:\Users\rybow\Obsidian\Cursor Collab`
 

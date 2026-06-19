@@ -1,5 +1,19 @@
 # QuantFlow Agent Entry
 
+## Active branch routing
+
+- On **`quantflow-v4`**: the active execution plan is **`BUILD_PLAN_V4.md`**
+  (per-rung goal shapes R0–R7) with **`docs/v4/V4_TERRITORY_MAP.md`** as the
+  locked territory reference and **`docs/v4/AGENTS.md`** as the subtree contract.
+  v4 is an **extension** of v3, not a rewrite — the v3 authority docs below
+  (`KERNEL_CONSTITUTION.md`, `docs/v3/*`, the goal-shape convention) remain
+  **fully binding**. Promote and build one rung at a time.
+- On **`quantflow-v3`**: `BUILD_PLAN_V3.md` is the execution plan (v3 is in the
+  dogfooding phase; the ladder Goals 0–9 are shipped).
+
+The v3 Authority section below applies on both branches as the constitutional
+base; v4 only adds the three constitutional lines documented in `BUILD_PLAN_V4.md`.
+
 ## v3 Authority
 
 Current branch: `quantflow-v3`
