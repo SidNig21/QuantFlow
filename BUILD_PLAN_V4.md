@@ -128,7 +128,12 @@ This section is the durable progress ledger for the v4 branch.
 | --- | --- | --- | --- | --- | --- |
 | R0 — Auth / capability preflight | Scoped / awaiting authorization | — | — | — | Extends the existing `diagnostics/` health-probe framework with a `capability` group; derived report only, no Kernel schema change. |
 | R1 — One real task atom | Scoped / awaiting authorization | — | — | — | Wires the existing `kernel.artifact.create` into the task atom, binds worker via `harness.send`, and replaces `taskVerify`'s rubber-stamp with a structural artifact check. One additive migration (`worker_instances.assigned_task_id`); registers a `mock` harness for CI. |
-| R2–R7 | Not yet scoped | — | — | — | — |
+| R2 — Upstream artifact → downstream context | Scoped / awaiting authorization | — | — | — | Context Envelope v0 (read-path projection) + artifact lineage (`derived_from`). Worker B consumes A's *verified* artifact via the envelope through `harness.send`. |
+| R3 — Small DAG + authority consolidation | Scoped / awaiting authorization | — | — | — | Resolves §10.1 (Run vs Workflow) first. DAG executor over `task_dependencies`; Run aggregates references only; "Kernel decides, Envoy mirrors" enforced; MCP gains Kernel reads. |
+| R4 — Durable pod runtime | Scoped / awaiting authorization | — | — | — | Worker Runtime Manager, budgets on Run, reload survival, stale/cancel/timeout/recover, simulation harness (failure catalog), exactly-once commands. The heaviest rung. |
+| R5 — Human checkpoint / deepen loop | Scoped / awaiting authorization | — | — | — | Pausable/resumable run; candidate-set artifact; token-bound human selection; deepening tasks spawn. Enforces the decision-authority rule. |
+| R6 — Run templates | Scoped / awaiting authorization | — | — | — | Scout / Research / Deep as saved plan-layer Conductor plans (DAG + roles + budgets + stop + artifact expectations + per-phase attention profiles). |
+| R7 — Judgment & compounding | Scoped / awaiting authorization | — | — | — | Run Replay (projection), semantic verification escalation, typed research artifacts + provenance, decision/outcome/lesson logs, eval auto-trigger, RL schema prep. |
 
 ---
 
@@ -707,4 +712,692 @@ the BUILD_PLAN_V4 ledger if approved, and pushes.
 
 ---
 
-*Goals R2–R7 are scoped one at a time, after the prior rung is approved.*
+# Goal R2 — Upstream Artifact → Downstream Context
+
+> Band B (flow) · territory map §4 Band B, §5 (Context Envelope v0 + artifact
+> lineage), §8 rung 2. Depends on R1.
+
+## Goal
+
+Make a **second** task consume the **verified** artifact of the first — the first
+real link of a pipeline. The downstream worker receives a structured **Context
+Envelope v0** (role, task, permissions summary, upstream verified artifacts,
+expected output, verification rule) delivered through `harness.send`, and the
+artifact it produces records its **lineage** (`derived_from`) back to the
+upstream artifact.
+
+R2 turns "one task does real work" (R1) into "work flows downstream." It is still
+a straight line — no graph, no parallelism, no Run object yet.
+
+## Why
+
+R1 proved one task produces a verified artifact; a research run is worthless if
+the next worker can't *use* it. The territory map's Band B smallest-first version
+is exactly this: "Context Envelope v0 passes upstream artifact metadata to the
+downstream worker" — not RAG, not densification. R2 also adopts the lineage seam
+(`derived_from`) early so evidence ancestry is reconstructable later (Band D
+Replay/lessons depend on it).
+
+## Direct Repo Scope
+
+```text
+src/kernel/context/envelope.ts            (NEW — pure ContextEnvelope v0 builder over Kernel reads)
+src/kernel/context/envelope.test.ts       (NEW — machine proof: projection shape + sensitivity rule)
+src/kernel/queries/index.ts               (add queryUpstreamArtifacts(taskId): verified artifacts via task_dependencies kind='context_from')
+src/kernel/migrations/00X-r2-artifact-lineage.sql (NEW — additive: artifacts.derived_from JSON array of artifact_ids)
+src/kernel/schema/types.ts + docs/v3/KERNEL_SCHEMA_V1.md (document derived_from)
+src/kernel/receipts/index.ts              (kernel.artifact.create accepts/records derived_from)
+src/main/conductor/conductor-actions.ts   (assign builds the envelope and delivers it via harness.send for the downstream task)
+quantflow-electron/scripts/smoke-context-flow.* + package.json (smoke:context-flow)
+BUILD_PLAN_V4.md                          (ledger update on approval — verifier only)
+```
+
+### Context Envelope v0 (read-path projection — never authoritative)
+
+Build from existing Kernel reads (`queryArtifactList`, `queryReceiptList`,
+`queryStateCardList`, `queryTaskGet`). Shape (territory map §5):
+
+```text
+run{run_id?, mode?, objective?}            (run_id null until R3)
+role
+task{objective, acceptance_criteria, expected_artifact, verification_rule}
+permissions(policy summary)
+upstream_artifacts[{artifact_id, title, uri, kind, verification_status, produced_by_task}]
+relevant_state_cards
+recent_receipts                             (densified later — not now)
+instrumentation{context_tokens_estimate, raw_receipt_count}
+```
+
+- The envelope **references** upstream artifacts by `artifact_id` + `uri`; it
+  **never copies** artifact content/truth.
+- `verification_status` is read from Kernel truth — only artifacts whose task
+  reached `complete` via a `verification_passed` receipt are marked `verified`.
+- **Sensitive artifacts (`sensitivity != normal`) are not injected by default.**
+  The `sensitivity` field is reserved (R7); R2 defaults everything to `normal`
+  but implements the exclusion hook so turning it on later is not a retrofit.
+- The `instrumentation` block is the densification **measurement** (capture now,
+  build densifiers only if measured pain appears — territory map §3).
+
+## Out of Scope
+
+- No DAG / parallel branches / Run object (R3) — exactly one upstream → one
+  downstream link.
+- No densification/RAG — instrument only.
+- No multi-run, no durability (R4).
+- No new provenance fields beyond `derived_from` (the rest are R7).
+
+## Acceptance Test
+
+### Machine proof (mock harness, CI)
+
+`bun run smoke:context-flow`:
+- Task A (mock) produces a verified artifact (reuses the R1 atom).
+- Task B is declared `context_from` A (`task_dependencies`). `assign_task` for B
+  builds a Context Envelope whose `upstream_artifacts` contains A's artifact with
+  `verification_status: verified`, `uri`, `produced_by_task: A`, and delivers it
+  via `mock.send` (assert the mock received the envelope, not a bare string).
+- B's produced artifact records `derived_from: [A.artifact_id]`.
+- The envelope is a pure projection: building it issues **no** Kernel mutation.
+- `instrumentation.context_tokens_estimate` / `raw_receipt_count` are present.
+- **Negative:** an upstream task that is not yet `complete`/verified is **not**
+  marked `verified` in the envelope (or is excluded); a `sensitivity != normal`
+  artifact is **not** injected by default.
+
+### Product proof (real, manual)
+
+A real downstream worker receives A's verified artifact via the envelope in its
+`send` payload and uses it to produce B's artifact, which records `derived_from`.
+
+### Regression Guard
+
+All R0/R1 acceptance + v3 smokes pass; `smoke:context-flow` added; migration is
+additive (`derived_from` defaults `[]`/null).
+
+## Failure Signals
+
+- The envelope **copies** artifact content/truth instead of referencing by
+  `artifact_id` + `uri` (a second store).
+- An unverified/incomplete upstream artifact is passed as `verified` context.
+- Building the envelope mutates Kernel state.
+- A sensitive artifact is injected into context by default.
+- Context delivered by paste/`terminal_write` instead of `harness.send`.
+
+## Handoff Block
+
+```text
+Branch quantflow-v4. Read: AGENTS.md chain → docs/v4/V4_TERRITORY_MAP.md →
+BUILD_PLAN_V3.md → KERNEL_CONSTITUTION.md + AUTHORITY_RULES.md + KERNEL_SCHEMA_V1.md
+→ R1 (done) → this goal (R2).
+
+R2 makes ONE downstream task consume ONE upstream VERIFIED artifact via a
+Context Envelope v0 delivered through harness.send. The envelope is a read-path
+PROJECTION — it references artifacts by id+uri, never copies truth, and only
+marks an artifact `verified` when its task completed via verification_passed.
+Add artifacts.derived_from (additive migration) and record it on the downstream
+artifact. Sensitive artifacts are not injected by default (implement the hook;
+sensitivity itself is R7). Capture context_tokens_estimate/raw_receipt_count but
+build NO densifier. Do not add a DAG, Run object, or parallelism. Run the full
+Regression Guard incl. smoke:context-flow before submitting.
+```
+
+---
+
+# Goal R3 — Small DAG + Authority Consolidation
+
+> Band B (flow) · territory map §4 Band B, §5 (Run object), §8 rung 3, §10.1
+> (Run vs Workflow — RESOLVE FIRST), §10.2 (Envoy resolution). Depends on R2.
+
+## Goal
+
+Execute a small **task graph** — `collect → analyze → synthesize` with one
+parallel branch — gating each downstream task on its upstream's verify-complete,
+running independent branches concurrently. Introduce the **Run** object as the
+execution-instance container that **aggregates references** to the tasks,
+artifacts, and receipts of one run. And enforce the v4 authority line **Kernel
+decides; Envoy mirrors** before graphs get complex.
+
+## Why
+
+A research run is a graph, not a line. The territory map makes R3 the rung where
+the authority rule must already be in force: "if two systems can both say whether
+a task is complete, DAG orchestration becomes unreliable." So R3 both builds the
+DAG executor and consolidates task authority onto the Kernel.
+
+## RESOLVE FIRST (territory map §10.1)
+
+Before any code: decide **Run vs Workflow** against the vocab lock. Either
+`Run` is a new primitive (new `runs` table) **or** the existing `Workflow` is the
+instance (extended with `mode`/`objective`/`budget`/`checkpoint_state`). Record
+the decision and rationale in the goal result, `docs/v3/GLOSSARY.md`, and
+`KERNEL_SCHEMA_V1.md`. The atom (R1) and R2 deliberately left `run_id` nullable so
+this decision was not pre-empted.
+
+## Direct Repo Scope
+
+```text
+docs/v3/GLOSSARY.md + KERNEL_SCHEMA_V1.md  (record the Run-vs-Workflow decision)
+src/kernel/runs/ (NEW if Run is a primitive) OR src/kernel/workflows/ (extension)
+src/kernel/migrations/00X-r3-run.sql       (runs table OR workflow instance columns; backfill artifacts.run_id — nullable)
+src/main/conductor/conductor-loop.ts + conductor-planner.ts (extend single-action → DAG walk over task_dependencies kind='blocks')
+src/kernel/tasks/index.ts                  (a task is claimable only when all blocks-deps are complete+verified)
+Envoy consolidation:
+  quantflow-electron/src/main/envoy-task-service.ts (route through Kernel task commands OR make Envoy a read-only mirror)
+  tools/quantflow-mcp/                      (add Kernel reads: kernel.canvas.snapshot / state_card / workflow.region / eval)
+quantflow-electron/scripts/smoke-dag.* + package.json (smoke:dag)
+```
+
+### Run object (aggregates references — NEVER copies truth)
+
+```text
+run_id · workflow_id/template_id · mode · objective · status · started_at · ended_at ·
+budget{…}(declared, enforced in R4) · checkpoint_state(R5) · policy(ref) ·
+task_ids[] · artifact_ids[] · receipt_ids[] · cost(rollup)
+```
+
+The Run holds **references + instance fields only**. It must never duplicate
+task/artifact/receipt truth, or it becomes a second store.
+
+### DAG executor
+
+Extend the stateless, approval-gated loop (`conductor-loop.ts`): walk the task
+graph via `task_dependencies` (`kind='blocks'`); a downstream task becomes
+claimable only when **every** upstream dependency is `complete` with a
+`verification_passed` receipt; independent branches may run in parallel (each
+action still routes through the approval gate and Kernel command boundary).
+
+### Authority consolidation (Kernel decides; Envoy mirrors)
+
+Resolve Envoy (bridge / migrate / retire — §10.2): Envoy task ops must route
+through Kernel task commands, or Envoy becomes a read-only mirror of Kernel task
+state — there is exactly **one** task authority. MCP gains read-only Kernel
+queries (the gap from `INCOMING_GOALS.md`).
+
+## Out of Scope
+
+- No durability/recovery, runtime manager, or budget **enforcement** (R4 —
+  budget fields are declared here, enforced there).
+- No human checkpoint/deepen (R5), no templates (R6), no judgment (R7).
+- No new harness; the DAG runs on mock (CI) and the real harness (proof).
+
+## Acceptance Test
+
+### Machine proof (mock harness, CI)
+
+`bun run smoke:dag`: a `collect → {analyze} → synthesize` graph with one parallel
+branch runs on mock workers; each downstream task starts only after its upstream
+`verification_passed`; the independent branch runs concurrently; the Run
+aggregates the task/artifact/receipt ids **without** duplicating them; artifacts
+carry `run_id`.
+
+### Authority proof
+
+There is one task authority: assert Envoy reflects Kernel task state and does not
+write competing task/receipt state; MCP exposes the new Kernel reads.
+
+### Product proof (real)
+
+A real multi-agent run executes the 3-node DAG end-to-end.
+
+### Regression Guard
+
+R0–R2 + v3 smokes pass; `smoke:dag` added; Run migration additive; the R1 single
+atom still passes unchanged.
+
+## Failure Signals
+
+- The Run **copies** task/artifact/receipt truth (second store).
+- A downstream task runs before its upstream is `complete`+verified.
+- Envoy still acts as a parallel task/receipt authority.
+- The DAG executor bypasses the approval gate or the Kernel command boundary.
+- `Run` is named/shaped without resolving §10.1 against the vocab lock.
+
+## Handoff Block
+
+```text
+Branch quantflow-v4. R3 = small DAG + one task authority.
+RESOLVE FIRST: Run vs Workflow (§10.1) against the vocab lock; record the
+decision in GLOSSARY + KERNEL_SCHEMA before coding. The Run AGGREGATES references
+(task_ids/artifact_ids/receipt_ids) + instance fields only — it NEVER copies
+task/artifact/receipt truth. Extend conductor-loop.ts into a DAG walk over
+task_dependencies(kind='blocks'); a downstream task is claimable only when all
+upstreams are complete + verification_passed; independent branches run in
+parallel through the SAME approval gate + Kernel command boundary. Enforce
+"Kernel decides; Envoy mirrors": route Envoy task ops through Kernel commands or
+make Envoy a read-only mirror; add Kernel read tools to MCP. Budgets are DECLARED
+on the Run here, ENFORCED in R4. Do not build durability/recovery/templates/
+judgment. Run the full Regression Guard incl. smoke:dag.
+```
+
+---
+
+# Goal R4 — Durable Pod Runtime
+
+> Band C (control) · territory map §4 Band C, §5 (Runtime Manager record, policy
+> envelope, budgets), §6 (hard problems), §7 (simulation harness), §8 rung 4,
+> §10.4/§10.5. Depends on R3. **The heaviest rung — weeks, not days.**
+
+## Goal
+
+Make a multi-worker run **survivable**: track many workers; timeout / cancel /
+restart / mark-stale / recover a worker's task; survive an app reload; stay
+bounded by budgets; be testable without real agents via a **simulation harness**
+that fakes the full failure catalog; and make submit/verify/complete
+**exactly-once** so retries and recovery can't double-write or double-complete.
+
+## Why
+
+In many-agent, long-running systems, **partial failure is the norm** — design
+around retry/recovery/degradation, not the happy path (territory map §6). This is
+the rung that turns "a graph runs once on a good day" into "a run survives the
+night." Difficulty concentrates here.
+
+## Direct Repo Scope
+
+```text
+src/kernel/migrations/00X-r4-runtime.sql   (additive: worker_instances status += stale|failed|assigned, auth_status, last_seen; Run budget fields; policy ref)
+src/kernel/schema/types.ts + KERNEL_SCHEMA_V1.md
+src/harness/runtime-manager/ (NEW)         (control plane over Goal 6A identity: track/timeout/cancel/restart/mark-stale/recover; status truth stays in Kernel)
+src/harness/sim/ (NEW)                      (simulation harness: fakes the failure catalog; same WorkerHarness contract)
+src/kernel/tasks/index.ts + commands        (attempt-keyed submit/verify/complete — enforce the R1 idempotency seam; stale-task recovery → open)
+src/main/conductor/conductor-loop.ts        (DAG executor checks Run budgets / stop conditions; pauses on budget exhaustion)
+quantflow-electron/src/main/canvas-persistence.ts + worker restore (reload survival: worker/task/run state restored from Kernel; persist/restore spawned tiles)
+run-template attention profile attribute    (phase touch level — plan-layer attribute, NOT a primitive)
+quantflow-electron/scripts/smoke-pod.* + package.json (smoke:pod)
+```
+
+### Worker Runtime Manager (control layer, NOT a truth store)
+
+Tracks many workers and drives harness verbs (timeout / cancel / restart /
+mark-stale / recover-task). **Worker status truth stays in the Kernel** (State
+Cards / `worker_instances.status`); the manager reports and drives, it does not
+own truth.
+
+### Budgets / stop conditions
+
+`max_workers · max_wallclock · max_spend · max_tool_calls · max_retries ·
+requires_checkpoint` declared on the Run (R3), checked by the executor.
+
+### Simulation harness (machine proof of Band B/C)
+
+Implements the same `WorkerHarness` contract and fakes the full catalog
+(territory map §7): `worker succeeds · submits bad artifact · times out · is
+rate-limited · returns a blocker · verifier rejects · human checkpoint waits ·
+downstream receives a missing artifact · app reloads mid-run`.
+
+### Idempotency / exactly-once + write-concurrency
+
+Attempt-keyed `submit`/`verify`/`complete` (enforce the R1 seam) so retry/recovery
+can't double-write artifacts or double-complete tasks. SQLite is single-writer —
+add a write strategy so concurrent receipt writes from many workers don't
+contend/corrupt (territory map §6 "storage write-concurrency").
+
+### Policy: declare now, enforce minimally
+
+Policy fields declared per run/worker; **minimal safety-critical enforcement only**
+routes through the Kernel (`request → validate → execute → receipt`). Broad
+capability enforcement stays on the deferred R0/distribution axis.
+
+## Out of Scope
+
+- No production/cloud durability — **driver seams only** (interface, no cloud
+  code).
+- No **broad** permission enforcement (R0/distribution axis).
+- No human checkpoint UI/deepen loop (R5), no templates (R6), no judgment (R7).
+
+## Acceptance Test
+
+### Machine proof (simulation harness, CI)
+
+`bun run smoke:pod`: multiple sim workers run a DAG; **reload mid-run → worker/
+task/run state survives** (fixes the MCP-tiles-lost-on-reload finding); a worker
+**timeout → marked stale → its task recovered to `open`**; **cancel** stops a
+worker; **budget exceeded → run stops**; each failure-catalog case is handled
+without corrupting state; a **retried submit/verify is exactly-once** (no double
+artifact, no double `complete`); concurrent receipt writes from many workers do
+not corrupt or deadlock.
+
+### Product proof (real)
+
+A real multi-worker run survives an app reload and a worker kill, and recovers.
+
+### Regression Guard
+
+R0–R3 + v3 smokes pass; `smoke:pod` added; migration additive; the R1 atom and
+R3 DAG still pass.
+
+## Failure Signals
+
+- The Runtime Manager becomes a **truth store** (worker status not in Kernel).
+- A reload loses worker/task/run state.
+- A retry double-writes an artifact or double-completes a task.
+- Budgets are declared but not enforced; a run blows its budget silently.
+- Concurrent writes corrupt or deadlock the DB.
+- `auth_status` or worker status is invented outside the Kernel.
+- Cloud/production code is added instead of driver seams.
+
+## Handoff Block
+
+```text
+Branch quantflow-v4. R4 = make a multi-worker run survivable. The heaviest rung —
+design around partial failure, not the happy path.
+Build: a Worker Runtime Manager (control layer — worker status truth STAYS in the
+Kernel), a simulation harness implementing the SAME WorkerHarness contract that
+fakes the full failure catalog, reload survival (restore worker/task/run from
+Kernel), budget enforcement by the executor, and attempt-keyed exactly-once
+submit/verify/complete (enforce the R1 idempotency seam). Add a SQLite
+write-concurrency strategy. Migration is additive (worker status values,
+auth_status, last_seen, Run budget fields). Policy is DECLARED with only minimal
+safety-critical enforcement routed through the Kernel; broad enforcement stays
+deferred. NO cloud code — driver seams only. NO checkpoint UI/templates/judgment.
+Run the full Regression Guard incl. smoke:pod.
+```
+
+---
+
+# Goal R5 — Human Checkpoint / Deepen Loop
+
+> Band C (control) · territory map §2 (decision-authority rule), §4 Band C, §8
+> rung 5. Depends on R4.
+
+## Goal
+
+Let a run **pause at a checkpoint, surface a candidate set to the human, take a
+token-bound selection, and spawn deepening tasks** for the chosen candidate(s),
+then resume. This operationalizes the decision-authority rule: the Kernel is
+terminal on truth, the **human is terminal on decisions**.
+
+## Why
+
+A research-run OS that auto-decides is a liability — "a Night Shift run produces a
+*briefing*, not a placed bet." R5 is the steering wheel: the run gathers
+candidates, the human picks, and only then does the system deepen. It reuses the
+proven Goal 5D approval-binding (token-bound, auditable in Kernel receipts).
+
+## Direct Repo Scope
+
+```text
+src/kernel/runs/ (or workflows)            (checkpoint_state transitions: running → awaiting-selection → resumed)
+src/kernel/migrations/00X-r5-checkpoint.sql (additive: run checkpoint_state if not already present)
+artifact kind 'candidate'                  (the candidate set is a typed artifact — kind already reserved in R1's enum)
+src/main/conductor/conductor-loop.ts        (at a checkpoint: pause → surface candidate set → take token-bound selection → spawn deepening tasks → resume)
+src/kernel/tasks/index.ts                   (deepening tasks created from the selected candidate, linked via task_dependencies)
+quantflow-electron/scripts/smoke-checkpoint.* + package.json (smoke:checkpoint)
+```
+
+### Checkpoint mechanics (reuse the 5D approval binding)
+
+- The run reaches a checkpoint phase and **pauses** (`awaiting-selection`).
+- It surfaces a **candidate-set artifact** (`kind: 'candidate'`) — the options.
+- The operator submits a **selection**, token-bound to the exact candidate set
+  shown (same drift-proof property as `proposalToken` in `conductor-loop.ts`).
+  The selection is recorded as a human decision (receipt).
+- **Deepening tasks spawn only for the selected candidate(s)**; the run resumes.
+
+## Out of Scope
+
+- No run templates (R6); no Run Replay / decision-log-as-typed-artifact (R7 — R5
+  records the selection, R7 formalizes the decision/outcome logs).
+- No semantic verification (R7).
+- No auto-selection of any kind.
+
+## Acceptance Test
+
+### Machine proof (sim harness, CI)
+
+`bun run smoke:checkpoint`: a run reaches a checkpoint, pauses
+(`awaiting-selection`), surfaces a candidate-set artifact, the operator submits a
+**token-bound** selection, deepening task(s) spawn for the **selected** candidate
+only, and the run resumes. The selection is recorded as a human-decision receipt.
+
+### Decision-authority proof
+
+The run does **not** auto-pick: with no selection submitted it stays paused
+indefinitely; a stale/forged/drifted selection token is refused (reuse the 5D
+stale-token behavior); no deepening task spawns without a valid selection.
+
+### Product proof (real)
+
+A real run pauses, the operator picks from the candidate set, and the deepening
+tasks run.
+
+### Regression Guard
+
+R0–R4 + v3 smokes pass; `smoke:checkpoint` added; migration additive; the 5D loop
+approval semantics are unchanged.
+
+## Failure Signals
+
+- The run **auto-decides** at a checkpoint (violates decision-authority).
+- The selection is not token-bound (an operator can approve set A and have the
+  run deepen drifted set B).
+- Deepening tasks spawn without a human selection.
+- The candidate set is stored as live mutable state instead of a `candidate`
+  artifact.
+
+## Handoff Block
+
+```text
+Branch quantflow-v4. R5 = human-in-the-loop steering. The run PAUSES at a
+checkpoint, surfaces a candidate-set artifact (kind 'candidate'), takes a
+TOKEN-BOUND human selection (reuse the Goal 5D proposalToken drift-proofing),
+and spawns deepening tasks ONLY for the selected candidate, then resumes. The run
+must NEVER auto-decide — no selection ⇒ stays paused; stale/forged token ⇒
+refused. Record the selection as a human-decision receipt. Do not build
+templates/replay/semantic-verify. Run the full Regression Guard incl.
+smoke:checkpoint.
+```
+
+---
+
+# Goal R6 — Run Templates (Scout / Research / Deep)
+
+> Band B/C plan layer · territory map §4 Band C (Attention Profile), §8 rung 6.
+> Depends on R5.
+
+## Goal
+
+Package the proven loop into **named run modes** — Scout / Research / Deep — as
+saved, parameterized **Conductor plans** that assemble a DAG (R3) + roles +
+budgets (R4) + stop conditions + artifact expectations + **per-phase attention
+profiles** and execute the full collect → checkpoint (R5) → deepen loop. Invoking
+a named mode runs the whole thing.
+
+## Why
+
+This is where v4 becomes a product rather than a pile of mechanisms: the operator
+picks "Scout this" or "Deep-research this" and a tuned run executes. The attention
+profile is what keeps it sane — **parallelize low-attention phases, serialize
+high-attention phases** (the human is the bottleneck, not agent count).
+
+## Direct Repo Scope
+
+```text
+run templates as plan-layer config (NOT a Kernel primitive) — e.g. <QUANTFLOW_DIR>/run-templates/*.json, like roles/*.json
+src/main/conductor/ (template runner)      (instantiate a Run from a template; drive it through the DAG executor + runtime manager + checkpoints)
+three templates: scout.json / research.json / deep.json (DAG depth, roles, budgets, stop conditions, artifact expectations, per-phase attention profile high|medium|low)
+attention-profile enforcement              (serialize high-attention phases; allow parallelism only in low-attention phases)
+quantflow-electron/scripts/smoke-run-template.* + package.json (smoke:run-template)
+```
+
+### Attention Profile (plan-layer attribute, NOT a primitive)
+
+Each run phase declares a touch level: **high** (spec / clarification / final
+decision), **medium** (plan review / candidate selection / verifier objections),
+**low** (collection / analysis / report generation). The runner runs **one**
+human-led high-attention lane plus one or more low-attention execution lanes with
+artifact handoff — never several high-attention agents interrogating the operator
+at once.
+
+## Out of Scope
+
+- No Night Shift unattended-reliability packaging or morning-briefing artifact
+  (that composition is R7 + R4 recovery + R6 budgets).
+- No Run Replay / semantic verify / lessons (R7).
+- Templates must not become Kernel truth — they are plan-layer config.
+
+## Acceptance Test
+
+### Machine proof (sim harness, CI)
+
+`bun run smoke:run-template`: invoking a named template (e.g. Scout) instantiates
+a Run, executes its DAG on sim workers within its declared budget, hits its
+checkpoint(s), and produces the expected artifacts. A **high-attention phase is
+serialized** (not parallelized) while a **low-attention phase runs in parallel**,
+per the template's attention profile.
+
+### Product proof (real)
+
+A real Scout (and one of Research/Deep) run executes end-to-end from a single
+named invocation.
+
+### Regression Guard
+
+R0–R5 + v3 smokes pass; `smoke:run-template` added; templates are config only (no
+schema/primitive added).
+
+## Failure Signals
+
+- A template becomes a Kernel primitive / truth store (it is plan-layer config).
+- A run **duplicates** Run truth inside the template.
+- The attention profile is ignored — a high-attention phase is parallelized and
+  swarms the operator.
+- A named run cannot execute the full collect → checkpoint → deepen loop.
+
+## Handoff Block
+
+```text
+Branch quantflow-v4. R6 = Scout/Research/Deep as saved plan-layer Conductor plans
+(config like roles/*.json, NOT a Kernel primitive). A template assembles a DAG
+(R3) + roles + budgets (R4) + stop conditions + artifact expectations + a
+per-phase attention profile, and a template runner drives the full
+collect → checkpoint (R5) → deepen loop from one named invocation. Enforce the
+attention profile: SERIALIZE high-attention phases, PARALLELIZE only
+low-attention phases — never swarm the operator. Do not make templates Kernel
+truth; do not build Night Shift packaging or Replay. Run the full Regression
+Guard incl. smoke:run-template.
+```
+
+---
+
+# Goal R7 — Judgment & Compounding
+
+> Band D (judgment & compounding) · territory map §4 Band D, §5 (typed research
+> artifacts + provenance), §8 rung 7, §9 (RL = schema prep only). Depends on R6.
+
+## Goal
+
+Make a completed run **trustworthy** and make the system **compound across runs**:
+a readable **Run Replay**, **semantic verification** (did the evidence actually
+support the claim) escalating from R1's structural check, **typed research
+artifacts** with external provenance, **decision** and **outcome** logs, **lesson
+cards** mirrored to the vault, and an **eval auto-trigger** so runs feed the
+evaluation layer.
+
+## Why
+
+When 8 agents run for 4 hours you must be able to see, debug, and trust what
+happened, and the system must get smarter each run. This is the other heavy rung —
+trust and the learning loop. The day-one implication seeded back at R1 pays off
+here: events/receipts must be **timeline-reconstructable** (ordered, linked,
+complete) for Replay to be cheap now.
+
+## Direct Repo Scope
+
+```text
+Run Replay (projection — renderer + conductor, derived; NOT truth) over events/receipts
+src/main/conductor/ (verifier role) + src/evals/  (semantic verification: escalate from structural; judged via the verifier role + evals)
+src/kernel/migrations/00X-r7-typed-artifacts.sql  (additive: artifact kind enum += evidence|candidate|skeptic_note|thesis|decision_log|outcome|lesson; provenance fields source_refs|observed_at|source_kind|confidence|quote_or_snapshot_ref|sensitivity)
+src/kernel/schema/types.ts + KERNEL_SCHEMA_V1.md
+decision_log + outcome artifact kinds       (what the human chose and why; what actually happened after)
+lesson card                                 ('lesson' artifact distilled from a run, mirrored to vault via the Goal 8 OKF exporters in src/vault)
+eval auto-trigger                           (on task/run complete → produce an evaluation; fixes the 'evaluations had 0 rows' finding)
+RL prep                                      (outcome/eval schema preparation ONLY — no training)
+quantflow-electron/scripts/smoke-judgment.* + package.json (smoke:judgment)
+```
+
+### Authority guards (Band D)
+
+- **Run Replay is a projection, not truth** (like State Cards). Build it over the
+  existing append-only events/receipts; verify they are ordered/linked/complete.
+- **Semantic verification** escalates from structural (R1): it never mutates state
+  outside the verification-receipt / eval path; high-risk proposals still go
+  through human approval.
+- **Evals stay non-authoritative** — no runtime path reads evals to decide task/
+  workflow state (the Goal 9 invariant holds).
+- **RL is schema preparation only** until runs produce real traces — no training,
+  no GRPO, no fine-tuning.
+- Typed evidence artifacts **extend** the base Artifact record with the reserved
+  provenance fields; the file/vault is storage, the artifact row is truth.
+
+## Out of Scope
+
+- No RL **training** / GRPO / fine-tuning — schema prep only.
+- No cloud / Night-Shift production infra — driver seams only.
+- No heavy context densification (instrumentation from R2 only).
+
+## Acceptance Test
+
+### Machine proof (sim harness, CI)
+
+`bun run smoke:judgment`: a completed run produces a **deterministic Run Replay**
+over its events/receipts (ordered, linked, complete), a `decision_log` artifact, an
+`outcome` artifact, and a `lesson` artifact mirrored to the vault; a **semantic
+verification** escalates from structural and is recorded as a verification/eval
+receipt; an **evaluation is auto-produced** on run/task complete (rows present —
+the missing trigger). Replay reconstructs the full timeline from Kernel evidence
+alone.
+
+### Product proof (real)
+
+A real completed run has a readable replay, a decision log, and a traceable
+outcome → lesson.
+
+### Regression Guard
+
+R0–R6 + v3 smokes pass; `smoke:judgment` added; migration additive; **evals remain
+non-authoritative** (no runtime decision path reads them); the existing
+`smoke:eval` and vault export still pass.
+
+## Failure Signals
+
+- Run Replay is treated as a source of truth instead of a projection.
+- Semantic verification mutates state outside the verification-receipt/eval path.
+- An eval becomes authoritative — a runtime path reads evals to decide task/
+  workflow state.
+- RL training is built instead of schema prep.
+- A decision/outcome/lesson lives outside the Kernel artifact record + vault
+  mirror.
+- Events/receipts turn out **not** to be timeline-reconstructable (R1's day-one
+  obligation was skipped).
+
+## Handoff Block
+
+```text
+Branch quantflow-v4. R7 = trust + compounding. Build: a Run Replay PROJECTION over
+the append-only events/receipts (derived, never truth — first verify they are
+ordered/linked/complete); semantic verification that ESCALATES from R1's
+structural check via the verifier role + evals (never mutates state outside the
+verification-receipt/eval path; high-risk still needs human approval); typed
+research artifacts (additive migration: kind enum + provenance fields
+source_refs/observed_at/source_kind/confidence/quote_or_snapshot_ref/sensitivity);
+decision_log + outcome + lesson artifact kinds (lesson mirrored to vault via the
+Goal 8 OKF exporters); and an eval AUTO-TRIGGER on task/run complete. Evals stay
+NON-AUTHORITATIVE. RL is SCHEMA PREP ONLY — no training. No cloud code. Run the
+full Regression Guard incl. smoke:judgment.
+```
+
+---
+
+## Night Shift (composition target — not a separate rung)
+
+Night Shift = Rungs 1–7 **plus** unattended reliability (R4 recovery + R6
+budgets) **plus** a morning-briefing artifact. It is the proof that the whole
+spine holds overnight: many real agents, recoverable, budget-bounded, producing a
+briefing the human decides on — never an auto-placed action. Compose it only
+after R7; do not build it as a parallel track.
+
+---
+
+*All eight rungs (R0–R7) are now scoped. They are promoted and authorized one at
+a time per the Promotion discipline above; future edits are expected as each rung
+meets reality.*
