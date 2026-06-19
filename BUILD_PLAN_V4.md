@@ -140,6 +140,17 @@ This section is the durable progress ledger for the v4 branch.
 | R5 — Human checkpoint / deepen loop | Scoped / awaiting authorization | — | — | — | Pausable/resumable run; candidate-set artifact; token-bound human selection; deepening tasks spawn. Enforces the decision-authority rule. |
 | R6 — Run templates | Scoped / awaiting authorization | — | — | — | Scout / Research / Deep as saved plan-layer Conductor plans (DAG + roles + budgets + stop + artifact expectations + per-phase attention profiles). |
 | R7 — Judgment & compounding | Scoped / awaiting authorization | — | — | — | Run Replay (projection), semantic verification escalation, typed research artifacts + provenance, decision/outcome/lesson logs, eval auto-trigger, RL schema prep. |
+| R8 — One-click agent/tool onboarding (legend bar) | Scoped / awaiting authorization | — | — | — | **Operator-added** (beyond the territory-map spine). Data-drives `LEGEND_RECIPES`; "+ Add" writes a custom role; per-recipe R0 readiness badge; same spawn path. Depends on R0. |
+
+> **Operator priority (reliability + extensibility over run-time):** the operator
+> has set the focus on **reliable parallel orchestration** and **easy addition of
+> tools/agents** — not on hitting specific run-time targets. Under that lens the
+> **value rungs are R1 → R3 → R4** (structural verify · one task authority + DAG
+> gating · durable/recoverable pod), with **R8** added so agents/tools are added
+> at the click of a button (R0-readiness-gated). R7's *semantic verify* still
+> matters (an edge-finder must not act on unchecked evidence); R7's *RL/lessons
+> compounding* and any run-time/latency tuning are explicitly deprioritized.
+> Suggested near-term order: **R0 → R1 → R8 → R3 → R4** (then R5/R6, R7-verify).
 
 ---
 
@@ -1607,6 +1618,125 @@ decision_log + outcome + lesson artifact kinds (lesson mirrored to vault via the
 Goal 8 OKF exporters); and an eval AUTO-TRIGGER on task/run complete. Evals stay
 NON-AUTHORITATIVE. RL is SCHEMA PREP ONLY — no training. No cloud code. Run the
 full Regression Guard incl. smoke:judgment.
+```
+
+---
+
+# Goal R8 — One-Click Agent/Tool Onboarding (the legend bar)
+
+> **Operator-added rung (beyond the territory-map spine)** — driven by the
+> reliability + extensibility focus: "I want adding to the legend bar to be easy,
+> anything at the click of a button." Band A/B (execution/flow) — an
+> extensibility seam, not new runtime authority. Depends on **R0** (readiness
+> badge); pairs with **R1** (a freshly-added agent can immediately run the atom).
+> Independent of R3–R7, but added agents only become *pod-useful* after R3/R4.
+
+## Goal
+
+Make adding a new agent/tool to the **legend bar (QF Dock spawn rail)** a
+**one-click UI action** — not a source edit + rebuild — and show a **live R0
+readiness badge** on every entry, so composing "a couple research tiles + a couple
+scripts" is a repeatable, reliable motion.
+
+## Why
+
+Today the spawn rail is a **hardcoded `LEGEND_RECIPES` array** in
+`quantflow-electron/src/windows/shell/src/legend-dock.js` (7 recipes) plus a
+hardcoded `ICONS` map — adding an agent/tool means editing source and rebuilding.
+The role registry **already** supports custom roles via `roles/*.json`
+(`role-service.ts` `listRoles()` merges them and attaches `commandAvailable`
+diagnostics), but the dock doesn't read them and there's no UI to create them. The
+operator's priority is reliable parallel orchestration with easy agent/tool
+addition; R8 makes the addition trivial and binds it to **R0** so a not-ready
+agent is visibly flagged before it's spawned into a pod.
+
+## Direct Repo Scope
+
+```text
+quantflow-electron/src/windows/shell/src/legend-dock.js   (recipes become DATA-DRIVEN from the role registry + user-added entries; built-ins stay as seed)
+quantflow-electron/src/windows/shell/src/legend-dock.test.ts (render-from-injected-registry; readiness-badge mapping)
+quantflow-electron/src/windows/shell/src/add-agent-form.*  (NEW — the "+ Add" form: id/name/command/runtimeTarget/icon/color/startupPrompt/type)
+quantflow-electron/src/main/role-service.ts               (add create/update/remove for custom roles — writes roles/*.json; listRoles already merges)
+quantflow-electron/src/main/ipc-*.ts                       (read: list recipes incl. custom + readiness; write: create/update/remove a custom agent/tool)
+quantflow-electron/src/windows/shell/src/legend-spawn.js   (custom recipe → roleId resolves through the SAME spawn path; no special-casing)
+(integrates the R0 capability report → per-recipe ready/amber/red badge)
+BUILD_PLAN_V4.md                                           (ledger update on approval — verifier only)
+```
+
+### What "one-click add" means
+
+- The dock renders recipes from a **registry list** (`listRoles()` + user-added),
+  not the hardcoded array. Built-ins become seed data, not the source of truth.
+- A **"+ Add"** affordance in the dock header opens a small form: `id`, `name`,
+  `commandTemplate`, `runtimeTarget` (`herdr-wsl`/`windows-pty`), `icon` (pick
+  from the existing `ICONS` set — no hand-SVG required), `color`, `startupPrompt`,
+  `type`. Saving writes a role to the registry and refreshes the bar — **no
+  rebuild**.
+- Each recipe shows an **R0 readiness badge** (green/amber/red from
+  present/authed/ready). A not-ready agent is **spawnable-but-flagged** (or gated
+  — operator's choice), so you never silently drop a dead agent into a pod.
+- A custom recipe spawns through the **same** role-spawn path
+  (`legend-spawn.js` → `roleId` → `kernel.worker.spawn`) — identical to built-ins.
+
+## Out of Scope
+
+- No change to orchestration/DAG (R3) — R8 makes agents *available*; their pod
+  behavior is R3/R4. (Newly-added agents are only *pod-useful* after R3/R4.)
+- **No domain-specific connectors/data tools here** — those are the first *pack*
+  (content) loaded *through* R8, scoped separately (see the domain-pack track).
+- **MCP-tool onboarding** (registering a live-data MCP connector at the click of a
+  button) is a sibling seam — note it as a follow-up; R8 covers spawn-rail
+  agent/tool *recipes*, not MCP server authoring.
+- No run-template authoring UI (templates are R6).
+- No Kernel schema change — roles are a config **registry**, not run-state truth.
+
+## Acceptance Test
+
+### Machine proof (CI)
+
+- `legend-dock` renders recipes from an **injected registry list** (not the
+  hardcoded array); the 7 built-ins still render and spawn.
+- Adding a recipe via the add path makes it appear without a rebuild; removing it
+  removes it. Round-trips through `role-service` create/remove.
+- The readiness badge maps `healthy|degraded|down → green|amber|red`
+  deterministically from an injected R0 capability result.
+- A custom recipe resolves to its `roleId` and spawns through the shared
+  role-spawn path (asserted with a fake spawn) — no special path.
+
+### Product proof (manual)
+
+The operator clicks **"+ Add"**, defines a new agent/tool (e.g. a `python`
+"odds-scraper" script tile, or a second `researcher`), it appears in the bar with
+a readiness badge, and spawns a working tile — **no source edit, no rebuild**.
+
+### Regression Guard
+
+Existing `legend-dock`/`legend-spawn` tests pass; the 7 built-in recipes render +
+spawn unchanged; cumulative v3 base + R0…N stack green (Appendix A).
+
+## Failure Signals
+
+- Recipes stay hardcoded — the "add" button writes source or needs a rebuild.
+- A custom agent spawns through a special path instead of the shared role-spawn.
+- The readiness badge is cosmetic (not wired to real R0 capability status).
+- Role/agent definitions become **Kernel run-state truth** instead of a config
+  registry.
+- A not-ready agent can be spawned into a pod with **no** readiness signal.
+
+## Handoff Block
+
+```text
+Branch quantflow-v4. R8 = make the legend bar (QF Dock spawn rail) one-click
+extensible. Today LEGEND_RECIPES in legend-dock.js is hardcoded; make it
+DATA-DRIVEN from the role registry (role-service.ts listRoles() already merges
+built-ins + roles/*.json with commandAvailable). Add a "+ Add" form that
+create/update/removes a custom role (writes roles/*.json via IPC) and refreshes
+the bar with NO rebuild. Show a per-recipe R0 readiness badge (green/amber/red
+from present/authed/ready) so a not-ready agent is flagged before it's spawned.
+Custom recipes spawn through the SAME legend-spawn → roleId → kernel.worker.spawn
+path — no special-casing. Roles are CONFIG, not Kernel run-state. Do not touch the
+DAG/orchestration (R3), domain connectors (separate pack), or run templates (R6).
+Run the cumulative Regression Guard (incl. legend-dock/legend-spawn tests).
 ```
 
 ---
