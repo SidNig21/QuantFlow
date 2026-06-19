@@ -127,7 +127,7 @@ This section is the durable progress ledger for the v4 branch.
 | Goal | Status | Worker | Verifier | Verified date | Notes |
 | --- | --- | --- | --- | --- | --- |
 | R0 — Auth / capability preflight | Scoped / awaiting authorization | — | — | — | Extends the existing `diagnostics/` health-probe framework with a `capability` group; derived report only, no Kernel schema change. |
-| R1 — One real task atom | Not yet scoped | — | — | — | — |
+| R1 — One real task atom | Scoped / awaiting authorization | — | — | — | Wires the existing `kernel.artifact.create` into the task atom, binds worker via `harness.send`, and replaces `taskVerify`'s rubber-stamp with a structural artifact check. One additive migration (`worker_instances.assigned_task_id`); registers a `mock` harness for CI. |
 | R2–R7 | Not yet scoped | — | — | — | — |
 
 ---
@@ -412,4 +412,299 @@ pushes.
 
 ---
 
-*Goals R1–R7 are scoped one at a time, after the prior rung is approved.*
+# Goal R1 — One Real Task Atom
+
+> Band A (execution) · the keystone · territory map §4 Band A, §5 (Artifact
+> record + structural verification checklist), §8 rung 1, §10.3 (artifact storage
+> root), §10.5 (idempotency seam — design now, enforce in C).
+
+## Goal
+
+Make **one** Conductor-driven task do **real work, end to end, with proof**: the
+task is assigned to a real worker, the instruction is delivered to that worker
+through the harness `send` seam (not terminal paste), the worker produces a real
+**artifact**, the task is submitted **with** that artifact, and verification
+**provably opens and checks the artifact** before the task is allowed to complete.
+
+This is the keystone of v4. v3 proved the *process* (a task can move
+`created → claimed → started → submitted → verifying → complete` with a full
+receipt chain) but the operator clicked the buttons and **no work happened** —
+the artifact plumbing exists but nothing flows through it, and `taskVerify`
+rubber-stamps completion without ever reading an artifact. R1 closes that gap on
+exactly one task, on two proof tracks (a deterministic mock harness in CI; one
+real authed worker in dogfood).
+
+R1 is deliberately the *smallest* important rung: no second task, no DAG, no
+multi-worker, no semantic judgment. Just the atom.
+
+## Why
+
+From the first live end-to-end run (`docs/v3/INCOMING_GOALS.md`, headline
+candidate): the Conductor drove a task through the full receipt chain, but
+`tasks.owner_worker_id` was left `null`, the worker sat idle, no artifact was
+produced, and Submit/Verify carried no artifact. The territory map names three
+fixes — task→worker delivery, worker executes, report-with-proof — and makes them
+the keystone "everything else is multiplication."
+
+The seams already exist, which is what keeps R1 an atom:
+- `kernel.artifact.create` ([receipts/index.ts]) already inserts an artifact row
+  + posts `artifact_created` and backfills `receipt_id`.
+- `kernel.task.submit` already accepts `artifactRefs` (but does not require them).
+- `WorkerHarness.send/readState/collectReceipts` ([src/harness/types.ts]) is a
+  shipped contract.
+- `tasks.owner_worker_id` and the `artifacts` table (`task_id`/`worker_id`/`uri`/
+  `content_hash`/`kind`) already exist.
+
+What is missing — and what R1 builds — is the **wiring and the gates**: bind the
+worker and push the instruction through `send`; require an artifact on submit;
+and make `taskVerify` **structural** instead of a rubber stamp.
+
+## Direct Repo Scope
+
+Create or update:
+
+```text
+src/kernel/artifacts/verify.ts            (NEW — structural verification helpers, fs injectable)
+src/kernel/artifacts/verify.test.ts       (NEW — machine proof for the structural checklist)
+src/kernel/tasks/index.ts                 (submit requires an artifact; verify runs the structural gate)
+src/kernel/tasks/validators.ts            (add: no-submit-without-artifact; structural-pass-before-complete)
+src/kernel/migrations/00X-r1-worker-task-binding.sql (NEW — additive: worker_instances.assigned_task_id)
+src/kernel/schema/types.ts                (add assigned_task_id to the worker row type)
+docs/v3/KERNEL_SCHEMA_V1.md               (document the new column + migration)
+src/kernel/worker-instances/index.ts      (set assigned_task_id on assign; clear on complete/stop)
+src/harness/types.ts                      (HarnessKind += 'mock')
+src/harness/mock/index.ts                 (NEW — deterministic mock harness, full WorkerHarness contract)
+src/harness/mock/index.test.ts            (NEW)
+src/harness/registry.ts                   (register mock descriptor + createHarness('mock'))
+src/main/conductor/conductor-actions.ts   (assign binds worker + delivers via harness.send; submit carries artifactId)
+quantflow-electron/scripts/smoke-task-atom.* (NEW — end-to-end mock atom + negative cases)
+quantflow-electron/package.json           (wire `smoke:task-atom`)
+ENVOY.md / docs note                      (the atom uses Kernel task authority; full Envoy consolidation is R3, not here)
+BUILD_PLAN_V4.md                          (ledger update on approval — verifier only)
+```
+
+### The three pieces (territory map §4 Band A)
+
+**1. Task → worker delivery (bind + send).**
+- `assign_task` (`conductor-actions.ts`) must result in a **non-null
+  `tasks.owner_worker_id`** (today it arrives null because nothing supplies the
+  binding) — pass `tileId`/`ownerWorkerId` so `taskClaim` binds the tile's
+  `worker_instance`, and set the reverse link `worker_instances.assigned_task_id`.
+- The task **instruction is delivered through `getWorkerHarness(kind).send(handle,
+  { text })`** (`harness-service.ts` + the Goal 6 contract) — **never** terminal
+  paste, `terminal_write`, or MCP. The send payload is the task objective plus
+  minimal context (full structured context is R2's Context Envelope — keep it a
+  plain instruction here).
+
+**2. Worker executes (two harnesses, same contract).**
+- **Mock harness (NEW, registered `mock` kind)** — deterministic, CI-safe, no
+  auth, no cost. `spawn` returns a fake handle; `send` records the instruction;
+  the mock **produces a real artifact file** at a deterministic path under the
+  artifact root and calls `kernel.artifact.create`; `collectReceipts` returns a
+  `ReceiptDraft` carrying the `artifactId`; `readState` reports a scripted
+  `working → done`; `stop` is a no-op. It implements the **same** `WorkerHarness`
+  interface so it is a true drop-in (territory map §7).
+- **Real harness** — the existing `local-shell` / `herdr-shell`, driven via
+  `send`, with the R0-authed worker producing a real artifact (e.g. a vault
+  markdown file). `readState`/`collectReceipts` report progress.
+
+**3. Report with proof (artifact-gated verify).**
+- **No submit without an artifact.** `taskSubmit` must reject a submit that
+  carries no `artifactRefs`/`artifactId` (territory map §5 minimal enforcement).
+- **Structural verification, not a rubber stamp.** Before `taskVerify` posts
+  `verification_passed`, it runs the structural checklist over the submitted
+  artifact(s) and **fails verification** (→ `verification_failed`, back to
+  `working`) if any check fails. Completion stays impossible without a
+  `verification_passed` receipt (already enforced):
+
+  ```text
+  [ ] artifact record exists and is linked (workflow_id, task_id, worker_instance_id)
+  [ ] uri is under the allowed artifact_root (policy)
+  [ ] file exists and is non-empty
+  [ ] sha256 matches content_hash when content_hash is provided
+  [ ] a verification receipt was emitted
+  [ ] task reaches complete ONLY after the verification_passed receipt
+  ```
+
+- The structural helpers live in `src/kernel/artifacts/verify.ts` with an
+  **injectable fs** so the checklist is unit-tested deterministically without
+  touching the real disk.
+
+### artifact_root convention (open decision §10.3 — pick the smallest)
+
+R1 introduces one **allowed artifact write root** used by structural
+verification. Smallest version: a single resolved root (e.g. the workflow's
+`vault_path` when set, else a configured `<QUANTFLOW_DIR>/artifacts` dir), with
+`uri` required to resolve **under** it. Document the chosen convention in the
+goal result. Do **not** build a per-worker/per-run policy matrix — that is Band C.
+
+### Idempotency seam (open decision §10.5 — design now, enforce later)
+
+Give `submit`/`verify` an optional **attempt key** (e.g. `attemptId` on the
+payload) so a retried submit/verify can later be made exactly-once. R1 only
+**threads the field through**; full exactly-once enforcement is R4. Do not add a
+dedup table here.
+
+## Out of Scope
+
+- No second task, no `TaskDependency` execution, no DAG, no parallel branches (R3).
+- No Context Envelope / structured upstream context (R2) — `send` carries a plain
+  instruction.
+- No `Run` object, no `run_id` on artifacts (reserved until §10.1 resolves, R3).
+- No multi-worker, runtime manager, budgets, recovery, or reload-survival (R4).
+- No **semantic** verification ("did the evidence support the claim") — R1 verify
+  is **structural only** (Band D owns semantic).
+- No Envoy retirement/migration — R1 simply uses Kernel task authority for the
+  atom; "Kernel decides; Envoy mirrors" is enforced at R3.
+- No new artifact provenance fields (`sensitivity`/`derived_from`/`source_refs`…)
+  — reserved (territory map §5).
+- No cost telemetry build-out (capturing tokens/cost is optional, not required).
+- No permission enforcement beyond the three minimal gates (no submit without
+  artifact; uri under artifact_root; no complete without verification receipt).
+
+## Tool / URL Requirements
+
+- Existing seams: `src/kernel/tasks/index.ts`, `src/kernel/receipts/index.ts`
+  (`handleArtifactCommand`), `src/kernel/worker-instances/index.ts`,
+  `src/harness/{types,registry}.ts`, `src/main/conductor/conductor-actions.ts`,
+  `quantflow-electron/src/main/harness-service.ts`.
+- Existing smokes under `quantflow-electron/scripts/` as the pattern for
+  `smoke:task-atom`.
+- For the real proof: one R0-green authed worker.
+
+## Acceptance Test (the completion signal)
+
+### Machine proof (CI-safe, mock harness, no auth, no cost)
+
+`bun run smoke:task-atom` drives the full atom on the `mock` harness and asserts
+the receipt chain in `kernel.db`:
+
+```text
+task_created → task_claimed → task_started → artifact_created → task_submitted
+→ verification_started → verification_passed → task_completed
+```
+
+- After assign, `tasks.owner_worker_id` is **non-null** and
+  `worker_instances.assigned_task_id` points back at the task (the live-run bug
+  fixed).
+- The instruction reached the worker via the harness `send` seam (assert the mock
+  recorded it) — no terminal paste path is exercised.
+- `verify` **opened the artifact file** (structural pass) before completing.
+- **Negative cases each BLOCK completion** (task never reaches `complete`):
+  - submit with no artifact → rejected at submit;
+  - artifact `uri` outside `artifact_root` → `verification_failed`;
+  - artifact file missing → `verification_failed`;
+  - empty artifact file → `verification_failed`;
+  - `content_hash` provided but sha256 mismatch → `verification_failed`.
+- A worker may not verify its own task (`validateVerifierDistinct` still holds).
+- `artifacts/verify.test.ts` covers the checklist over an injected fs;
+  `mock/index.test.ts` covers the mock contract. Deterministic (no
+  timestamps/uuids in compared bodies).
+
+### Product proof (one real worker — manual, capture evidence)
+
+> The real worker is started manually via the normal worker path (as in R0). The
+> Kernel atom and structural verify do the gating; the machine proof above does
+> **not** depend on this real run.
+
+- Using an R0-green real worker, the operator runs the atom once: the Conductor
+  assigns a task, the instruction is delivered to the real agent **via
+  `harness.send`** (not paste), the agent produces a real artifact (e.g. a vault
+  markdown file at a known path), submit carries the `artifactId`, `verify`
+  opens the file and passes, and the task completes.
+- The full receipt chain is present in `kernel.db`, `owner_worker_id` is
+  non-null, and the artifact row links workflow/task/worker. Capture the chain +
+  the produced artifact path.
+
+### Regression Guard (do not break v3)
+
+All must still pass, unchanged, after R1:
+
+```text
+cd quantflow-electron
+bun run smoke:kernel-task
+bun run smoke:state-card
+bun run smoke:conductor
+bun run smoke:conductor-actions
+bun run smoke:conductor-loop
+bun run smoke:worker-harness
+bun run smoke:harness-interface
+bun run smoke:workflow-region
+bun run smoke:vault-export
+bun run smoke:eval
+bun run smoke:task-atom        # new
+bun test src/main/harness-ops.test.ts
+bun run build
+
+cd ../tools/quantflow-mcp && node --test
+```
+
+- The migration is **additive**: existing `worker_instances` rows get
+  `assigned_task_id = NULL`; no existing column changes. `KERNEL_SCHEMA_V1.md`
+  and `schema/types.ts` are updated to match.
+- No change to the verifier-distinct guard or the legacy-bypass semantics of
+  `kernel.task.complete`.
+- No new receipt type or event kind (reuse `artifact_created`,
+  `verification_started/passed/failed`, `task_completed`).
+
+## Failure Signals
+
+- A task reaches `complete` with **no artifact**, or with an artifact whose file
+  is missing / empty / outside `artifact_root` / hash-mismatched — verify must be
+  structural, not a rubber stamp.
+- The instruction is delivered via terminal paste, `terminal_write`, or MCP
+  instead of `harness.send`.
+- `tasks.owner_worker_id` is still null after assign.
+- Artifact **truth** is stored anywhere other than the Kernel `artifacts` table
+  (the vault file / disk is *storage*; the artifact row is *truth*).
+- The mock harness writes Kernel state directly instead of going through Kernel
+  commands / the `WorkerHarness` contract.
+- `verify` reads the file but completion proceeds even on a structural failure.
+- The migration is non-additive, or an existing smoke / the MCP tests /
+  `bun run build` regresses.
+- Scope creep: a second task, a DAG, a Context Envelope, a Run object, or
+  semantic verification appears in the diff.
+
+## Handoff Block
+
+```text
+Branch quantflow-v4.
+Read order: applicable AGENTS.md chain → docs/v4/V4_TERRITORY_MAP.md →
+BUILD_PLAN_V3.md → KERNEL_CONSTITUTION.md + docs/v3/AUTHORITY_RULES.md +
+docs/v3/KERNEL_SCHEMA_V1.md → this goal (R1).
+
+Goal R1 is the keystone: make ONE Conductor task do real work with proof, on two
+tracks (deterministic mock harness in CI; one real authed worker in dogfood).
+
+Three pieces:
+1. Bind + send — assign sets tasks.owner_worker_id AND worker_instances.assigned_task_id,
+   and delivers the instruction through getWorkerHarness(kind).send(...) — NEVER paste.
+2. Worker executes — add a registered `mock` harness (deterministic, produces a
+   real artifact file + kernel.artifact.create); the real local-shell/herdr path
+   does the same via the same WorkerHarness contract.
+3. Artifact-gated verify — submit is REJECTED without an artifact; taskVerify runs
+   the structural checklist (record linked, uri under artifact_root, file exists +
+   non-empty, sha256 matches if provided, verification receipt emitted) and FAILS
+   verification if any check fails. Completion stays impossible without a
+   verification_passed receipt.
+
+The structural artifact check is the heart of this goal — verify must provably
+OPEN the artifact, not rubber-stamp it.
+
+kernel.artifact.create already exists (receipts/index.ts) — WIRE it into the
+atom, do not re-create it. The artifacts table and tasks.owner_worker_id already
+exist. The only schema change is the additive worker_instances.assigned_task_id
+migration (update KERNEL_SCHEMA_V1.md + schema/types.ts).
+
+Do not: add a second task, a DAG, a Context Envelope, a Run object, semantic
+verification, Envoy migration, or new artifact provenance fields. Verify is
+STRUCTURAL only here.
+
+Run the full Regression Guard (including the new smoke:task-atom) before
+submitting. Commit locally before handoff; the verifier reviews the diff, updates
+the BUILD_PLAN_V4 ledger if approved, and pushes.
+```
+
+---
+
+*Goals R2–R7 are scoped one at a time, after the prior rung is approved.*
