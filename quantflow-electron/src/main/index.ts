@@ -374,7 +374,11 @@ function buildAppMenu(): void {
         { role: "redo" },
         { type: "separator" },
         { role: "cut" },
-        { role: "copy" },
+        // Do NOT register the Ctrl/Cmd+C accelerator: terminals need Ctrl+C to
+        // reach the focused tile as SIGINT (xterm sends \x03). The menu item
+        // still shows its shortcut, but the key flows to the renderer/terminal.
+        // Native copy still works in editable fields and via right-click.
+        { role: "copy", registerAccelerator: false },
         { role: "paste" },
         { role: "selectAll" },
         { type: "separator" },

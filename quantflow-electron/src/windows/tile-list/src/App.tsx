@@ -6,6 +6,17 @@ import {
   summarizeTileRegistry,
   type TileRegistryEntry,
 } from "./tile-registry";
+import {
+  buildHerdrWorkspaceState,
+  type HerdrWorkspaceState,
+} from "./herdr-workspace";
+
+// Self-contained platform check. `PLATFORM` is not defined in this window
+// context (it lived only in the shell renderer), so referencing it directly
+// threw a ReferenceError that blanked the whole panel on the empty state.
+const IS_MAC =
+  typeof navigator !== "undefined" &&
+  /mac/i.test(navigator.platform || navigator.userAgent || "");
 
 type TileType =
   | "term"
@@ -27,6 +38,14 @@ interface TileEntry extends TileRegistryEntry {
 
 interface TileRegistryMeta {
   workspaceName: string;
+}
+
+interface HerdrPayload {
+  available?: boolean;
+  panes?: unknown[];
+  workspaceId?: string | null;
+  updatedAt?: number;
+  error?: string | null;
 }
 
 function isTileEntry(value: unknown): value is TileEntry {
@@ -162,8 +181,82 @@ function TileEntryRow({
   );
 }
 
+function HerdrWorkspaceView({
+  state,
+  onFocusTile,
+}: {
+  state: HerdrWorkspaceState;
+  onFocusTile: (id: string) => void;
+}) {
+  const liveCount = state.panes.filter(
+    (pane) => normalizeTileStatus(pane.status) === "running",
+  ).length;
+  const workspaceLabel = state.workspaceId || "QuantFlow";
+  return (
+    <section className="herdr-workspace" aria-label="Herdr workspace">
+      <header className="herdr-header">
+        <div>
+          <div className="registry-eyebrow">Herdr Workspace</div>
+          <div className="registry-title">{workspaceLabel}</div>
+        </div>
+        <div className="herdr-summary">
+          <span>{state.panes.length}</span>
+          <small>{liveCount} live</small>
+        </div>
+      </header>
+
+      {!state.available && (
+        <div className="herdr-empty" data-tone="warn">
+          <strong>Herdr unavailable</strong>
+          <span>{state.error || "Start Herdr to see workspace panes."}</span>
+        </div>
+      )}
+      {state.available && state.panes.length === 0 && (
+        <div className="herdr-empty">
+          <strong>No Herdr panes active</strong>
+          <span>Spawn a Herdr role from the dock or Conductor.</span>
+        </div>
+      )}
+      {state.available && state.panes.length > 0 && (
+        <div className="herdr-pane-list">
+          {state.panes.map((pane) => {
+            const status = normalizeTileStatus(pane.status);
+            const linked = Boolean(pane.linkedTileId);
+            return (
+              <button
+                type="button"
+                key={pane.paneId}
+                className="herdr-pane-row"
+                data-status={status}
+                data-linked={linked ? "true" : "false"}
+                disabled={!linked}
+                title={linked ? "Focus linked tile" : "Pane has no linked canvas tile"}
+                onClick={() => {
+                  if (pane.linkedTileId) onFocusTile(pane.linkedTileId);
+                }}
+              >
+                <span className="herdr-pane-main">
+                  <span className="herdr-pane-title">{pane.title}</span>
+                  <span className="herdr-pane-subtitle">
+                    {pane.subtitle || "Herdr pane"}
+                  </span>
+                </span>
+                <span className="herdr-pane-meta">
+                  <span className="herdr-pane-id">{pane.shortPaneId}</span>
+                  <span className="herdr-pane-status">{statusLabel(pane.status)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function App() {
   const [entries, setEntries] = useState<TileEntry[]>([]);
+  const [herdrPayload, setHerdrPayload] = useState<HerdrPayload | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -180,6 +273,17 @@ function App() {
   const visibleEntries = useMemo(
     () => groups.flatMap((group) => group.entries),
     [groups],
+  );
+  const herdrWorkspace = useMemo<HerdrWorkspaceState>(
+    () => buildHerdrWorkspaceState({
+      available: herdrPayload?.available === true,
+      panes: Array.isArray(herdrPayload?.panes) ? herdrPayload.panes : [],
+      tiles: entries,
+      workspaceId: herdrPayload?.workspaceId ?? null,
+      updatedAt: herdrPayload?.updatedAt,
+      error: herdrPayload?.error ?? null,
+    }),
+    [entries, herdrPayload],
   );
 
   useEffect(() => {
@@ -211,6 +315,8 @@ function App() {
           );
         } else if (channel === "tile-list:focus") {
           setFocusedId(args[0] as string | null);
+        } else if (channel === "tile-list:herdr") {
+          setHerdrPayload((args[0] as HerdrPayload | undefined) ?? null);
         }
       },
     );
@@ -315,6 +421,11 @@ function App() {
         />
       </div>
 
+      <HerdrWorkspaceView
+        state={herdrWorkspace}
+        onFocusTile={handleDoubleClick}
+      />
+
       <div className="tile-groups">
         {groups.map((group) => (
           <section className="tile-group" key={group.id}>
@@ -358,7 +469,7 @@ function App() {
           </svg>
           <strong>No tiles yet</strong>
           <span>
-            Spawn from the dock or press {PLATFORM === "darwin" ? "Cmd+K" : "Ctrl+K"} for commands
+            Spawn from the dock or press {IS_MAC ? "Cmd+K" : "Ctrl+K"} for commands
           </span>
         </div>
       )}

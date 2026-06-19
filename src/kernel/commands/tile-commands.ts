@@ -138,11 +138,25 @@ function tileRemove(db: KernelDB, payload: Record<string, unknown>): CommandResu
       db.prepare('UPDATE receipts SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
       db.prepare('UPDATE artifacts SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
       db.prepare('UPDATE events SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
+      // Remaining FK refs to worker_instances that must clear BEFORE the worker
+      // row is deleted. State Cards/evals are detached (kept as truth/derived);
+      // permissions are worker-scoped, so they go with the worker.
+      db.prepare('UPDATE state_cards SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
+      db.prepare('UPDATE evaluations SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
+      db.prepare('DELETE FROM permissions WHERE worker_id = ?').run(worker.id);
     }
     db.prepare('DELETE FROM worker_instances WHERE tile_id = ?').run(id);
     db.prepare('DELETE FROM state_cards WHERE tile_id = ?').run(id);
     db.prepare('UPDATE artifacts SET tile_id = NULL WHERE tile_id = ?').run(id);
     db.prepare('UPDATE events SET tile_id = NULL WHERE tile_id = ?').run(id);
+    // Receipts are append-only evidence: detach the tile FK (nullable) but keep
+    // the receipt rows + their task/worker/correlation provenance intact.
+    db.prepare('UPDATE receipts SET tile_id = NULL WHERE tile_id = ?').run(id);
+    // Connections require both endpoints (tile_a_id/tile_b_id are NOT NULL), so a
+    // connection cannot outlive a removed endpoint — delete any that touch it.
+    db.prepare(
+      'DELETE FROM connections WHERE tile_a_id = ? OR tile_b_id = ? OR from_tile_id = ? OR to_tile_id = ?',
+    ).run(id, id, id, id);
     const info = db.prepare('DELETE FROM tiles WHERE id = ?').run(id);
     // DELETE is idempotent: a missing row means the desired end state (gone)
     // already holds. Still emit so renderers reconcile.
