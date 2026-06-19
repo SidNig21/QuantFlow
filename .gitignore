@@ -5,6 +5,8 @@
 docs/*
 !docs/v3/
 !docs/v3/**
+!docs/v4/
+!docs/v4/**
 .collaborator
 .superpowers
 .claude/
