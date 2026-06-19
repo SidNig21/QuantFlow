@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	getWatermarkOpacity,
 	updateCanvasWatermark,
+	WATERMARK_OPACITY,
 } from "./canvas-watermark.js";
 
 function mockWatermark() {
@@ -19,15 +20,11 @@ function mockWatermark() {
 }
 
 describe("getWatermarkOpacity", () => {
-	test("keeps the mark strongest for empty canvases", () => {
-		expect(getWatermarkOpacity(0)).toBe(0.22);
-	});
-
-	test("softens the mark for sparse and populated canvases", () => {
-		expect(getWatermarkOpacity(1)).toBe(0.12);
-		expect(getWatermarkOpacity(2)).toBe(0.12);
-		expect(getWatermarkOpacity(3)).toBe(0.04);
-		expect(getWatermarkOpacity(12)).toBe(0.04);
+	test("holds a constant opacity regardless of tile count (no fade)", () => {
+		expect(getWatermarkOpacity(0)).toBe(WATERMARK_OPACITY);
+		expect(getWatermarkOpacity(1)).toBe(WATERMARK_OPACITY);
+		expect(getWatermarkOpacity(4)).toBe(WATERMARK_OPACITY);
+		expect(getWatermarkOpacity(12)).toBe(WATERMARK_OPACITY);
 	});
 });
 
@@ -37,17 +34,19 @@ describe("updateCanvasWatermark", () => {
 
 		updateCanvasWatermark(watermark, 0);
 
-		expect(watermark.style.opacity).toBe("0.22");
+		expect(watermark.style.opacity).toBe(String(WATERMARK_OPACITY));
 		expect(watermark.dataset.empty).toBe("true");
 		expect(watermark.getAttribute("aria-hidden")).toBe("false");
 	});
 
-	test("keeps the brand mark faint when tiles exist", () => {
+	test("keeps the logo opacity steady and hides hints when tiles exist", () => {
 		const watermark = mockWatermark();
 
 		updateCanvasWatermark(watermark, 4);
 
-		expect(watermark.style.opacity).toBe("0.04");
+		// Logo no longer fades — same opacity as the empty state.
+		expect(watermark.style.opacity).toBe(String(WATERMARK_OPACITY));
+		// data-empty still flips so the quick-action hints hide via CSS.
 		expect(watermark.dataset.empty).toBe("false");
 		expect(watermark.getAttribute("aria-hidden")).toBe("true");
 	});
