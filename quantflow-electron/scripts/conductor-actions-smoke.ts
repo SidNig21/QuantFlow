@@ -15,13 +15,14 @@
  */
 
 import { Database } from 'bun:sqlite';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { handleTaskCommand, queryTaskGet } from '../../src/kernel/tasks/index';
 import { handleWorkerCommand } from '../../src/kernel/commands/worker-commands';
 import { handleConnectionCommand } from '../../src/kernel/commands/connection-commands';
-import { handleReceiptCommand, queryReceiptList } from '../../src/kernel/receipts/index';
+import { handleArtifactCommand, handleReceiptCommand, queryReceiptList } from '../../src/kernel/receipts/index';
 import { handleConductorCommand, queryConductorContext } from '../../src/kernel/conductor/index';
 import { handleTileCommand } from '../../src/kernel/commands/tile-commands';
 import { startStateCardWatcher } from '../../src/kernel/watchers/index';
@@ -42,8 +43,23 @@ const now = Date.now();
 db.prepare(`INSERT INTO workflows (id, name, objective, status, created_at, updated_at) VALUES ('wf1','Build loader','o','active',?,?)`).run(now, now);
 // deno-lint-ignore no-explicit-any
 const kdb = db as any;
+const artifactRoot = mkdtempSync(join(tmpdir(), 'qf-conductor-actions-'));
 seedHarnessRegistry(kdb);
 startStateCardWatcher(kdb);
+
+function createArtifact(taskId: string, uri: string, body: string): string {
+  writeFileSync(join(artifactRoot, uri), body, 'utf-8');
+  const result = handleArtifactCommand(kdb, 'kernel.artifact.create', {
+    workflowId: 'wf1',
+    taskId,
+    workerId: queryTaskGet(kdb, taskId)?.ownerWorkerId,
+    kind: 'file',
+    uri,
+    summary: `proof for ${taskId}`,
+  });
+  check(`artifact ${taskId} ok`, result.ok === true);
+  return result.id as string;
+}
 
 // Inject a dispatch that routes to the DB-injected Kernel handlers — exactly the
 // command surface dispatchKernelCommand routes to in the live app. Record the
@@ -55,6 +71,7 @@ const dispatch = async (type: string, payload: Record<string, unknown>) => {
   if (type.startsWith('kernel.worker.')) return handleWorkerCommand(kdb, type, payload);
   if (type.startsWith('kernel.connection.')) return handleConnectionCommand(kdb, type, payload);
   if (type.startsWith('kernel.receipt.')) return handleReceiptCommand(kdb, type, payload);
+  if (type.startsWith('kernel.artifact.')) return handleArtifactCommand(kdb, type, payload);
   if (type.startsWith('kernel.conductor.')) return handleConductorCommand(kdb, type, payload);
   return { ok: false, error: `unhandled ${type}` };
 };
@@ -96,11 +113,12 @@ check('assign_task ok (claim+start)', assigned.ok === true);
 check('task is working after assign', queryTaskGet(kdb, 'task1')?.status === 'working');
 check('owner is tile_w worker', queryTaskGet(kdb, 'task1')?.ownerWorkerId === queryWorkerForTile(kdb, 'tile_w'));
 
-const submitted = await actions.runAction('submit_task', { taskId: 'task1', summary: 'done' });
+const artifact1 = createArtifact('task1', 'task1-proof.md', 'done');
+const submitted = await actions.runAction('submit_task', { taskId: 'task1', summary: 'done', artifactRefs: [artifact1] });
 check('submit_task ok', submitted.ok === true);
 check('task is submitted', queryTaskGet(kdb, 'task1')?.status === 'submitted');
 
-const verified = await actions.runAction('verify_task', { taskId: 'task1', verifierWorkerId, verdict: 'pass' });
+const verified = await actions.runAction('verify_task', { taskId: 'task1', verifierWorkerId, verdict: 'pass', artifactRoot });
 check('verify_task ok', verified.ok === true);
 check('task complete via verified path', queryTaskGet(kdb, 'task1')?.status === 'complete');
 
@@ -108,7 +126,7 @@ const chain = queryReceiptList(kdb, { taskId: 'task1' }).map((r) => r.type);
 check(
   'receipt chain is the verified lifecycle',
   JSON.stringify(chain) === JSON.stringify([
-    'task_created', 'task_claimed', 'task_started', 'task_submitted',
+    'task_created', 'task_claimed', 'task_started', 'artifact_created', 'task_submitted',
     'verification_started', 'verification_passed', 'task_completed',
   ]),
 );
@@ -124,7 +142,8 @@ check('connect_tiles ok', connected.ok === true);
 console.log('\n— reject path returns a task to working —');
 await actions.runAction('create_task', { id: 'task2', workflowId: 'wf1', title: 'T2', objective: 'o' });
 await actions.runAction('assign_task', { taskId: 'task2', tileId: 'tile_w' });
-await actions.runAction('submit_task', { taskId: 'task2' });
+const artifact2 = createArtifact('task2', 'task2-proof.md', 'redo');
+await actions.runAction('submit_task', { taskId: 'task2', artifactRefs: [artifact2] });
 const rejected = await actions.runAction('reject_task', { taskId: 'task2', verifierWorkerId, reason: 'redo' });
 check('reject_task ok', rejected.ok === true);
 check('task2 back to working', queryTaskGet(kdb, 'task2')?.status === 'working');

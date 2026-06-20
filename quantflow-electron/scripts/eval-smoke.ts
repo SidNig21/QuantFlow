@@ -14,7 +14,8 @@
  */
 
 import { Database } from 'bun:sqlite';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { handleTileCommand } from '../../src/kernel/commands/tile-commands';
@@ -46,6 +47,7 @@ db.exec(readFileSync(join(migrationsDir, '002-evaluations.sql'), 'utf-8'));
 // deno-lint-ignore no-explicit-any
 const kdb = db as any;
 const t0 = Date.now();
+const artifactRoot = mkdtempSync(join(tmpdir(), 'qf-eval-smoke-'));
 db.prepare(`INSERT INTO workflows (id,name,objective,status,created_at,updated_at) VALUES ('wf1','Eval WF','Prove evaluation layer','active',?,?)`).run(t0, t0);
 seedHarnessRegistry(kdb);
 startStateCardWatcher(kdb);
@@ -56,6 +58,19 @@ db.prepare(`INSERT INTO worker_instances (id,tile_id,workflow_id,status,created_
 
 const dim = (result: any, name: string) => result.dimensions.find((d: any) => d.dimension === name);
 const evalRowCount = () => (db.prepare('SELECT COUNT(*) AS n FROM evaluations').get() as any).n as number;
+function createArtifact(taskId: string, uri: string, body: string): string {
+  writeFileSync(join(artifactRoot, uri), body, 'utf-8');
+  const result = handleArtifactCommand(kdb, 'kernel.artifact.create', {
+    workflowId: 'wf1',
+    taskId,
+    workerId: 'w_owner',
+    kind: 'code',
+    uri,
+    summary: `${taskId} artifact`,
+  });
+  check(`artifact ${taskId} ok`, (result as any).ok === true);
+  return (result as any).id as string;
+}
 
 // ── Scenario setup ─────────────────────────────────────────────────────────
 
@@ -63,10 +78,9 @@ const evalRowCount = () => (db.prepare('SELECT COUNT(*) AS n FROM evaluations').
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'task_happy', workflowId: 'wf1', title: 'Loader', objective: 'o' });
 handleTaskCommand(kdb, 'kernel.task.claim', { taskId: 'task_happy', ownerWorkerId: 'w_owner' });
 handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task_happy' });
-handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task_happy', summary: 'done' });
-handleArtifactCommand(kdb, 'kernel.artifact.create', { workflowId: 'wf1', taskId: 'task_happy', workerId: 'w_owner', kind: 'code', uri: 'src/loader.ts', summary: 'loader' });
-handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task_happy', verifierWorkerId: 'w_verifier' });
-handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task_happy', verifierWorkerId: 'w_verifier', verdict: 'pass' });
+const happyArtifact = createArtifact('task_happy', 'loader.ts', 'export const ok = true;');
+handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task_happy', summary: 'done', artifactRefs: [happyArtifact] });
+handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task_happy', verifierWorkerId: 'w_verifier', verdict: 'pass', artifactRoot });
 
 // 2. Legacy bypass: working → complete via legacy flag, no verification.
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'task_legacy', workflowId: 'wf1', title: 'Legacy', objective: 'o' });
@@ -79,9 +93,7 @@ handleTaskCommand(kdb, 'kernel.task.create', { id: 'task_missing', workflowId: '
 handleTaskCommand(kdb, 'kernel.task.claim', { taskId: 'task_missing', ownerWorkerId: 'w_owner' });
 handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task_missing' });
 handleReceiptCommand(kdb, 'kernel.receipt.post', { type: 'progress', workflowId: 'wf1', taskId: 'task_missing', summary: 'cites artifact', artifactRefs: ['artifact_ghost'] });
-handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task_missing', summary: 'done' });
-handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task_missing', verifierWorkerId: 'w_verifier' });
-handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task_missing', verifierWorkerId: 'w_verifier', verdict: 'pass' });
+handleTaskCommand(kdb, 'kernel.task.complete', { taskId: 'task_missing', legacy: true });
 
 // 4. Blocked task, unresolved.
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'task_blk', workflowId: 'wf1', title: 'Blocked', objective: 'o' });
@@ -97,9 +109,9 @@ const deniedReceiptId = (planRes as any).id as string;
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'task_self', workflowId: 'wf1', title: 'Self', objective: 'o' });
 handleTaskCommand(kdb, 'kernel.task.claim', { taskId: 'task_self', ownerWorkerId: 'w_owner' });
 handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task_self' });
-handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task_self', summary: 'done' });
-handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task_self', verifierWorkerId: 'w_owner', operatorOverride: true });
-handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task_self', verifierWorkerId: 'w_owner', verdict: 'pass', operatorOverride: true });
+const selfArtifact = createArtifact('task_self', 'self.ts', 'export const self = true;');
+handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task_self', summary: 'done', artifactRefs: [selfArtifact] });
+handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task_self', verifierWorkerId: 'w_owner', verdict: 'pass', operatorOverride: true, artifactRoot });
 
 const evidence = collectEvalEvidence(kdb, 'wf1');
 

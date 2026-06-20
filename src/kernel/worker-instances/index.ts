@@ -164,6 +164,7 @@ export interface WorkerStatusPatch {
   status?: WorkerInstanceStatus;
   herdrPaneId?: string | null;
   envoySpaceId?: string | null;
+  assignedTaskId?: string | null;
 }
 
 /** Resolve a worker id from an explicit id or a tile id. */
@@ -174,6 +175,17 @@ export function resolveWorkerId(
   if (ref.workerId) return ref.workerId;
   if (ref.tileId) return queryWorkerForTile(db, ref.tileId);
   return null;
+}
+
+function hasAssignedTaskColumn(db: KernelDB): boolean {
+  const rows = db.prepare("PRAGMA table_info('worker_instances')").all() as Array<{ name: string }>;
+  return rows.some((row) => row.name === 'assigned_task_id');
+}
+
+export function assignWorkerToTask(db: KernelDB, workerId: string, taskId: string | null): void {
+  if (!hasAssignedTaskColumn(db)) return;
+  db.prepare('UPDATE worker_instances SET assigned_task_id = ?, updated_at = ? WHERE id = ?')
+    .run(taskId, Date.now(), workerId);
 }
 
 /** Patch a worker's status and/or runtime ids. Returns the tile id (for events). */
@@ -201,6 +213,10 @@ export function updateWorkerInstance(
     sets.push('envoy_space_id = ?');
     vals.push(patch.envoySpaceId);
   }
+  if (patch.assignedTaskId !== undefined && hasAssignedTaskColumn(db)) {
+    sets.push('assigned_task_id = ?');
+    vals.push(patch.assignedTaskId);
+  }
   vals.push(workerId);
   db.prepare(`UPDATE worker_instances SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
   return { tileId: row.tile_id, workflowId: row.workflow_id };
@@ -216,6 +232,7 @@ export interface WorkerSnapshot {
   status: WorkerInstanceStatus;
   herdrPaneId: string | null;
   envoySpaceId: string | null;
+  assignedTaskId: string | null;
 }
 
 function rowToWorker(r: Record<string, unknown>): WorkerSnapshot {
@@ -229,6 +246,7 @@ function rowToWorker(r: Record<string, unknown>): WorkerSnapshot {
     status: r['status'] as WorkerInstanceStatus,
     herdrPaneId: (r['herdr_pane_id'] as string | null) ?? null,
     envoySpaceId: (r['envoy_space_id'] as string | null) ?? null,
+    assignedTaskId: (r['assigned_task_id'] as string | null) ?? null,
   };
 }
 

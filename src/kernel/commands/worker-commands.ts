@@ -95,7 +95,7 @@ function workerStop(db: KernelDB, payload: Record<string, unknown>): CommandResu
   });
   if (!workerId) return { ok: false, error: 'worker.stop: worker not found (need workerId or tileId)' };
   try {
-    const result = updateWorkerInstance(db, workerId, { status: 'stopped' });
+    const result = updateWorkerInstance(db, workerId, { status: 'stopped', assignedTaskId: null });
     if (!result) return { ok: false, error: `worker.stop: worker not found: ${workerId}` };
     emitKernelEvent({
       kind: 'worker.stopped',

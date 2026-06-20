@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import baselineSql from './migrations/001-v3-baseline.sql?raw';
 import evaluationsSql from './migrations/002-evaluations.sql?raw';
+import r1WorkerTaskBindingSql from './migrations/003-r1-worker-task-binding.sql?raw';
 
 /**
  * Ordered Kernel migrations. Each entry's SQL records its own `schema_migrations`
@@ -13,6 +14,7 @@ import evaluationsSql from './migrations/002-evaluations.sql?raw';
 const MIGRATIONS: Array<{ version: number; sql: string }> = [
   { version: 1, sql: baselineSql },
   { version: 2, sql: evaluationsSql },
+  { version: 3, sql: r1WorkerTaskBindingSql },
 ];
 
 let _db: Database.Database | null = null;

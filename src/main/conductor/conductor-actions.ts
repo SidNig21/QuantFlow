@@ -19,6 +19,9 @@
  */
 
 import { dispatchKernelCommand, type CommandResult } from '../../kernel/commands/index';
+import type { TaskSnapshot } from '../../kernel/tasks/index';
+import type { WorkerSnapshot } from '../../kernel/worker-instances/index';
+import type { HarnessKind, ReceiptDraft, WorkerHandle, WorkerHarness } from '../../harness/types';
 
 export type ConductorActionDispatch = (
   type: string,
@@ -38,6 +41,9 @@ export type ConductorSpawnRole = (
 
 export interface ConductorActionDeps {
   spawnRole?: ConductorSpawnRole;
+  getTask?: (taskId: string) => TaskSnapshot | null | Promise<TaskSnapshot | null>;
+  getWorker?: (workerId: string) => WorkerSnapshot | null | Promise<WorkerSnapshot | null>;
+  getWorkerHarness?: (kind: HarnessKind) => WorkerHarness;
 }
 
 export const CONDUCTOR_ACTIONS = [
@@ -57,6 +63,17 @@ const REQUESTED_BY = 'conductor';
 
 function rec(args: unknown): Record<string, unknown> {
   return (args as Record<string, unknown>) ?? {};
+}
+
+function asHarnessKind(value: unknown): HarnessKind {
+  return value === 'mock' || value === 'eve-harness' || value === 'herdr-shell' || value === 'local-shell'
+    ? value
+    : 'local-shell';
+}
+
+function approvalPresent(args: Record<string, unknown>): boolean {
+  return args['operatorApproved'] === true
+    || (typeof args['approvalToken'] === 'string' && args['approvalToken'].trim().length > 0);
 }
 
 export interface ConductorActions {
@@ -88,7 +105,9 @@ export function createConductorActions(
           ownerWorkerId: args['ownerWorkerId'],
         });
         if (!claim.ok) return claim;
-        return cmd('kernel.task.start', { taskId: args['taskId'] });
+        const start = await cmd('kernel.task.start', { taskId: args['taskId'] });
+        if (!start.ok || args['deliver'] !== true) return start;
+        return deliverAssignedTask(args, cmd, deps);
       }
 
       case 'submit_task':
@@ -123,4 +142,93 @@ export function createConductorActions(
   }
 
   return { runAction };
+}
+
+async function deliverAssignedTask(
+  args: Record<string, unknown>,
+  cmd: (type: string, payload: Record<string, unknown>) => Promise<CommandResult>,
+  deps: ConductorActionDeps,
+): Promise<CommandResult> {
+  if (!deps.getTask || !deps.getWorkerHarness) {
+    return { ok: false, error: 'assign_task deliver unavailable: missing task lookup or harness binding' };
+  }
+  const taskId = args['taskId'];
+  if (typeof taskId !== 'string' || !taskId.trim()) {
+    return { ok: false, error: 'assign_task deliver requires taskId' };
+  }
+  const harnessKind = asHarnessKind(args['harnessKind']);
+  if (harnessKind !== 'mock' && !approvalPresent(args)) {
+    return { ok: false, error: 'assign_task deliver to real harness requires operator approval' };
+  }
+
+  const task = await deps.getTask(taskId);
+  if (!task) return { ok: false, error: `assign_task deliver: task not found: ${taskId}` };
+  if (!task.ownerWorkerId) return { ok: false, error: 'assign_task deliver: task has no owner worker' };
+
+  const worker = deps.getWorker ? await deps.getWorker(task.ownerWorkerId) : null;
+  const handle: WorkerHandle = {
+    workerId: task.ownerWorkerId,
+    tileId: worker?.tileId ?? (typeof args['tileId'] === 'string' ? args['tileId'] : task.ownerWorkerId),
+    kind: harnessKind,
+    eveSessionId: typeof args['eveSessionId'] === 'string' ? args['eveSessionId'] : null,
+    workspacePath: typeof args['artifactRoot'] === 'string' ? args['artifactRoot'] : null,
+  };
+  const harness = deps.getWorkerHarness(harnessKind);
+  const instruction = [task.title, '', task.objective].join('\n').trim();
+  await harness.send(handle, {
+    text: instruction,
+    taskId,
+    workflowId: task.workflowId,
+    artifactRoot: (args['artifactRoot'] as string | null) ?? null,
+  });
+  await harness.readState(handle);
+  const drafts = await harness.collectReceipts(handle);
+  const artifactIds: string[] = [];
+  for (const draft of drafts) {
+    if (!draft.artifactFilePath) continue;
+    const created = await createArtifactFromDraft(cmd, task, handle, draft);
+    if (!created.ok) return created;
+    const data = (created.data && typeof created.data === 'object')
+      ? created.data as Record<string, unknown>
+      : {};
+    const artifactId = typeof created.id === 'string'
+      ? created.id
+      : typeof data['artifactId'] === 'string'
+        ? data['artifactId']
+        : null;
+    if (artifactId) artifactIds.push(artifactId);
+  }
+  if (artifactIds.length === 0) {
+    return { ok: false, error: 'assign_task deliver: harness produced no artifact draft' };
+  }
+  const submitted = await cmd('kernel.task.submit', {
+    taskId,
+    summary: drafts[0]?.summary ?? 'result submitted',
+    artifactRefs: artifactIds,
+    attemptId: args['attemptId'],
+  });
+  if (!submitted.ok) return submitted;
+  return { ok: true, id: taskId, data: { artifactIds } };
+}
+
+async function createArtifactFromDraft(
+  cmd: (type: string, payload: Record<string, unknown>) => Promise<CommandResult>,
+  task: TaskSnapshot,
+  handle: WorkerHandle,
+  draft: ReceiptDraft,
+): Promise<CommandResult> {
+  return cmd('kernel.artifact.create', {
+    workflowId: task.workflowId,
+    taskId: task.id,
+    workerId: task.ownerWorkerId,
+    tileId: handle.tileId,
+    kind: draft.artifactKind ?? 'file',
+    uri: draft.artifactFilePath,
+    summary: draft.summary,
+    contentHash: draft.contentHash ?? null,
+    mediaType: draft.mediaType ?? null,
+    sizeBytes: draft.sizeBytes ?? null,
+    correlationId: task.correlationId,
+    metadata: draft.metadata ?? {},
+  });
 }

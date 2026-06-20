@@ -96,3 +96,10 @@ All adapters implement this interface. The Kernel does not know which adapter is
 Before editing: walk this chain.
 
 After meaningful changes: update this file if local rules or owned scope changed.
+
+## v4 R1 Addendum
+
+- Registered harness kinds now include `mock` and `eve-harness` alongside the shell adapters.
+- `mock/index.ts` is deterministic and CI-safe: it records `send`, writes one real artifact under `artifactRoot`, and returns a receipt draft plus artifact file path.
+- `eve/index.ts` is a minimal HTTP translator for local `quantflow-eve`: open session, send instruction, read one workspace artifact, return one draft plus path. Durability, recovery, subagents, and HITL are out of scope.
+- Harness adapters still never call `kernel.*`; callers post drafts through Kernel commands.

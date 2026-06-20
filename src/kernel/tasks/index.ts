@@ -20,7 +20,8 @@ import type { KernelDB } from '../database';
 import type { TaskRow, TaskStatus } from '../schema/types';
 import { emitKernelEvent } from '../events/index';
 import { postReceipt } from '../receipts/index';
-import { ensureWorkerInstanceForTile } from '../worker-instances/index';
+import { verifyTaskArtifacts } from '../artifacts/verify';
+import { assignWorkerToTask, ensureWorkerInstanceForTile } from '../worker-instances/index';
 import type { CommandResult } from '../commands/types';
 import { assertTransition } from './state-machine';
 import {
@@ -97,6 +98,46 @@ function transition(
   const check = assertTransition(task.status, to);
   if (!check.ok) return { ok: false, error: check.error! };
   return { ok: true, task };
+}
+
+function normalizeArtifactRefs(payload: Record<string, unknown>): string[] {
+  const refs: string[] = [];
+  const artifactId = payload['artifactId'];
+  if (typeof artifactId === 'string' && artifactId.trim()) refs.push(artifactId.trim());
+  const artifactRefs = payload['artifactRefs'];
+  if (Array.isArray(artifactRefs)) {
+    for (const ref of artifactRefs) {
+      if (typeof ref === 'string' && ref.trim()) refs.push(ref.trim());
+    }
+  }
+  return [...new Set(refs)];
+}
+
+function latestSubmittedArtifactRefs(db: KernelDB, taskId: string): string[] {
+  const row = db
+    .prepare(
+      `SELECT artifact_refs_json FROM receipts
+       WHERE task_id = ? AND type = 'task_submitted'
+       ORDER BY created_at DESC, rowid DESC
+       LIMIT 1`,
+    )
+    .get(taskId) as { artifact_refs_json: string } | undefined;
+  if (!row) return [];
+  try {
+    const parsed = JSON.parse(row.artifact_refs_json);
+    return Array.isArray(parsed)
+      ? parsed.filter((v) => typeof v === 'string' && v.trim().length > 0)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function attemptMetadata(payload: Record<string, unknown>): Record<string, unknown> {
+  const attemptId = payload['attemptId'];
+  return typeof attemptId === 'string' && attemptId.trim()
+    ? { attemptId: attemptId.trim() }
+    : {};
 }
 
 // ---------------------------------------------------------------------------
@@ -179,10 +220,17 @@ function taskClaim(db: KernelDB, payload: Record<string, unknown>): CommandResul
     if (!ownerWorkerId && typeof payload['tileId'] === 'string') {
       ownerWorkerId = ensureWorkerInstanceForTile(db, payload['tileId'] as string);
     }
+    if (!ownerWorkerId) {
+      return {
+        ok: false,
+        error: 'task.claim requires ownerWorkerId or tileId resolving to a WorkerInstance',
+      };
+    }
     setStatus(db, id, 'claimed', {
       owner_worker_id: ownerWorkerId,
       claimed_at: now,
     });
+    assignWorkerToTask(db, ownerWorkerId, id);
     const updated = getTask(db, id)!;
     postReceipt(db, {
       type: 'task_claimed',
@@ -223,6 +271,10 @@ function taskStart(db: KernelDB, payload: Record<string, unknown>): CommandResul
 function taskSubmit(db: KernelDB, payload: Record<string, unknown>): CommandResult {
   const t = transition(db, payload, 'submitted');
   if (!t.ok) return t;
+  const artifactRefs = normalizeArtifactRefs(payload);
+  if (artifactRefs.length === 0) {
+    return { ok: false, error: 'task.submit requires artifactId or non-empty artifactRefs' };
+  }
   try {
     setStatus(db, t.task.id, 'submitted', { submitted_at: Date.now() });
     const updated = getTask(db, t.task.id)!;
@@ -233,7 +285,8 @@ function taskSubmit(db: KernelDB, payload: Record<string, unknown>): CommandResu
       workerId: updated.owner_worker_id,
       correlationId: updated.correlation_id,
       summary: (payload['summary'] as string | undefined) ?? 'result submitted',
-      artifactRefs: (payload['artifactRefs'] as unknown[] | undefined) ?? [],
+      artifactRefs,
+      metadata: attemptMetadata(payload),
     });
     emitTaskEvent(updated, 'task.submitted', { status: 'submitted' });
     return { ok: true, id: updated.id };
@@ -265,6 +318,11 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
 
   const verdict = (payload['verdict'] as string | undefined) ?? 'pass';
   const summary = (payload['summary'] as string | undefined) ?? `verification ${verdict}`;
+  const explicitArtifactRefs = normalizeArtifactRefs(payload);
+  const submittedArtifactRefs = explicitArtifactRefs.length > 0
+    ? explicitArtifactRefs
+    : latestSubmittedArtifactRefs(db, id);
+  const metadataBase = attemptMetadata(payload);
 
   // Enter verifying from submitted.
   if (task.status === 'submitted') {
@@ -277,6 +335,8 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
       workerId: verifierWorkerId,
       correlationId: verifying.correlation_id,
       summary: 'verification started',
+      artifactRefs: submittedArtifactRefs,
+      metadata: metadataBase,
     });
     emitTaskEvent(verifying, 'task.verifying', { status: 'verifying' });
   } else if (task.status !== 'verifying') {
@@ -288,7 +348,23 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
 
   try {
     if (verdict === 'fail') {
-      return rejectFromVerifying(db, id, verifierWorkerId, summary);
+      return rejectFromVerifying(db, id, verifierWorkerId, summary, submittedArtifactRefs, metadataBase);
+    }
+
+    const structural = verifyTaskArtifacts(db, {
+      taskId: id,
+      artifactRefs: submittedArtifactRefs,
+      artifactRoot: (payload['artifactRoot'] as string | null) ?? null,
+    });
+    if (!structural.ok) {
+      return rejectFromVerifying(
+        db,
+        id,
+        verifierWorkerId,
+        'verification failed: structural artifact check',
+        submittedArtifactRefs,
+        { ...metadataBase, structural },
+      );
     }
 
     // Pass: record the verification_passed receipt, then complete.
@@ -300,7 +376,8 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
       workerId: verifierWorkerId,
       correlationId: verifying.correlation_id,
       summary,
-      artifactRefs: (payload['artifactRefs'] as unknown[] | undefined) ?? [],
+      artifactRefs: submittedArtifactRefs,
+      metadata: { ...metadataBase, structural },
     });
     emitTaskEvent(verifying, 'task.verification_passed', {});
 
@@ -309,6 +386,7 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
       verified_at: verifying.verified_at ?? now,
       completed_at: now,
     });
+    if (verifying.owner_worker_id) assignWorkerToTask(db, verifying.owner_worker_id, null);
     const completed = getTask(db, id)!;
     postReceipt(db, {
       type: 'task_completed',
@@ -372,6 +450,8 @@ function rejectFromVerifying(
   id: string,
   verifierWorkerId: string | null,
   summary: string,
+  artifactRefs: string[] = [],
+  metadata: Record<string, unknown> = {},
 ): CommandResult {
   const verifying = getTask(db, id)!;
   postReceipt(db, {
@@ -381,6 +461,8 @@ function rejectFromVerifying(
     workerId: verifierWorkerId,
     correlationId: verifying.correlation_id,
     summary,
+    artifactRefs,
+    metadata,
   });
   setStatus(db, id, 'working');
   const working = getTask(db, id)!;
@@ -412,6 +494,7 @@ function taskComplete(db: KernelDB, payload: Record<string, unknown>): CommandRe
       verified_at: task.verified_at ?? (legacy ? null : now),
       completed_at: now,
     });
+    if (task.owner_worker_id) assignWorkerToTask(db, task.owner_worker_id, null);
     const completed = getTask(db, id)!;
     postReceipt(db, {
       type: 'task_completed',
@@ -457,6 +540,7 @@ function taskFail(db: KernelDB, payload: Record<string, unknown>): CommandResult
   if (!t.ok) return t;
   try {
     setStatus(db, t.task.id, 'failed');
+    if (t.task.owner_worker_id) assignWorkerToTask(db, t.task.owner_worker_id, null);
     const updated = getTask(db, t.task.id)!;
     postReceipt(db, {
       type: 'task_failed',

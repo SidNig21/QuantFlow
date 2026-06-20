@@ -271,6 +271,25 @@ gate. Such completions are tagged on the `task_completed` receipt
 completions stay distinguishable in the evidence chain. The legacy bypass is a
 temporary compatibility affordance to be retired in a later goal.
 
+### v4 R1 task atom delta
+
+The verified Kernel path now requires artifact evidence:
+
+```text
+task_created -> task_claimed -> task_started -> artifact_created
+-> task_submitted -> verification_started -> verification_passed -> task_completed
+```
+
+`kernel.task.submit` rejects empty submissions unless `artifactId` or
+`artifactRefs` is supplied. `kernel.task.verify` structurally verifies the
+submitted artifacts before `verification_passed`: linked Kernel artifact row,
+URI under the allowed artifact root, non-empty readable file, and matching sha256
+when `content_hash` is present. Optional `attemptId` on submit/verify is copied
+to receipt metadata. The R1 Conductor delivery path uses `WorkerHarness.send`;
+harnesses return drafts plus artifact file paths and never write Kernel truth.
+`mock` is the deterministic CI harness; `eve-harness` is the minimal local
+quantflow-eve HTTP translator.
+
 ## Out Of Scope
 
 - Live Hermes to Codex tile proof (Phase 6).

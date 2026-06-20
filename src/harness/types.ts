@@ -12,7 +12,7 @@
  * inject fakes. Harness-specific assumptions must not leak into the Kernel.
  */
 
-export type HarnessKind = 'local-shell' | 'herdr-shell';
+export type HarnessKind = 'local-shell' | 'herdr-shell' | 'mock' | 'eve-harness';
 
 export interface HarnessDescriptor {
   kind: HarnessKind;
@@ -26,6 +26,8 @@ export interface WorkerRuntimeIds {
   herdrPaneId?: string | null;
   envoySpaceId?: string | null;
   ptySessionId?: string | null;
+  eveSessionId?: string | null;
+  workspacePath?: string | null;
 }
 
 /**
@@ -56,12 +58,18 @@ export interface WorkerHandle {
   herdrPaneId?: string | null;
   envoySpaceId?: string | null;
   ptySessionId?: string | null;
+  eveSessionId?: string | null;
+  workspacePath?: string | null;
 }
 
 export interface WorkerMessage {
   text: string;
   /** Append a newline (submit the line). Defaults true. */
   appendNewline?: boolean;
+  taskId?: string | null;
+  workflowId?: string | null;
+  artifactRoot?: string | null;
+  artifactFileName?: string | null;
 }
 
 /** A partial State Card projection read from Kernel truth (never log scraping). */
@@ -78,6 +86,11 @@ export interface ReceiptDraft {
   summary: string;
   taskId?: string | null;
   artifactRefs?: unknown[];
+  artifactFilePath?: string | null;
+  artifactKind?: string | null;
+  contentHash?: string | null;
+  mediaType?: string | null;
+  sizeBytes?: number | null;
   metadata?: Record<string, unknown>;
 }
 

@@ -154,6 +154,7 @@ export interface WorkerInstanceRow {
   permissions_json: string;
   envoy_space_id: string | null;
   herdr_pane_id: string | null;
+  assigned_task_id: string | null;
   created_at: number;
   updated_at: number;
   metadata_json: string;

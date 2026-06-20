@@ -20,7 +20,8 @@
  */
 
 import { Database } from 'bun:sqlite';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { handleTileCommand } from '../../src/kernel/commands/tile-commands';
@@ -46,6 +47,7 @@ const db = new Database(':memory:');
 db.exec('PRAGMA foreign_keys = ON;');
 db.exec(readFileSync(schemaPath, 'utf-8'));
 const t0 = Date.now();
+const artifactRoot = mkdtempSync(join(tmpdir(), 'qf-vault-export-'));
 db.prepare(
   `INSERT INTO workflows (id, name, objective, status, created_at, updated_at)
    VALUES ('wf1','Build Replay Loader','Load and verify replays end to end','active',?,?)`,
@@ -70,10 +72,11 @@ handleConductorCommand(kdb, 'kernel.conductor.plan', {
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'task1', workflowId: 'wf1', title: 'Implement loader', objective: 'Implement and prove the loader' });
 handleTaskCommand(kdb, 'kernel.task.claim', { taskId: 'task1', ownerWorkerId: 'w_owner' });
 handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task1' });
-handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task1', summary: 'loader implemented' });
-handleArtifactCommand(kdb, 'kernel.artifact.create', { workflowId: 'wf1', taskId: 'task1', kind: 'code', uri: 'src/loader.ts', summary: 'replay loader module' });
-handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task1', verifierWorkerId: 'w_verifier' });
-handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task1', verifierWorkerId: 'w_verifier', verdict: 'pass' });
+mkdirSync(join(artifactRoot, 'src'), { recursive: true });
+writeFileSync(join(artifactRoot, 'src', 'loader.ts'), 'export function load() { return true; }', 'utf-8');
+const artifact = handleArtifactCommand(kdb, 'kernel.artifact.create', { workflowId: 'wf1', taskId: 'task1', workerId: 'w_owner', kind: 'code', uri: 'src/loader.ts', summary: 'replay loader module' });
+handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task1', summary: 'loader implemented', artifactRefs: [artifact.id] });
+handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task1', verifierWorkerId: 'w_verifier', verdict: 'pass', artifactRoot });
 
 // task2: blocked.
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'task2', workflowId: 'wf1', title: 'Wire UI', objective: 'Wire the loader UI' });

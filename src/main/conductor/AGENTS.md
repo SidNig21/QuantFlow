@@ -103,3 +103,9 @@ commands, `kernel.connection.create`) and the approved shell role-spawn path for
 Before editing: walk this chain.
 
 After meaningful changes: update this file if local rules or owned scope changed.
+
+## v4 R1 Addendum
+
+- `assign_task` remains claim+start by default. With `deliver:true`, it sends through `deps.getWorkerHarness(kind)`, collects drafts, posts `kernel.artifact.create`, then posts `kernel.task.submit`.
+- Mock delivery may auto-run for CI. Real harness delivery requires explicit operator approval (`operatorApproved` or `approvalToken`).
+- The Conductor still never writes artifact/task truth directly; all truth writes remain Kernel commands.

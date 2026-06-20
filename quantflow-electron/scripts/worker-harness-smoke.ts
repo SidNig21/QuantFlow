@@ -2,7 +2,7 @@
  * Worker reconciliation + minimal harness registry smoke (Goal 6A).
  *
  * Proves the Kernel is the authoritative worker identity/status owner:
- *  - harness registry (local-shell, herdr-shell) + default model are seeded.
+ *  - harness registry (local-shell, herdr-shell, mock, eve-harness) + default model are seeded.
  *  - tile.create yields exactly one default worker row (harness/model populated).
  *  - kernel.worker.spawn establishes role/harness/model + status 'spawning'.
  *  - kernel.worker.status_update records runtime ids (herdr_pane_id/envoy_space_id)
@@ -52,9 +52,11 @@ seedHarnessRegistry(kdb);
 seedHarnessRegistry(kdb); // idempotent
 startStateCardWatcher(kdb);
 const harnessCount = (db.prepare('SELECT COUNT(*) AS n FROM harnesses').get() as { n: number }).n;
-check('two harnesses seeded', harnessCount === 2);
+check('four harnesses seeded', harnessCount === 4);
 check('local-shell harness present', !!db.prepare("SELECT id FROM harnesses WHERE kind='local-shell'").get());
 check('herdr-shell harness present', !!db.prepare("SELECT id FROM harnesses WHERE kind='herdr-shell'").get());
+check('mock harness present', !!db.prepare("SELECT id FROM harnesses WHERE kind='mock'").get());
+check('eve-harness present', !!db.prepare("SELECT id FROM harnesses WHERE kind='eve-harness'").get());
 check('default model seeded', !!db.prepare("SELECT id FROM models WHERE id='model-local-default'").get());
 
 console.log('\n— tile.create yields one default worker (harness/model populated) —');

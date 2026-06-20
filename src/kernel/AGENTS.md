@@ -86,3 +86,9 @@ Enforce these transitions centrally here. Do not let callers bypass them.
 Before editing: walk this chain.
 
 After meaningful changes: update this file if local rules or owned scope changed.
+
+## v4 R1 Addendum
+
+- `artifacts/verify.ts` owns structural artifact verification with injectable fs: linked artifact row, under artifact root, non-empty readable file, optional sha256 match.
+- `tasks/index.ts` rejects submit without `artifactId`/`artifactRefs`, records optional `attemptId` on submit/verify receipts, and runs structural verification before `verification_passed`.
+- `worker_instances.assigned_task_id` is an additive reverse link set on task claim and cleared on verified/legacy completion, failure, or worker stop when the column exists.

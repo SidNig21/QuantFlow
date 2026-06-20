@@ -20,7 +20,8 @@
  */
 
 import { Database } from 'bun:sqlite';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { handleTaskCommand, queryTaskGet } from '../../src/kernel/tasks/index';
@@ -80,6 +81,22 @@ db.prepare(
 // get/all/run/exec surface is compatible.
 // deno-lint-ignore no-explicit-any
 const kdb = db as any;
+const artifactRoot = mkdtempSync(join(tmpdir(), 'qf-kernel-task-smoke-'));
+
+function createArtifact(taskId: string, uri: string, body: string): string {
+  const path = join(artifactRoot, uri);
+  writeFileSync(path, body, 'utf-8');
+  const result = handleArtifactCommand(kdb, 'kernel.artifact.create', {
+    taskId,
+    workflowId: 'wf1',
+    workerId: 'w_owner',
+    kind: 'file',
+    uri,
+    summary: `proof for ${taskId}`,
+  });
+  expectOk(`artifact ${taskId}`, result);
+  return result.id as string;
+}
 
 console.log('— state-machine unit checks —');
 check('open→claimed allowed', canTransition('open', 'claimed'));
@@ -110,20 +127,9 @@ expectReject(
 );
 check('still working after blocked complete', queryTaskGet(kdb, 'task1')?.status === 'working');
 
-expectOk('submit', handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task1', summary: 'done' }));
+const artifact1 = createArtifact('task1', 'proof.md', 'proof body');
+expectOk('submit', handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task1', summary: 'done', artifactRefs: [artifact1] }));
 check('status submitted', queryTaskGet(kdb, 'task1')?.status === 'submitted');
-
-expectOk(
-  'artifact receipt',
-  handleArtifactCommand(kdb, 'kernel.artifact.create', {
-    taskId: 'task1',
-    workflowId: 'wf1',
-    workerId: 'w_owner',
-    kind: 'file',
-    uri: 'proof.md',
-    summary: 'proof artifact',
-  }),
-);
 
 // Self-verification refused.
 expectReject(
@@ -138,6 +144,7 @@ expectOk(
     taskId: 'task1',
     verifierWorkerId: 'w_verifier',
     verdict: 'pass',
+    artifactRoot,
   }),
 );
 const t1 = queryTaskGet(kdb, 'task1');
@@ -151,8 +158,8 @@ const expectedChain = [
   'task_created',
   'task_claimed',
   'task_started',
-  'task_submitted',
   'artifact_created',
+  'task_submitted',
   'verification_started',
   'verification_passed',
   'task_completed',
@@ -166,7 +173,8 @@ console.log('\n— reject path: submit → reject → working → resubmit → v
 handleTaskCommand(kdb, 'kernel.task.create', { id: 'task2', workflowId: 'wf1', title: 'T2', objective: 'o' });
 handleTaskCommand(kdb, 'kernel.task.claim', { taskId: 'task2', ownerWorkerId: 'w_owner' });
 handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task2' });
-handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task2' });
+const artifact2 = createArtifact('task2', 'proof-task2.md', 'redo body');
+handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task2', artifactRefs: [artifact2] });
 expectOk(
   'reject',
   handleTaskCommand(kdb, 'kernel.task.reject', { taskId: 'task2', verifierWorkerId: 'w_verifier', reason: 'redo' }),

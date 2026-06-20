@@ -91,10 +91,13 @@ const ops: HarnessRuntimeOps = {
   },
 };
 
-console.log('— registry exposes both shipped harness kinds (pi deferred) —');
-check('two harness descriptors', HARNESS_DESCRIPTORS.length === 2);
+console.log('— registry exposes shipped shell kinds plus R1 mock/eve kinds (pi deferred) —');
+check('four harness descriptors', HARNESS_DESCRIPTORS.length === 4);
+check('mock + eve descriptors registered', HARNESS_DESCRIPTORS.some((d) => d.kind === 'mock') && HARNESS_DESCRIPTORS.some((d) => d.kind === 'eve-harness'));
 check('createHarness(local-shell) builds an adapter', createHarness('local-shell', ops).kind === 'local-shell');
 check('createHarness(herdr-shell) builds an adapter', createHarness('herdr-shell', ops).kind === 'herdr-shell');
+check('createHarness(mock) builds an adapter without shell ops', createHarness('mock').kind === 'mock');
+check('createHarness(eve-harness) builds an adapter without shell ops', createHarness('eve-harness').kind === 'eve-harness');
 
 const baseConfig: SpawnWorkerInput = {
   roleName: 'Coder',

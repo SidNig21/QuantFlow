@@ -14,13 +14,14 @@
  */
 
 import { Database } from 'bun:sqlite';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { handleTaskCommand, queryTaskGet } from '../../src/kernel/tasks/index';
 import { handleWorkerCommand } from '../../src/kernel/commands/worker-commands';
 import { handleConnectionCommand } from '../../src/kernel/commands/connection-commands';
-import { handleReceiptCommand, queryReceiptList } from '../../src/kernel/receipts/index';
+import { handleArtifactCommand, handleReceiptCommand, queryReceiptList } from '../../src/kernel/receipts/index';
 import { handleTileCommand } from '../../src/kernel/commands/tile-commands';
 import { handleConductorCommand, queryConductorContext } from '../../src/kernel/conductor/index';
 import { startStateCardWatcher } from '../../src/kernel/watchers/index';
@@ -39,18 +40,35 @@ const schemaPath = join(import.meta.dir, '..', '..', 'src', 'kernel', 'migration
 const db = new Database(':memory:');
 db.exec('PRAGMA foreign_keys = ON;');
 db.exec(readFileSync(schemaPath, 'utf-8'));
-db.prepare(`INSERT INTO workflows (id, name, objective, status, created_at, updated_at) VALUES ('wf1','Build loader','o','active',?,?)`).run(Date.now(), Date.now());
+const artifactRoot = mkdtempSync(join(tmpdir(), 'qf-conductor-loop-'));
+db.prepare(`INSERT INTO workflows (id, name, objective, status, vault_path, created_at, updated_at) VALUES ('wf1','Build loader','o','active',?,?,?)`).run(artifactRoot, Date.now(), Date.now());
 // deno-lint-ignore no-explicit-any
 const kdb = db as any;
 seedHarnessRegistry(kdb);
 startStateCardWatcher(kdb);
 handleTileCommand(kdb, 'kernel.tile.create', { id: 'tile_w', workflowId: 'wf1', displayName: 'Coder', tileKind: 'worker' });
 
+function createArtifact(taskId: string, uri: string, body: string): string {
+  writeFileSync(join(artifactRoot, uri), body, 'utf-8');
+  const owner = queryTaskGet(kdb, taskId)?.ownerWorkerId;
+  const result = handleArtifactCommand(kdb, 'kernel.artifact.create', {
+    workflowId: 'wf1',
+    taskId,
+    workerId: owner,
+    kind: 'file',
+    uri,
+    summary: `proof for ${taskId}`,
+  });
+  check(`artifact ${taskId} ok`, result.ok === true);
+  return result.id as string;
+}
+
 const dispatch = async (type: string, payload: Record<string, unknown>) => {
   if (type.startsWith('kernel.task.')) return handleTaskCommand(kdb, type, payload);
   if (type.startsWith('kernel.worker.')) return handleWorkerCommand(kdb, type, payload);
   if (type.startsWith('kernel.connection.')) return handleConnectionCommand(kdb, type, payload);
   if (type.startsWith('kernel.receipt.')) return handleReceiptCommand(kdb, type, payload);
+  if (type.startsWith('kernel.artifact.')) return handleArtifactCommand(kdb, type, payload);
   if (type.startsWith('kernel.conductor.')) return handleConductorCommand(kdb, type, payload);
   return { ok: false, error: `unhandled ${type}` };
 };
@@ -101,7 +119,8 @@ check('t1 working', queryTaskGet(kdb, 't1')?.status === 'working');
 check('working → paused', (await loop.step(wf)).status === 'paused');
 
 console.log('\n— high-risk verify is approval-gated; deny needs the token —');
-await actions.runAction('submit_task', { taskId: 't1' });
+const artifact1 = createArtifact('t1', 't1-proof.md', 'done');
+await actions.runAction('submit_task', { taskId: 't1', artifactRefs: [artifact1] });
 r = await loop.step(wf);
 check('awaiting-approval with a token', r.status === 'awaiting-approval' && typeof r.proposalToken === 'string');
 const t1Token = r.proposalToken!;
@@ -121,7 +140,8 @@ const staleToken = r.proposalToken!;
 // Mutate the world so the next high-risk proposal targets a different task.
 await actions.runAction('create_task', { id: 't2', workflowId: 'wf1', title: 'T2', objective: 'o' });
 await actions.runAction('assign_task', { taskId: 't2', tileId: 'tile_w' });
-await actions.runAction('submit_task', { taskId: 't2' }); // t2 is now the newest submitted
+const artifact2 = createArtifact('t2', 't2-proof.md', 'done2');
+await actions.runAction('submit_task', { taskId: 't2', artifactRefs: [artifact2] }); // t2 is now the newest submitted
 r = await loop.step({ ...wf, approve: true, proposalToken: staleToken });
 check('drifted approval → stale', r.status === 'stale');
 check('no task completed by the stale approval', queryTaskGet(kdb, 't1')?.status === 'submitted' && queryTaskGet(kdb, 't2')?.status === 'submitted');

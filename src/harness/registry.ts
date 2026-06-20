@@ -15,14 +15,20 @@
 import type { HarnessDescriptor, HarnessKind, HarnessRuntimeOps, WorkerHarness } from './types';
 import { localShellHarness, createLocalShellHarness } from './local-shell/index';
 import { herdrShellHarness, createHerdrShellHarness } from './herdr-shell/index';
+import { mockHarness, createMockHarness } from './mock/index';
+import { eveHarness, createEveHarness } from './eve/index';
 
 export const HARNESS_DESCRIPTORS: readonly HarnessDescriptor[] = [
   localShellHarness,
   herdrShellHarness,
+  mockHarness,
+  eveHarness,
 ];
 
 /** Map a tile/role runtime target to a harness kind. herdr-wsl → herdr-shell. */
 export function resolveHarnessKind(runtimeTarget?: string | null): HarnessKind {
+  if (runtimeTarget === 'mock') return 'mock';
+  if (runtimeTarget === 'eve' || runtimeTarget === 'eve-harness') return 'eve-harness';
   return runtimeTarget === 'herdr-wsl' || runtimeTarget === 'herdr-shell'
     ? 'herdr-shell'
     : 'local-shell';
@@ -37,12 +43,18 @@ export function getHarnessDescriptor(kind: HarnessKind): HarnessDescriptor | und
  * shipped runtime + Kernel boundary. Throws for an unknown kind so a missing
  * adapter fails loudly rather than silently.
  */
-export function createHarness(kind: HarnessKind, ops: HarnessRuntimeOps): WorkerHarness {
+export function createHarness(kind: HarnessKind, ops?: HarnessRuntimeOps): WorkerHarness {
   switch (kind) {
     case 'local-shell':
+      if (!ops) throw new Error('local-shell harness requires runtime ops');
       return createLocalShellHarness(ops);
     case 'herdr-shell':
+      if (!ops) throw new Error('herdr-shell harness requires runtime ops');
       return createHerdrShellHarness(ops);
+    case 'mock':
+      return createMockHarness();
+    case 'eve-harness':
+      return createEveHarness();
     default:
       throw new Error(`Unknown harness kind: ${kind as string}`);
   }

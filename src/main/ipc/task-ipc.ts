@@ -79,7 +79,9 @@ export function registerKernelTaskRpc(registerMethod: RegisterMethod): void {
     params: {
       taskId: 'Task id',
       summary: '(optional) result summary',
-      artifactRefs: '(optional) array of artifact ids',
+      artifactId: '(optional) single artifact id',
+      artifactRefs: 'array of artifact ids (required unless artifactId is supplied)',
+      attemptId: '(optional) stable logical attempt id recorded on receipt metadata',
     },
   });
 
@@ -91,6 +93,8 @@ export function registerKernelTaskRpc(registerMethod: RegisterMethod): void {
       verdict: '(optional) "pass" (default) or "fail"',
       verifierWorkerId: '(optional) verifier worker id; must differ from owner',
       summary: '(optional) verdict note',
+      artifactRoot: '(optional) allowed artifact root override; otherwise workflow.vault_path then QUANTFLOW_DIR/artifacts',
+      attemptId: '(optional) stable logical attempt id recorded on receipt metadata',
       operatorOverride: '(optional) bypass self-verification guard',
     },
   });

@@ -17,7 +17,8 @@
  */
 
 import { Database } from 'bun:sqlite';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { handleTaskCommand } from '../../src/kernel/tasks/index';
@@ -46,6 +47,7 @@ db.prepare(`INSERT INTO workflows (id, name, objective, status, created_at, upda
 
 // deno-lint-ignore no-explicit-any
 const kdb = db as any;
+const artifactRoot = mkdtempSync(join(tmpdir(), 'qf-state-card-'));
 startStateCardWatcher(kdb);
 
 console.log('— tile.create seeds an idle State Card + a default WorkerInstance —');
@@ -82,16 +84,25 @@ check('blocker promoted', card?.blocker === 'waiting on upstream');
 
 console.log('\n— resume → submit → artifact → verify (derived verifier worker) —');
 handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task1' }); // blocked → working
-handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task1', summary: 'done' });
+writeFileSync(join(artifactRoot, 'proof.md'), 'proof', 'utf-8');
+const artifact = handleArtifactCommand(kdb, 'kernel.artifact.create', {
+  taskId: 'task1',
+  workflowId: 'wf1',
+  workerId: queryWorkerForTile(kdb, 'tile1'),
+  kind: 'file',
+  uri: 'proof.md',
+  summary: 'proof',
+});
+check('artifact create ok', artifact.ok === true);
+handleTaskCommand(kdb, 'kernel.task.submit', { taskId: 'task1', summary: 'done', artifactRefs: [artifact.id] });
 card = queryStateCardGet(kdb, 'tile1');
 check('submit promoted (no raw logs)', card?.lastMeaningfulUpdate === 'Result submitted');
 
-handleArtifactCommand(kdb, 'kernel.artifact.create', { taskId: 'task1', workflowId: 'wf1', kind: 'file', uri: 'proof.md', summary: 'proof' });
 card = queryStateCardGet(kdb, 'tile1');
 check('artifact promoted into card', Array.isArray(card?.artifacts) && card!.artifacts.length === 1);
 check('last receipt id set', card?.lastReceiptId != null);
 
-handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task1', verifierWorkerId, verdict: 'pass' });
+handleTaskCommand(kdb, 'kernel.task.verify', { taskId: 'task1', verifierWorkerId, verdict: 'pass', artifactRoot });
 card = queryStateCardGet(kdb, 'tile1');
 check('status complete after verify pass', card?.status === 'complete');
 check('next action cleared on complete', card?.nextAction === '—');

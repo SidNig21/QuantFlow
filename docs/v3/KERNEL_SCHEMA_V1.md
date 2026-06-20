@@ -136,6 +136,7 @@ Runtime participants connected to tiles.
 | `permissions_json` | TEXT | `{}` — quick-access snapshot of active permissions |
 | `envoy_space_id` | TEXT | Envoy space binding (nullable) |
 | `herdr_pane_id` | TEXT | herdr pane binding (nullable) |
+| `assigned_task_id` | TEXT FK -> tasks | Nullable; R1 reverse link to the task currently assigned to this worker |
 | `created_at` | INTEGER | ms since epoch |
 | `updated_at` | INTEGER | ms since epoch |
 | `metadata_json` | TEXT | `{}` |
@@ -177,6 +178,12 @@ working / submitted / verifying → failed
 ```
 
 The Kernel enforces all transitions. `complete` requires prior `submitted` and `verifying`.
+As of v4 R1, `kernel.task.submit` requires `artifactId` or non-empty `artifactRefs`.
+`kernel.task.verify` performs a structural artifact check before `verification_passed`:
+the artifact row must link to the workflow/task/owning worker, its `uri` must resolve
+under the allowed artifact root, the file must exist and be non-empty, and
+`content_hash` must match sha256 when provided. Optional `attemptId` on submit/verify
+is recorded in receipt metadata as the stable id for the same logical retry attempt.
 
 **Status values:** `open`, `claimed`, `working`, `submitted`, `verifying`, `complete`, `blocked`, `failed`
 
