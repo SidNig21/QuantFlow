@@ -5,6 +5,39 @@ running locally** so QuantFlow's `eve-harness` has something real to drive durin
 the **R1 product proof**. Codex builds the QuantFlow↔Eve wiring; you just need a
 runnable agent to point it at.
 
+## ✅ Proven working config (verified 2026-06-19 — OpenCode Go)
+
+Proven end-to-end (real chat response via `deepseek-v4-pro`). **This is the
+canonical setup — it supersedes the generic OpenRouter/Anthropic examples below.**
+
+`agent/agent.ts`:
+```ts
+import { defineAgent } from "eve";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+
+const opencode = createOpenAICompatible({
+  name: "opencode-go",
+  baseURL: "https://opencode.ai/zen/go/v1",   // NO /chat/completions — the SDK appends it
+  apiKey: process.env.OPENCODE_GO_API_KEY,
+});
+
+export default defineAgent({
+  model: opencode("deepseek-v4-pro"),          // BARE id — no "opencode-go/" prefix
+  modelContextWindowTokens: 128000,            // required for custom (non-AI-Gateway) providers
+});
+```
+
+Install (version-aligned with Eve's `ai@7-beta`): `npm i @ai-sdk/openai-compatible@beta` (→ 3.x v7 line).
+`.env.local`: `OPENCODE_GO_API_KEY=sk-...` (gitignored; **fully restart** `npm run dev` after editing).
+
+Hard-won gotchas:
+- Model IDs are **bare** (`deepseek-v4-pro`), no `opencode-go/` prefix. Live list: `curl.exe https://opencode.ai/zen/go/v1/models -H "Authorization: Bearer <key>"`.
+- Custom (non-AI-Gateway) providers have no context-window metadata → compaction fails unless you set `modelContextWindowTokens`.
+- `eve dev` compiles config at startup — a full restart is required after editing `agent.ts` or `.env.local`.
+- `Vercel CLI not found · /vc` is cosmetic for OpenCode Go (no AI Gateway, no deploy) — ignore until R4.
+- `@openrouter/ai-sdk-provider` targets `ai@^6` and does NOT fit Eve's `ai@7-beta`; use `@ai-sdk/openai-compatible` (works for OpenRouter too — just swap `baseURL`/key).
+- Model menu (bare ids): `deepseek-v4-pro`/`-flash` · `glm-5.2`/`5.1`/`5` · `kimi-k2.7-code`/`k2.6` · `qwen3.7-max`/`-plus` · `minimax-m3`/`m2.7` · `mimo-v2.5-pro`.
+
 ## When you actually need this
 - **R0:** you need **none** of this. R0's Eve-lane probe only checks reachability +
   that a key is present. Don't set up Eve for R0.
