@@ -126,6 +126,97 @@ real-agent auth (territory map §7).
 
 ---
 
+# Eve Integration — v4 Worker Substrate (decided 2026-06-19)
+
+This is the single source of truth for the Eve rescope. The affected goals below
+carry a one-line "Eve delta" pointer back here.
+
+## Decision
+
+**Eve (Vercel's agent framework) is adopted as the durable worker substrate,
+behind the `WorkerHarness` contract.** Verified against Eve's docs: `defineState`
+is session-scoped working memory that "lives and dies with the session," and
+anything that must "outlive the session, be shared across sessions or users, or be
+queried independently of a turn belongs in an external store… or your own
+database." Eve **defers persistent/cross-agent truth to your DB by design** — it
+was built to sit *under* a higher authority. So there is no split-brain:
+**Eve owns execution; the Kernel owns truth.**
+
+## The boundary (what is and isn't Vercel)
+
+- **QuantFlow stays an Electron desktop app.** Shell, canvas, and Kernel run
+  local. "Host QuantFlow on Vercel" is a separate, future decision — out of scope.
+- **Only the durable agent-execution lane is Vercel** (Eve agents run on Vercel
+  Functions/Workflows/Sandbox).
+- **The local lane stays first-class** (Codex/Claude/herdr/scripts) with *light*
+  durability. **Durability is scoped to need:** heavy (park/resume/recover) = Eve
+  only; local = reload-survive + restart-on-fail.
+- Keep each Vercel piece (Workflows, Connect, xmcp) **behind a seam** so "leave
+  Vercel later" is a harness/connection swap, not a rewrite — the same insulation
+  that makes betting on beta-Eve safe.
+
+## eve-harness = event-stream translator (F4)
+
+A bounded adapter that drives Eve's HTTP API — POST `/eve/v1/session`, GET
+`/eve/v1/session/<id>/stream`, POST `/eve/v1/session/<id>` with `continuationToken`
+— and **translates Eve's NDJSON session events into Kernel receipt drafts the
+caller posts.** Eve never writes Kernel state directly. Event mapping:
+
+```text
+result.completed / session.completed  → artifact + task_submitted drafts
+step.completed / action.result        → progress drafts
+input.requested / authorization.required → R5 checkpoint (park; QF takes the
+                                          token-bound decision; resume via continuationToken)
+subagent.called / subagent.completed  → INTRA-agent; stay BELOW the DAG line (not QF tasks)
+session.failed / step.failed          → task_failed / task_blocked drafts
+```
+
+## Vocab locks
+
+- **"harness" is overloaded** — Eve's intra-agent loop nests *inside* QuantFlow's
+  runtime adapter. Never write "harness" unqualified.
+- **"run" is overloaded — §10.1 RESOLVED: extend `Workflow`** (with
+  mode/budget/checkpoint_state); do **not** introduce a "Run" primitive (Eve owns
+  "run" at session scope; three "runs" = footgun).
+- **Eve subagents (intra-agent) ≠ the QuantFlow DAG (cross-worker).** Don't merge.
+
+## Model provider — OpenRouter, AI Gateway OUT
+
+- Single **`OPENROUTER_API_KEY`** via the R0 credential accessor. **AI Gateway is
+  removed from all scopes** (per-action tax). Default cheap-reasoning model
+  `deepseek/deepseek-r1`; per-recipe model routing is an R8 legend config.
+- **R0 spike (UNVERIFIED — do not lock until confirmed):** confirm `defineAgent`
+  accepts a custom AI-SDK provider (OpenRouter, own key) *instead of* an AI-Gateway
+  slug. Eve is AI-SDK-based and OpenRouter ships `@openrouter/ai-sdk-provider`, so
+  it's likely — but Eve's documented default is AI Gateway. If Eve hard-requires
+  gateway slugs, fall back to the cheapest non-gateway path Eve supports.
+
+## Cloud → local reads
+
+Cloud Eve agents cannot reach a local Kernel directly. **Front-load context via
+the R2 Context Envelope in the session message** (Eve consumes it through
+instructions/skills + its own compaction) — no callback needed. The **`xmcp`
+Kernel-read connection** (Eve `connection_search` against a QuantFlow MCP
+endpoint) is the **later** path, for when a Kernel-read endpoint is actually
+hosted/reachable from Vercel. **One read surface** — `xmcp` must not become a
+second MCP server beside `tools/quantflow-mcp`.
+
+## Per-rung delta (build → integrate)
+
+| Rung | Eve delta |
+| --- | --- |
+| **R0** | Two-lane preflight: local-CLI lane (safeStorage) + **Eve lane** (`/eve/v1/info` reachability + OpenRouter key present/valid). + the OpenRouter-provider spike. |
+| **R1** | The "real" proof = an **Eve worker** (introduces the translator minimally). Eve artifact lands in the **Eve workspace** → structural verify pulls the bytes back **through the harness**; `artifact_root` for Eve = the Eve workspace. |
+| **R2** | Unchanged build (cross-agent envelope is yours). Delivery = the envelope in the Eve session message. |
+| **R3** | DAG stays; **Envoy dies**. §10.1 resolved → extend `Workflow`. `xmcp` Kernel-read endpoint = an Eve **connection** (later/hosted); R2-envelope-first for now. |
+| **R4** | **Collapses.** Eve workers get durability/sandbox/recovery/park-resume from **Vercel Workflow** replay. Runtime Manager → thin control+mapping: persist `task↔sessionId`, drive Eve cancel/recover via API, consume `session.*` → Kernel worker status, restore the mapping on reload (the session survives on Vercel). Local lane keeps **light** durability only. |
+| **R5** | Eve `input.requested` parks the session; the QF loop surfaces the candidate set + takes the **token-bound** selection (5D authority stays QF's); resume via `continuationToken`. |
+| **R6** | A template role can target the **eve-harness** ("spawn N Eve research agents"). Structure unchanged. |
+| **R7** | Run Replay = QF cross-agent receipt projection **+** Eve per-session replayable streams. `eve eval` may feed per-agent scoring; QF evals stay **non-authoritative + cross-run**. |
+| **R8** | Legend onboarding adds **per-recipe model routing** (OpenRouter) and the eve-harness as a runtime target; directory-shaped Eve agent defs are onboardable. |
+
+---
+
 # v4 Goal Status
 
 This section is the durable progress ledger for the v4 branch.
@@ -152,6 +243,13 @@ This section is the durable progress ledger for the v4 branch.
 > compounding* and any run-time/latency tuning are explicitly deprioritized.
 > Suggested near-term order: **R0 → R1 → R8 → R3 → R4** (then R5/R6, R7-verify).
 
+> **Eve substrate (decided 2026-06-19) — see the § Eve Integration section below.**
+> Eve = the durable worker substrate behind the harness; Kernel still owns truth
+> (Eve defers truth by design). R4 collapses onto Vercel Workflow durability;
+> §10.1 resolved → extend `Workflow`; model provider = OpenRouter (AI Gateway
+> out); QuantFlow stays an Electron desktop app (only the durable agent lane is
+> Vercel). Each affected goal carries an "Eve delta" pointer.
+
 ---
 
 # Goal R0 — Auth / Capability Preflight
@@ -159,6 +257,12 @@ This section is the durable progress ledger for the v4 branch.
 > Band A (environment) · parallel track · territory map §8 rung 0, §5 (policy
 > envelope — "preflight-report-not-Settings"), §7 (two proof tracks), §9
 > (credential accessor seam).
+>
+> **Eve delta (see § Eve Integration):** two-lane preflight — local-CLI lane
+> (safeStorage) **+ Eve lane** (`/eve/v1/info` reachability + `OPENROUTER_API_KEY`
+> present/valid). Add the OpenRouter-provider **spike** (confirm Eve accepts a
+> custom AI-SDK provider, not just an AI-Gateway slug). Credential accessor holds
+> `OPENROUTER_API_KEY`; AI Gateway is out.
 
 ## Goal
 
@@ -464,6 +568,12 @@ pushes.
 > Band A (execution) · the keystone · territory map §4 Band A, §5 (Artifact
 > record + structural verification checklist), §8 rung 1, §10.3 (artifact storage
 > root), §10.5 (idempotency seam — design now, enforce in C).
+>
+> **Eve delta (see § Eve Integration):** the *real* proof becomes an **Eve
+> worker** driven through the event-stream-translator harness (mock harness still
+> proves the atom first in CI). The Eve artifact lands in the **Eve workspace**, so
+> structural verify pulls the bytes back **through the harness**; `artifact_root`
+> for an Eve worker = the Eve workspace.
 
 ## Goal
 
@@ -989,6 +1099,11 @@ DAG executor and consolidates task authority onto the Kernel.
 
 ## RESOLVE FIRST (territory map §10.1)
 
+> **§10.1 IS NOW RESOLVED (see § Eve Integration): extend `Workflow`; do NOT
+> introduce a "Run" primitive** — Eve owns "run" at session scope, so a QuantFlow
+> "Run" would be the third meaning of the word. The memo below now governs *how*
+> to extend Workflow (mode/budget/checkpoint_state), not *whether*.
+
 **Gate zero — a one-page decision memo before any migration SQL (F6).** Decide
 **Run vs Workflow** against the vocab lock and write the memo into the goal result
 + `docs/v3/GLOSSARY.md` + `KERNEL_SCHEMA_V1.md`. Either `Run` is a new primitive
@@ -1150,6 +1265,16 @@ judgment. Run the full Regression Guard incl. smoke:dag.
 > Band C (control) · territory map §4 Band C, §5 (Runtime Manager record, policy
 > envelope, budgets), §6 (hard problems), §7 (simulation harness), §8 rung 4,
 > §10.4/§10.5. Depends on R3. **The heaviest rung — weeks, not days.**
+>
+> **Eve delta (see § Eve Integration) — this rung COLLAPSES for Eve workers.**
+> Durability / sandbox / recovery / park-resume come from **Vercel Workflow**
+> replay, not hand-built. The Runtime Manager shrinks to a thin control+mapping
+> layer: persist `task↔sessionId`, drive Eve cancel/recover via its API, consume
+> `session.*` events → Kernel worker status, restore the mapping on reload (the
+> session itself survives on Vercel). The heavy durability engine below applies
+> only to the **local lane**, which gets *light* durability (reload-survive +
+> restart) — not the full park/resume machinery. Build heavy durability ONCE,
+> and it's Eve's.
 
 ## Goal
 
@@ -1299,6 +1424,12 @@ Run the full Regression Guard incl. smoke:pod.
 
 > Band C (control) · territory map §2 (decision-authority rule), §4 Band C, §8
 > rung 5. Depends on R4.
+>
+> **Eve delta (see § Eve Integration):** Eve's `input.requested` /
+> `authorization.required` events **park** the session; the QF loop surfaces the
+> candidate set and takes the **token-bound** selection (5D decision authority
+> stays QuantFlow's), then resumes via `continuationToken`. Eve provides
+> pause/resume; QuantFlow keeps the decision.
 
 ## Goal
 
