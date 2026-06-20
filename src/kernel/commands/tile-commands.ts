@@ -4,6 +4,12 @@ import { emitKernelEvent } from '../events/index';
 import { ensureWorkerInstanceForTile } from '../worker-instances/index';
 import type { CommandResult } from './types';
 
+function tableExists(db: KernelDB, tableName: string): boolean {
+  return db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(tableName) != null;
+}
+
 export function handleTileCommand(
   db: KernelDB,
   type: string,
@@ -142,7 +148,9 @@ function tileRemove(db: KernelDB, payload: Record<string, unknown>): CommandResu
       // row is deleted. State Cards/evals are detached (kept as truth/derived);
       // permissions are worker-scoped, so they go with the worker.
       db.prepare('UPDATE state_cards SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
-      db.prepare('UPDATE evaluations SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
+      if (tableExists(db, 'evaluations')) {
+        db.prepare('UPDATE evaluations SET worker_id = NULL WHERE worker_id = ?').run(worker.id);
+      }
       db.prepare('DELETE FROM permissions WHERE worker_id = ?').run(worker.id);
     }
     db.prepare('DELETE FROM worker_instances WHERE tile_id = ?').run(id);
