@@ -156,6 +156,10 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("pref:set", key, value),
   diagnosticsHealth: () =>
     ipcRenderer.invoke("qf:diagnostics:health"),
+  capabilityRun: () =>
+    ipcRenderer.invoke("capability:run"),
+  capabilitySnapshot: () =>
+    ipcRenderer.invoke("capability:snapshot"),
   diagnosticsRunProbe: (name: string) =>
     ipcRenderer.invoke("qf:diagnostics:run-probe", name),
   diagnosticsTailLogs: (request?: unknown) =>

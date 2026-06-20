@@ -222,7 +222,7 @@ function commandExistsInWsl(command: string): boolean {
   }
 }
 
-function commandExists(command: string): boolean {
+export function commandExists(command: string): boolean {
   try {
     execFileSync(
       process.platform === "win32" ? "where.exe" : "which",

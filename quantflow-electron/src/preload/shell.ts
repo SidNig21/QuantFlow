@@ -236,6 +236,10 @@ contextBridge.exposeInMainWorld("shellApi", {
     ipcRenderer.invoke("runtime:diagnostics"),
   diagnosticsHealth: (): Promise<unknown> =>
     ipcRenderer.invoke("qf:diagnostics:health"),
+  capabilityRun: (): Promise<unknown> =>
+    ipcRenderer.invoke("capability:run"),
+  capabilitySnapshot: (): Promise<unknown> =>
+    ipcRenderer.invoke("capability:snapshot"),
   diagnosticsRunProbe: (name: string): Promise<unknown> =>
     ipcRenderer.invoke("qf:diagnostics:run-probe", name),
   diagnosticsTailLogs: (request?: unknown): Promise<unknown> =>

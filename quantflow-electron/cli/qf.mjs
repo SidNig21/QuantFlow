@@ -98,6 +98,30 @@ function printProbeSummary(probe) {
   }
 }
 
+function printCapabilitySummary(health) {
+  const summary = health.summary ?? {};
+  console.log(
+    `QuantFlow capability: ${health.level ?? "unknown"} `
+    + `(${summary.healthy ?? 0} healthy, `
+    + `${summary.degraded ?? 0} degraded, ${summary.down ?? 0} down)`,
+  );
+  const probes = [...(health.probes ?? [])].sort((a, b) =>
+    String(a.name).localeCompare(String(b.name))
+  );
+  for (const probe of probes) {
+    const detail = probe.detail ?? {};
+    const authed = detail.authed === null ? "n/a" : Boolean(detail.authed);
+    console.log(
+      `[${probe.level}] ${probe.name} `
+      + `present=${Boolean(detail.present)} `
+      + `reachable=${Boolean(detail.reachable)} `
+      + `authed=${authed} `
+      + `ready=${Boolean(detail.ready)} - ${probe.message}`,
+    );
+    if (probe.remediation) console.log(`  remediation: ${probe.remediation}`);
+  }
+}
+
 function doctorUsage() {
   console.log(`qf doctor - run QuantFlow diagnostics
 
@@ -116,6 +140,22 @@ EXIT CODES
   0   Healthy
   1   Degraded or warning
   2   Down, broken, or QuantFlow is not reachable`);
+}
+
+function capabilityUsage() {
+  console.log(`qf capability - run QuantFlow capability preflight
+
+USAGE
+  qf capability [options]
+
+OPTIONS
+  --json                  Print JSON output
+  -h, --help              Show this help
+
+EXIT CODES
+  0   All capabilities ready
+  1   One or more capabilities degraded
+  2   One or more capabilities down, or QuantFlow is not reachable`);
 }
 
 function tilesToGrid(result) {
@@ -926,6 +966,29 @@ async function cmdDoctor(args) {
   process.exit(doctorExitCode(health.level));
 }
 
+async function cmdCapability(args) {
+  let json = false;
+
+  for (const flag of args) {
+    if (flag === "--json") {
+      json = true;
+    } else if (flag === "--help" || flag === "-h") {
+      capabilityUsage();
+      process.exit(0);
+    } else {
+      die(`unknown capability option: ${flag}`);
+    }
+  }
+
+  const health = await rpcCall("capability.run", {});
+  if (json) {
+    console.log(pretty(health));
+  } else {
+    printCapabilitySummary(health);
+  }
+  process.exit(doctorExitCode(health.level));
+}
+
 // --- usage ----------------------------------------------------------------
 
 function usage() {
@@ -936,6 +999,7 @@ USAGE
 
 COMMANDS
   doctor [options]                    Run QuantFlow diagnostics
+  capability [options]                Run capability preflight
   tile list                          List all tiles on the canvas
   tile create <type> [options]       Create a new tile
   tile rm <id>                       Remove a tile
@@ -1054,6 +1118,9 @@ try {
       break;
     case "doctor":
       await cmdDoctor(argv.slice(1));
+      break;
+    case "capability":
+      await cmdCapability(argv.slice(1));
       break;
     case "tile": {
       if (argv.length < 2) {

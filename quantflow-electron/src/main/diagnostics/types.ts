@@ -2,7 +2,8 @@ export type HealthGroup =
   | "transport"
   | "storage"
   | "runtime"
-  | "integrations";
+  | "integrations"
+  | "capability";
 
 export type HealthLevel = "healthy" | "degraded" | "down";
 
@@ -23,6 +24,18 @@ export interface ProbeCheckResult {
   level: HealthLevel;
   message: string;
   detail?: Record<string, unknown>;
+}
+
+export type CapabilityKind = "role" | "harness" | "provider";
+
+export interface CapabilityDetail extends Record<string, unknown> {
+  capabilityId: string;
+  kind: CapabilityKind;
+  present: boolean;
+  reachable: boolean;
+  authed: boolean | null;
+  ready: boolean;
+  checkedAt: string;
 }
 
 export interface HealthProbe {

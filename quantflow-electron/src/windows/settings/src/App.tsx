@@ -60,6 +60,8 @@ interface SettingsApi {
   setTheme: (mode: string) => Promise<void>;
   getAppVersion: () => Promise<string>;
   diagnosticsHealth: () => Promise<unknown>;
+  capabilityRun: () => Promise<unknown>;
+  capabilitySnapshot: () => Promise<unknown>;
   diagnosticsRunProbe: (name: string) => Promise<unknown>;
   diagnosticsTailLogs: (request?: unknown) => Promise<unknown>;
   diagnosticsListCrashes: () => Promise<unknown>;
@@ -840,6 +842,33 @@ function HealthSummary({ health }: { health: ControllerHealth }) {
   );
 }
 
+function CapabilityBits({ probe }: { probe: HealthResult }) {
+  const detail = probe.detail ?? {};
+  if (probe.group !== "capability") return null;
+  const items = [
+    ["present", detail.present],
+    ["reachable", detail.reachable],
+    ["authed", detail.authed === null ? "n/a" : detail.authed],
+    ["ready", detail.ready],
+  ];
+  return (
+    <div className="flex flex-wrap gap-1 pt-1">
+      {items.map(([label, value]) => (
+        <span
+          key={label}
+          className="rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground"
+          style={{
+            backgroundColor:
+              "color-mix(in srgb, var(--foreground) 7%, transparent)",
+          }}
+        >
+          {label}={String(value)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function ProbeRow({
   probe,
   running,
@@ -864,6 +893,12 @@ function ProbeRow({
         <p className="truncate text-[11px] text-muted-foreground">
           {probe.description}
         </p>
+        <CapabilityBits probe={probe} />
+        {probe.remediation && (
+          <p className="truncate text-[11px] text-muted-foreground">
+            {probe.remediation}
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -887,6 +922,97 @@ function ProbeRow({
           <Play className="h-4 w-4" weight="fill" />
         )}
       </button>
+    </div>
+  );
+}
+
+function CapabilityPane() {
+  const [health, setHealth] = useState<ControllerHealth | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadCapability = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = assertControllerHealth(await api.capabilityRun());
+      setHealth(result);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCapability();
+  }, [loadCapability]);
+
+  const probes = [...(health?.probes ?? [])].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+
+  return (
+    <div className="space-y-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">Capability</h2>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => { void loadCapability(); }}
+          disabled={loading}
+          className="flex h-8 items-center gap-2 rounded-md bg-foreground px-3 text-xs font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? (
+            <CircleNotch className="h-4 w-4 animate-spin" />
+          ) : (
+            <ArrowClockwise className="h-4 w-4" />
+          )}
+          Run
+        </button>
+      </div>
+
+      {health && <HealthSummary health={health} />}
+
+      {error && (
+        <div
+          role="alert"
+          className="rounded-md px-3 py-2 text-sm"
+          style={{
+            border:
+              "1px solid color-mix(in srgb, var(--foreground) 18%, transparent)",
+            backgroundColor:
+              "color-mix(in srgb, var(--foreground) 5%, transparent)",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div
+        className="divide-y divide-border/60 overflow-hidden rounded-md"
+        style={{
+          border:
+            "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
+        }}
+      >
+        {probes.length > 0 ? (
+          probes.map((probe) => (
+            <ProbeRow
+              key={probe.name}
+              probe={probe}
+              running={false}
+              onRun={() => { void loadCapability(); }}
+            />
+          ))
+        ) : (
+          <div className="px-3 py-2 text-sm text-muted-foreground">
+            {loading ? "Loading capability checks." : "No capability check has run."}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1249,7 +1375,7 @@ function LaunchTracesPane() {
   );
 }
 
-type Pane = "appearance" | "health" | "logs" | "crashes" | "launches" | "terminal" | "integrations" | "controls";
+type Pane = "appearance" | "health" | "capability" | "logs" | "crashes" | "launches" | "terminal" | "integrations" | "controls";
 
 const NAV_ITEMS: {
   id: Pane;
@@ -1258,6 +1384,7 @@ const NAV_ITEMS: {
 }[] = [
     { id: "appearance", label: "Appearance", icon: Palette },
     { id: "health", label: "Health", icon: Pulse },
+    { id: "capability", label: "Capability", icon: CheckCircle },
     { id: "logs", label: "Logs", icon: Terminal },
     { id: "crashes", label: "Crashes", icon: WarningCircle },
     { id: "launches", label: "Launches", icon: CircleNotch },
@@ -1387,6 +1514,7 @@ export default function App() {
       <div className="settings-content flex-1 overflow-auto">
         {activePane === "appearance" && <AppearancePane />}
         {activePane === "health" && <HealthPane />}
+        {activePane === "capability" && <CapabilityPane />}
         {activePane === "logs" && <LogsPane />}
         {activePane === "crashes" && <CrashesPane />}
         {activePane === "launches" && <LaunchTracesPane />}

@@ -2,7 +2,8 @@ export type HealthGroup =
   | "transport"
   | "storage"
   | "runtime"
-  | "integrations";
+  | "integrations"
+  | "capability";
 
 export type HealthLevel = "healthy" | "degraded" | "down";
 
@@ -38,6 +39,7 @@ export const HEALTH_GROUPS: Array<{ id: HealthGroup; label: string }> = [
   { id: "storage", label: "Storage" },
   { id: "runtime", label: "Runtime" },
   { id: "integrations", label: "Integrations" },
+  { id: "capability", label: "Capability" },
 ];
 
 const LEVEL_WEIGHT: Record<HealthLevel, number> = {
@@ -138,6 +140,7 @@ export function groupHealthProbes(
     storage: [],
     runtime: [],
     integrations: [],
+    capability: [],
   };
   for (const probe of health?.probes ?? []) {
     grouped[probe.group].push(probe);

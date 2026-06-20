@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import { registerMethod } from "./json-rpc-server";
 import { runHealth, runNamedProbe } from "./diagnostics/health-runner";
+import { renderPreflightReport, runPreflight } from "./diagnostics/preflight";
 import { tailLogs } from "./diagnostics/log-tailer";
 import { backupRuntimeDb } from "./diagnostics/db-backup";
 import { listCrashReports } from "./diagnostics/crash-reports";
@@ -16,6 +17,8 @@ function probeName(params: unknown): string {
 
 export function registerDiagnosticsHandlers(): void {
   ipcMain.handle("qf:diagnostics:health", () => runHealth());
+  ipcMain.handle("capability:run", () => runPreflight());
+  ipcMain.handle("capability:snapshot", () => runPreflight());
   ipcMain.handle(
     "qf:diagnostics:run-probe",
     (_event, name: string) => runNamedProbe(name),
@@ -51,6 +54,30 @@ export function registerDiagnosticsHandlers(): void {
     {
       description: "Run a single QuantFlow health probe by name",
       params: { name: "Probe name, for example relay.socket" },
+    },
+  );
+
+  registerMethod(
+    "capability.run",
+    () => runPreflight(),
+    {
+      description: "Run the QuantFlow capability preflight report",
+    },
+  );
+
+  registerMethod(
+    "capability.snapshot",
+    () => runPreflight(),
+    {
+      description: "Return a read-only QuantFlow capability preflight snapshot",
+    },
+  );
+
+  registerMethod(
+    "capability.report",
+    async () => renderPreflightReport(await runPreflight()),
+    {
+      description: "Return the QuantFlow capability preflight report as stable text",
     },
   );
 
