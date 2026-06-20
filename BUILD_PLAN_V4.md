@@ -1542,6 +1542,15 @@ budgets (R4) + stop conditions + artifact expectations + **per-phase attention
 profiles** and execute the full collect → checkpoint (R5) → deepen loop. Invoking
 a named mode runs the whole thing.
 
+> **Bottom-half dock model (the operator's two-section legend).** A template is
+> the dock's bottom half: a **saved layout** — `tiles[]` (each a `roleId` + canvas
+> position) + `connections[]` + the workflow wiring (DAG/roles/budgets). Clicking
+> it **restores the full canvas layout**, then arming/Commence spawns the wired
+> pod. Templates **only reference roleIds already stocked in the top half (R8)** —
+> they never define agents and carry no spawn logic. Stock the top, arm the
+> bottom. (Today only the hardcoded `rl-training` template exists in
+> `legend-dock.js`; R6 makes this data-driven and multi-template.)
+
 ## Why
 
 This is where v4 becomes a product rather than a pile of mechanisms: the operator
@@ -1821,6 +1830,47 @@ R8 must not blur these — it adds **agents**, not templates.
   — operator's choice), so you never silently drop a dead agent into a pod.
 - A custom recipe spawns through the **same** role-spawn path
   (`legend-spawn.js` → `roleId` → `kernel.worker.spawn`) — identical to built-ins.
+
+### Agent inventory model — CLI roles + Eve packages (the extensibility contract)
+
+The top half is a **scrollable, data-driven inventory** of *every* agent/script.
+Two recipe shapes feed the same row UI + the same R0 readiness badge:
+
+- **CLI role** (Codex, Claude, shell, Python, Pi) — a thin `role.json`
+  (`commandTemplate`, `runtimeTarget`), spawned via PTY/herdr. The shape that
+  exists today.
+- **Eve package** (e.g. `quantflow-eve`) — a **directory** (`agent/agent.ts`,
+  instructions, channels) plus a **`manifest.json`** that supplies the dock-row
+  metadata. Spawned via the **`eve-harness`** (event-stream translator), not a
+  terminal command. This is what "use Eve to structure the bar" means: **one
+  folder = one manifest = one dock entry = one harness target.**
+
+This adds `eve-harness` as a `HarnessKind` (alongside `local-shell`/`herdr-shell`,
+behind the same `WorkerHarness` contract) and `eve-local` / `eve-deployed` runtime
+targets. `role ≠ harness ≠ model` still holds; the dock just renders all layers.
+
+**`manifest.json` contract (the standard the dock consumes — config, not Kernel truth):**
+```jsonc
+{
+  "id": "qf-research-eve",
+  "name": "QF Research (Eve)",
+  "roleId": "eve-researcher",
+  "harnessKind": "eve-harness",
+  "icon": "...", "color": "#...",
+  "endpoint": "http://127.0.0.1:3000",   // eve-local now; deployed /eve/v1 base URL later (R4)
+  "modelHint": "deepseek-v4-pro",         // a bare OpenCode Go model id
+  "type": "agent"
+}
+```
+"+ Add" writes either a `role.json` (CLI) **or** an Eve `manifest.json`; the dock
+discovers, renders, and badges it — no rebuild. **One spawn path:** every row →
+`legend-spawn` → `kernel.worker.spawn` (CLI) or `eve-harness` (Eve); no special
+cases. Readiness is **derived** from the R0 probe per row (Eve row checks
+`/eve/v1/info` + key; CLI row checks `role:<id>` present/authed).
+
+> The proven `quantflow-eve` package (see `docs/v4/EVE_SETUP.md`) is the first
+> real Eve recipe; sketching its `manifest.json` is the cheap pre-R8 step that
+> doesn't touch Kernel or templates.
 
 ## Out of Scope
 
