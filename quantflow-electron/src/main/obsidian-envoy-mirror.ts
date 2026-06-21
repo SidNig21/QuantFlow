@@ -1,13 +1,13 @@
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { readVaultConfig } from "./vault-config";
+import { resolveVaultPath as resolveConfiguredVaultPath } from "./vault-paths";
 import { ensureEnvoyListener } from "./envoy-listener";
 import type { NormalizedEnvoyPacket } from "./envoy-listener";
 import { getEnvoyService } from "./envoy-service";
 import { listEnvoyReceipts, listEnvoyTasks } from "./runtime-state/envoy-repo";
 import type { EnvoyReceiptRow, EnvoyTaskRow } from "./runtime-state/types";
 
-const DEFAULT_VAULT_PATH = "C:\\Users\\rybow\\Obsidian\\QuantFlow";
 const POLL_INTERVAL_MS = 2000;
 const LIVE_MAX_LINES = 500;
 
@@ -30,7 +30,7 @@ function envoyMirrorDir(vaultPath: string): string {
 async function resolveVaultPath(explicit?: string | null): Promise<string> {
   if (explicit?.trim()) return explicit.trim();
   const cfg = await readVaultConfig();
-  return cfg.vaultPath?.trim() || DEFAULT_VAULT_PATH;
+  return resolveConfiguredVaultPath(cfg.vaultPath);
 }
 
 async function atomicWrite(filePath: string, content: string): Promise<void> {

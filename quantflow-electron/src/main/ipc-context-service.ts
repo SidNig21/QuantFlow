@@ -13,14 +13,10 @@ import {
   addDecision,
 } from "./context-service";
 import { readFile as readVaultFile } from "node:fs/promises";
-import { readVaultConfig } from "./vault-config";
+import { getVaultPath } from "./vault-config";
 
 async function requireVaultPath(): Promise<string> {
-  const cfg = await readVaultConfig();
-  if (!cfg.vaultPath) {
-    throw new Error("No vault path configured");
-  }
-  return cfg.vaultPath;
+  return getVaultPath();
 }
 
 function requireString(value: unknown, label: string): string {

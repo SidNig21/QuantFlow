@@ -5,7 +5,7 @@ QuantFlow uses two workspaces:
 | Workspace | Root | Current role |
 | --- | --- | --- |
 | Repo | `C:\Users\rybow\QuantFlow` | Code and execution authority |
-| Vault | `C:\Users\rybow\Obsidian\QuantFlow` | Operator planning, references, live mirrors |
+| Vault | `C:\Users\rybow\Obsidian\QuantFlow Vault` | Operator planning, references, live mirrors, Envoy output |
 
 Current repo branch for v3 work:
 
@@ -50,7 +50,7 @@ Use them to clarify intent, vocabulary, and strategy. Fold any implementation-ch
 The project reference folder remains useful, but treat it as historical context:
 
 ```text
-C:\Users\rybow\Obsidian\QuantFlow\Projects\QuantFlow\reference
+C:\Users\rybow\Obsidian\QuantFlow Vault\Projects\QuantFlow\reference
 ```
 
 Use it for prior decisions, links, design artifacts, and v2/v1 archaeology. Do not treat files there as current marching orders unless `BUILD_PLAN_V3.md` explicitly points to them.

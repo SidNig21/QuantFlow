@@ -168,7 +168,7 @@ If the branch is not `quantflow-v3`, stop and ask the operator before editing.
 This repo is paired with the Obsidian vault at:
 
 ```text
-C:\Users\rybow\Obsidian\QuantFlow
+C:\Users\rybow\Obsidian\QuantFlow Vault
 ```
 
 Current vault source:

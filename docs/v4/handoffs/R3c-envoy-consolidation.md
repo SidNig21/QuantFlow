@@ -9,7 +9,9 @@ Full goal shape = `BUILD_PLAN_V4.md` § "Goal R3" sub-milestone **R3c** (authori
 This handoff covers **R3c-b only** — wiring Envoy task ops through Kernel commands and adding
 `smoke:authority`. MCP Kernel reads (R3c-a) were shipped separately.
 
-**Deferred (explicit):** 3-node canvas DAG product proof · R4 · full `envoy_tasks` table retirement.
+**Product proof:** operator runbook → `docs/v4/handoffs/R3-product-proof-operator.md` (machine proof done; DAG witness is operator).
+
+**Deferred (explicit):** R4 · full `envoy_tasks` table retirement.
 
 ## 1. Read before verifying (in order)
 
@@ -96,7 +98,7 @@ quantflow-electron/scripts/envoy-task-smoke.ts              Kernel assertions
 docs/v4/handoffs/R3c-envoy-consolidation.md                 THIS FILE
 ```
 
-### 5.2 Command outputs (Cursor builder run — 2026-06-20)
+### 5.2 Command outputs (Cursor builder run — 2026-06-21, re-verified)
 
 **smoke:authority** — OK — 0 failure(s) (17 checks PASS)
 
@@ -132,7 +134,7 @@ docs/v4/handoffs/R3c-envoy-consolidation.md                 THIS FILE
 - **Bug fixed during build:** mirror used `kernel.correlation_id` (undefined on `TaskSnapshot`); corrected to `kernel.correlationId`.
 - **Test infra:** `setKernelDbForTesting` + `bun:sqlite` in-memory migrations (matches `smoke-dag` pattern); production `initKernelDb` lazy-loads `better-sqlite3` from `quantflow-electron/node_modules`.
 - **Legacy complete:** intentional `legacy: true` on Envoy-complete path for Hermes/MCP until full submit/verify adoption.
-- **Product proof:** 3-node canvas DAG still operator-deferred; R3 machine authority is complete.
+- **Product proof:** operator runbook at `docs/v4/handoffs/R3-product-proof-operator.md`; machine stack re-green 2026-06-21.
 
 ---
 
@@ -152,7 +154,7 @@ docs/v4/handoffs/R3c-envoy-consolidation.md                 THIS FILE
 4. **Confirm task creation**
    - DevTools → Console:
      ```javascript
-     await window.quantflow.kernel.conductor.context()
+     await window.kernelApi.sendQuery("kernel.conductor.context", {})
      ```
    - Expect a new task with `status: "open"`, title from your prompt, `correlationId` matching the workflow result.
 

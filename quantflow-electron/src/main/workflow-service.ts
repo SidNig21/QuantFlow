@@ -14,8 +14,8 @@ import {
 } from "./workflow-agent-ready";
 import { appendEvent } from "./runtime-state/events-repo";
 import { readVaultConfig } from "./vault-config";
+import { resolveVaultPath } from "./vault-paths";
 
-const DEFAULT_VAULT_PATH = "C:\\Users\\rybow\\Obsidian\\QuantFlow";
 const DEFAULT_REPO_ROOT = "C:\\Users\\rybow\\QuantFlow";
 
 export const CANVAS_SKILL_RELATIVE_PATH = join(
@@ -52,8 +52,7 @@ export async function resolveCanvasSkillPath(
   vaultPathOverride?: string,
 ): Promise<string> {
   const vaultPath = vaultPathOverride?.trim()
-    || (await readVaultConfig()).vaultPath?.trim()
-    || DEFAULT_VAULT_PATH;
+    || resolveVaultPath((await readVaultConfig()).vaultPath);
   return join(vaultPath, CANVAS_SKILL_RELATIVE_PATH);
 }
 
