@@ -27,6 +27,9 @@ describe("legend recipe role mapping", () => {
 		expect(source.indexOf("await shellApi.herdrSpawnRole"))
 			.toBeLessThan(source.lastIndexOf("spawnTerminalWebview(tile, true)"));
 		expect(source).not.toContain("connectHerdrRoleTile");
+		// Mode-1 correction: no headless eve-harness fork in the UI spawn path.
+		expect(source).not.toContain("isEveHarness");
+		expect(source).not.toContain('ptyStatus = "idle"');
 	});
 
 	test("renderer delegates role spawn to the shared module", () => {
@@ -66,6 +69,48 @@ describe("legend recipe role mapping", () => {
 			name: "Claude Code",
 		});
 		expect(resolveLegendRecipeRole("puffer", roles)).toMatchObject({ id: "puffer" });
+	});
+
+	test("Eve recipe threads commandTemplate/cwd/runtimeTarget for a Mode-1 terminal spawn", async () => {
+		const recipes = [{
+			id: "quantflow-eve",
+			roleId: "quantflow-eve",
+			group: "spawn",
+			type: "agent",
+			name: "QuantFlow Eve",
+			description: "Eve · OpenCode",
+			runtime: "windows-pty",
+			color: "#6366f1",
+			icon: "hermes",
+			custom: true,
+			commandTemplate: "npm run dev",
+			cwd: "C:\\Users\\rybow\\quantflow-eve",
+			runtimeTarget: "windows-pty",
+		}];
+
+		// Resolved against the on-disk role.json (role-list path): role fields win.
+		const fromRoleList = resolveLegendRecipeRole("quantflow-eve", [{
+			id: "quantflow-eve",
+			name: "QuantFlow Eve",
+			commandTemplate: "npm run dev",
+			cwd: "C:\\Users\\rybow\\quantflow-eve",
+			runtimeTarget: "windows-pty",
+		}], recipes);
+		expect(fromRoleList).toMatchObject({
+			commandTemplate: "npm run dev",
+			cwd: "C:\\Users\\rybow\\quantflow-eve",
+			runtimeTarget: "windows-pty",
+		});
+
+		// Resolved with no matching role (synthesized path): fields come from the recipe.
+		const synthesized = resolveLegendRecipeRole("quantflow-eve", [], recipes);
+		expect(synthesized).toMatchObject({
+			commandTemplate: "npm run dev",
+			cwd: "C:\\Users\\rybow\\quantflow-eve",
+			runtimeTarget: "windows-pty",
+		});
+		// No eve-harness / headless fork is introduced by the resolution.
+		expect(synthesized.harnessKind).toBeUndefined();
 	});
 
 	test("custom recipe uses the shared role-spawn path via fake spawn", async () => {

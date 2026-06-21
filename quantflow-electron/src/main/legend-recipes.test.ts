@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -21,7 +21,6 @@ describe("legend-recipes registry", () => {
     tempDir = await mkdtemp(join(tmpdir(), "qf-legend-"));
     _setLegendRegistryDirs({
       rolesDir: join(tempDir, "roles"),
-      evePackagesDir: join(tempDir, "eve-packages"),
     });
   });
 
@@ -53,24 +52,60 @@ describe("legend-recipes registry", () => {
     expect(afterRemove.some((recipe) => recipe.id === "odds-scraper")).toBe(false);
   });
 
-  test("create/remove round-trips an Eve manifest package", async () => {
+  test("an Eve persona is a plain role.json that terminal-spawns (Mode 1, no manifest)", async () => {
+    // Mode-1 correction: an Eve persona is a normal role row whose commandTemplate
+    // runs `npm run dev` in its package cwd — NOT an eve-harness manifest package.
     await createLegendRecipe({
-      id: "qf-research-eve",
-      name: "QF Research (Eve)",
-      roleId: "eve-researcher",
-      color: "#14d9ff",
-      icon: "codex",
-      harnessKind: "eve-harness",
-      endpoint: "http://127.0.0.1:3000",
+      id: "quantflow-eve",
+      name: "QuantFlow Eve",
+      description: "Eve · OpenCode",
+      color: "#6366f1",
+      icon: "hermes",
+      commandTemplate: "npm run dev",
+      runtimeTarget: "windows-pty",
+      type: "agent",
       modelHint: "deepseek-v4-pro",
-      type: "eve",
     });
     const listed = await listLegendRecipes();
-    const recipe = listed.find((entry) => entry.id === "qf-research-eve");
-    expect(recipe?.harnessKind).toBe("eve-harness");
-    expect(recipe?.roleId).toBe("eve-researcher");
-    await removeLegendRecipe("qf-research-eve");
-    expect((await listLegendRecipes()).some((entry) => entry.id === "qf-research-eve")).toBe(false);
+    const recipe = listed.find((entry) => entry.id === "quantflow-eve");
+    // It is a terminal recipe: the spawn fields reach the legend, no eve-harness fork.
+    expect(recipe?.commandTemplate).toBe("npm run dev");
+    expect(recipe?.runtimeTarget).toBe("windows-pty");
+    expect(recipe?.harnessKind).toBeUndefined();
+    expect(recipe?.custom).toBe(true);
+    await removeLegendRecipe("quantflow-eve");
+    expect((await listLegendRecipes()).some((entry) => entry.id === "quantflow-eve")).toBe(false);
+  });
+
+  test("an operator-authored role.json round-trips cwd + commandTemplate to the recipe", async () => {
+    // The Mode-1 path: the operator drops a roles/*.json with an absolute cwd (the
+    // Eve package folder). The registry must thread cwd + commandTemplate + runtimeTarget
+    // to the recipe so the dock spawn runs `npm run dev` in that folder.
+    const rolesDir = join(tempDir, "roles");
+    await mkdir(rolesDir, { recursive: true });
+    await writeFile(
+      join(rolesDir, "eve-on-disk.json"),
+      JSON.stringify({
+        id: "eve-on-disk",
+        name: "Eve On Disk",
+        description: "Eve · OpenCode",
+        color: "#14d9ff",
+        icon: "hermes",
+        commandTemplate: "npm run dev",
+        cwd: "C:\\Users\\rybow\\quantflow-eve",
+        runtimeTarget: "windows-pty",
+        showInLegend: true,
+        legendType: "agent",
+        modelHint: "deepseek-v4-pro",
+      }, null, 2),
+      "utf-8",
+    );
+    const recipe = (await listLegendRecipes()).find((entry) => entry.id === "eve-on-disk");
+    expect(recipe).toBeDefined();
+    expect(recipe?.commandTemplate).toBe("npm run dev");
+    expect(recipe?.cwd).toBe("C:\\Users\\rybow\\quantflow-eve");
+    expect(recipe?.runtimeTarget).toBe("windows-pty");
+    expect(recipe?.runtime).toBe("windows-pty");
   });
 
   test("maps readiness from injected capability levels", () => {

@@ -27,6 +27,10 @@ function synthesizeRoleFromRecipe(recipe) {
 		name: recipe.name,
 		description: recipe.description,
 		color: recipe.color,
+		icon: recipe.icon,
+		commandTemplate: recipe.commandTemplate,
+		cwd: recipe.cwd,
+		runtimeTarget: recipe.runtimeTarget,
 		harnessKind: recipe.harnessKind,
 		endpoint: recipe.endpoint,
 	};
@@ -43,6 +47,9 @@ export function resolveLegendRecipeRole(recipeId, roles, recipes = LEGEND_RECIPE
 	return {
 		...role,
 		name: recipe.name ?? role.name,
+		commandTemplate: role.commandTemplate ?? recipe.commandTemplate,
+		cwd: role.cwd ?? recipe.cwd,
+		runtimeTarget: role.runtimeTarget ?? recipe.runtimeTarget,
 		harnessKind: recipe.harnessKind ?? role.harnessKind,
 		endpoint: recipe.endpoint ?? role.endpoint,
 	};

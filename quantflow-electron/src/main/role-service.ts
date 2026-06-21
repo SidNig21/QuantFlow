@@ -19,6 +19,8 @@ export interface Role {
   icon?: string;
   commandTemplate?: string;
   commandAvailable?: boolean;
+  /** Absolute working directory for the spawn (e.g. an Eve package folder). */
+  cwd?: string;
   cwdPolicy?: "workspace" | "home" | "inherit";
   defaultShell?: "auto" | "powershell" | "wsl" | "shell";
   runtimeTarget?: RoleRuntimeTarget;

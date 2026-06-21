@@ -36,22 +36,13 @@ export interface LegendRecipe {
   icon: string;
   disabled?: boolean;
   custom?: boolean;
+  /** Mode-1 terminal spawn fields, copied verbatim from the role.json. */
+  commandTemplate?: string;
+  cwd?: string;
+  runtimeTarget?: RoleRuntimeTarget;
   harnessKind?: "eve-harness" | "local-shell" | "herdr-shell";
   endpoint?: string;
   modelHint?: string;
-}
-
-export interface EvePackageManifest {
-  id: string;
-  name: string;
-  roleId: string;
-  harnessKind: "eve-harness";
-  icon: string;
-  color: string;
-  endpoint?: string;
-  modelHint?: string;
-  type?: "agent";
-  description?: string;
 }
 
 export interface LegendRecipeCreateInput {
@@ -158,14 +149,12 @@ export const BUILT_IN_LEGEND_RECIPES: LegendRecipe[] = [
 ];
 
 let rolesDir = join(QUANTFLOW_DIR, "roles");
-let evePackagesDir = join(QUANTFLOW_DIR, "eve-packages");
 
-export function _setLegendRegistryDirs(input: { rolesDir?: string; evePackagesDir?: string }): void {
+export function _setLegendRegistryDirs(input: { rolesDir?: string }): void {
   if (input.rolesDir) {
     rolesDir = input.rolesDir;
     _setRolesDir(input.rolesDir);
   }
-  if (input.evePackagesDir) evePackagesDir = input.evePackagesDir;
 }
 
 export function mapHealthLevelToBadge(level: HealthLevel): "green" | "amber" | "red" {
@@ -211,27 +200,12 @@ function roleToLegendRecipe(role: Role & {
     color: role.color,
     icon: role.icon ?? "shell",
     custom: true,
+    commandTemplate: role.commandTemplate,
+    cwd: role.cwd,
+    runtimeTarget: role.runtimeTarget,
     harnessKind: role.harnessKind,
     endpoint: role.endpoint,
     modelHint: role.modelHint,
-  };
-}
-
-function manifestToLegendRecipe(manifest: EvePackageManifest): LegendRecipe {
-  return {
-    id: manifest.id,
-    roleId: manifest.roleId,
-    group: "spawn",
-    type: "eve",
-    name: manifest.name,
-    description: manifest.description ?? manifest.modelHint ?? "eve-harness",
-    runtime: "eve-harness",
-    color: manifest.color,
-    icon: manifest.icon,
-    custom: true,
-    harnessKind: "eve-harness",
-    endpoint: manifest.endpoint,
-    modelHint: manifest.modelHint,
   };
 }
 
@@ -262,36 +236,10 @@ async function readCustomLegendRoles(): Promise<LegendRecipe[]> {
   return recipes.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function readEveManifestRecipes(): Promise<LegendRecipe[]> {
-  try {
-    await mkdir(evePackagesDir, { recursive: true });
-    const entries = await readdir(evePackagesDir, { withFileTypes: true });
-    const recipes: LegendRecipe[] = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const manifestPath = join(evePackagesDir, entry.name, "manifest.json");
-      try {
-        const raw = await readFile(manifestPath, "utf-8");
-        const parsed = JSON.parse(raw) as EvePackageManifest;
-        if (!parsed.id || !parsed.name || !parsed.roleId || parsed.harnessKind !== "eve-harness") {
-          continue;
-        }
-        recipes.push(manifestToLegendRecipe(parsed));
-      } catch {
-        // skip packages without a valid manifest
-      }
-    }
-    return recipes.sort((a, b) => a.name.localeCompare(b.name));
-  } catch {
-    return [];
-  }
-}
-
 export async function listLegendRecipes(): Promise<LegendRecipe[]> {
   const customRoles = await readCustomLegendRoles();
-  const eveRecipes = await readEveManifestRecipes();
   const extraById = new Map<string, LegendRecipe>();
-  for (const recipe of [...customRoles, ...eveRecipes]) extraById.set(recipe.id, recipe);
+  for (const recipe of customRoles) extraById.set(recipe.id, recipe);
   const builtInIds = new Set<string>(BUILT_IN_LEGEND_RECIPE_IDS);
   return [
     ...BUILT_IN_LEGEND_RECIPES,
@@ -333,28 +281,9 @@ export async function createLegendRecipe(input: LegendRecipeCreateInput): Promis
   assertCustomId(input.id);
   await mkdir(rolesDir, { recursive: true });
 
-  if (input.harnessKind === "eve-harness") {
-    await mkdir(join(evePackagesDir, input.id), { recursive: true });
-    const manifest: EvePackageManifest = {
-      id: input.id,
-      name: input.name,
-      roleId: input.roleId ?? input.id,
-      harnessKind: "eve-harness",
-      icon: input.icon,
-      color: input.color,
-      endpoint: input.endpoint,
-      modelHint: input.modelHint,
-      type: "agent",
-      description: input.description,
-    };
-    await writeFile(
-      join(evePackagesDir, input.id, "manifest.json"),
-      `${JSON.stringify(manifest, null, 2)}\n`,
-      "utf-8",
-    );
-    return manifestToLegendRecipe(manifest);
-  }
-
+  // Every recipe — CLI, script, or Eve — is a single `roles/*.json` shape. An Eve
+  // persona is just a role whose commandTemplate runs `npm run dev` in its package
+  // `cwd` (see docs/v4/SPAWN_MODEL.md). The legend never owns a separate manifest.
   const role: Role & {
     legendType?: LegendRecipeKind;
     showInLegend: boolean;
@@ -384,22 +313,12 @@ export async function createLegendRecipe(input: LegendRecipeCreateInput): Promis
 
 export async function removeLegendRecipe(id: string): Promise<boolean> {
   assertCustomId(id);
-  let removed = false;
   const rolePath = join(rolesDir, `${id}.json`);
   try {
     await rm(rolePath);
-    removed = true;
   } catch {
-    // missing role file is fine
+    throw new Error(`legend recipe not found: ${id}`);
   }
-  const manifestDir = join(evePackagesDir, id);
-  try {
-    await rm(manifestDir, { recursive: true, force: true });
-    removed = true;
-  } catch {
-    // missing package dir is fine
-  }
-  if (!removed) throw new Error(`legend recipe not found: ${id}`);
   return true;
 }
 

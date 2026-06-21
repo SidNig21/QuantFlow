@@ -217,34 +217,26 @@ second MCP server beside `tools/quantflow-mcp`.
 
 ---
 
-## Operator spawn model — Mode 1 vs Mode 2 (decided 2026-06-20)
+## Operator spawn model — Mode 1 vs Mode 2
 
-The "two lanes / herdr vs eve / harness kind" framing was builder jargon and
-caused a real UX mistake in R8. The operator vocabulary is **two spawn modes**:
+> **Moved to its single source of truth: [`docs/v4/SPAWN_MODEL.md`](docs/v4/SPAWN_MODEL.md).**
+> That file is canonical for the Mode-1 / Mode-2 decision, the
+> role / harness / model vocabulary, the three verbs (author / summon / automate),
+> and the R8 correction. Do not restate the decision here — link to it.
 
-| Mode | What happens | Used by |
-| --- | --- | --- |
-| **Mode 1 — terminal summon** (default for **all** agents incl. Eve) | legend click → **terminal tile** → the operator chats/works directly | the **legend bar** + settings inventory, every day |
-| **Mode 2 — background task** (optional, automation) | Conductor `assign_task` → `eve-harness` (headless) → artifact verify | the **Conductor/DAG** path (R1), when the Kernel must prove completion |
+One-line recap (authoritative text lives in `SPAWN_MODEL.md`): an agent is just
+**model + tools + harness**; the model is a swappable **API-key binding** (QF does
+not route models), tools + orchestration are the owned asset, and there are **no
+per-provider agent species**. **Mode 1** (terminal summon) is the default legend
+path for *all* agents incl. Eve; **Mode 2** (`eve-harness`, headless) is the
+Conductor/automation path only. R8 owns *summon*, R8.5 owns *authoring*, R1 owns
+*automate*.
 
-Rules that follow:
-- **Legend bar = Mode 1 only.** A legend click opens a terminal tile the operator
-  drives — identical feel for Codex, Claude, Python, **and Eve** (Eve = `eve dev`
-  TUI in its package folder, same as any CLI recipe).
-- **`eve-harness` is Mode 2 only** — it is **not** the default Eve spawn path. Keep
-  it (R1 proof + future pods/automation depend on it); never wire it to a dock click.
-- **`herdr` is plumbing, not an agent** — "this terminal runs in WSL." It is an
-  implementation detail of Mode 1, never part of the operator model.
-- Three verbs on the same agent, kept distinct: **author** (Eve package =
-  `instructions.md` + `tools/`), **summon** (Mode 1, legend), **automate** (Mode 2,
-  Conductor). R8 owns *summon*; Eve-first *authoring* is the R8.5 follow-on; R1 owns
-  *automate*.
-
-> **R8 correction:** R8 shipped Eve as Mode 2 (idle headless tile) on a legend
-> click. The fix is to make the Eve recipe spawn a **Mode 1 terminal tile** like a
-> CLI role (`commandTemplate` + `cwd` + `runtimeTarget: local-shell`), and stop
-> using `harnessKind: eve-harness` for the dock click. This is an **R8 scope
-> clarification, not a rewrite** — R0/R1/the R8 registry all stand.
+> **Sequencing:** promote **R8.5 only after R8 is Complete** (R8.5 changes the
+> authoring front door; it presumes Mode-1 summon is already correct). **R2/R3
+> snag:** R3's cross-worker context handoff depends on R2's Context Envelope — the
+> R3 DAG structure can land first, but real cross-worker context-passing needs R2
+> un-paused; R2 is deferred-until-R3-context, not droppable.
 
 ---
 

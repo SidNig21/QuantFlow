@@ -83,6 +83,78 @@ One persona per port when you run multiple tiles together.
 > **not** route models. (See `BUILD_PLAN_V4.md` § Operator spawn model; the
 > `eve-packages/manifest.json` split is being collapsed to `roles/*.json`.)
 
+## Eve agent package — full folder reference (R8.5 authoring)
+
+Eve builds an agent by walking the filesystem under `agent/`. Below is the
+authoritative layout, each slot annotated with the **QuantFlow boundary** (the rule
+that keeps Kernel-owns-truth intact) and **when** we need it.
+**Verified 2026-06-21 against [eve.dev/docs/reference/project-layout](https://eve.dev/docs/reference/project-layout).**
+
+> **⚠️ This tree is the MENU, not the scaffold.** Eve does **not** pre-create these
+> folders. `npx eve init` gives you only `agent.ts` + `instructions.md` +
+> `channels/eve.ts`. **You create a folder only when you author that capability** —
+> e.g. there is no `skills/` until you add `agent/skills/<name>.md`. Empty slots not
+> existing yet is normal and correct.
+>
+> Our `quantflow-eve/agent/` currently holds: `agent.ts`, `instructions.md`,
+> `channels/eve.ts`, and `tools/write_task_artifact.ts`. That is the expected R1
+> state — everything below marked `[create on demand]` is added later, as needed.
+
+```text
+quantflow-eve-agents/
+└── odds-analyst/              ← one persona = one package = one legend row (Mode 1)
+    ├── package.json           [scaffolded]
+    ├── tsconfig.json          [scaffolded]
+    ├── .env.local             [scaffolded] the API key(s) — gitignored, NEVER committed
+    ├── agent/
+    │   ├── agent.ts           [scaffolded] model + runtime config  ← model binding lives HERE
+    │   ├── instructions.md    [scaffolded] always-on system prompt (who / how / rules)
+    │   ├── channels/          [scaffolded] how callers reach the agent (eve.ts = HTTP) [root-only]
+    │   ├── tools/             [create on demand] typed functions the model can call
+    │   ├── skills/            [create on demand] longer on-demand procedures
+    │   ├── connections/       [create on demand] external MCP / OpenAPI / auth integrations
+    │   ├── subagents/         [create on demand] child agents (intra-agent delegation)
+    │   ├── sandbox/           [create on demand] sandboxed-compute config + lifecycle hooks
+    │   ├── hooks/             [create on demand] subscribe to runtime stream events
+    │   ├── schedules/         [create on demand] cron-like repeatable runs    [root-only]
+    │   ├── instrumentation.ts [create on demand] runtime tracing / telemetry  [root-only]
+    │   └── lib/               [create on demand] shared helper code across agent files
+    └── evals/                 [create on demand] scored checks — project ROOT, sibling of agent/
+```
+
+> **Path-derived naming (Eve rule):** identity comes from the file path — you never
+> write a `name`/`id` on a `define*` call. `agent/tools/get_weather.ts` → tool
+> `get_weather`; `agent/connections/linear.ts` → connection `linear`;
+> `agent/subagents/researcher/agent.ts` → subagent `researcher`. So in our world a
+> persona's surface is *literally its folder tree* — which is exactly why the
+> R8.5 front door is "drop a folder," not a form.
+
+| Slot | What it is | QuantFlow boundary rule | When |
+| --- | --- | --- | --- |
+| `agent.ts` | model + runtime config | **the model binding** (+ `.env.local`); QF does **not** route models — `modelHint` in the role is a label only | R1 scaffold |
+| `instructions.md` | always-on prompt | core authoring surface | R1 scaffold |
+| `instrumentation.ts` | runtime tracing/telemetry **[root-only]** | telemetry only; not a truth source | later |
+| `channels/` | how callers reach Eve; `eve.ts` = HTTP channel **[root-only]** | `eve-harness` drives `eve.ts` in **Mode 2**; Mode 1 is the `eve dev` TUI | R1 (scaffold default) |
+| `schedules/` | cron / repeatable runs **[root-only]** | **do not make this a second QF scheduler.** Use only when Eve is a packaged external worker; QF owns run state / Night Shift | later (guarded) |
+| `tools/` | typed model-callable functions | **never mutate the Kernel.** Eve tools read/produce artifact *files*; Kernel mutation stays behind QuantFlow (F4) | **R8.5** |
+| `skills/` | reusable procedures (e.g. skeptic review, odds analysis, research brief) | pure procedure; no Kernel writes | **R8.5** |
+| `connections/` | external MCP / OpenAPI / auth services | maps to the future **`xmcp` Kernel-read connection** (one read surface, hosted/later); Eve never *owns* QF truth | R3+/later |
+| `subagents/` | child agents for focused subtasks | **intra-agent — stays BELOW the DAG line.** Eve subagents ≠ the QuantFlow cross-worker DAG | later |
+| `sandbox/` | sandboxed execution + lifecycle hooks | safe code-exec for isolated runs | **R4** |
+| `hooks/` | runtime event-stream extension points | may emit telemetry, but the **Kernel owns official receipts** (the `eve-harness` translator drafts them — F4) | later |
+| `lib/` | shared helper code across agent files | plain code reuse; no special role | as needed |
+| `evals/` | scored checks, `defineEval` / `eve eval` (**project root**, sibling of `agent/`) | `eve eval` may feed **per-agent** scoring; QF evals stay **non-authoritative + cross-run** (R7) | R7 |
+
+> **Subagent limitation (verified):** a declared subagent under
+> `agent/subagents/<id>/` may have its own `agent.ts`, `instructions.md/ts`,
+> `tools/`, `skills/`, `connections/`, `hooks/`, `sandbox/`, `lib/`, and nested
+> `subagents/`. **`channels/`, `schedules/`, and `instrumentation.ts` are
+> ROOT-ONLY** — not allowed inside a subagent.
+
+**Minimum to be runnable (R1 product proof):** just `agent.ts` + `instructions.md`
++ the scaffolded `channels/eve.ts`. Everything else is authoring depth you add as
+the persona matures (`tools/`+`skills/` at R8.5; `sandbox/` at R4).
+
 ## eve-harness wiring (R1+) — how QuantFlow talks to this agent
 
 R1 shipped a minimal `eve-harness` (`src/harness/eve/index.ts`) that drives this
