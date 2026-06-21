@@ -32,7 +32,8 @@ export function setKernelDbForTesting(db: KernelDB | null): void {
 }
 
 function loadBetterSqlite3(): typeof import('better-sqlite3').default {
-  const require = createRequire(join(import.meta.dir, '../../quantflow-electron/package.json'));
+  // import.meta.dir is undefined in the electron-vite bundle; url works in dev + out/main.
+  const require = createRequire(import.meta.url);
   return require('better-sqlite3') as typeof import('better-sqlite3').default;
 }
 
