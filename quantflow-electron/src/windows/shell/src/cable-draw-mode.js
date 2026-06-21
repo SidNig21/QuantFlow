@@ -16,6 +16,10 @@ export function isCableDrawBlockedTarget(target) {
 export function shouldEnterCableDrawMode(event) {
 	return (
 		event?.code === "KeyC" &&
+		event?.shiftKey === true &&
+		event?.ctrlKey !== true &&
+		event?.metaKey !== true &&
+		event?.altKey !== true &&
 		!event?.repeat &&
 		!isCableDrawBlockedTarget(event?.target)
 	);

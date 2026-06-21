@@ -1,4 +1,4 @@
-import { QFMark } from "./QFMark";
+import { QFFlowCube } from "./QFFlowCube";
 import { QFWordmark } from "./QFWordmark";
 
 const FONT_MONO = "'IBM Plex Mono', 'Geist Mono', ui-monospace, Consolas, monospace";
@@ -31,7 +31,7 @@ export function QFLockup({
         gap: horizontal ? 22 : 18,
       }}
     >
-      <QFMark size={markSize} glow={glow} />
+      <QFFlowCube size={markSize} glow={glow} />
       <div
         style={{
           display: "flex",

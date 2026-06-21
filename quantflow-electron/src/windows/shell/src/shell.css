@@ -27,6 +27,7 @@
 
 	/* QuantFlow Brand meaning palette */
 	--flow:        #b7ff00;
+	--flow-rgb:    183, 255, 0;
 	--flow-dim:    oklch(0.62 0.13 145);
 	--flow-bright: #caff4d;
 	--flow-glow:   oklch(0.78 0.16 145 / 0.18);
@@ -139,6 +140,8 @@
 	--canvas-bg-hi: #0f141b;
 	--fg:           #e7ecf2;
 	--border:       #1c232d;
+	--border-rgb:   28, 35, 45;
+	--surface-rgb:  15, 20, 27;
 	--tile-border:  #1c232d;
 	--muted:        #6b7686;
 	--edge-dot:       var(--accent);
@@ -321,15 +324,15 @@ html.platform-win #panel-viewer::before {
 }
 
 .titlebar-brand-mark {
-	width: 18px;
-	height: 18px;
+	width: 22px;
+	height: 22px;
 	color: var(--ivory);
 	display: block;
 	overflow: visible;
 	flex: 0 0 auto;
 }
 
-.titlebar-brand-signal {
+.titlebar-brand-node {
 	fill: var(--flow);
 	filter: drop-shadow(0 0 4px var(--flow)) drop-shadow(0 0 1px var(--flow));
 }
@@ -355,6 +358,7 @@ html.platform-win #panel-viewer::before {
 
 #panel-nav {
 	position: relative;
+	z-index: 320;
 	display: flex;
 	flex-direction: column;
 	flex: 1 1 0;
@@ -393,16 +397,23 @@ html.platform-win #panel-viewer::before {
 }
 
 #panel-viewer {
+	--canvas-chrome-left: 80px;
 	display: flex;
 	flex-direction: column;
 	flex: 1 1 0;
 	min-width: 200px;
 	overflow: hidden;
 	position: relative;
+	z-index: 1;
+	isolation: isolate;
 	background:
 		var(--canvas-origin-glow),
 		var(--canvas-gradient);
 	outline: none;
+}
+
+#panel-viewer:has(.lv1-dock[data-density="comfortable"]) {
+	--canvas-chrome-left: 268px;
 }
 
 #panel-viewer::after {
@@ -410,7 +421,7 @@ html.platform-win #panel-viewer::before {
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
-	z-index: 104;
+	z-index: 210;
 	box-shadow: none;
 }
 
@@ -435,6 +446,8 @@ html.platform-win #panel-viewer::before {
 }
 
 #panel-agent {
+	position: relative;
+	z-index: 320;
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
@@ -471,10 +484,11 @@ html.platform-win #panel-viewer::before {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	justify-content: center;
 	pointer-events: none;
-	opacity: 0.22;
-	transition: opacity var(--motion-slow) ease;
 	padding-bottom: calc(var(--floating-bottom) + 8px);
+	-webkit-mask-image: radial-gradient(58% 58% at 50% 46%, #000 42%, transparent 86%);
+	mask-image: radial-gradient(58% 58% at 50% 46%, #000 42%, transparent 86%);
 }
 
 .canvas-watermark-lockup {
@@ -489,45 +503,10 @@ html.platform-win #panel-viewer::before {
 	filter: drop-shadow(0 0 24px rgba(var(--flow-rgb), 0.22));
 }
 
-.canvas-watermark-mark {
-	width: clamp(320px, 38vw, 520px);
+#flow-cube-watermark svg {
+	width: min(74vw, 990px);
 	height: auto;
-	color: var(--ivory);
-	overflow: visible;
-}
-
-.canvas-watermark-mark g {
-	color: var(--flow);
-	filter: drop-shadow(0 0 11px rgba(var(--flow-rgb), 0.78));
-}
-
-.canvas-watermark-signal-orbit {
-	transform-origin: 60px 60px;
-	animation: qfSpin 2.6s linear infinite;
-}
-
-.canvas-watermark-mark .canvas-watermark-signal {
-	fill: var(--flow);
-	filter: drop-shadow(0 0 10px rgba(var(--flow-rgb), 0.86));
-}
-
-.canvas-watermark-wordmark {
-	margin-top: 20px;
-	color: var(--ivory);
-	font-family: var(--font-display);
-	font-size: clamp(24px, 3.2vw, 42px);
-	font-weight: 600;
-	letter-spacing: 0.14em;
-	text-transform: uppercase;
-	text-shadow: 0 0 14px rgba(var(--ivory-rgb), 0.18);
-}
-
-.canvas-watermark-underline {
-	width: min(240px, 40vw);
-	height: 3px;
-	margin-top: 12px;
-	background: linear-gradient(90deg, transparent, var(--flow), transparent);
-	box-shadow: var(--flow-glow);
+	max-height: 88%;
 }
 
 .canvas-watermark-hints {
@@ -1262,13 +1241,17 @@ html.platform-win #panel-viewer::before {
 	opacity: 0;
 }
 
-#loading-spinner {
-	width: 32px;
-	height: 32px;
-	border: 3px solid rgba(255, 255, 255, 0.2);
-	border-top-color: rgba(255, 255, 255, 0.8);
-	border-radius: 50%;
-	animation: spin 0.8s linear infinite;
+#loading-flow-cube {
+	width: 58px;
+	height: 58px;
+	color: var(--ivory);
+	filter: drop-shadow(0 0 18px rgba(var(--flow-rgb), 0.22));
+	pointer-events: none;
+}
+
+#loading-flow-cube svg {
+	width: 100%;
+	height: 100%;
 }
 
 #loading-status {
@@ -1310,7 +1293,7 @@ html.platform-win #panel-viewer::before {
 	left: 0;
 	right: 0;
 	bottom: 0;
-	z-index: 106;
+	z-index: 260;
 	min-height: var(--status-bar-height);
 	display: flex;
 	align-items: center;
@@ -1405,6 +1388,7 @@ html.platform-win #panel-viewer::before {
 	pointer-events: none;
 	z-index: 2;
 	overflow: visible;
+	clip-path: inset(0 0 var(--status-bar-height) var(--canvas-chrome-left));
 }
 
 #region-layer .region-box {
@@ -1453,6 +1437,7 @@ html.platform-win #panel-viewer::before {
 	pointer-events: none;
 	z-index: 104;
 	overflow: visible;
+	clip-path: inset(0 0 var(--status-bar-height) var(--canvas-chrome-left));
 }
 
 #cable-layer path.cable-hit {
@@ -2561,6 +2546,7 @@ html.platform-win #panel-viewer::before {
 	will-change: transform;
 	pointer-events: none;
 	z-index: 103;
+	clip-path: inset(0 0 var(--status-bar-height) var(--canvas-chrome-left));
 }
 
 /* Per-tile overlay covering only the webview content area (not title bar).
@@ -2603,6 +2589,8 @@ html.platform-win #panel-viewer::before {
 }
 
 .canvas-tile.tile-dragging {
+	z-index: 999;
+	filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.48));
 }
 
 .canvas-tile.tile-dragging::before,

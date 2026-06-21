@@ -39,24 +39,41 @@ describe("isCableDrawBlockedTarget", () => {
 });
 
 describe("shouldEnterCableDrawMode", () => {
-	test("enters only on a fresh C key press outside blocked targets", () => {
+	test("enters only on fresh Shift+C outside blocked targets", () => {
 		expect(shouldEnterCableDrawMode({
 			code: "KeyC",
+			shiftKey: true,
 			repeat: false,
 			target: mockTarget(),
 		})).toBe(true);
 		expect(shouldEnterCableDrawMode({
 			code: "KeyC",
+			shiftKey: true,
 			repeat: true,
 			target: mockTarget(),
 		})).toBe(false);
 		expect(shouldEnterCableDrawMode({
 			code: "KeyC",
+			shiftKey: true,
 			repeat: false,
 			target: mockTarget({ closestSelector: "webview" }),
 		})).toBe(false);
 		expect(shouldEnterCableDrawMode({
+			code: "KeyC",
+			ctrlKey: true,
+			shiftKey: false,
+			repeat: false,
+			target: mockTarget(),
+		})).toBe(false);
+		expect(shouldEnterCableDrawMode({
+			code: "KeyC",
+			shiftKey: false,
+			repeat: false,
+			target: mockTarget(),
+		})).toBe(false);
+		expect(shouldEnterCableDrawMode({
 			code: "KeyK",
+			shiftKey: true,
 			repeat: false,
 			target: mockTarget(),
 		})).toBe(false);
@@ -79,7 +96,7 @@ describe("shouldExitCableDrawModeOnKeyup", () => {
 });
 
 describe("shouldStartCableDraw", () => {
-	test("starts from held-C mode or a forced cable port drag", () => {
+	test("starts from held Shift+C mode or a forced cable port drag", () => {
 		expect(shouldStartCableDraw({ cableHeld: true })).toBe(true);
 		expect(shouldStartCableDraw({ force: true })).toBe(true);
 		expect(shouldStartCableDraw({ cableHeld: false, force: false })).toBe(false);

@@ -30,6 +30,14 @@ describe("shortcut registry", () => {
 		});
 	});
 
+	test("renders custom canvas letter actions as Shift chords", () => {
+		expect(shortcutToCommand(SHORTCUTS.find((shortcut) => shortcut.actionId === "cable-draw-mode")!, { platform: "win32" }))
+			.toMatchObject({ subtitle: "Shift+C" });
+		expect(shortcutToCommand(SHORTCUTS.find((shortcut) => shortcut.actionId === "toggle-watchtower")!, { platform: "win32" }))
+			.toMatchObject({ subtitle: "Shift+W" });
+		expect(findDuplicateShortcuts(SHORTCUTS)).toEqual([]);
+	});
+
 	test("opens help on question mark outside editable targets", () => {
 		expect(shouldOpenShortcutPanel({ key: "?", target: { tagName: "DIV" } })).toBe(true);
 		expect(shouldOpenShortcutPanel({ key: "?", target: { tagName: "INPUT" } })).toBe(false);

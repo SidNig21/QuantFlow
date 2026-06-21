@@ -9,6 +9,10 @@ export interface TileRegistryEntry {
   groupLabel?: string;
   metaLabel?: string;
   routeHandle?: string;
+  herdrPaneId?: string | null;
+  herdrWorkspaceId?: string | null;
+  herdrAgentName?: string | null;
+  runtimeTarget?: string | null;
 }
 
 export interface TileRegistrySummary {

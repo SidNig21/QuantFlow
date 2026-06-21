@@ -95,6 +95,10 @@ import { createLegendDock, LEGEND_RECIPES } from "./legend-dock.js";
 import { createWorkflowModal } from "./workflow-modal.js";
 import { spawnRoleTileAt as spawnRoleTileAtShared } from "./role-tile-spawn.js";
 import {
+	createFlowCubeLoadingMark,
+	createFlowCubeWatermark,
+} from "./flow-cube-watermark.js";
+import {
 	LEGEND_TILE_SIZE,
 	getLegendClickPlacement,
 	getLegendViewportCenterPlacement,
@@ -112,10 +116,16 @@ const viewportState = { panX: 0, panY: 0, zoom: 1 };
 const canvasEl = document.getElementById("panel-viewer");
 const gridCanvas = document.getElementById("grid-canvas");
 const canvasWatermark = document.getElementById("canvas-watermark");
+const flowCubeWatermark = document.getElementById("flow-cube-watermark");
+const loadingFlowCube = document.getElementById("loading-flow-cube");
 canvasEl.tabIndex = -1;
 const toasts = createToastController({ document });
 const operationalEvents = createOperationalEventLog({ limit: 120 });
 const viewport = createViewport(canvasEl, gridCanvas, tiles);
+createFlowCubeWatermark(flowCubeWatermark, {
+	getTileCount: () => tiles.length,
+});
+createFlowCubeLoadingMark(loadingFlowCube);
 
 document.documentElement.classList.toggle("platform-win", IS_WINDOWS);
 document.body.classList.toggle("platform-win", IS_WINDOWS);
@@ -644,6 +654,10 @@ async function init() {
 		"groupLabel",
 		"metaLabel",
 		"routeHandle",
+		"herdrPaneId",
+		"herdrWorkspaceId",
+		"herdrAgentName",
+		"runtimeTarget",
 	];
 
 	function sameTileListEntry(prev, next) {
@@ -834,6 +848,10 @@ async function init() {
 			groupLabel: buildTileGroupLabel(tile, label),
 			metaLabel: buildTileMetaLabel(tile, label, description),
 			routeHandle: tile.routeHandle || null,
+			herdrPaneId: tile.herdrPaneId || null,
+			herdrWorkspaceId: tile.herdrWorkspaceId || null,
+			herdrAgentName: tile.herdrAgentName || null,
+			runtimeTarget: tile.runtimeTarget || null,
 		};
 	}
 
@@ -946,6 +964,42 @@ async function init() {
 			}
 		}
 		updateStatusBar();
+		void syncHerdrWorkspaceView();
+	}
+
+	async function syncHerdrWorkspaceView() {
+		if (!tileListWebview?.send) return;
+		try {
+			const available = await window.shellApi.herdrAvailable?.();
+			if (!available) {
+				tileListWebview.send("tile-list:herdr", {
+					available: false,
+					panes: [],
+					workspaceId: null,
+					updatedAt: Date.now(),
+				});
+				return;
+			}
+			const panes = await window.shellApi.herdrList?.();
+			const paneList = Array.isArray(panes) ? panes : [];
+			const workspaceId = paneList.find((pane) => pane?.workspace_id || pane?.workspaceId)?.workspace_id
+				?? paneList.find((pane) => pane?.workspace_id || pane?.workspaceId)?.workspaceId
+				?? null;
+			tileListWebview.send("tile-list:herdr", {
+				available: true,
+				panes: paneList,
+				workspaceId,
+				updatedAt: Date.now(),
+			});
+		} catch (err) {
+			tileListWebview.send("tile-list:herdr", {
+				available: false,
+				panes: [],
+				workspaceId: null,
+				error: err?.message || "Herdr unavailable",
+				updatedAt: Date.now(),
+			});
+		}
 	}
 
 	// -- Tile manager --
@@ -1116,6 +1170,9 @@ async function init() {
 		getAllWebviews,
 		isSpaceHeld: () => spaceHeld,
 		onBeforeClose: () => true,
+		onCloseRejected: (message, tone = "warn") => {
+			toasts.show({ message, tone });
+		},
 		onCableMousedown,
 		onReposition: () => updateCables(),
 		onSaveDebounced(state) {
@@ -2792,16 +2849,19 @@ async function init() {
 
 	window.addEventListener("keydown", (e) => {
 		if (
-			e.code === "KeyW" && !e.metaKey && !e.ctrlKey && !e.altKey &&
+			e.code === "KeyW" && e.shiftKey &&
+			!e.metaKey && !e.ctrlKey && !e.altKey &&
+			!e.repeat &&
 			!e.target.closest?.("webview") &&
 			!e.target.matches?.("input, textarea")
 		) {
+			e.preventDefault();
 			if (watchtowerVisible) hideWatchtower();
 			else showWatchtower();
 		}
 	});
 
-	// -- C key: cable draw mode --
+	// -- Shift+C: cable draw mode --
 
 	window.addEventListener("keydown", (e) => {
 		if (shouldCancelCableDrawMode(e, cableHeld)) {
@@ -2924,12 +2984,19 @@ async function init() {
 		} else if (action === "close-tile") {
 			const focusedId = tileManager.getFocusedTileId();
 			if (focusedId) {
-				tileManager.requestCloseCanvasTile(focusedId).then((closed) => {
-					if (!closed) return;
-					tileManager.setFocusedTileId(null);
-					canvasEl.focus();
-					noteSurfaceFocus("canvas");
-				});
+				tileManager.requestCloseCanvasTile(focusedId)
+					.then((closed) => {
+						if (!closed) return;
+						tileManager.setFocusedTileId(null);
+						canvasEl.focus();
+						noteSurfaceFocus("canvas");
+					})
+					.catch(() => {
+						toasts.show({
+							message: "Could not close tile",
+							tone: "error",
+						});
+					});
 			}
 		} else if (action === "flip-state-card") {
 			tileManager.flipAllTiles();
@@ -3152,6 +3219,7 @@ async function init() {
 				initEntries,
 				buildTileRegistryMeta(),
 			);
+			void syncHerdrWorkspaceView();
 
 			const focusedId = tileManager.getFocusedTileId();
 			if (focusedId) {
@@ -3466,6 +3534,7 @@ async function init() {
 			tileId: tile.id,
 			status: mapHerdrStatusToWorker(status),
 		});
+		syncTileList();
 	});
 	for (const tile of tiles.filter((t) => t.herdrPaneId)) {
 		void window.shellApi.herdrLinkPane(tile.id, tile.herdrPaneId);

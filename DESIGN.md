@@ -40,6 +40,22 @@ canvas a week apart, the result should look like one product.
 - **Motion:** subtle and purposeful (a live string flow, a brief pulse on relay).
   Never animate for decoration. Respect existing `--motion-*` timings.
 
+## Brand Mark
+
+The QuantFlow insignia is the **Flow Cube**: a corner-on wireframe cube spun
+about its body diagonal, with live nodes routing the edge loop. It replaces the
+old Q-ring/F mark. The `QUANTFLOW` wordmark stays as-is.
+
+- **Live Green `#B7FF00` remains the identity color.** It is the primary node
+  and underline color.
+- Animated/live surfaces may use the approved packet spectrum:
+  Live Green `#B7FF00`, teal `#2fe6cf`, and violet `#c79bff`.
+- Tiny/static surfaces may use a single Live Green node for legibility.
+- No pure black or pure white. Use QuantFlow dark `#0a0d12` and ivory
+  `#f2f0ec` for icon/background contrast.
+- The canvas watermark uses the cube + wordmark lockup, quiet behind tiles. It
+  is a projector only; it never owns canvas state or workflow meaning.
+
 ## Semantic String Palette (Goal 7)
 
 A string's color tells the operator what the relationship means. Keep these

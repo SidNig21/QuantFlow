@@ -15,7 +15,7 @@ import {
   WarningCircle,
   XCircle,
 } from "@phosphor-icons/react";
-import { QFMark } from "@collab/components/brand";
+import { QFFlowCube } from "@collab/components/brand";
 import {
   HEALTH_GROUPS,
   aggregateHealthLevel,
@@ -1473,7 +1473,7 @@ export default function App() {
         </div>
 
         <div className="settings-brand-lockup px-2 mt-4">
-          <QFMark size={26} glow strokeScale={1.05} />
+          <QFFlowCube size={26} glow strokeScale={1.05} />
           <div className="settings-brand-copy">
             <span className="settings-brand-name">QuantFlow</span>
             <span className="settings-brand-sub">Settings</span>

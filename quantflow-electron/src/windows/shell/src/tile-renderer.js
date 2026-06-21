@@ -162,7 +162,7 @@ export function getCablePortMetadata(tile, side = "E") {
   return {
     title: `Drag cable from ${sideName} port to another terminal`,
     tooltip: `Drag cable from ${sideName}`,
-    shortcut: "C",
+    shortcut: "Shift+C",
     ariaLabel: `Drag cable from ${label} ${sideName} port to another terminal`,
   };
 }
@@ -354,10 +354,14 @@ export function createTileDOM(tile, callbacks) {
   closeBtn.className = "tile-action-btn tile-close-btn";
   closeBtn.innerHTML = "&times;";
   closeBtn.title = "Close tile";
-  closeBtn.addEventListener("mousedown", (e) => {
+  const stopCloseEvent = (e) => {
     e.stopPropagation();
-  });
+  };
+  closeBtn.addEventListener("pointerdown", stopCloseEvent);
+  closeBtn.addEventListener("mousedown", stopCloseEvent);
+  closeBtn.addEventListener("mouseup", stopCloseEvent);
   closeBtn.addEventListener("click", (e) => {
+    e.preventDefault();
     e.stopPropagation();
     callbacks.onClose(tile.id, e);
   });

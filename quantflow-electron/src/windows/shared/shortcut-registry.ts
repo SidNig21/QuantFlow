@@ -34,8 +34,8 @@ export const SHORTCUTS: ShortcutDefinition[] = [
   { actionId: "focus-tile-right", keys: ["alt", "arrowright"], when: "canvas", description: "Focus tile right" },
   { actionId: "focus-tile-up", keys: ["alt", "arrowup"], when: "canvas", description: "Focus tile up" },
   { actionId: "focus-tile-down", keys: ["alt", "arrowdown"], when: "canvas", description: "Focus tile down" },
-  { actionId: "toggle-watchtower", keys: ["w"], when: "canvas", description: "Toggle Watchtower" },
-  { actionId: "cable-draw-mode", keys: ["c"], when: "canvas", description: "Hold cable draw mode" },
+  { actionId: "toggle-watchtower", keys: ["shift", "w"], when: "canvas", description: "Toggle Watchtower" },
+  { actionId: "cable-draw-mode", keys: ["shift", "c"], when: "canvas", description: "Hold cable draw mode" },
 ];
 
 function normalizeKey(value: unknown): string {

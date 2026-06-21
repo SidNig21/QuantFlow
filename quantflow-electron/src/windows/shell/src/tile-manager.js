@@ -37,6 +37,7 @@ export function createTileManager({
 	onTileFocused,
 	onTileDblClick,
 	onBeforeClose,
+	onCloseRejected,
 	onReposition,
 	onCableMousedown,
 	onCablePortMouseDown,
@@ -692,8 +693,19 @@ export function createTileManager({
 		window.shellApi.trackEvent("tile_created", { type });
 
 		const dom = createTileDOM(tile, {
-			onClose: (id, event) => {
-				void requestCloseCanvasTile(id, { event });
+			onClose: async (id, event) => {
+				try {
+					const closed = await requestCloseCanvasTile(id, { event });
+					if (!closed) return;
+				} catch (err) {
+					const current = getTile(id);
+					const isHerdr = current?.runtimeTarget === "herdr-wsl";
+					onCloseRejected?.(
+						isHerdr ? "Could not close Herdr tile" : "Could not close tile",
+						"error",
+					);
+					console.warn("[tile] close failed:", err);
+				}
 			},
 			onFocus: (id, e) => {
 				if (e && e.shiftKey) {
@@ -834,14 +846,27 @@ export function createTileManager({
 		// intent -> Kernel command -> Kernel write -> event -> local removal.
 		if (window.kernelApi) {
 			for (const conn of getConnectionsForTile(id)) {
-				await window.kernelApi.sendCommand(
+				const connResult = await window.kernelApi.sendCommand(
 					"kernel.connection.delete", { id: conn.id },
 				);
+				if (connResult && connResult.ok === false) {
+					onCloseRejected?.(
+						`Tile close rejected by Kernel: ${connResult.error ?? "connection delete rejected"}`,
+						"warn",
+					);
+					return false;
+				}
 			}
 			const kr = await window.kernelApi.sendCommand(
 				"kernel.tile.remove", { id },
 			);
-			if (kr && kr.ok === false) return false; // Kernel rejected — keep tile
+			if (kr && kr.ok === false) {
+				onCloseRejected?.(
+					`Tile close rejected by Kernel: ${kr.error ?? "remove rejected"}`,
+					"warn",
+				);
+				return false; // Kernel rejected - keep tile
+			}
 		}
 
 		const dom = tileDOMs.get(id);

@@ -182,7 +182,7 @@ describe("getCablePortMetadata", () => {
     })).toEqual({
       title: "Drag cable from right port to another terminal",
       tooltip: "Drag cable from right",
-      shortcut: "C",
+      shortcut: "Shift+C",
       ariaLabel: "Drag cable from Reviewer right port to another terminal",
     });
   });
