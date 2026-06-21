@@ -103,3 +103,8 @@ After meaningful changes: update this file if local rules or owned scope changed
 - `mock/index.ts` is deterministic and CI-safe: it records `send`, writes one real artifact under `artifactRoot`, and returns a receipt draft plus artifact file path.
 - `eve/index.ts` is a minimal HTTP translator for local `quantflow-eve`: open session, send instruction, read one workspace artifact, return one draft plus path. Durability, recovery, subagents, and HITL are out of scope.
 - Harness adapters still never call `kernel.*`; callers post drafts through Kernel commands.
+
+## v4 R4 Addendum
+
+- `runtime-manager/index.ts` is an injected control plane for cancel/restart/stale/recover. It may call injected runtime stop/start hooks, but every durable mutation goes through injected Kernel command dispatch.
+- The manager must not import Electron or write SQLite directly. Stale workers are marked through `kernel.worker.status_update`; recovered work goes through `kernel.task.recover`.
