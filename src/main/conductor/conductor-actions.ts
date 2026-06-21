@@ -166,7 +166,7 @@ async function deliverAssignedTask(
   if (!task.ownerWorkerId) return { ok: false, error: 'assign_task deliver: task has no owner worker' };
 
   const worker = deps.getWorker ? await deps.getWorker(task.ownerWorkerId) : null;
-  let handle: WorkerHandle = {
+  const handle: WorkerHandle = {
     workerId: task.ownerWorkerId,
     tileId: worker?.tileId ?? (typeof args['tileId'] === 'string' ? args['tileId'] : task.ownerWorkerId),
     kind: harnessKind,
@@ -174,14 +174,6 @@ async function deliverAssignedTask(
     workspacePath: typeof args['artifactRoot'] === 'string' ? args['artifactRoot'] : null,
   };
   const harness = deps.getWorkerHarness(harnessKind);
-  if (harnessKind === 'eve-harness' && !handle.eveSessionId) {
-    handle = await harness.spawn({
-      tileId: handle.tileId,
-      workflowId: task.workflowId,
-      cwd: (args['artifactRoot'] as string | null) ?? null,
-      activationPrompt: 'QuantFlow R1 Eve session ready.',
-    });
-  }
   const instruction = [task.title, '', task.objective].join('\n').trim();
   await harness.send(handle, {
     text: instruction,

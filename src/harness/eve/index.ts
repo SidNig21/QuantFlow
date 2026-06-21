@@ -28,11 +28,17 @@ type EveResponse = {
   text?: () => Promise<string>;
 };
 
-type EveFetch = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<EveResponse>;
+type EveFetch = (url: string, init?: {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  signal?: AbortSignal;
+}) => Promise<EveResponse>;
 
 export interface EveHarnessOptions {
   baseUrl?: string;
   workspace?: string;
+  streamTimeoutMs?: number;
   fetch?: EveFetch;
   fs?: {
     existsSync?(path: string): boolean;
@@ -41,17 +47,19 @@ export interface EveHarnessOptions {
 }
 
 interface EveState {
-  sessionId: string;
+  sessionId: string | null;
   continuationToken: string | null;
-  status: 'working' | 'done' | 'stopped';
+  status: 'idle' | 'working' | 'done' | 'stopped';
   workspace: string;
   artifactPath: string | null;
   collected: boolean;
+  turnComplete: boolean;
 }
 
 export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness {
   const baseUrl = stripTrailingSlash(options.baseUrl ?? process.env.QF_EVE_BASE_URL ?? 'http://127.0.0.1:3000');
   const workspace = resolve(options.workspace ?? process.env.QF_EVE_WORKSPACE ?? process.cwd());
+  const streamTimeoutMs = options.streamTimeoutMs ?? 60_000;
   const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   const io = options.fs ?? { existsSync, readFileSync };
   const states = new Map<string, EveState>();
@@ -65,9 +73,20 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
     return parseResponse(res);
   }
 
-  function stateFor(handle: WorkerHandle): EveState {
-    const state = states.get(handle.workerId);
-    if (!state) throw new Error(`eve-harness has no state for worker: ${handle.workerId}`);
+  function stateFor(handle: WorkerHandle, fallbackWorkspace = workspace): EveState {
+    let state = states.get(handle.workerId);
+    if (!state) {
+      state = {
+        sessionId: handle.eveSessionId ?? null,
+        continuationToken: null,
+        status: handle.eveSessionId ? 'working' : 'idle',
+        workspace: resolve(handle.workspacePath ?? fallbackWorkspace),
+        artifactPath: null,
+        collected: false,
+        turnComplete: false,
+      };
+      states.set(handle.workerId, state);
+    }
     return state;
   }
 
@@ -75,58 +94,63 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
     kind: 'eve-harness',
 
     async spawn(input: SpawnWorkerInput): Promise<WorkerHandle> {
-      const body = await postJson('/eve/v1/session', {
-        message: input.activationPrompt ?? 'QuantFlow Eve session ready.',
-        cwd: input.cwd ?? workspace,
-        workflowId: input.workflowId ?? null,
-      });
-      const sessionId = extractSessionId(body);
-      if (!sessionId) throw new Error('eve-harness spawn: missing sessionId from Eve response');
-      const continuationToken = extractContinuationToken(body);
-      const tileId = input.tileId ?? `eve-${sessionId}`;
+      const tileId = input.tileId ?? 'eve-pending';
       const handle: WorkerHandle = {
-        workerId: `eve-worker-${sessionId}`,
+        workerId: input.roleId ?? `eve-worker-${tileId}`,
         tileId,
         kind: 'eve-harness',
-        eveSessionId: sessionId,
-        workspacePath: workspace,
+        eveSessionId: null,
+        workspacePath: resolve(input.cwd ?? workspace),
       };
       states.set(handle.workerId, {
-        sessionId,
-        continuationToken,
-        status: 'working',
-        workspace,
-        artifactPath: resolveArtifactPath(workspace, extractArtifactPath(body)),
+        sessionId: null,
+        continuationToken: null,
+        status: 'idle',
+        workspace: handle.workspacePath,
+        artifactPath: null,
         collected: false,
+        turnComplete: false,
       });
       return handle;
     },
 
     async send(handle: WorkerHandle, message: WorkerMessage): Promise<void> {
-      const state = stateFor(handle);
-      const body = await postJson(`/eve/v1/session/${state.sessionId}`, {
-        message: message.text,
-        continuationToken: state.continuationToken,
-        taskId: message.taskId ?? null,
-        workflowId: message.workflowId ?? null,
-      });
+      const state = stateFor(handle, message.artifactRoot ?? workspace);
+      const body = state.sessionId
+        ? await postJson(`/eve/v1/session/${state.sessionId}`, {
+          message: message.text,
+          continuationToken: state.continuationToken,
+          taskId: message.taskId ?? null,
+          workflowId: message.workflowId ?? null,
+        })
+        : await postJson('/eve/v1/session', {
+          message: message.text,
+          cwd: message.artifactRoot ?? handle.workspacePath ?? state.workspace,
+          taskId: message.taskId ?? null,
+          workflowId: message.workflowId ?? null,
+        });
+      state.sessionId = extractSessionId(body) ?? state.sessionId;
+      if (!state.sessionId) throw new Error('eve-harness send: missing sessionId from Eve response');
       state.continuationToken = extractContinuationToken(body) ?? state.continuationToken;
+      handle.eveSessionId = state.sessionId;
       state.artifactPath = resolveArtifactPath(state.workspace, extractArtifactPath(body)) ?? state.artifactPath;
+      state.turnComplete = false;
+      state.status = 'working';
       state.status = state.artifactPath ? 'done' : state.status;
     },
 
     async readState(handle: WorkerHandle): Promise<PartialStateCard> {
       const state = stateFor(handle);
-      if (state.status === 'working') await refreshFromStream(state);
+      if (state.status === 'working' && !state.turnComplete) await refreshFromStream(state);
       return {
         status: state.status === 'done' ? 'complete' : state.status === 'stopped' ? 'stopped' : 'active',
-        lastMeaningfulUpdate: state.sessionId,
+        lastMeaningfulUpdate: state.sessionId ?? null,
       };
     },
 
     async collectReceipts(handle: WorkerHandle): Promise<ReceiptDraft[]> {
       const state = stateFor(handle);
-      if (!state.artifactPath) await refreshFromStream(state);
+      if (!state.artifactPath && !state.turnComplete) await refreshFromStream(state);
       if (state.collected || !state.artifactPath) return [];
       if (io.existsSync && !io.existsSync(state.artifactPath)) {
         throw new Error(`eve-harness artifact missing: ${state.artifactPath}`);
@@ -137,7 +161,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
       state.collected = true;
       return [{
         type: 'task_submitted',
-        summary: `eve artifact from session ${state.sessionId}`,
+        summary: `eve artifact from session ${state.sessionId ?? 'unknown'}`,
         artifactFilePath: state.artifactPath,
         artifactKind: 'file',
         contentHash,
@@ -145,7 +169,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
         sizeBytes: bytes.length,
         metadata: {
           harnessKind: 'eve-harness',
-          eveSessionId: state.sessionId,
+          eveSessionId: state.sessionId ?? null,
           workspace: state.workspace,
         },
       }];
@@ -157,32 +181,48 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
   };
 
   async function refreshFromStream(state: EveState): Promise<void> {
-    const res = await fetchImpl(`${baseUrl}/eve/v1/session/${state.sessionId}/stream`, {
-      method: 'GET',
-      headers: { accept: 'application/x-ndjson' },
-    });
-    if (res.ok === false) throw new Error(`Eve HTTP error: ${res.status ?? 'unknown'}`);
-    if (res.body) {
-      await readStreamUntilArtifact(state, res.body);
-      return;
+    if (!state.sessionId) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), streamTimeoutMs);
+    try {
+      const res = await fetchImpl(`${baseUrl}/eve/v1/session/${state.sessionId}/stream`, {
+        method: 'GET',
+        headers: { accept: 'application/x-ndjson' },
+        signal: controller.signal,
+      });
+      if (res.ok === false) throw new Error(`Eve HTTP error: ${res.status ?? 'unknown'}`);
+      if (res.body) {
+        await readStreamUntilArtifact(state, res.body, streamTimeoutMs);
+        return;
+      }
+      processStreamText(state, await parseText(res));
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error(`eve-harness stream timed out after ${streamTimeoutMs}ms`);
+      throw error;
+    } finally {
+      clearTimeout(timeout);
     }
-    processStreamText(state, await parseText(res));
   }
 }
 
-async function readStreamUntilArtifact(state: EveState, body: ReadableStream<Uint8Array>): Promise<void> {
+async function readStreamUntilArtifact(
+  state: EveState,
+  body: ReadableStream<Uint8Array>,
+  streamTimeoutMs: number,
+): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
+  const deadline = Date.now() + streamTimeoutMs;
   let buffer = '';
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await readWithDeadline(reader, deadline);
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split(/\r?\n/);
       buffer = lines.pop() ?? '';
-      processStreamText(state, lines.join('\n'));
-      if (state.status === 'done') {
+      const boundarySeen = processStreamText(state, lines.join('\n'));
+      if (state.status === 'done' || boundarySeen) {
         await reader.cancel().catch(() => {});
         break;
       }
@@ -193,17 +233,40 @@ async function readStreamUntilArtifact(state: EveState, body: ReadableStream<Uin
   }
 }
 
-function processStreamText(state: EveState, text: string): void {
+async function readWithDeadline(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  deadline: number,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new Error('eve-harness stream timed out');
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      reader.read(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('eve-harness stream timed out')), remaining);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function processStreamText(state: EveState, text: string): boolean {
+  let boundarySeen = false;
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     try {
       const event = JSON.parse(line) as unknown;
       state.artifactPath = resolveArtifactPath(state.workspace, extractArtifactPath(event)) ?? state.artifactPath;
-      if (isDoneEvent(event) && state.artifactPath) state.status = 'done';
+      boundarySeen = isTurnBoundaryEvent(event) || boundarySeen;
+      if (state.artifactPath && (boundarySeen || isArtifactEvent(event))) state.status = 'done';
     } catch {
       // Ignore malformed or partial stream lines.
     }
   }
+  state.turnComplete = state.turnComplete || boundarySeen;
+  return boundarySeen;
 }
 
 async function parseResponse(res: EveResponse): Promise<unknown> {
@@ -283,11 +346,18 @@ function resolveArtifactPath(workspace: string, path: string | null): string | n
   return isAbsolute(path) ? resolve(path) : resolve(workspace, path);
 }
 
-function isDoneEvent(value: unknown): boolean {
+function isArtifactEvent(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
   const event = value as { type?: unknown };
   return event.type === 'message.completed'
-    || event.type === 'turn.completed'
+    || event.type === 'result.completed'
+    || event.type === 'session.completed';
+}
+
+function isTurnBoundaryEvent(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const event = value as { type?: unknown };
+  return event.type === 'turn.completed'
     || event.type === 'session.waiting'
     || event.type === 'session.completed';
 }
