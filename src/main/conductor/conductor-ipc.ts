@@ -14,6 +14,8 @@ import { createConductorActions, type ConductorSpawnRole } from './conductor-act
 import { createConductorLoop, proposeNextAction } from './conductor-loop';
 import { dispatchKernelCommand } from '../../kernel/commands/index';
 import { queryConductorContext, queryReceiptList } from '../../kernel/queries/index';
+import { getKernelDb } from '../../kernel/database';
+import { queryRun } from '../../kernel/workflows/index';
 
 export interface ConductorIpcOptions {
   /** Approved shell role-spawn binding (starts runtime; gated by kernel.worker.spawn). */
@@ -47,6 +49,9 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
   // each step and posts a decision receipt for every step.
   const loop = createConductorLoop({
     readContext: (workflowId) => queryConductorContext(workflowId ? { workflowId } : {}),
+    readRun: (workflowId) => queryRun(getKernelDb(), workflowId),
+    pauseRun: (workflowId, reason) =>
+      dispatchKernelCommand('kernel.workflow.update', { id: workflowId, status: 'paused', reason }, 'conductor'),
     propose: proposeNextAction,
     runAction: (action, args) => actions.runAction(action, args),
     hasPendingApproval: ({ workflowId, proposalToken }) => {

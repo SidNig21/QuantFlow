@@ -39,6 +39,7 @@
 		"smoke:task-atom": "bun scripts/smoke-task-atom.ts",
 		"smoke:dag": "bun scripts/smoke-dag.ts",
 		"smoke:authority": "bun scripts/smoke-authority.ts",
+		"smoke:pod": "bun scripts/smoke-pod.ts",
 		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",
 		"postinstall": "node scripts/postinstall.mjs"
 	},

@@ -109,3 +109,8 @@ After meaningful changes: update this file if local rules or owned scope changed
 - `assign_task` remains claim+start by default. With `deliver:true`, it sends through `deps.getWorkerHarness(kind)`, collects drafts, posts `kernel.artifact.create`, then posts `kernel.task.submit`.
 - Mock delivery may auto-run for CI. Real harness delivery requires explicit operator approval (`operatorApproved` or `approvalToken`).
 - The Conductor still never writes artifact/task truth directly; all truth writes remain Kernel commands.
+
+## v4 R4 Addendum
+
+- `conductor-loop.ts` enforces declared Workflow/Run budgets when wired with `readRun`: max workers, wallclock, spend, tool calls, retries, and checkpoint requirement.
+- Budget exhaustion pauses through the Kernel workflow update hook and records a `budget-paused` planning receipt before any new proposal or action executes.
