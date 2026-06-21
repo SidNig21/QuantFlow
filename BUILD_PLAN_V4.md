@@ -255,6 +255,7 @@ This section is the durable progress ledger for the v4 branch.
 | R6 — Run templates | Scoped / awaiting authorization | — | — | — | Scout / Research / Deep as saved plan-layer Conductor plans (DAG + roles + budgets + stop + artifact expectations + per-phase attention profiles). |
 | R7 — Judgment & compounding | Scoped / awaiting authorization | — | — | — | Run Replay (projection), semantic verification escalation, typed research artifacts + provenance, decision/outcome/lesson logs, eval auto-trigger, RL schema prep. |
 | R8 — One-click agent/tool onboarding (legend bar) | **Complete / approved** | Cursor (engine) · Claude (Mode-1 correction) | Claude (engine) · operator-witnessed (product proof) | 2026-06-21 | **Operator-added** (beyond the territory-map spine). **Engine verified** 2026-06-20 (diff `24f26db..98c32bf`): data-driven registry, "+ Add" disk write + refresh, real readiness badge, shared spawn path, machine proof green. **Mode-1 correction Complete 2026-06-21** (diff `e244be5`, canonical spawn doc `docs/v4/SPAWN_MODEL.md`): legend click = **Mode 1 terminal summon for all agents incl. Eve**; registry collapsed to `roles/*.json` (dropped `eve-packages/manifest.json`); `isEveHarness` headless fork removed (one terminal path; `runtimeTarget` alone forks PTY vs herdr); `role.cwd` threaded; `eve-harness` kept for **Mode 2 (Conductor) only**. Machine proof green (28 legend tests + all smokes incl. `smoke:task-atom` + build + MCP). **Product proof PASSED (operator-witnessed 2026-06-21):** legend-click QuantFlow Eve → Windows PowerShell tile running `npm run dev` → live `eve dev` TUI (eve v0.11.8, bound to opencode-go/deepseek-v4-pro). **Open follow-ons → R8.5:** the "+ Add" → Eve form still writes a broken `harnessKind: eve-harness` row (no `commandTemplate`/`cwd`); demote/replace it with Eve-first authoring + settings agent inventory. Handoff: `docs/v4/handoffs/R8-mode1-spawn-correction.md`. |
+| R8.5 — Settings agent inventory + Eve-first authoring | **Drafted / awaiting authorization** | — | — | — | Goal shape drafted below (front door = *author a tool set, bind a key*, not the modal form). Settings "Agents" pane over the same `roles/*.json` registry; Eve-first scaffold path that emits a **`roles/*.json`** (eve-packages discovery is gone); fix/replace the broken "+ Add" → Eve form (it still writes `harnessKind: eve-harness` with no `commandTemplate`/`cwd`). Depends on R8 (✅). No Kernel/schema. |
 
 > **Operator priority (reliability + extensibility over run-time):** the operator
 > has set the focus on **reliable parallel orchestration** and **easy addition of
@@ -1978,6 +1979,126 @@ prerequisite (an overnight run needs reliably authed workers — F37). It is the
 proof that the whole spine holds overnight: many real agents, recoverable,
 budget-bounded, producing a briefing the human decides on — never an auto-placed
 action. Compose it only after R7; do not build it as a parallel track.
+
+---
+
+# Goal R8.5 — Settings Agent Inventory + Eve-First Authoring
+
+> **STATUS: DRAFT — awaiting operator authorization.** Not authorized work until the
+> operator promotes it. Extensibility band (sibling of R8). Depends on **R8 ✅**.
+> Canonical frame: `docs/v4/SPAWN_MODEL.md` (agent = model + tools + harness; front
+> door = *author a tool set, then bind a key*). Intake: `docs/v4/INCOMING_GOALS.md`.
+
+## Goal
+
+Make **adding and customizing an agent feel like authoring an Eve agent** (a folder:
+`instructions.md` + `tools/` + a bound model), not filling a metadata modal — and give
+Settings a single place to **view/manage the whole agent roster**. Keep the R8 engine
+(registry · readiness badge · shared Mode-1 spawn) intact; change only the **front
+door** (authoring) and add the **inventory**.
+
+## Why
+
+R8 made every agent summonable from the legend, but two gaps remain:
+1. **The "+ Add" → Eve form is broken** (verified during the R8 proof): it writes a
+   role with `harnessKind: eve-harness` and **no `commandTemplate`/`cwd`**, so any Eve
+   row created through it spawns a broken WSL/Ubuntu shell, not Eve. The front door
+   actively lies to the operator.
+2. **No agent inventory** — Settings only does Canvas Skill install; there is no place
+   to view/add/edit/remove the `roles/*.json` roster the dock reads.
+
+The operator rejected hand-typing metadata: "incorporate how you build Eve agents for
+everything." So authoring = **scaffold a real Eve package + edit files**, and the dock
+picks it up through the existing `roles/*.json` registry.
+
+## Direct Repo Scope
+
+```text
+src/windows/shell/src/settings-*.{js,...}        Settings "Agents" pane (list/add/edit/remove)
+src/windows/shell/src/add-agent-form.js          FIX: stop emitting harnessKind:eve-harness;
+                                                  Eve option = scaffold path (folder picker + cwd),
+                                                  modal demoted to CLI/one-shot fallback only
+src/main/legend-recipes.ts                        reuse create/update/remove (already roles/*.json)
+src/main/eve-scaffold.ts (NEW)                    scaffold an Eve package from the proven template
+src/main/ipc-legend-recipes.ts                    add cwd to the create/update input; wire scaffold IPC
+docs/v4/EVE_SETUP.md                              authoring quickstart (template, Node-24, no empty folders)
+BUILD_PLAN_V4.md                                  ledger update on approval (verifier only)
+```
+
+## Spike first (decides the scaffold shape)
+
+- **Eve: multiple agents per app vs one project per agent.** `quantflow-eve` is
+  one-project-one-agent today. Confirm whether `npx eve init <name>` / a copied
+  template per persona is the model (it is, per current evidence) before building the
+  scaffolder.
+- **Node ≥24 requirement** is real (proven this session): the scaffold/role must target
+  a Node-24 runtime (Windows PowerShell has it; WSL needs the nvm launcher). Record the
+  chosen default in the scaffolder.
+
+## The authoring path (build → integrate)
+
+1. **Settings "Agents" pane** reads `listLegendRecipesWithReadiness()` and renders the
+   roster (name · runtime · readiness badge · model label). Add/edit/remove call the
+   existing `legend:create/update/remove` IPC (extended with `cwd`).
+2. **"Add Eve agent"** = `eve-scaffold`: scaffold a fresh Eve package from the proven
+   template into an operator-chosen folder, then write a **`roles/*.json`** pointing at
+   it (`commandTemplate: npm run dev` + `cwd` = that folder + `runtimeTarget` +
+   `defaultShell`). It must emit a `roles/*.json` — **`eve-packages` discovery was
+   removed in R8**; the registry is `roles/*.json` only.
+3. **Fix the broken form:** the Eve path no longer writes `harnessKind: eve-harness`
+   with no command; it produces a valid Mode-1 role (or routes to the scaffolder). The
+   plain modal stays only for dumb CLI/one-shot scripts.
+4. **Customize = edit files:** authoring depth is adding `tools/`, `skills/`, etc. to
+   the Eve folder (with content — **never empty folders**, which break Eve discovery).
+
+## Out of Scope
+
+- No Kernel command, receipt, or schema change — roles stay config.
+- No Conductor/DAG (R3), no Mode-2/`eve-harness` change, no durability (R4).
+- No model routing in QuantFlow — the key lives in the agent folder's `.env.local`.
+- No pre-created empty Eve capability folders (Eve discovery rejects them).
+- No new registry path — one shape (`roles/*.json`).
+
+## Acceptance Test
+
+### Machine proof (CI-safe)
+- Settings/registry round-trip: add → list → edit → remove a role through the IPC; the
+  dock registry reflects each (unit-tested over a temp roles dir).
+- `eve-scaffold` writes a **runnable** Eve package (boots `eve dev` with 0 discovery
+  errors — no empty `.gitkeep` folders) **and** a valid `roles/*.json` with
+  `commandTemplate`/`cwd`/`runtimeTarget`.
+- The Add→Eve path **never** emits `harnessKind: eve-harness` and never a role missing
+  `commandTemplate`/`cwd` (regression test for the R8-proof bug).
+
+### Product proof (operator, manual)
+- From Settings → "Add Eve agent", scaffold a new persona into a folder; it appears in
+  the legend with a readiness badge; legend-click → **Mode-1 `eve dev` TUI tile**.
+- Edit (rename/recolor) and remove from Settings both reflect in the dock.
+
+### Regression Guard (cumulative — Appendix A)
+- All R8 tests (`legend-dock` / `legend-spawn` / `legend-recipes`) + every prior smoke
+  + `bun run build` + MCP stay green. No Kernel/schema change.
+
+## Failure Signals
+- Authoring writes a broken role (no `commandTemplate`/`cwd`, or `harnessKind:
+  eve-harness`) — the exact bug R8.5 exists to kill.
+- A scaffolded agent fails `eve dev` discovery (e.g. empty folders shipped).
+- A second registry/discovery path reappears beside `roles/*.json`.
+- Any Kernel/schema mutation, or model routing added to QuantFlow.
+
+## Handoff Block
+
+```text
+Branch quantflow-v4. Read: AGENTS.md chain → docs/v4/SPAWN_MODEL.md → docs/v4/EVE_SETUP.md
+→ BUILD_PLAN_V4 § Goal R8.5 → R8 ledger row.
+
+R8.5 changes the AUTHORING front door + adds a Settings agent inventory. Keep the R8
+engine (registry/badge/Mode-1 spawn). Front door = author a tool set + bind a key, via an
+Eve-package scaffold that emits a roles/*.json (eve-packages discovery is GONE — roles/*.json
+only). Fix add-agent-form.js so the Eve path never writes harnessKind:eve-harness/no-command.
+Never pre-create empty Eve folders (discovery breaks). No Kernel/schema. Two proof tracks.
+Commit locally; verifier checks + pushes. Do not self-approve.
+```
 
 ---
 

@@ -33,18 +33,24 @@ Entry shape:
     (view all agents · readiness badge · add/remove/edit name/command/folder/icon).
   - **Eve-first authoring path:** "add agent" = **scaffold an Eve agent** from the
     proven template, then customize by editing `instructions.md` + dropping `tools/`
-    files — it auto-discovers into the dock (eve-packages discovery already exists).
-  - Demote the R8 modal form to a fallback (dumb CLI/one-shot scripts only).
-- **Open spike (do first):** Eve capability — does Eve support **multiple agents per
-  app** vs **one project per agent**; how you scaffold a new agent; how tools/MCP
-  attach. Determines scaffolding + discovery shape. (`quantflow-eve` is one-project-
-  one-agent today.)
-- **Depends on:** R8 (Mode-1 summon) landing first. Same band (extensibility), **no
-  Kernel schema**.
+    files. It surfaces in the dock by writing a **`roles/*.json`** that points at the
+    folder (`commandTemplate: npm run dev` + `cwd` + `runtimeTarget`). **NOTE (R8
+    correction):** the old `eve-packages/manifest.json` discovery was **removed** — the
+    registry is `roles/*.json` only, so the scaffolder must emit that.
+  - **Fix the broken "+ Add" → Eve form** (found during R8 proof): it writes
+    `harnessKind: eve-harness` with **no `commandTemplate`/`cwd`** → spawns a broken
+    WSL shell, not Eve. Demote the modal to dumb CLI/one-shot scripts only.
+  - **Gotcha to bake in:** never scaffold **empty** Eve capability folders — Eve
+    discovery rejects them (even with `.gitkeep`) and refuses to boot. Node ≥24 required.
+- **Open spike (do first):** Eve capability — **multiple agents per app** vs **one
+  project per agent**; how you scaffold a new agent; how tools/MCP attach. Determines
+  scaffolding shape. (`quantflow-eve` is one-project-one-agent today.)
+- **Depends on:** R8 (Mode-1 summon) ✅ landed. Same band (extensibility), **no Kernel
+  schema**.
 - **Layer(s):** renderer (settings + dock) · main (role-service / legend-recipes /
-  eve scaffolding) · harness (eve-harness already exists)
+  eve scaffolding) · harness (eve-harness already exists, Mode 2 only)
 - **Priority:** high (operator's stated extensibility priority)
-- **Status:** captured
+- **Status:** drafted into BUILD_PLAN_V4 (Goal R8.5) — awaiting authorization
 
 ### (note) R8 Mode-1 spawn correction — already in BUILD_PLAN_V4, not a candidate
 The Eve-legend-click → terminal-tile fix is an **R8 scope clarification** recorded
