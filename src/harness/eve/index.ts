@@ -23,6 +23,7 @@ export const eveHarness: HarnessDescriptor = {
 type EveResponse = {
   ok?: boolean;
   status?: number;
+  body?: ReadableStream<Uint8Array> | null;
   json?: () => Promise<unknown>;
   text?: () => Promise<string>;
 };
@@ -41,6 +42,7 @@ export interface EveHarnessOptions {
 
 interface EveState {
   sessionId: string;
+  continuationToken: string | null;
   status: 'working' | 'done' | 'stopped';
   workspace: string;
   artifactPath: string | null;
@@ -80,6 +82,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
       });
       const sessionId = extractSessionId(body);
       if (!sessionId) throw new Error('eve-harness spawn: missing sessionId from Eve response');
+      const continuationToken = extractContinuationToken(body);
       const tileId = input.tileId ?? `eve-${sessionId}`;
       const handle: WorkerHandle = {
         workerId: `eve-worker-${sessionId}`,
@@ -90,6 +93,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
       };
       states.set(handle.workerId, {
         sessionId,
+        continuationToken,
         status: 'working',
         workspace,
         artifactPath: resolveArtifactPath(workspace, extractArtifactPath(body)),
@@ -102,15 +106,18 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
       const state = stateFor(handle);
       const body = await postJson(`/eve/v1/session/${state.sessionId}`, {
         message: message.text,
+        continuationToken: state.continuationToken,
         taskId: message.taskId ?? null,
         workflowId: message.workflowId ?? null,
       });
+      state.continuationToken = extractContinuationToken(body) ?? state.continuationToken;
       state.artifactPath = resolveArtifactPath(state.workspace, extractArtifactPath(body)) ?? state.artifactPath;
       state.status = state.artifactPath ? 'done' : state.status;
     },
 
     async readState(handle: WorkerHandle): Promise<PartialStateCard> {
       const state = stateFor(handle);
+      if (state.status === 'working') await refreshFromStream(state);
       return {
         status: state.status === 'done' ? 'complete' : state.status === 'stopped' ? 'stopped' : 'active',
         lastMeaningfulUpdate: state.sessionId,
@@ -119,6 +126,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
 
     async collectReceipts(handle: WorkerHandle): Promise<ReceiptDraft[]> {
       const state = stateFor(handle);
+      if (!state.artifactPath) await refreshFromStream(state);
       if (state.collected || !state.artifactPath) return [];
       if (io.existsSync && !io.existsSync(state.artifactPath)) {
         throw new Error(`eve-harness artifact missing: ${state.artifactPath}`);
@@ -147,6 +155,55 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
       stateFor(handle).status = 'stopped';
     },
   };
+
+  async function refreshFromStream(state: EveState): Promise<void> {
+    const res = await fetchImpl(`${baseUrl}/eve/v1/session/${state.sessionId}/stream`, {
+      method: 'GET',
+      headers: { accept: 'application/x-ndjson' },
+    });
+    if (res.ok === false) throw new Error(`Eve HTTP error: ${res.status ?? 'unknown'}`);
+    if (res.body) {
+      await readStreamUntilArtifact(state, res.body);
+      return;
+    }
+    processStreamText(state, await parseText(res));
+  }
+}
+
+async function readStreamUntilArtifact(state: EveState, body: ReadableStream<Uint8Array>): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? '';
+      processStreamText(state, lines.join('\n'));
+      if (state.status === 'done') {
+        await reader.cancel().catch(() => {});
+        break;
+      }
+    }
+    if (buffer.trim()) processStreamText(state, buffer);
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function processStreamText(state: EveState, text: string): void {
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const event = JSON.parse(line) as unknown;
+      state.artifactPath = resolveArtifactPath(state.workspace, extractArtifactPath(event)) ?? state.artifactPath;
+      if (isDoneEvent(event) && state.artifactPath) state.status = 'done';
+    } catch {
+      // Ignore malformed or partial stream lines.
+    }
+  }
 }
 
 async function parseResponse(res: EveResponse): Promise<unknown> {
@@ -161,19 +218,30 @@ async function parseResponse(res: EveResponse): Promise<unknown> {
   return res.text ? res.text() : {};
 }
 
+async function parseText(res: EveResponse): Promise<string> {
+  if (res.ok === false) throw new Error(`Eve HTTP error: ${res.status ?? 'unknown'}`);
+  return res.text ? res.text() : JSON.stringify(await parseResponse(res));
+}
+
 function extractSessionId(value: unknown): string | null {
   const found = findStringField(value, new Set(['sessionId', 'session_id', 'id']));
   return found?.trim() || null;
 }
 
+function extractContinuationToken(value: unknown): string | null {
+  const found = findStringField(value, new Set(['continuationToken', 'continuation_token']));
+  return found?.trim() || null;
+}
+
 function extractArtifactPath(value: unknown): string | null {
-  const direct = findStringField(value, new Set(['artifactPath', 'artifact_path', 'filePath', 'file_path', 'path', 'uri']));
+  if (typeof value === 'string') return parseArtifactPathMarker(value);
+  const event = asRecord(value);
+  if (!event) return null;
+  const direct = stringProp(event, 'artifactPath') ?? stringProp(event, 'artifact_path');
   if (direct) return direct;
-  if (typeof value === 'string') {
-    const match = value.match(/ARTIFACT_PATH:\s*(.+)$/m);
-    return match?.[1]?.trim() ?? null;
-  }
-  return null;
+  if (event['type'] !== 'message.completed') return null;
+  const data = asRecord(event['data']);
+  return parseArtifactPathMarker(stringProp(data, 'message'));
 }
 
 function findStringField(value: unknown, names: Set<string>): string | null {
@@ -193,9 +261,35 @@ function findStringField(value: unknown, names: Set<string>): string | null {
   return null;
 }
 
+function parseArtifactPathMarker(text: string | null): string | null {
+  return text?.match(/^ARTIFACT_PATH:\s*(.+)$/m)?.[1]?.trim() || null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function stringProp(record: Record<string, unknown> | null, key: string): string | null {
+  const value = record?.[key];
+  return typeof value === 'string' ? value : null;
+}
+
 function resolveArtifactPath(workspace: string, path: string | null): string | null {
   if (!path) return null;
+  if (path === '/workspace') return workspace;
+  if (path.startsWith('/workspace/')) return resolve(workspace, path.slice('/workspace/'.length));
   return isAbsolute(path) ? resolve(path) : resolve(workspace, path);
+}
+
+function isDoneEvent(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const event = value as { type?: unknown };
+  return event.type === 'message.completed'
+    || event.type === 'turn.completed'
+    || event.type === 'session.waiting'
+    || event.type === 'session.completed';
 }
 
 function stripTrailingSlash(s: string): string {
