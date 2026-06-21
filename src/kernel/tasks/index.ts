@@ -49,6 +49,7 @@ export function handleTaskCommand(
     case 'kernel.task.complete': return taskComplete(db, payload);
     case 'kernel.task.block': return taskBlock(db, payload);
     case 'kernel.task.fail': return taskFail(db, payload);
+    case 'kernel.task.recover': return taskRecover(db, payload);
     default: return { ok: false, error: `Unhandled task command: ${type}` };
   }
 }
@@ -192,11 +193,71 @@ function latestSubmittedArtifactRefs(db: KernelDB, taskId: string): string[] {
   }
 }
 
-function attemptMetadata(payload: Record<string, unknown>): Record<string, unknown> {
+function parseJsonObject(s: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(s);
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function parseJsonArray(s: string): unknown[] {
+  try {
+    const parsed = JSON.parse(s);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function attemptIdFromPayload(payload: Record<string, unknown>): string | null {
   const attemptId = payload['attemptId'];
-  return typeof attemptId === 'string' && attemptId.trim()
-    ? { attemptId: attemptId.trim() }
-    : {};
+  return typeof attemptId === 'string' && attemptId.trim() ? attemptId.trim() : null;
+}
+
+function attemptMetadata(payload: Record<string, unknown>): Record<string, unknown> {
+  const attemptId = attemptIdFromPayload(payload);
+  return attemptId ? { attemptId } : {};
+}
+
+interface AttemptReceipt {
+  id: string;
+  artifactRefs: string[];
+  metadata: Record<string, unknown>;
+}
+
+function findAttemptReceipt(
+  db: KernelDB,
+  taskId: string,
+  type: string,
+  attemptId: string | null,
+): AttemptReceipt | null {
+  if (!attemptId) return null;
+  const rows = db
+    .prepare(
+      `SELECT id, artifact_refs_json, metadata_json FROM receipts
+       WHERE task_id = ? AND type = ?
+       ORDER BY created_at ASC, rowid ASC`,
+    )
+    .all(taskId, type) as Array<{ id: string; artifact_refs_json: string; metadata_json: string }>;
+  for (const row of rows) {
+    const metadata = parseJsonObject(row.metadata_json);
+    if (metadata['attemptId'] === attemptId) {
+      return {
+        id: row.id,
+        artifactRefs: parseJsonArray(row.artifact_refs_json).filter((v): v is string => typeof v === 'string'),
+        metadata,
+      };
+    }
+  }
+  return null;
+}
+
+function sameStringSet(a: string[], b: string[]): boolean {
+  const left = [...new Set(a)].sort();
+  const right = [...new Set(b)].sort();
+  return left.length === right.length && left.every((v, i) => v === right[i]);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,12 +428,25 @@ function taskStart(db: KernelDB, payload: Record<string, unknown>): CommandResul
 }
 
 function taskSubmit(db: KernelDB, payload: Record<string, unknown>): CommandResult {
-  const t = transition(db, payload, 'submitted');
-  if (!t.ok) return t;
+  const idCheck = requireString(payload, 'taskId');
+  if (!idCheck.ok) return { ok: false, error: idCheck.error };
+  const taskId = payload['taskId'] as string;
   const artifactRefs = normalizeArtifactRefs(payload);
   if (artifactRefs.length === 0) {
     return { ok: false, error: 'task.submit requires artifactId or non-empty artifactRefs' };
   }
+  const attemptId = attemptIdFromPayload(payload);
+  const existing = findAttemptReceipt(db, taskId, 'task_submitted', attemptId);
+  if (existing) {
+    if (!sameStringSet(existing.artifactRefs, artifactRefs)) {
+      return { ok: false, error: `task.submit attemptId already used with different artifact refs: ${attemptId}` };
+    }
+    const task = getTask(db, taskId);
+    return { ok: true, id: taskId, data: { status: task?.status ?? null, receiptId: existing.id, idempotent: true } };
+  }
+
+  const t = transition(db, payload, 'submitted');
+  if (!t.ok) return t;
   try {
     setStatus(db, t.task.id, 'submitted', { submitted_at: Date.now() });
     const updated = getTask(db, t.task.id)!;
@@ -409,12 +483,24 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
   const task = getTask(db, id);
   if (!task) return { ok: false, error: `task not found: ${id}` };
 
+  const attemptId = attemptIdFromPayload(payload);
+  const verdict = (payload['verdict'] as string | undefined) ?? 'pass';
+  const existingPass = findAttemptReceipt(db, id, 'verification_passed', attemptId);
+  if (existingPass && verdict !== 'fail') {
+    const current = getTask(db, id);
+    return { ok: true, id, data: { status: current?.status ?? null, verified: true, receiptId: existingPass.id, idempotent: true } };
+  }
+  const existingFail = findAttemptReceipt(db, id, 'verification_failed', attemptId);
+  if (existingFail) {
+    const current = getTask(db, id);
+    return { ok: true, id, data: { status: current?.status ?? null, verified: false, receiptId: existingFail.id, idempotent: true } };
+  }
+
   const verifierWorkerId = (payload['verifierWorkerId'] as string | null) ?? null;
   const operatorOverride = payload['operatorOverride'] === true;
   const distinct = validateVerifierDistinct(task, verifierWorkerId, operatorOverride);
   if (!distinct.ok) return { ok: false, error: distinct.error };
 
-  const verdict = (payload['verdict'] as string | undefined) ?? 'pass';
   const summary = (payload['summary'] as string | undefined) ?? `verification ${verdict}`;
   const explicitArtifactRefs = normalizeArtifactRefs(payload);
   const submittedArtifactRefs = explicitArtifactRefs.length > 0
@@ -493,7 +579,7 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
       workerId: completed.owner_worker_id,
       correlationId: completed.correlation_id,
       summary: 'task completed (verified)',
-      metadata: { verified: true },
+      metadata: { ...metadataBase, verified: true },
     });
     emitTaskEvent(completed, 'task.completed', { status: 'complete', verified: true });
     return { ok: true, id, data: { status: 'complete', verified: true } };
@@ -582,6 +668,12 @@ function taskComplete(db: KernelDB, payload: Record<string, unknown>): CommandRe
   const task = getTask(db, id);
   if (!task) return { ok: false, error: `task not found: ${id}` };
 
+  const attemptId = attemptIdFromPayload(payload);
+  const existing = findAttemptReceipt(db, id, 'task_completed', attemptId);
+  if (existing && task.status === 'complete') {
+    return { ok: true, id, data: { status: 'complete', receiptId: existing.id, idempotent: true } };
+  }
+
   const legacy = payload['legacy'] === true;
   const guard = validateComplete(db, task, legacy);
   if (!guard.ok) return { ok: false, error: guard.error };
@@ -603,7 +695,9 @@ function taskComplete(db: KernelDB, payload: Record<string, unknown>): CommandRe
       summary: legacy
         ? (payload['summary'] as string | undefined) ?? 'task completed (legacy, verification bypassed)'
         : (payload['summary'] as string | undefined) ?? 'task completed (verified)',
-      metadata: legacy ? { legacy: true, bypassedVerification: true } : { verified: true },
+      metadata: legacy
+        ? { ...attemptMetadata(payload), legacy: true, bypassedVerification: true }
+        : { ...attemptMetadata(payload), verified: true },
     });
     emitTaskEvent(completed, 'task.completed', { status: 'complete', verified: !legacy, legacy });
     return { ok: true, id, data: { status: 'complete', verified: !legacy, legacy } };
@@ -650,6 +744,45 @@ function taskFail(db: KernelDB, payload: Record<string, unknown>): CommandResult
     });
     emitTaskEvent(updated, 'task.failed', { status: 'failed' });
     return { ok: true, id: updated.id };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function taskRecover(db: KernelDB, payload: Record<string, unknown>): CommandResult {
+  const idCheck = requireString(payload, 'taskId');
+  if (!idCheck.ok) return { ok: false, error: idCheck.error };
+  const id = payload['taskId'] as string;
+  const task = getTask(db, id);
+  if (!task) return { ok: false, error: `task not found: ${id}` };
+  if (task.status === 'complete' || task.status === 'failed') {
+    return { ok: false, error: `task.recover cannot reopen terminal task '${task.status}'` };
+  }
+  try {
+    db.prepare(
+      `UPDATE tasks
+       SET status = 'open',
+           owner_worker_id = NULL,
+           claimed_at = NULL,
+           submitted_at = NULL,
+           verified_at = NULL,
+           completed_at = NULL,
+           updated_at = ?
+       WHERE id = ?`,
+    ).run(Date.now(), id);
+    if (task.owner_worker_id) assignWorkerToTask(db, task.owner_worker_id, null);
+    const recovered = getTask(db, id)!;
+    postReceipt(db, {
+      type: 'progress',
+      taskId: id,
+      workflowId: recovered.workflow_id,
+      workerId: task.owner_worker_id,
+      correlationId: recovered.correlation_id,
+      summary: (payload['reason'] as string | undefined) ?? 'task recovered to open',
+      metadata: { recovered: true, fromStatus: task.status },
+    });
+    emitTaskEvent(recovered, 'task.recovered', { status: 'open', fromStatus: task.status });
+    return { ok: true, id, data: { status: 'open' } };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

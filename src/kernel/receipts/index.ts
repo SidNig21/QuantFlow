@@ -19,6 +19,15 @@ import type { ReceiptRow, ReceiptType } from '../schema/types';
 import { emitKernelEvent } from '../events/index';
 import type { CommandResult } from '../commands/types';
 
+function safeJsonObject(s: string): Record<string, unknown> {
+  try {
+    const v = JSON.parse(s);
+    return v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 export interface PostReceiptInput {
   type: ReceiptType;
   taskId?: string | null;
@@ -117,6 +126,29 @@ export function handleArtifactCommand(
   }
   const kind = payload['kind'] as string | undefined;
   if (!kind) return { ok: false, error: 'artifact.create: kind required' };
+  const metadata = (payload['metadata'] as Record<string, unknown> | undefined) ?? {};
+  const attemptId = typeof metadata['attemptId'] === 'string' && metadata['attemptId'].trim()
+    ? metadata['attemptId'].trim()
+    : null;
+  const taskId = (payload['taskId'] as string | null) ?? null;
+  const workerId = (payload['workerId'] as string | null) ?? null;
+  if (attemptId && taskId) {
+    const rows = db
+      .prepare(
+        `SELECT id, receipt_id, metadata_json FROM artifacts
+         WHERE task_id = ? AND worker_id IS ? AND kind = ?
+         ORDER BY created_at ASC, rowid ASC`,
+      )
+      .all(taskId, workerId, kind) as Array<{ id: string; receipt_id: string | null; metadata_json: string }>;
+    const existing = rows.find((row) => safeJsonObject(row.metadata_json)['attemptId'] === attemptId);
+    if (existing) {
+      return {
+        ok: true,
+        id: existing.id,
+        data: { artifactId: existing.id, receiptId: existing.receipt_id, idempotent: true },
+      };
+    }
+  }
   const id = randomUUID();
   const now = Date.now();
   try {
@@ -128,7 +160,7 @@ export function handleArtifactCommand(
     ).run(
       id,
       (payload['workflowId'] as string | null) ?? null,
-      (payload['taskId'] as string | null) ?? null,
+      taskId,
       (payload['workerId'] as string | null) ?? null,
       (payload['tileId'] as string | null) ?? null,
       null, // receipt_id backfilled below via the artifact_created receipt
@@ -139,19 +171,19 @@ export function handleArtifactCommand(
       (payload['mediaType'] as string | null) ?? null,
       (payload['sizeBytes'] as number | null) ?? null,
       now,
-      JSON.stringify((payload['metadata'] as Record<string, unknown> | undefined) ?? {}),
+      JSON.stringify(metadata),
     );
 
     const receiptId = postReceipt(db, {
       type: 'artifact_created',
-      taskId: (payload['taskId'] as string | null) ?? null,
+      taskId,
       workflowId: (payload['workflowId'] as string | null) ?? null,
       workerId: (payload['workerId'] as string | null) ?? null,
       tileId: (payload['tileId'] as string | null) ?? null,
       summary: (payload['summary'] as string | undefined) ?? `artifact: ${kind}`,
       artifactRefs: [id],
       correlationId: (payload['correlationId'] as string | null) ?? null,
-      metadata: { artifactId: id, kind },
+      metadata: { ...metadata, artifactId: id, kind },
     });
     db.prepare('UPDATE artifacts SET receipt_id = ? WHERE id = ?').run(receiptId, id);
 
@@ -300,14 +332,5 @@ function safeJsonArray(s: string): unknown[] {
     return Array.isArray(v) ? v : [];
   } catch {
     return [];
-  }
-}
-
-function safeJsonObject(s: string): Record<string, unknown> {
-  try {
-    const v = JSON.parse(s);
-    return v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
-  } catch {
-    return {};
   }
 }

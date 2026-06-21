@@ -141,14 +141,21 @@ Runtime participants connected to tiles.
 | `role_id` | TEXT FK → roles | Nullable |
 | `harness_id` | TEXT FK → harnesses | Nullable |
 | `model_id` | TEXT FK → models | Nullable |
-| `status` | TEXT | `spawning`, `active`, `idle`, `stopped`, `error` |
+| `status` | TEXT | `spawning`, `active`, `assigned`, `idle`, `stale`, `stopped`, `error`, `failed` |
 | `permissions_json` | TEXT | `{}` — quick-access snapshot of active permissions |
 | `envoy_space_id` | TEXT | Envoy space binding (nullable) |
 | `herdr_pane_id` | TEXT | herdr pane binding (nullable) |
 | `assigned_task_id` | TEXT FK -> tasks | Nullable; R1 reverse link to the task currently assigned to this worker |
+| `auth_status` | TEXT | R4 · `unknown`, `ok`, `missing`, `expired`, `error`; default `unknown` |
+| `last_seen` | INTEGER | R4 · last worker heartbeat/liveness timestamp, nullable |
 | `created_at` | INTEGER | ms since epoch |
 | `updated_at` | INTEGER | ms since epoch |
 | `metadata_json` | TEXT | `{}` |
+
+R4 status reconciliation: `active` means the runtime is up, `assigned` means
+`assigned_task_id` is non-null, `stale` means liveness expired, `failed` is a
+terminal runtime failure, and `error` is transient. Task-like states such as
+`working`/`blocked` do not belong on `worker_instances`.
 
 ---
 

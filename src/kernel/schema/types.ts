@@ -22,9 +22,14 @@ export type TileStatus = 'idle' | 'active' | 'blocked' | 'complete' | 'error';
 export type WorkerInstanceStatus =
   | 'spawning'
   | 'active'
+  | 'assigned'
   | 'idle'
+  | 'stale'
   | 'stopped'
-  | 'error';
+  | 'error'
+  | 'failed';
+
+export type WorkerAuthStatus = 'unknown' | 'ok' | 'missing' | 'expired' | 'error';
 
 /**
  * Canonical v3 task states.
@@ -159,6 +164,8 @@ export interface WorkerInstanceRow {
   envoy_space_id: string | null;
   herdr_pane_id: string | null;
   assigned_task_id: string | null;
+  auth_status: WorkerAuthStatus;
+  last_seen: number | null;
   created_at: number;
   updated_at: number;
   metadata_json: string;
@@ -315,6 +322,7 @@ export type KernelCommandType =
   | 'kernel.worker.status_update'
   | 'kernel.worker.stop'
   | 'kernel.task.create'
+  | 'kernel.task.depend'
   | 'kernel.task.claim'
   | 'kernel.task.start'
   | 'kernel.task.submit'
@@ -322,6 +330,7 @@ export type KernelCommandType =
   | 'kernel.task.complete'
   | 'kernel.task.block'
   | 'kernel.task.fail'
+  | 'kernel.task.recover'
   | 'kernel.receipt.post'
   | 'kernel.state_card.update'
   | 'kernel.artifact.create'

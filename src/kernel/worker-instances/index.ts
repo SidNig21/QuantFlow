@@ -12,7 +12,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { KernelDB } from '../database';
-import type { WorkerInstanceStatus } from '../schema/types';
+import type { WorkerAuthStatus, WorkerInstanceStatus } from '../schema/types';
 import { HARNESS_DESCRIPTORS, type HarnessKind } from '../../harness/registry';
 
 const DEFAULT_MODEL_ID = 'model-local-default';
@@ -165,6 +165,8 @@ export interface WorkerStatusPatch {
   herdrPaneId?: string | null;
   envoySpaceId?: string | null;
   assignedTaskId?: string | null;
+  authStatus?: WorkerAuthStatus;
+  lastSeen?: number | null;
 }
 
 /** Resolve a worker id from an explicit id or a tile id. */
@@ -177,15 +179,23 @@ export function resolveWorkerId(
   return null;
 }
 
-function hasAssignedTaskColumn(db: KernelDB): boolean {
+function hasWorkerColumn(db: KernelDB, name: string): boolean {
   const rows = db.prepare("PRAGMA table_info('worker_instances')").all() as Array<{ name: string }>;
-  return rows.some((row) => row.name === 'assigned_task_id');
+  return rows.some((row) => row.name === name);
 }
 
 export function assignWorkerToTask(db: KernelDB, workerId: string, taskId: string | null): void {
-  if (!hasAssignedTaskColumn(db)) return;
-  db.prepare('UPDATE worker_instances SET assigned_task_id = ?, updated_at = ? WHERE id = ?')
-    .run(taskId, Date.now(), workerId);
+  if (!hasWorkerColumn(db, 'assigned_task_id')) return;
+  const row = db.prepare('SELECT status FROM worker_instances WHERE id = ?').get(workerId) as
+    | { status: WorkerInstanceStatus }
+    | undefined;
+  const nextStatus = taskId
+    ? 'assigned'
+    : row?.status === 'assigned'
+      ? 'idle'
+      : row?.status ?? 'idle';
+  db.prepare('UPDATE worker_instances SET assigned_task_id = ?, status = ?, updated_at = ? WHERE id = ?')
+    .run(taskId, nextStatus, Date.now(), workerId);
 }
 
 /** Patch a worker's status and/or runtime ids. Returns the tile id (for events). */
@@ -213,9 +223,17 @@ export function updateWorkerInstance(
     sets.push('envoy_space_id = ?');
     vals.push(patch.envoySpaceId);
   }
-  if (patch.assignedTaskId !== undefined && hasAssignedTaskColumn(db)) {
+  if (patch.assignedTaskId !== undefined && hasWorkerColumn(db, 'assigned_task_id')) {
     sets.push('assigned_task_id = ?');
     vals.push(patch.assignedTaskId);
+  }
+  if (patch.authStatus !== undefined && hasWorkerColumn(db, 'auth_status')) {
+    sets.push('auth_status = ?');
+    vals.push(patch.authStatus);
+  }
+  if (patch.lastSeen !== undefined && hasWorkerColumn(db, 'last_seen')) {
+    sets.push('last_seen = ?');
+    vals.push(patch.lastSeen);
   }
   vals.push(workerId);
   db.prepare(`UPDATE worker_instances SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
@@ -233,6 +251,8 @@ export interface WorkerSnapshot {
   herdrPaneId: string | null;
   envoySpaceId: string | null;
   assignedTaskId: string | null;
+  authStatus: WorkerAuthStatus;
+  lastSeen: number | null;
 }
 
 function rowToWorker(r: Record<string, unknown>): WorkerSnapshot {
@@ -247,6 +267,8 @@ function rowToWorker(r: Record<string, unknown>): WorkerSnapshot {
     herdrPaneId: (r['herdr_pane_id'] as string | null) ?? null,
     envoySpaceId: (r['envoy_space_id'] as string | null) ?? null,
     assignedTaskId: (r['assigned_task_id'] as string | null) ?? null,
+    authStatus: (r['auth_status'] as WorkerAuthStatus | null) ?? 'unknown',
+    lastSeen: (r['last_seen'] as number | null) ?? null,
   };
 }
 

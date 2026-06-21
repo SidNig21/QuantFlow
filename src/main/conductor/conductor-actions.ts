@@ -186,7 +186,7 @@ async function deliverAssignedTask(
   const artifactIds: string[] = [];
   for (const draft of drafts) {
     if (!draft.artifactFilePath) continue;
-    const created = await createArtifactFromDraft(cmd, task, handle, draft);
+    const created = await createArtifactFromDraft(cmd, task, handle, draft, args);
     if (!created.ok) return created;
     const data = (created.data && typeof created.data === 'object')
       ? created.data as Record<string, unknown>
@@ -216,7 +216,11 @@ async function createArtifactFromDraft(
   task: TaskSnapshot,
   handle: WorkerHandle,
   draft: ReceiptDraft,
+  args: Record<string, unknown>,
 ): Promise<CommandResult> {
+  const attemptId = typeof args['attemptId'] === 'string' && args['attemptId'].trim()
+    ? args['attemptId'].trim()
+    : null;
   return cmd('kernel.artifact.create', {
     workflowId: task.workflowId,
     taskId: task.id,
@@ -229,6 +233,6 @@ async function createArtifactFromDraft(
     mediaType: draft.mediaType ?? null,
     sizeBytes: draft.sizeBytes ?? null,
     correlationId: task.correlationId,
-    metadata: draft.metadata ?? {},
+    metadata: attemptId ? { ...(draft.metadata ?? {}), attemptId } : draft.metadata ?? {},
   });
 }

@@ -24,6 +24,33 @@ import {
 } from '../worker-instances/index';
 import { resolveHarnessKind } from '../../harness/registry';
 
+const WORKER_STATUSES: readonly WorkerInstanceStatus[] = [
+  'spawning',
+  'active',
+  'assigned',
+  'idle',
+  'stale',
+  'stopped',
+  'error',
+  'failed',
+];
+
+const WORKER_AUTH_STATUSES = ['unknown', 'ok', 'missing', 'expired', 'error'] as const;
+
+function parseWorkerStatus(value: unknown): WorkerInstanceStatus | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === 'string' && WORKER_STATUSES.includes(value as WorkerInstanceStatus)
+    ? value as WorkerInstanceStatus
+    : undefined;
+}
+
+function parseAuthStatus(value: unknown): 'unknown' | 'ok' | 'missing' | 'expired' | 'error' | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === 'string' && WORKER_AUTH_STATUSES.includes(value as typeof WORKER_AUTH_STATUSES[number])
+    ? value as typeof WORKER_AUTH_STATUSES[number]
+    : undefined;
+}
+
 export function handleWorkerCommand(
   db: KernelDB,
   type: string,
@@ -70,10 +97,21 @@ function workerStatusUpdate(db: KernelDB, payload: Record<string, unknown>): Com
   });
   if (!workerId) return { ok: false, error: 'worker.status_update: worker not found (need workerId or tileId)' };
   try {
+    const status = parseWorkerStatus(payload['status']);
+    if (payload['status'] !== undefined && !status) {
+      return { ok: false, error: `worker.status_update: invalid worker status: ${String(payload['status'])}` };
+    }
+    const authStatus = parseAuthStatus(payload['authStatus']);
+    if (payload['authStatus'] !== undefined && !authStatus) {
+      return { ok: false, error: `worker.status_update: invalid authStatus: ${String(payload['authStatus'])}` };
+    }
     const result = updateWorkerInstance(db, workerId, {
-      status: payload['status'] as WorkerInstanceStatus | undefined,
+      status,
       herdrPaneId: payload['herdrPaneId'] as string | null | undefined,
       envoySpaceId: payload['envoySpaceId'] as string | null | undefined,
+      assignedTaskId: payload['assignedTaskId'] as string | null | undefined,
+      authStatus,
+      lastSeen: typeof payload['lastSeen'] === 'number' ? payload['lastSeen'] : undefined,
     });
     if (!result) return { ok: false, error: `worker.status_update: worker not found: ${workerId}` };
     emitKernelEvent({

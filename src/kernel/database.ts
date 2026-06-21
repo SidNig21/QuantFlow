@@ -6,6 +6,7 @@ import baselineSql from './migrations/001-v3-baseline.sql?raw';
 import evaluationsSql from './migrations/002-evaluations.sql?raw';
 import r1WorkerTaskBindingSql from './migrations/003-r1-worker-task-binding.sql?raw';
 import r3WorkflowInstanceSql from './migrations/004-r3-workflow-instance.sql?raw';
+import r4RuntimeSql from './migrations/005-r4-runtime.sql?raw';
 
 /**
  * Ordered Kernel migrations. Each entry's SQL records its own `schema_migrations`
@@ -18,6 +19,7 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
   { version: 2, sql: evaluationsSql },
   { version: 3, sql: r1WorkerTaskBindingSql },
   { version: 4, sql: r3WorkflowInstanceSql },
+  { version: 5, sql: r4RuntimeSql },
 ];
 
 let _db: BetterSqliteDatabase | null = null;
@@ -43,6 +45,7 @@ export function initKernelDb(dataDir: string): void {
   const Database = loadBetterSqlite3();
   const db = new Database(join(dataDir, 'kernel.db'));
   db.pragma('journal_mode = WAL');
+  db.pragma('busy_timeout = 5000');
   db.pragma('foreign_keys = ON');
   db.pragma('synchronous = NORMAL');
   runMigrations(db);

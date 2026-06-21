@@ -92,3 +92,10 @@ After meaningful changes: update this file if local rules or owned scope changed
 - `artifacts/verify.ts` owns structural artifact verification with injectable fs: linked artifact row, under artifact root, non-empty readable file, optional sha256 match.
 - `tasks/index.ts` rejects submit without `artifactId`/`artifactRefs`, records optional `attemptId` on submit/verify receipts, and runs structural verification before `verification_passed`.
 - `worker_instances.assigned_task_id` is an additive reverse link set on task claim and cleared on verified/legacy completion, failure, or worker stop when the column exists.
+
+## v4 R4 Addendum
+
+- Migration `005-r4-runtime.sql` adds `worker_instances.auth_status` and `last_seen`; code must guard these additive columns for older baseline smokes.
+- Worker statuses are runtime statuses only: `spawning`, `active`, `assigned`, `idle`, `stale`, `stopped`, `error`, `failed`. Do not store task-like `working` or `blocked` on workers.
+- `kernel.task.recover` is the Kernel-owned recovery path for returning non-terminal stale work to `open`; runtime managers must call it rather than editing task rows.
+- `attemptId` is the exactly-once key for artifact/create + submit/verify/complete retry handling. Retries with the same attempt must not post duplicate evidence.
