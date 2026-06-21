@@ -93,12 +93,20 @@ that keeps Kernel-owns-truth intact) and **when** we need it.
 > **⚠️ This tree is the MENU, not the scaffold.** Eve does **not** pre-create these
 > folders. `npx eve init` gives you only `agent.ts` + `instructions.md` +
 > `channels/eve.ts`. **You create a folder only when you author that capability** —
-> e.g. there is no `skills/` until you add `agent/skills/<name>.md`. Empty slots not
-> existing yet is normal and correct.
+> e.g. there is no `skills/` until you add `agent/skills/<name>.md`.
+>
+> **❌ Do NOT pre-create empty capability folders (verified 2026-06-21).** Eve's
+> discovery is strict: an empty `agent/skills/`, `lib/`, `schedules/`, or `sandbox/`
+> — even with a `.gitkeep` placeholder — makes `eve dev` **fail discovery and refuse
+> to boot** ("Expected … to be a supported authored module", "Sandbox folder contains
+> neither a definition nor a workspace/"). A `.gitkeep` is treated as a broken module,
+> not ignored. So: leave a slot **absent** until it has real content. (We tried the
+> skeleton approach and had to revert it.)
 >
 > Our `quantflow-eve/agent/` currently holds: `agent.ts`, `instructions.md`,
 > `channels/eve.ts`, and `tools/write_task_artifact.ts`. That is the expected R1
-> state — everything below marked `[create on demand]` is added later, as needed.
+> state — everything below marked `[create on demand]` is added later, as needed,
+> **with content, not as an empty folder.**
 
 ```text
 quantflow-eve-agents/
