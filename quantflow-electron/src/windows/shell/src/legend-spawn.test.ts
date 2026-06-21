@@ -8,6 +8,7 @@ import {
 	getLegendRoleId,
 	getLegendViewportCenterPlacement,
 	resolveLegendRecipeRole,
+	spawnLegendRecipeViaRolePath,
 } from "./legend-spawn.js";
 
 describe("legend recipe role mapping", () => {
@@ -62,9 +63,53 @@ describe("legend recipe role mapping", () => {
 		];
 		expect(resolveLegendRecipeRole("claude", roles)).toEqual({
 			id: "claude-worker",
-			name: "Claude Worker",
+			name: "Claude Code",
 		});
-		expect(resolveLegendRecipeRole("puffer", roles)).toBeNull();
+		expect(resolveLegendRecipeRole("puffer", roles)).toMatchObject({ id: "puffer" });
+	});
+
+	test("custom recipe uses the shared role-spawn path via fake spawn", async () => {
+		const recipes = [
+			...Object.entries(LEGEND_RECIPE_ROLE_IDS).map(([id, roleId]) => ({
+				id,
+				roleId,
+				group: "spawn",
+				type: "tool",
+				name: id,
+				description: id,
+				runtime: "herdr-wsl",
+				color: "#fff",
+				icon: "shell",
+			})),
+			{
+				id: "odds-scraper",
+				roleId: "odds-scraper",
+				group: "spawn",
+				type: "tool",
+				name: "Odds Scraper",
+				description: "python script",
+				runtime: "herdr-wsl",
+				color: "#6366f1",
+				icon: "python",
+				custom: true,
+			},
+		];
+		const roles = [{ id: "odds-scraper", name: "Odds Scraper", commandTemplate: "python" }];
+		const calls: Array<Record<string, unknown>> = [];
+		await spawnLegendRecipeViaRolePath({
+			recipeId: "odds-scraper",
+			recipes,
+			roles,
+			spawnRole: async (role, meta) => {
+				calls.push({ roleId: role.id, ...meta });
+				return { ok: true };
+			},
+		});
+		expect(calls).toEqual([{
+			roleId: "odds-scraper",
+			recipeId: "odds-scraper",
+			harnessKind: null,
+		}]);
 	});
 });
 

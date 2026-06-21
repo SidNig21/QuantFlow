@@ -92,6 +92,7 @@ import {
 } from "./launch-diagnostics-view.js";
 import { formatRoleStartupEvent } from "./role-startup.js";
 import { createLegendDock, LEGEND_RECIPES } from "./legend-dock.js";
+import { createAddAgentForm } from "./add-agent-form.js";
 import { createWorkflowModal } from "./workflow-modal.js";
 import { spawnRoleTileAt as spawnRoleTileAtShared } from "./role-tile-spawn.js";
 import {
@@ -328,22 +329,70 @@ async function init() {
 	const loadingStatusEl =
 		document.getElementById("loading-status");
 	const tileLayer = document.getElementById("tile-layer");
+	const legendRegistry = {
+		recipes: [...LEGEND_RECIPES],
+		readinessByRecipeId: {},
+	};
+	let legendDock;
+	async function refreshLegendRegistry() {
+		const entries = await window.shellApi.legendList?.() ?? [];
+		if (!Array.isArray(entries) || entries.length === 0) return;
+		legendRegistry.recipes = entries.map((entry) => ({
+			id: entry.id,
+			roleId: entry.roleId,
+			group: entry.group ?? "spawn",
+			type: entry.type,
+			name: entry.name,
+			description: entry.description,
+			runtime: entry.runtime,
+			color: entry.color,
+			icon: entry.icon,
+			disabled: entry.disabled,
+			custom: entry.custom,
+			harnessKind: entry.harnessKind,
+			endpoint: entry.endpoint,
+			modelHint: entry.modelHint,
+		}));
+		legendRegistry.readinessByRecipeId = Object.fromEntries(
+			entries.map((entry) => [entry.id, entry.readinessBadge ?? "red"]),
+		);
+		legendDock?.refresh?.();
+	}
 	const legendSpawnGhost = document.createElement("div");
 	legendSpawnGhost.className = "lv1-spawn-ghost";
 	legendSpawnGhost.hidden = true;
 	panelViewer.appendChild(legendSpawnGhost);
-	const legendDock = createLegendDock({
+	legendDock = createLegendDock({
 		document,
 		container: panelViewer,
 		storage: window.localStorage,
 		getTileCount: () => tiles.length,
+		getRecipes: () => legendRegistry.recipes,
+		getReadinessByRecipeId: () => legendRegistry.readinessByRecipeId,
 		onRecipeActivate: ({ recipeId, spawnMode, event }) => {
 			handleLegendRecipeActivate(recipeId, spawnMode, event);
 		},
 		onRunWorkflow: () => {
 			void runWorkflow();
 		},
+		onAddAgent: () => {
+			addAgentForm.open();
+		},
 	});
+	const addAgentForm = createAddAgentForm({
+		document,
+		onSubmit: async (payload) => {
+			try {
+				await window.shellApi.legendCreate?.(payload);
+				await refreshLegendRegistry();
+				toasts.show({ message: `Added ${payload.name} to the dock`, tone: "success" });
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				toasts.show({ message: `Could not add recipe: ${message}`, tone: "error" });
+			}
+		},
+	});
+	void refreshLegendRegistry();
 	const workflowModal = createWorkflowModal({ document });
 	const panelAgent = document.getElementById("panel-agent");
 	const agentResizeHandle = document.getElementById("agent-resize");
@@ -1585,8 +1634,9 @@ async function init() {
 
 	async function spawnLegendRecipeAt(recipeId, position) {
 		const roles = await window.shellApi.rolesList?.() ?? [];
-		const role = resolveLegendRecipeRole(recipeId, roles);
-		const recipe = LEGEND_RECIPES.find((entry) => entry.id === recipeId);
+		const role = resolveLegendRecipeRole(recipeId, roles, legendRegistry.recipes);
+		const recipe = legendRegistry.recipes.find((entry) => entry.id === recipeId)
+			?? LEGEND_RECIPES.find((entry) => entry.id === recipeId);
 		if (!role) {
 			const message = `Legend recipe role not found: ${recipeId}`;
 			operationalEvents.record({

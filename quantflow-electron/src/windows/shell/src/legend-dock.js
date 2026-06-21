@@ -3,6 +3,7 @@ export const LEGEND_PREF_KEYS = {
 	spawnMode: "legendV1.spawnMode",
 };
 
+/** Built-in seed recipes — registry list is authoritative at runtime via getRecipes(). */
 export const LEGEND_RECIPES = [
 	{
 		id: "shell",
@@ -83,6 +84,8 @@ export const LEGEND_RECIPES = [
 		disabled: true,
 	},
 ];
+
+export { mapHealthLevelToBadge, resolveRecipeCapabilityId, resolveReadinessBadge } from "./legend-readiness.js";
 
 const GROUPS = [
 	{ id: "flow", label: "Flow" },
@@ -173,8 +176,8 @@ export function getCommenceCopy(state) {
 	};
 }
 
-export function getDisabledRecipeIds(state) {
-	const ids = new Set(LEGEND_RECIPES
+export function getDisabledRecipeIds(state, recipes = LEGEND_RECIPES) {
+	const ids = new Set(recipes
 		.filter((recipe) => recipe.disabled)
 		.map((recipe) => recipe.id));
 	if (state.armedTemplate === TEMPLATE_ID && state.running) {
@@ -277,8 +280,8 @@ export function createLegendState(options = {}) {
 			update({ running: true, pendingRecipe: null });
 			return true;
 		},
-		activateRecipe(recipeId) {
-			if (getDisabledRecipeIds(state).has(recipeId)) return false;
+		activateRecipe(recipeId, recipes = LEGEND_RECIPES) {
+			if (getDisabledRecipeIds(state, recipes).has(recipeId)) return false;
 			const pendingRecipe = state.spawnMode === "click" ? recipeId : null;
 			state.pendingRecipe = pendingRecipe;
 			return {
@@ -303,8 +306,8 @@ function escapeHtml(value) {
 		.replaceAll('"', "&quot;");
 }
 
-function recipeButton(recipe, state) {
-	const disabled = getDisabledRecipeIds(state).has(recipe.id);
+function recipeButton(recipe, state, readinessBadge = "red", recipes = LEGEND_RECIPES) {
+	const disabled = getDisabledRecipeIds(state, recipes).has(recipe.id);
 	const recipeState = disabled ? "disabled" : "idle";
 	const runtime = recipe.runtime ?? recipe.description;
 	return `
@@ -315,13 +318,15 @@ function recipeButton(recipe, state) {
 			data-state="${recipeState}"
 			data-role-color="${escapeHtml(recipe.color)}"
 			data-runtime="${escapeHtml(runtime)}"
+			data-readiness="${readinessBadge}"
 			style="--role-color: ${escapeHtml(recipe.color)}"
 			type="button"
 			${disabled ? "disabled" : ""}
-			aria-label="${disabled ? "Disabled" : "Spawn"} ${escapeHtml(recipe.name)}"
+			aria-label="${disabled ? "Disabled" : "Spawn"} ${escapeHtml(recipe.name)} (${readinessBadge} readiness)"
 			title="${escapeHtml(recipe.name)} - ${escapeHtml(runtime)}"
 		>
-			<span class="lv1-recipe__disc">${ICONS[recipe.icon]}</span>
+			<span class="lv1-recipe__disc">${ICONS[recipe.icon] ?? ICONS.shell}</span>
+			<span class="lv1-recipe__badge lv1-recipe__badge--${readinessBadge}" aria-hidden="true"></span>
 			<span class="lv1-recipe__copy">
 				<span class="lv1-recipe__name">${escapeHtml(recipe.name)}</span>
 				<span class="lv1-recipe__desc">${escapeHtml(recipe.description)}</span>
@@ -359,17 +364,23 @@ function flowActivityButton() {
 	`;
 }
 
-function renderDockHtml(state) {
+export function renderDockHtml(state, recipes = LEGEND_RECIPES, readinessByRecipeId = {}) {
 	const commence = getCommenceCopy(state);
 	const toggles = getToggleContent(state);
 	const armed = state.armedTemplate === TEMPLATE_ID;
+	const spawnRecipes = recipes.filter((recipe) => recipe.group === "spawn");
 	const groups = GROUPS.map((group) => `
 		<section class="lv1-group" data-group="${group.id}">
 			<div class="lv1-group__label">${group.label}</div>
 			${group.id === "flow"
 				? flowActivityButton()
-				: LEGEND_RECIPES.filter((recipe) => recipe.group === group.id)
-					.map((recipe) => recipeButton(recipe, state)).join("")}
+				: spawnRecipes
+					.map((recipe) => recipeButton(
+						recipe,
+						state,
+						readinessByRecipeId[recipe.id] ?? "red",
+						recipes,
+					)).join("")}
 		</section>
 	`).join("");
 
@@ -377,6 +388,7 @@ function renderDockHtml(state) {
 		<header class="lv1-dock__header">
 			<span class="lv1-dock__title">QF Dock</span>
 			<span class="lv1-dock__eyebrow">spawn rail</span>
+			<button class="lv1-dock__add" type="button" data-action="add-agent" title="Add agent or tool">+ Add</button>
 			${ICONS.legend}
 		</header>
 		<div class="lv1-mode-toggle" role="group" aria-label="Dock mode">
@@ -459,11 +471,14 @@ function applyRootAttributes(root, state) {
 }
 
 function bindDockEvents(root, stateStore, options = {}) {
+	const getRecipes = options.getRecipes ?? (() => LEGEND_RECIPES);
+
 	for (const button of root.querySelectorAll(".lv1-recipe")) {
 		button.addEventListener("click", (event) => {
 			const recipeId = button.getAttribute("data-recipe");
 			if (!recipeId) return;
-			const result = stateStore.activateRecipe(recipeId);
+			const recipes = getRecipes();
+			const result = stateStore.activateRecipe(recipeId, recipes);
 			if (!result) return;
 			button.dataset.state = "active";
 			window.setTimeout?.(() => {
@@ -473,13 +488,17 @@ function bindDockEvents(root, stateStore, options = {}) {
 			}, 600);
 			options.onRecipeActivate?.({
 				recipeId,
-				recipe: LEGEND_RECIPES.find((recipe) => recipe.id === recipeId) ?? null,
+				recipe: recipes.find((recipe) => recipe.id === recipeId) ?? null,
 				state: stateStore.getSnapshot(),
 				spawnMode: result.spawnMode,
 				event,
 			});
 		});
 	}
+
+	root.querySelector('[data-action="add-agent"]')?.addEventListener("click", () => {
+		options.onAddAgent?.();
+	});
 
 	root.querySelector(".lv1-template")?.addEventListener("click", () => {
 		stateStore.toggleTemplate(TEMPLATE_ID);
@@ -511,8 +530,11 @@ export function createLegendDock(options) {
 		container,
 		storage = globalThis.localStorage,
 		getTileCount = () => 0,
+		getRecipes = () => LEGEND_RECIPES,
+		getReadinessByRecipeId = () => ({}),
 		onRecipeActivate = null,
 		onRunWorkflow = null,
+		onAddAgent = null,
 	} = options;
 	if (!document || !container) {
 		throw new Error("createLegendDock requires document and container");
@@ -540,9 +562,9 @@ export function createLegendDock(options) {
 
 	function render(snapshot = stateStore.getSnapshot()) {
 		applyRootAttributes(root, snapshot);
-		root.innerHTML = renderDockHtml(snapshot);
+		root.innerHTML = renderDockHtml(snapshot, getRecipes(), getReadinessByRecipeId());
 		chip.textContent = getSpawnModeChipText(snapshot.spawnMode);
-		bindDockEvents(root, stateStore, { onRecipeActivate, onRunWorkflow });
+		bindDockEvents(root, stateStore, { onRecipeActivate, onRunWorkflow, onAddAgent, getRecipes });
 		updateEmptyHint();
 	}
 
@@ -557,5 +579,8 @@ export function createLegendDock(options) {
 		state: stateStore,
 		render,
 		updateEmptyHint,
+		refresh() {
+			render(stateStore.getSnapshot());
+		},
 	};
 }

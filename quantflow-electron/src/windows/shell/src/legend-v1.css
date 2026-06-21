@@ -730,3 +730,121 @@
 		box-shadow: 0 0 0 1px var(--flow), 0 0 34px var(--accent-glow), 0 8px 22px rgba(0, 0, 0, 0.5);
 	}
 }
+
+.lv1-dock__add {
+	margin-left: auto;
+	margin-right: 8px;
+	padding: 4px 10px;
+	border: 1px solid color-mix(in srgb, var(--flow) 45%, transparent);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--flow) 10%, transparent);
+	color: var(--foreground);
+	font-family: var(--font-ui);
+	font-size: 11px;
+	cursor: pointer;
+}
+
+.lv1-recipe__badge {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	width: 8px;
+	height: 8px;
+	border-radius: 999px;
+	border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.lv1-recipe__badge--green { background: #22c55e; }
+.lv1-recipe__badge--amber { background: #f59e0b; }
+.lv1-recipe__badge--red { background: #ef4444; }
+
+.lv1-recipe {
+	position: relative;
+}
+
+.lv1-add-form-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 2000;
+	display: grid;
+	place-items: center;
+	background: rgba(0, 0, 0, 0.55);
+}
+
+.lv1-add-form-overlay[hidden] {
+	display: none;
+}
+
+.lv1-add-form {
+	width: min(420px, calc(100vw - 32px));
+	padding: 18px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: var(--card);
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+.lv1-add-form__title {
+	margin: 0;
+	font-size: 16px;
+}
+
+.lv1-add-form__hint {
+	margin: 6px 0 0;
+	color: var(--faint);
+	font-size: 12px;
+}
+
+.lv1-add-form__body {
+	display: grid;
+	gap: 10px;
+	margin-top: 14px;
+}
+
+.lv1-add-form__field {
+	display: grid;
+	gap: 4px;
+}
+
+.lv1-add-form__label {
+	color: var(--muted-foreground);
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.lv1-add-form__input {
+	width: 100%;
+	padding: 8px 10px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--background);
+	color: var(--foreground);
+	font: inherit;
+}
+
+.lv1-add-form__textarea {
+	min-height: 56px;
+	resize: vertical;
+}
+
+.lv1-add-form__footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+.lv1-add-form__btn {
+	padding: 8px 12px;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	background: transparent;
+	color: var(--foreground);
+	cursor: pointer;
+}
+
+.lv1-add-form__btn--primary {
+	border-color: color-mix(in srgb, var(--flow) 55%, transparent);
+	background: color-mix(in srgb, var(--flow) 18%, transparent);
+}

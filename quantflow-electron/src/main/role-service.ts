@@ -29,6 +29,12 @@ export interface Role {
   envoyProfile?: string;
   /** When true, legend commandTemplate runs through envoy-run.sh (one-shot workers). */
   envoyWrapCommand?: boolean;
+  /** R8 legend registry — config only, not Kernel truth. */
+  showInLegend?: boolean;
+  legendType?: string;
+  harnessKind?: "eve-harness" | "local-shell" | "herdr-shell";
+  endpoint?: string;
+  modelHint?: string;
 }
 
 export function requiresHerdrSpawn(

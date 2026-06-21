@@ -47,7 +47,7 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 	const displayName = String(options.displayName ?? "").trim()
 		|| resolveRoleDisplayName(tiles, role);
 
-	if (isMissingRoleCommand?.(role)) {
+	if (isMissingRoleCommand?.(role) && !isEveHarness) {
 		const message = `${displayName} is missing command: ${getRoleCommandName?.(role)}`;
 		onRoleSpawnFailed?.(createRoleSpawnFailureEvent(role, message));
 		toasts?.show?.({ message, tone: "error" });
@@ -57,7 +57,8 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 	const cwd = options.cwd ?? getTerminalCwd();
 	const size = options.size ?? getTerminalSize();
 	const tileId = options.id || generateId();
-	const shouldUseHerdr = requiresHerdrSpawn(role);
+	const isEveHarness = role.harnessKind === "eve-harness";
+	const shouldUseHerdr = !isEveHarness && requiresHerdrSpawn(role);
 
 	if (shouldUseHerdr && !shellApi?.herdrSpawnRole) {
 		const message = "Herdr spawn API is unavailable";
@@ -102,7 +103,8 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 				tileId: tile.id,
 				workflowId: options.workflowId ?? null,
 				roleName: role.name,
-				runtimeTarget: shouldUseHerdr ? "herdr-wsl" : "local-shell",
+				runtimeTarget: isEveHarness ? "local-shell" : (shouldUseHerdr ? "herdr-wsl" : "local-shell"),
+				harnessKind: role.harnessKind ?? (shouldUseHerdr ? "herdr-shell" : "local-shell"),
 			});
 		} catch (err) {
 			spawnResult = { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -122,6 +124,19 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 
 	onRoleSpawned?.(createRoleSpawnedEvent(tile, role));
 	tileManager.saveCanvasImmediate();
+
+	if (isEveHarness) {
+		tile.terminalPending = false;
+		tile.ptyStatus = "idle";
+		updateRoleTileChrome?.(tile);
+		if (kapi) {
+			await kapi.sendCommand("kernel.worker.status_update", {
+				tileId: tile.id,
+				status: "active",
+			});
+		}
+		return tile;
+	}
 
 	if (shouldUseHerdr) {
 		try {

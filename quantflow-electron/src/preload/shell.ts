@@ -455,6 +455,9 @@ contextBridge.exposeInMainWorld("shellApi", {
   // ── Role service ──
   rolesList: () => ipcRenderer.invoke("roles:list"),
   rolesGet: (id: string) => ipcRenderer.invoke("roles:get", id),
+  legendList: () => ipcRenderer.invoke("legend:list"),
+  legendCreate: (payload: Record<string, unknown>) => ipcRenderer.invoke("legend:create", payload),
+  legendRemove: (id: string) => ipcRenderer.invoke("legend:remove", id),
 
   // ── Obsidian vault ──
   vaultGetPath: (): Promise<string | null> =>

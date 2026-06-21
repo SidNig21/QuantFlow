@@ -7,8 +7,11 @@ import {
 	getLegendRootAttributes,
 	getSpawnModeChipText,
 	getToggleContent,
+	mapHealthLevelToBadge,
 	normalizeLegendDensity,
 	normalizeLegendSpawnMode,
+	renderDockHtml,
+	resolveReadinessBadge,
 } from "./legend-dock.js";
 
 function createStorage(seed: Record<string, string> = {}) {
@@ -189,5 +192,39 @@ describe("LegendState", () => {
 		const state = createLegendState({ storage: createStorage() });
 		expect(state.activateRecipe("memory")).toBe(false);
 		expect(state.getSnapshot().pendingRecipe).toBeNull();
+	});
+});
+
+describe("Legend registry rendering", () => {
+	test("renders injected custom recipes without rebuild", () => {
+		const recipes = [
+			...LEGEND_RECIPES,
+			{
+				id: "odds-scraper",
+				roleId: "odds-scraper",
+				group: "spawn",
+				type: "tool",
+				name: "Odds Scraper",
+				description: "python script",
+				runtime: "herdr-wsl",
+				color: "#6366f1",
+				icon: "python",
+				custom: true,
+			},
+		];
+		const html = renderDockHtml(createLegendState({ storage: createStorage() }).getSnapshot(), recipes, {
+			"odds-scraper": "amber",
+		});
+		expect(html).toContain("Odds Scraper");
+		expect(html).toContain('data-readiness="amber"');
+		expect(html).toContain('data-recipe="odds-scraper"');
+	});
+
+	test("maps readiness levels to badge colors deterministically", () => {
+		const recipe = { roleId: "codex", harnessKind: undefined };
+		expect(mapHealthLevelToBadge("healthy")).toBe("green");
+		expect(mapHealthLevelToBadge("degraded")).toBe("amber");
+		expect(mapHealthLevelToBadge("down")).toBe("red");
+		expect(resolveReadinessBadge(recipe, { "role:codex": "healthy" })).toBe("green");
 	});
 });

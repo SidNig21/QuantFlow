@@ -19,6 +19,7 @@ import { registerCanvasHandlers } from "./ipc-canvas";
 import { registerMiscHandlers } from "./ipc-misc";
 import { registerTileRegistryHandlers } from "./ipc-tile-registry";
 import { registerRoleServiceHandlers } from "./ipc-role-service";
+import { registerLegendRecipeHandlers } from "./ipc-legend-recipes";
 import { registerVaultHandlers } from "./ipc-vault";
 import { registerContextServiceHandlers } from "./ipc-context-service";
 import { registerRuntimeDiagnosticsHandlers } from "./ipc-runtime-diagnostics";
@@ -156,6 +157,7 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerMiscHandlers(miscCtx);
   registerTileRegistryHandlers();
   registerRoleServiceHandlers();
+  registerLegendRecipeHandlers();
   registerVaultHandlers(() => mainWindow);
   registerContextServiceHandlers();
   registerRuntimeDiagnosticsHandlers();

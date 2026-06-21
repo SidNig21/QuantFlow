@@ -1,22 +1,51 @@
 import { defaultSize } from "./canvas-state.js";
 import { LEGEND_RECIPES } from "./legend-dock.js";
 
-export const LEGEND_RECIPE_ROLE_IDS = {
-	...Object.fromEntries(LEGEND_RECIPES.map((recipe) => [recipe.id, recipe.roleId])),
-};
+export function buildLegendRoleIdMap(recipes = LEGEND_RECIPES) {
+	return Object.fromEntries(recipes.map((recipe) => [recipe.id, recipe.roleId]));
+}
+
+export const LEGEND_RECIPE_ROLE_IDS = buildLegendRoleIdMap(LEGEND_RECIPES);
 
 /** Match default terminal tile size so legend spawns look like canvas double-click tiles. */
 export const LEGEND_TILE_SIZE = Object.freeze(defaultSize("term"));
 export const LEGEND_GHOST_SIZE = Object.freeze({ width: 120, height: 72 });
 
-export function getLegendRoleId(recipeId) {
-	return LEGEND_RECIPE_ROLE_IDS[recipeId] ?? null;
+export function getLegendRoleId(recipeId, recipes = LEGEND_RECIPES) {
+	const map = buildLegendRoleIdMap(recipes);
+	return map[recipeId] ?? null;
 }
 
-export function resolveLegendRecipeRole(recipeId, roles) {
-	const roleId = getLegendRoleId(recipeId);
-	if (!roleId || !Array.isArray(roles)) return null;
-	return roles.find((role) => role?.id === roleId) ?? null;
+export function resolveLegendRecipe(recipeId, recipes = LEGEND_RECIPES) {
+	return recipes.find((recipe) => recipe.id === recipeId) ?? null;
+}
+
+function synthesizeRoleFromRecipe(recipe) {
+	if (!recipe) return null;
+	return {
+		id: recipe.roleId,
+		name: recipe.name,
+		description: recipe.description,
+		color: recipe.color,
+		harnessKind: recipe.harnessKind,
+		endpoint: recipe.endpoint,
+	};
+}
+
+export function resolveLegendRecipeRole(recipeId, roles, recipes = LEGEND_RECIPES) {
+	const recipe = resolveLegendRecipe(recipeId, recipes);
+	const roleId = recipe?.roleId ?? getLegendRoleId(recipeId, recipes);
+	if (!roleId) return null;
+	const role = Array.isArray(roles)
+		? roles.find((entry) => entry?.id === roleId) ?? synthesizeRoleFromRecipe(recipe)
+		: synthesizeRoleFromRecipe(recipe);
+	if (!role || !recipe) return role;
+	return {
+		...role,
+		name: recipe.name ?? role.name,
+		harnessKind: recipe.harnessKind ?? role.harnessKind,
+		endpoint: recipe.endpoint ?? role.endpoint,
+	};
 }
 
 export function clampLegendCanvasPosition(point, options = {}) {
@@ -74,4 +103,25 @@ export function getLegendClickPlacement(options) {
 		x: (Number(options.clientX ?? 0) - rectLeft - panX) / zoom - width / 2,
 		y: (Number(options.clientY ?? 0) - rectTop - panY) / zoom - height / 2,
 	}, options);
+}
+
+/**
+ * Shared legend spawn path — resolves recipe → roleId → caller spawn hook.
+ * Used by tests to assert no special-case spawn routing.
+ */
+export async function spawnLegendRecipeViaRolePath({
+	recipeId,
+	recipes,
+	roles,
+	spawnRole,
+}) {
+	const recipe = resolveLegendRecipe(recipeId, recipes);
+	const role = resolveLegendRecipeRole(recipeId, roles, recipes);
+	if (!recipe || !role) {
+		throw new Error(`legend recipe role not found: ${recipeId}`);
+	}
+	return spawnRole(role, {
+		recipeId: recipe.id,
+		harnessKind: recipe.harnessKind ?? role.harnessKind ?? null,
+	});
 }
