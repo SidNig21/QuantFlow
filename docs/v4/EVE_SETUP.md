@@ -112,7 +112,8 @@ key.** Put the key in a local `.env` (e.g. `OPENROUTER_API_KEY=...`).
 ```bash
 npm run dev
 ```
-Then, in a second terminal, send it a message:
+Then, in a second terminal, send it a message (**substitute your actual port** —
+the TUI prints it on start; this operator's instance runs on `:2000`):
 ```bash
 curl -X POST http://127.0.0.1:3000/eve/v1/session \
   -H 'content-type: application/json' \
@@ -140,4 +141,5 @@ scrub it first.
 - *Missing credential at `npm run dev`* → use the TUI `/model` command, or add the
   key to `.env`.
 - *`curl` hangs / connection refused* → make sure `npm run dev` is still running in
-  the other terminal and is on port 3000.
+  the other terminal, and that you're hitting **its actual port** (the TUI prints it;
+  `:3000` is the scaffold default, but this operator's instance runs on `:2000`).

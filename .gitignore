@@ -13,4 +13,5 @@ docs/*
 notes/
 Screenshots/
 .worktrees
+quantflow-electron/logs/
 opencode.json
