@@ -6,9 +6,12 @@ import {
   Keyboard,
   Palette,
   Play,
+  Plus,
   PuzzlePiece,
   Pulse,
+  Robot,
   Sun,
+  Trash,
   Moon,
   Monitor,
   Terminal,
@@ -69,7 +72,24 @@ interface SettingsApi {
   getAgents: () => Promise<AgentStatus[]>;
   installSkill: (agentId: string) => Promise<{ ok: boolean }>;
   uninstallSkill: (agentId: string) => Promise<{ ok: boolean }>;
+  legendList: () => Promise<LegendRecipeEntry[]>;
+  legendCreate: (payload: Record<string, unknown>) => Promise<unknown>;
+  legendRemove: (id: string) => Promise<unknown>;
   close: () => void;
+}
+
+interface LegendRecipeEntry {
+  id: string;
+  name: string;
+  description: string;
+  runtime: string;
+  type: string;
+  custom?: boolean;
+  cwd?: string;
+  commandTemplate?: string;
+  runtimeTarget?: string;
+  modelHint?: string;
+  readinessBadge: "green" | "amber" | "red";
 }
 
 const api = (window as unknown as { api: SettingsApi }).api;
@@ -767,6 +787,235 @@ function IntegrationsPane() {
   );
 }
 
+const BADGE_COLOR: Record<string, string> = {
+  green: "#22c55e",
+  amber: "#f59e0b",
+  red: "#ef4444",
+};
+
+function ReadinessDot({ badge }: { badge: "green" | "amber" | "red" }) {
+  return (
+    <span
+      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+      style={{ backgroundColor: BADGE_COLOR[badge] ?? "#71717a" }}
+      title={badge}
+    />
+  );
+}
+
+const SHELL_OPTIONS = ["auto", "powershell", "wsl", "shell"] as const;
+
+// Mirror of the dock "+ Add" Eve defaults — a persona is a Mode-1 role (terminal
+// summon), never a harnessKind:eve-harness row. See docs/v4/SPAWN_MODEL.md.
+function AddAgentInline({
+  busy,
+  onCreate,
+  onCancel,
+}: {
+  busy: boolean;
+  onCreate: (payload: Record<string, unknown>) => void;
+  onCancel: () => void;
+}) {
+  const [kind, setKind] = useState<"cli" | "eve">("eve");
+  const isEve = kind === "eve";
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const cwd = String(data.get("cwd") ?? "").trim();
+    if (isEve && !cwd) return;
+    const payload: Record<string, unknown> = {
+      id: String(data.get("id") ?? "").trim(),
+      name: String(data.get("name") ?? "").trim(),
+      description: String(data.get("description") ?? "").trim() || undefined,
+      icon: "hermes",
+      color: String(data.get("color") ?? "#6366f1"),
+      cwd: cwd || undefined,
+      commandTemplate: String(data.get("commandTemplate") ?? "").trim()
+        || (isEve ? "npm run dev" : undefined),
+      runtimeTarget: String(data.get("runtimeTarget") ?? (isEve ? "windows-pty" : "herdr-wsl")),
+      defaultShell: String(data.get("defaultShell") ?? (isEve ? "powershell" : "auto")),
+      type: isEve ? "agent" : "tool",
+      modelHint: String(data.get("modelHint") ?? "").trim() || undefined,
+    };
+    onCreate(payload);
+  }
+
+  const inputCls = "h-8 rounded-md border border-border/70 bg-transparent px-2 text-sm";
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-2 rounded-md p-3"
+      style={{ border: "1px solid color-mix(in srgb, var(--foreground) 14%, transparent)" }}
+    >
+      <div className="flex items-center gap-2">
+        {(["eve", "cli"] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setKind(k)}
+            className="rounded-md px-2.5 py-1 text-xs font-medium"
+            style={{
+              backgroundColor: kind === k ? "var(--accent)" : "color-mix(in srgb, var(--foreground) 8%, transparent)",
+              color: kind === k ? "var(--foreground)" : "var(--muted-foreground)",
+            }}
+          >
+            {k === "eve" ? "Eve agent" : "CLI role"}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <input className={inputCls} name="id" required pattern="[a-z][a-z0-9-]*" placeholder="id (my-eve)" />
+        <input className={inputCls} name="name" required placeholder="Name" />
+      </div>
+      <input className={`${inputCls} w-full`} name="description" placeholder="Description" />
+      <input
+        className={`${inputCls} w-full`}
+        name="cwd"
+        placeholder={isEve ? "Folder (C:\\Users\\you\\quantflow-eve)" : "Folder (optional)"}
+        required={isEve}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <input className={inputCls} name="commandTemplate" placeholder={isEve ? "npm run dev" : "python"} />
+        <select className={inputCls} name="runtimeTarget" defaultValue={isEve ? "windows-pty" : "herdr-wsl"}>
+          <option value="herdr-wsl">herdr-wsl</option>
+          <option value="windows-pty">windows-pty</option>
+        </select>
+        <select className={inputCls} name="defaultShell" defaultValue={isEve ? "powershell" : "auto"}>
+          {SHELL_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <input className={inputCls} name="modelHint" placeholder="model label (optional)" />
+      </div>
+      <input type="hidden" name="color" value="#6366f1" />
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <button type="button" onClick={onCancel} className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground">
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-50"
+        >
+          Add agent
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function AgentsPane() {
+  const [agents, setAgents] = useState<LegendRecipeEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setAgents(await api.legendList());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function handleRemove(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.legendRemove(id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCreate(payload: Record<string, unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.legendCreate(payload);
+      setAdding(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">Agents</h2>
+          <p className="text-sm text-muted-foreground">
+            The legend roster. A legend click summons each as a terminal tile (Mode 1).
+            "Eve agent" = a folder running <code>npm run dev</code>.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAdding((v) => !v)}
+          className="flex h-8 items-center gap-2 rounded-md bg-foreground px-3 text-xs font-medium text-background"
+        >
+          <Plus className="h-4 w-4" />
+          Add agent
+        </button>
+      </div>
+
+      {error && (
+        <p className="text-xs" style={{ color: "#ef4444" }}>{error}</p>
+      )}
+
+      {adding && (
+        <AddAgentInline busy={busy} onCreate={(p) => { void handleCreate(p); }} onCancel={() => setAdding(false)} />
+      )}
+
+      <div className="space-y-1.5">
+        {agents.map((agent) => (
+          <div
+            key={agent.id}
+            className="flex items-center justify-between rounded-md px-3 py-2.5"
+            style={{ border: "1px solid color-mix(in srgb, var(--foreground) 15%, transparent)" }}
+          >
+            <div className="flex min-w-0 items-center gap-2.5">
+              <ReadinessDot badge={agent.readinessBadge} />
+              <div className="min-w-0 space-y-0.5">
+                <p className="truncate text-sm font-medium">{agent.name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {agent.runtime}{agent.modelHint ? ` · ${agent.modelHint}` : ""}
+                  {agent.custom ? "" : " · built-in"}
+                </p>
+              </div>
+            </div>
+            {agent.custom ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => { void handleRemove(agent.id); }}
+                aria-label={`Remove ${agent.name}`}
+                title={`Remove ${agent.name}`}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                <Trash className="h-4 w-4" />
+              </button>
+            ) : (
+              <span className="text-[11px] text-muted-foreground">locked</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function levelLabel(level: HealthLevel): string {
   if (level === "healthy") return "Healthy";
   if (level === "degraded") return "Degraded";
@@ -1375,7 +1624,7 @@ function LaunchTracesPane() {
   );
 }
 
-type Pane = "appearance" | "health" | "capability" | "logs" | "crashes" | "launches" | "terminal" | "integrations" | "controls";
+type Pane = "appearance" | "agents" | "health" | "capability" | "logs" | "crashes" | "launches" | "terminal" | "integrations" | "controls";
 
 const NAV_ITEMS: {
   id: Pane;
@@ -1383,6 +1632,7 @@ const NAV_ITEMS: {
   icon: typeof Palette;
 }[] = [
     { id: "appearance", label: "Appearance", icon: Palette },
+    { id: "agents", label: "Agents", icon: Robot },
     { id: "health", label: "Health", icon: Pulse },
     { id: "capability", label: "Capability", icon: CheckCircle },
     { id: "logs", label: "Logs", icon: Terminal },
@@ -1513,6 +1763,7 @@ export default function App() {
       {/* Content */}
       <div className="settings-content flex-1 overflow-auto">
         {activePane === "appearance" && <AppearancePane />}
+        {activePane === "agents" && <AgentsPane />}
         {activePane === "health" && <HealthPane />}
         {activePane === "capability" && <CapabilityPane />}
         {activePane === "logs" && <LogsPane />}

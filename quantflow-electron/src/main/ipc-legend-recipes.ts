@@ -27,8 +27,13 @@ function parseCreateInput(raw: unknown): LegendRecipeCreateInput {
     icon,
     type: typeof input.type === "string" ? input.type as LegendRecipeCreateInput["type"] : undefined,
     commandTemplate: typeof input.commandTemplate === "string" ? input.commandTemplate : undefined,
+    cwd: typeof input.cwd === "string" && input.cwd.trim() ? input.cwd.trim() : undefined,
     runtimeTarget: input.runtimeTarget === "windows-pty" || input.runtimeTarget === "herdr-wsl"
       ? input.runtimeTarget
+      : undefined,
+    defaultShell: input.defaultShell === "powershell" || input.defaultShell === "wsl"
+      || input.defaultShell === "shell" || input.defaultShell === "auto"
+      ? input.defaultShell
       : undefined,
     startupPrompt: typeof input.startupPrompt === "string" ? input.startupPrompt : undefined,
     harnessKind: input.harnessKind === "eve-harness" ? "eve-harness" : undefined,

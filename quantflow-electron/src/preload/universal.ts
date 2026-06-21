@@ -392,6 +392,12 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("integrations:install-skill", agentId),
   uninstallSkill: (agentId: string) =>
     ipcRenderer.invoke("integrations:uninstall-skill", agentId),
+
+  // Agent inventory (R8.5) — the same legend recipe registry the dock reads.
+  legendList: () => ipcRenderer.invoke("legend:list"),
+  legendCreate: (payload: Record<string, unknown>) =>
+    ipcRenderer.invoke("legend:create", payload),
+  legendRemove: (id: string) => ipcRenderer.invoke("legend:remove", id),
   hasOfferedPlugin: () =>
     ipcRenderer.invoke("integrations:has-offered-plugin"),
   markPluginOffered: () =>

@@ -77,6 +77,33 @@ describe("legend-recipes registry", () => {
     expect((await listLegendRecipes()).some((entry) => entry.id === "quantflow-eve")).toBe(false);
   });
 
+  test("createLegendRecipe (Eve authoring path) persists cwd + defaultShell, no harnessKind", async () => {
+    // R8.5: "Add Eve agent" writes a Mode-1 role — folder + npm run dev + windows-pty
+    // + powershell — NOT a harnessKind:eve-harness row.
+    const created = await createLegendRecipe({
+      id: "my-eve",
+      name: "My Eve",
+      description: "Eve · OpenCode",
+      color: "#6366f1",
+      icon: "hermes",
+      type: "agent",
+      commandTemplate: "npm run dev",
+      cwd: "C:/Users/me/my-eve",
+      runtimeTarget: "windows-pty",
+      defaultShell: "powershell",
+      modelHint: "deepseek-v4-pro",
+    });
+    expect(created.cwd).toBe("C:/Users/me/my-eve");
+    expect(created.runtimeTarget).toBe("windows-pty");
+    expect(created.harnessKind).toBeUndefined();
+    // Round-trips through disk read.
+    const listed = (await listLegendRecipes()).find((r) => r.id === "my-eve");
+    expect(listed?.cwd).toBe("C:/Users/me/my-eve");
+    expect(listed?.commandTemplate).toBe("npm run dev");
+    expect(listed?.harnessKind).toBeUndefined();
+    await removeLegendRecipe("my-eve");
+  });
+
   test("an operator-authored role.json round-trips cwd + commandTemplate to the recipe", async () => {
     // The Mode-1 path: the operator drops a roles/*.json with an absolute cwd (the
     // Eve package folder). The registry must thread cwd + commandTemplate + runtimeTarget

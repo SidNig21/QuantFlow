@@ -54,7 +54,9 @@ export interface LegendRecipeCreateInput {
   icon: string;
   type?: LegendRecipeKind;
   commandTemplate?: string;
+  cwd?: string;
   runtimeTarget?: RoleRuntimeTarget;
+  defaultShell?: "auto" | "powershell" | "wsl" | "shell";
   startupPrompt?: string;
   harnessKind?: LegendRecipe["harnessKind"];
   endpoint?: string;
@@ -297,10 +299,11 @@ export async function createLegendRecipe(input: LegendRecipeCreateInput): Promis
     color: input.color,
     icon: input.icon,
     commandTemplate: input.commandTemplate,
+    cwd: input.cwd,
     runtimeTarget: input.runtimeTarget ?? "herdr-wsl",
     startupPrompt: input.startupPrompt,
     cwdPolicy: "workspace",
-    defaultShell: "auto",
+    defaultShell: input.defaultShell ?? "auto",
     legendType: input.type ?? "tool",
     showInLegend: true,
     harnessKind: input.harnessKind,
@@ -337,8 +340,10 @@ export async function updateLegendRecipe(
     color: patch.color ?? existing.color,
     icon: patch.icon ?? existing.icon,
     type: patch.type ?? existing.type,
-    commandTemplate: patch.commandTemplate,
-    runtimeTarget: patch.runtimeTarget,
+    commandTemplate: patch.commandTemplate ?? existing.commandTemplate,
+    cwd: patch.cwd ?? existing.cwd,
+    runtimeTarget: patch.runtimeTarget ?? existing.runtimeTarget,
+    defaultShell: patch.defaultShell,
     startupPrompt: patch.startupPrompt,
     harnessKind: patch.harnessKind ?? existing.harnessKind,
     endpoint: patch.endpoint ?? existing.endpoint,
