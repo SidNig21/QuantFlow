@@ -4,9 +4,7 @@
 
 QuantFlow is an infinite-canvas desktop workspace for orchestrating real multi-agent work. Spawn Hermes, Codex, Claude, and other workers as live terminal tiles; connect them with cables; run task graphs with verification gates and receipts. The **Kernel** owns truth — the canvas only projects it.
 
-![Hermes and Codex on the canvas, connected by a cable](assets/readme/canvas-agents.png)
-
-![Legend dock, workflow tiles, and Run Workflow](assets/readme/canvas-workflow.png)
+![QuantFlow canvas — Legend dock and agent spawn rail](assets/readme/canvas-hero.png)
 
 ## What it does today
 
