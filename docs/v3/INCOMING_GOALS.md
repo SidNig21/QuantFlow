@@ -51,6 +51,26 @@ wishlist. Use this shape:
 - **Status:** captured — **do NOT install SpatialClaw as a dependency**; pattern-only. Aligns with Goal 7's parked Smart Grid / layout-verification ideas.
 - **Hard rails (carry into any promotion):** screenshots are never source of truth; visual reasoning never mutates canvas/Kernel state; high-risk proposals still go through Conductor approval; no GPU/3D/segmentation stack for v3.
 
+### Context Densification Layer (Headroom-inspired, native — parked)
+- **Problem / friction:** receipts, task lists, State Cards, logs, search hits, and Conductor loop history produce volume over time; the next worker/handoff/Conductor pass drowns in repeated JSON and metadata even though Kernel truth is correct.
+- **Evidence:** not yet measured in dogfooding — captured from Headroom/context discussion (2026-06-17). **Confirm noisy handoffs before promoting.** Full spec: vault `Projects/QuantFlow/Context Densification — Goal C1 (parked).md`.
+- **Proposed scope (phased):**
+  - **Measure** noisiest shapes from real goal sessions.
+  - **Native densifiers** (pure functions): `densifyReceipts`, `densifyTasks`, `densifyStateCards`, `densifyCanvasSnapshot`, `densifySearchResults`, `densifyBuildLog` — Kernel keeps full originals; agents see dense projection with provenance ids.
+  - **Context envelope** on worker spawn, Conductor read, MCP context bundles; optional retrospective → INCOMING_GOALS loop.
+- **Layer(s):** conductor, kernel/queries (source), harness spawn injection, mcp adapter, vault formatting — **not** new truth store
+- **Priority:** medium-high when connective tissue is the focus — **parked until dogfooding evidence**
+- **Status:** captured — **do NOT install Headroom as runtime dependency**; inspiration/eval only. Do not replace State Cards or hide active context behind retrieval markers.
+- **Hard rails:** derived read-path only; append-only receipts unchanged; redact secrets in dense views; no silent AGENTS.md mutation.
+
+### R3 product proof dogfooding (2026-06-21)
+
+#### Legend-spawn workers lack Run Workflow context inject (MEDIUM)
+- **Problem:** Hermes from Legend + manual DAG seed worked (MCP, canvas skill, claim/write). Codex spawned from Legend did **not** receive canvas skill / MCP activation — only Run Workflow → Hermes inject path wires that today (`injectWorkflowContext` / `buildCodexWorkerCommand`).
+- **Evidence:** R3 product proof `wf-r3-proof`; Hermes sessions 2026-06-21; operator had Hermes cover `extract` because Codex tile was a plain shell.
+- **Proposed scope:** on Legend spawn for worker roles (Codex, etc.), inject canvas skill + QuantFlow MCP config (or shared `contextInjectToTile` with skill pin) — same contract as Run Workflow workers.
+- **Layer(s):** main/workflow-service, legend-spawn, context-service — **Priority:** medium — **Status:** captured
+
 ### Dogfooding findings — first live session (2026-06-16)
 
 Validated live with the running app + QuantFlow MCP. **Positive:** MCP `role_spawn`

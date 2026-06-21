@@ -112,6 +112,11 @@ async function r3FinishTask(taskId, relativePath = `${taskId}.md`) {
   const workerId = task.ownerWorkerId;
   if (!workerId) throw new Error("claim the task first (ownerWorkerId missing)");
 
+  if (task.status === "claimed") {
+    const start = await k.sendCommand("kernel.task.start", { taskId });
+    if (!start?.ok) throw new Error(start?.error ?? "start failed");
+  }
+
   const art = await k.sendCommand("kernel.artifact.create", {
     workflowId: WF,
     taskId,
@@ -187,16 +192,14 @@ Before step 1b, in Hermes try claiming **analyze** — Kernel must reject (`unve
 
 ```javascript
 const WF = "wf-r3-proof";
-const run = await window.kernelApi.sendQuery("kernel.run", { workflowId: WF });
-console.log("Run projection:", run);
-// Expect: 4 task ids, artifact ids, receipt ids; runId === workflowId === WF
-
-const ctx = await window.kernelApi.sendQuery("kernel.conductor.context", {});
-console.log("Tasks:", ctx.tasks.map(t => ({ id: t.id, status: t.status })));
-// All four → complete
+const tasks = await window.kernelApi.sendQuery("kernel.task.list", { workflowId: WF });
+console.log("Tasks:", tasks.map(t => ({ id: t.id, status: t.status })));
+// All four → complete: collect, analyze, extract, synthesize
 ```
 
-**Capture:** screenshot of canvas (Hermes + Codex tiles), DevTools `Run projection` JSON, final task statuses.
+(`kernel.run` Run projection is MCP-only today — use `quantflow_kernel_run` over MCP if needed.)
+
+**Capture:** screenshot of canvas (Hermes + Codex tiles), DevTools task list JSON, final task statuses.
 
 ## 7. Authority smoke (optional second proof)
 
@@ -208,14 +211,11 @@ R3 authority smoke: qf_task_list → claim this task → qf_task_update progress
 
 Confirm same `task_id` in Kernel and Envoy mirror (`kernel.task.get` + inbox).
 
-## 8. Close R3 in ledger (you approve)
+## 8. Close R3 in ledger
 
-Edit `BUILD_PLAN_V4.md` R3 row:
+**Done 2026-06-21** — operator approved; ledger updated in `BUILD_PLAN_V4.md`.
 
-- R3a ✅ R3b ✅ R3c-a ✅ R3c-b ✅
-- Machine proof: §6 below, date witnessed
-- Product proof: operator-witnessed DAG run (paste session date + tile ids)
-- Then promote R4 when ready
+Product proof: Hermes sessions under `Cursor Collab/Agents/Hermes/hermes-home/sessions/` (2026-06-21). Legend Codex lacked context inject; Hermes executed extract.
 
 ---
 
@@ -233,4 +233,4 @@ Run from `quantflow-electron`:
 | `cd ../tools/quantflow-mcp && node --test` | 24 pass |
 | `bun run build` | ✓ built |
 
-Commits: `1881d0c` (R3c-b), `7fd2fba` (sqlite bundle fix), `2c97dd3` (vault path + runbook).
+Commits: `1881d0c` (R3c-b), `7fd2fba` (sqlite bundle fix), `bf62afc` (vault path + runbook).

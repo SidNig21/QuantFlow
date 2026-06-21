@@ -134,7 +134,7 @@ docs/v4/handoffs/R3c-envoy-consolidation.md                 THIS FILE
 - **Bug fixed during build:** mirror used `kernel.correlation_id` (undefined on `TaskSnapshot`); corrected to `kernel.correlationId`.
 - **Test infra:** `setKernelDbForTesting` + `bun:sqlite` in-memory migrations (matches `smoke-dag` pattern); production `initKernelDb` lazy-loads `better-sqlite3` from `quantflow-electron/node_modules`.
 - **Legacy complete:** intentional `legacy: true` on Envoy-complete path for Hermes/MCP until full submit/verify adoption.
-- **Product proof:** operator runbook at `docs/v4/handoffs/R3-product-proof-operator.md`; machine stack re-green 2026-06-21.
+- **Product proof:** **PASSED** operator-witnessed 2026-06-21 — DAG `wf-r3-proof`, 4/4 tasks complete via submit/verify; runbook `docs/v4/handoffs/R3-product-proof-operator.md`. R3 ledger closed same date.
 
 ---
 
