@@ -40,6 +40,7 @@ export function handleTaskCommand(
 ): CommandResult {
   switch (type) {
     case 'kernel.task.create': return taskCreate(db, payload);
+    case 'kernel.task.depend': return taskDepend(db, payload);
     case 'kernel.task.claim': return taskClaim(db, payload);
     case 'kernel.task.start': return taskStart(db, payload);
     case 'kernel.task.submit': return taskSubmit(db, payload);
@@ -58,6 +59,64 @@ export function handleTaskCommand(
 
 function getTask(db: KernelDB, id: string): TaskRow | undefined {
   return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as TaskRow | undefined;
+}
+
+/** A task is satisfied as an upstream only when it is `complete` AND carries a
+ * verification_passed receipt — not merely `complete` (the legacy bypass can
+ * complete without verification, and the DAG must never gate on that). */
+function isUpstreamSatisfied(db: KernelDB, taskId: string): boolean {
+  const up = getTask(db, taskId);
+  if (!up || up.status !== 'complete') return false;
+  const verified = db
+    .prepare("SELECT 1 FROM receipts WHERE task_id = ? AND type = 'verification_passed' LIMIT 1")
+    .get(taskId);
+  return Boolean(verified);
+}
+
+/** The unmet `blocks` dependencies of a task (upstreams not complete+verified).
+ * Empty array = the task is free to claim. R3b DAG claim gate. */
+export function unmetBlockingDependencies(db: KernelDB, taskId: string): string[] {
+  const deps = db
+    .prepare("SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ? AND kind = 'blocks'")
+    .all(taskId) as { depends_on_task_id: string }[];
+  return deps
+    .map((d) => d.depends_on_task_id)
+    .filter((upstreamId) => !isUpstreamSatisfied(db, upstreamId));
+}
+
+/** All declared task dependencies (optionally scoped to a workflow), for the
+ * DAG scheduler to build its eligibility set. Read-only. */
+export function queryTaskDependencies(
+  db: KernelDB,
+  workflowId?: string,
+): Array<{ taskId: string; dependsOnTaskId: string; kind: string }> {
+  const rows = workflowId
+    ? (db
+        .prepare(
+          `SELECT d.task_id, d.depends_on_task_id, d.kind
+           FROM task_dependencies d JOIN tasks t ON t.id = d.task_id
+           WHERE t.workflow_id = ?`,
+        )
+        .all(workflowId) as { task_id: string; depends_on_task_id: string; kind: string }[])
+    : (db
+        .prepare('SELECT task_id, depends_on_task_id, kind FROM task_dependencies')
+        .all() as { task_id: string; depends_on_task_id: string; kind: string }[]);
+  return rows.map((r) => ({ taskId: r.task_id, dependsOnTaskId: r.depends_on_task_id, kind: r.kind }));
+}
+
+/** Task ids that carry a verification_passed receipt (optionally scoped). The
+ * DAG scheduler uses this set to decide which upstreams are satisfied. */
+export function queryVerifiedTaskIds(db: KernelDB, workflowId?: string): string[] {
+  const rows = workflowId
+    ? (db
+        .prepare(
+          "SELECT DISTINCT task_id FROM receipts WHERE type = 'verification_passed' AND workflow_id = ? AND task_id IS NOT NULL",
+        )
+        .all(workflowId) as { task_id: string }[])
+    : (db
+        .prepare("SELECT DISTINCT task_id FROM receipts WHERE type = 'verification_passed' AND task_id IS NOT NULL")
+        .all() as { task_id: string }[]);
+  return rows.map((r) => r.task_id);
 }
 
 function setStatus(
@@ -191,6 +250,33 @@ function taskCreate(db: KernelDB, payload: Record<string, unknown>): CommandResu
   }
 }
 
+/** Declare a task dependency edge (R3 DAG). kind defaults to 'blocks'. Both tasks
+ * must exist; a self-edge is rejected. Idempotent on (task_id, depends_on_task_id). */
+function taskDepend(db: KernelDB, payload: Record<string, unknown>): CommandResult {
+  const taskCheck = requireString(payload, 'taskId');
+  if (!taskCheck.ok) return { ok: false, error: taskCheck.error };
+  const depCheck = requireString(payload, 'dependsOnTaskId');
+  if (!depCheck.ok) return { ok: false, error: depCheck.error };
+  const taskId = payload['taskId'] as string;
+  const dependsOnTaskId = payload['dependsOnTaskId'] as string;
+  if (taskId === dependsOnTaskId) return { ok: false, error: 'a task cannot depend on itself' };
+  const kindRaw = typeof payload['kind'] === 'string' ? (payload['kind'] as string) : 'blocks';
+  if (kindRaw !== 'blocks' && kindRaw !== 'context_from') {
+    return { ok: false, error: `invalid dependency kind: ${kindRaw}` };
+  }
+  if (!getTask(db, taskId)) return { ok: false, error: `task not found: ${taskId}` };
+  if (!getTask(db, dependsOnTaskId)) return { ok: false, error: `task not found: ${dependsOnTaskId}` };
+  try {
+    db.prepare(
+      `INSERT OR IGNORE INTO task_dependencies (id, task_id, depends_on_task_id, kind, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(randomUUID(), taskId, dependsOnTaskId, kindRaw, Date.now());
+    return { ok: true, id: taskId };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 function taskClaim(db: KernelDB, payload: Record<string, unknown>): CommandResult {
   const idCheck = requireString(payload, 'taskId');
   if (!idCheck.ok) return { ok: false, error: idCheck.error };
@@ -208,6 +294,18 @@ function taskClaim(db: KernelDB, payload: Record<string, unknown>): CommandResul
   } else if (task.status !== 'open') {
     const check = assertTransition(task.status, 'claimed');
     if (!check.ok) return { ok: false, error: check.error };
+  }
+
+  // R3b DAG gate: a downstream task is claimable only when every `blocks`
+  // upstream is complete + verification_passed. Independent branches stay
+  // claimable in parallel; this gate is the Kernel-side enforcement that backs
+  // the dag-scheduler's eligibility set.
+  const unmet = unmetBlockingDependencies(db, id);
+  if (unmet.length > 0) {
+    return {
+      ok: false,
+      error: `task blocked by unverified upstream dependencies: ${unmet.join(', ')}`,
+    };
   }
 
   try {

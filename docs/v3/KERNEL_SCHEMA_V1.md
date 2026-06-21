@@ -38,19 +38,28 @@ Fifteen canonical primitives. Do not create aliases or synonyms.
 
 ### `workflows`
 
-The top-level mission context.
+The top-level mission context. **Workflow IS the run instance (R3a, §10.1 resolved):
+`run_id ≡ workflow_id`; no separate `runs` table.** `queryRun` projects a
+references-only view (instance fields + task/artifact/receipt ids).
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `id` | TEXT PK | UUID |
+| `id` | TEXT PK | UUID. Also the `run_id`. |
 | `name` | TEXT | Human-readable name |
 | `objective` | TEXT | Mission statement |
 | `status` | TEXT | `active`, `paused`, `complete`, `archived` |
 | `active_correlation_id` | TEXT | Current active correlation chain |
 | `vault_path` | TEXT | Obsidian export path (nullable) |
+| `mode` | TEXT | R3a · run mode (`scout`/`research`/`deep`…), nullable; set by R6 templates |
+| `budget_json` | TEXT | R3a · `{}` default. Budget **declared** here; **enforced** in R4 |
+| `checkpoint_state` | TEXT | R3a · R5 human-checkpoint pause state, nullable |
 | `created_at` | INTEGER | ms since epoch |
 | `updated_at` | INTEGER | ms since epoch |
 | `metadata_json` | TEXT | `{}` |
+
+> Migration `004-r3-workflow-instance.sql` adds `mode`/`budget_json`/`checkpoint_state`
+> (additive, nullable). Artifacts already carry `workflow_id`, which serves as
+> `run_id` — no redundant `artifacts.run_id` column is added (that would duplicate truth).
 
 ---
 

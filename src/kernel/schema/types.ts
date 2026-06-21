@@ -96,6 +96,10 @@ export interface WorkflowRow {
   status: WorkflowStatus;
   active_correlation_id: string | null;
   vault_path: string | null;
+  /** R3a run-instance fields (Workflow IS the run). mode/checkpoint_state nullable. */
+  mode: string | null;
+  budget_json: string;
+  checkpoint_state: string | null;
   created_at: number;
   updated_at: number;
   metadata_json: string;

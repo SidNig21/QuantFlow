@@ -90,6 +90,9 @@ export function createMockHarness(options: MockHarnessOptions = {}): MockWorkerH
         sizeBytes: Buffer.byteLength(body),
         metadata: { harnessKind: 'mock' },
       };
+      // Each send produces a fresh artifact, so it is collectable again — this is
+      // what lets one worker run multiple tasks in sequence (e.g. a DAG branch).
+      state.collected = false;
       state.status = 'done';
     },
 

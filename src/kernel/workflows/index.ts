@@ -161,6 +161,85 @@ export function queryWorkflowRegion(db: KernelDB, workflowId: string): WorkflowR
 }
 
 /**
+ * The Run projection (R3a). §10.1 is resolved as "extend Workflow" — a Workflow
+ * IS the execution instance, so run_id ≡ workflow_id. This is a strictly
+ * read-only AGGREGATE OF REFERENCES: the instance fields (mode/status/budget/
+ * checkpoint_state) plus the *ids* of the tasks, artifacts, and receipts that
+ * already carry this workflow_id. It NEVER copies task/artifact/receipt truth —
+ * doing so would make a second store (the R3 failure signal). Returns null when
+ * the workflow does not exist.
+ */
+export interface WorkflowRun {
+  /** run_id ≡ workflow_id (Workflow is the run instance). */
+  runId: string;
+  workflowId: string;
+  objective: string;
+  status: string;
+  mode: string | null;
+  /** DECLARED here (R3); ENFORCED in R4. Parsed from workflows.budget_json. */
+  budget: Record<string, unknown>;
+  checkpointState: string | null;
+  startedAt: number;
+  endedAt: number | null;
+  /** References only — never the rows themselves. */
+  taskIds: string[];
+  artifactIds: string[];
+  receiptIds: string[];
+}
+
+export function queryRun(db: KernelDB, workflowId: string): WorkflowRun | null {
+  const wf = db
+    .prepare(
+      `SELECT id, objective, status, mode, budget_json, checkpoint_state, created_at, updated_at
+       FROM workflows WHERE id = ?`,
+    )
+    .get(workflowId) as
+    | {
+        id: string;
+        objective: string;
+        status: string;
+        mode: string | null;
+        budget_json: string;
+        checkpoint_state: string | null;
+        created_at: number;
+        updated_at: number;
+      }
+    | undefined;
+  if (!wf) return null;
+
+  const taskIds = (db.prepare('SELECT id FROM tasks WHERE workflow_id = ? ORDER BY created_at ASC').all(workflowId) as { id: string }[]).map((r) => r.id);
+  const artifactIds = (db.prepare('SELECT id FROM artifacts WHERE workflow_id = ? ORDER BY created_at ASC').all(workflowId) as { id: string }[]).map((r) => r.id);
+  const receiptIds = (db.prepare('SELECT id FROM receipts WHERE workflow_id = ? ORDER BY created_at ASC').all(workflowId) as { id: string }[]).map((r) => r.id);
+
+  let budget: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(wf.budget_json ?? '{}');
+    if (parsed && typeof parsed === 'object') budget = parsed as Record<string, unknown>;
+  } catch {
+    budget = {};
+  }
+
+  // A run is "ended" once the workflow is complete/archived; updated_at is the
+  // last transition time. We expose a reference timestamp, not a derived truth.
+  const ended = wf.status === 'complete' || wf.status === 'archived';
+
+  return {
+    runId: wf.id,
+    workflowId: wf.id,
+    objective: wf.objective,
+    status: wf.status,
+    mode: wf.mode,
+    budget,
+    checkpointState: wf.checkpoint_state,
+    startedAt: wf.created_at,
+    endedAt: ended ? wf.updated_at : null,
+    taskIds,
+    artifactIds,
+    receiptIds,
+  };
+}
+
+/**
  * All workflow regions (one per workflow row), newest activity last by created
  * order. Empty workflows are included with a null bounds so callers can decide
  * whether to draw them.

@@ -12,6 +12,8 @@ Do not create alternate terms for concepts already defined here. If a term is mi
 
 A persistent mission context. Wraps a goal, its participating tiles, tasks, receipts, and state cards. The top-level coordination unit. All tiles in a workflow share a `workflow_id`.
 
+**Workflow IS the Run (R3a decision, §10.1 resolved).** v4 needed an "execution instance" container. Rather than add a `Run` primitive — which would be the *third* meaning of "run" after Eve's session-scope "run" and the loose verb — the Workflow is extended to be the instance: it gains `mode`, `budget_json`, and `checkpoint_state`. So **`run_id ≡ workflow_id`**. The "Run" surfaced to callers (`queryRun`) is a strictly read-only **projection** that aggregates *references* (the ids of the workflow's tasks/artifacts/receipts) plus the instance fields — it never copies their truth. Each mission = one run instance; if/when a mission must host *many* runs over time, that is a future split, not v4. See [Run](#run-anti-pattern).
+
 ### Tile
 
 A visible canvas object. Can host a WorkerInstance, display a terminal, show a Conductor view, or represent any canvas participant. All tile state is Kernel-owned. The canvas renders tiles from Kernel snapshots.
@@ -143,3 +145,4 @@ The WSL session manager. Owns panes, Unix socket API, and agent state. Wrapped b
 | **string relay** | Retired. Do not revive. |
 | **profile (fusing role+harness+model)** | `role ≠ harness ≠ model`; keep them separate. |
 | **second source of truth** | Every component derives state from the Kernel. |
+| <a id="run-anti-pattern"></a>**`Run` as a new primitive** | "Run" is overloaded (Eve owns it at session scope). v4 does NOT add a `runs` table — the **Workflow is the run** (`run_id ≡ workflow_id`); `queryRun` is a references-only projection. A `runs` table duplicating Workflow = the second-store failure. |
