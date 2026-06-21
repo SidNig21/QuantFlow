@@ -4,7 +4,8 @@ import { readVaultConfig } from "./vault-config";
 import { ensureEnvoyListener } from "./envoy-listener";
 import type { NormalizedEnvoyPacket } from "./envoy-listener";
 import { getEnvoyService } from "./envoy-service";
-import { listEnvoyTasks } from "./runtime-state/envoy-repo";
+import { listEnvoyReceipts, listEnvoyTasks } from "./runtime-state/envoy-repo";
+import type { EnvoyReceiptRow, EnvoyTaskRow } from "./runtime-state/types";
 
 const DEFAULT_VAULT_PATH = "C:\\Users\\rybow\\Obsidian\\QuantFlow";
 const POLL_INTERVAL_MS = 2000;
@@ -96,6 +97,151 @@ async function writeHistory(
   await atomicWrite(join(dir, "history.md"), content);
 }
 
+function parseJsonArray(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseJsonObject(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function formatMs(ms: number | null | undefined): string {
+  if (!ms) return "-";
+  try {
+    return new Date(ms).toISOString();
+  } catch {
+    return String(ms);
+  }
+}
+
+function cleanDisplayText(value: string): string {
+  return value
+    .replace(/\u00e2\u20ac\u201d/g, "-")
+    .replace(/\u00e2\u20ac\u201c/g, "-")
+    .replace(/\u00e2\u20ac\u2122/g, "'")
+    .replace(/\u00e2\u20ac\u0153/g, '"')
+    .replace(/\u00e2\u20ac\u009d/g, '"')
+    .replace(/\u00c2\u00a7/g, "Section ");
+}
+
+export function safeEnvoyResultFilePart(value: string): string {
+  return value
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+    .replace(/\s+/g, "-")
+    .slice(0, 80) || "untitled";
+}
+
+function resultText(task: EnvoyTaskRow): string {
+  if (task.result_summary?.trim()) return cleanDisplayText(task.result_summary.trim());
+  if (task.status === "done") return "Completed without a result summary.";
+  if (task.status === "blocked") return "Blocked without a blocker summary.";
+  if (task.status === "failed") return "Failed without a failure summary.";
+  return "No result yet.";
+}
+
+function formatReceiptLine(receipt: EnvoyReceiptRow): string {
+  const payload = parseJsonObject(receipt.payload);
+  const summary = payload.summary
+    ?? payload.result_summary
+    ?? payload.reason
+    ?? payload.message
+    ?? "";
+  const suffix = typeof summary === "string" && summary.trim()
+    ? ` - ${cleanDisplayText(summary.trim())}`
+    : "";
+  return `- ${formatMs(receipt.created_at)} - ${receipt.kind} - ${receipt.agent_name ?? receipt.actor_tile_id ?? "unknown"}${suffix}`;
+}
+
+export function buildTaskResultNote(task: EnvoyTaskRow, receipts: EnvoyReceiptRow[]): string {
+  const artifacts = parseJsonArray(task.artifact_paths);
+  const acceptance = parseJsonArray(task.acceptance_criteria);
+  return [
+    `# ${cleanDisplayText(task.title)}`,
+    "",
+    `Status: ${task.status}`,
+    `Task ID: ${task.task_id}`,
+    `Correlation ID: ${task.correlation_id}`,
+    `Envoy space: ${task.envoy_space_id}`,
+    `Agent: ${task.claimed_by ?? "-"}`,
+    `Updated: ${formatMs(task.updated_at)}`,
+    "",
+    "## Instruction",
+    "",
+    cleanDisplayText(task.instruction.trim()) || "-",
+    "",
+    "## Result",
+    "",
+    resultText(task),
+    "",
+    "## Acceptance Criteria",
+    "",
+    ...(acceptance.length ? acceptance.map((item) => `- ${cleanDisplayText(item)}`) : ["- None recorded"]),
+    "",
+    "## Artifacts",
+    "",
+    ...(artifacts.length ? artifacts.map((item) => `- ${cleanDisplayText(item)}`) : ["- None recorded"]),
+    "",
+    "## Receipt Trail",
+    "",
+    ...(receipts.length ? receipts.map(formatReceiptLine) : ["- No receipts recorded"]),
+    "",
+  ].join("\n");
+}
+
+async function writeRunResults(dir: string): Promise<void> {
+  const tasks = listEnvoyTasks({ status: "all" });
+  const visibleTasks = tasks
+    .filter((task) => ["done", "blocked", "failed"].includes(task.status))
+    .sort((a, b) => b.updated_at - a.updated_at);
+  const latestUpdate = visibleTasks.reduce(
+    (latest, task) => Math.max(latest, task.updated_at),
+    0,
+  );
+  const rows = visibleTasks.slice(0, 50).map((task) => {
+    const fileName = `${safeEnvoyResultFilePart(task.updated_at.toString())}-${safeEnvoyResultFilePart(task.title)}-${task.task_id.slice(0, 8)}.md`;
+    return { task, fileName };
+  });
+  const content = [
+    "# Envoy Run Results",
+    "",
+    "Human-readable results from the legacy Envoy bridge. Kernel/OKF exports remain the canonical v3 evidence path.",
+    "",
+    `Latest result update: ${formatMs(latestUpdate)}`,
+    "",
+    "## Recent Results",
+    "",
+    ...(rows.length
+      ? rows.map(({ task, fileName }) =>
+          `- **${task.status}** [[runs/${fileName}|${task.title}]] - ${task.claimed_by ?? "unclaimed"} - ${task.correlation_id}`,
+        )
+      : ["- No completed, blocked, or failed Envoy tasks yet."]),
+    "",
+  ].join("\n");
+
+  await atomicWrite(join(dir, "run-results.md"), content);
+  await mkdir(join(dir, "runs"), { recursive: true });
+  await Promise.all(rows.map(async ({ task, fileName }) => {
+    const receipts = listEnvoyReceipts({ taskId: task.task_id });
+    await atomicWrite(
+      join(dir, "runs", fileName),
+      buildTaskResultNote(task, receipts),
+    );
+  }));
+}
+
 async function appendLive(
   dir: string,
   line: string,
@@ -142,6 +288,7 @@ export async function ensureObsidianEnvoyMirror(
     try {
       await writeTaskBoard(dir, options.envoySpaceId);
       await writeHistory(dir, options.envoySpaceId);
+      await writeRunResults(dir);
     } catch {
       // Mirror is best-effort; Envoy CLI may be unavailable during startup.
     } finally {
