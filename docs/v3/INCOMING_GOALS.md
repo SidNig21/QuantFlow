@@ -82,12 +82,12 @@ path. Gaps found:
 - **Problem:** `qf_task_*` MCP tools and the live delegation flow create/track **Envoy** tasks; the v3 Kernel task lifecycle (Goals 3/5C/5D) is separate. The Conductor (reads Kernel) showed `0 tasks` while `qf_task_list` had ~18 Envoy tasks on other canvases. So external agents / the live flow do not exercise v3 task truth, gates, or receipts.
 - **Evidence:** Conductor "Generate plan" = 0 tasks; `qf_task_list` all `envoy_task_id`/`envoy_space_id` on `Cursor Collab` + `phase6-*` canvases.
 - **Proposed scope:** decide the bridge — either route the Envoy task ops through Kernel task commands, or expose Kernel tasks via MCP (`kernel.task.*` adapter), so one task authority drives the live app. Likely the next major build plan.
-- **Layer(s):** kernel, mcp adapter, conductor — **Priority:** high — **Status:** captured
+- **Layer(s):** kernel, mcp adapter, conductor — **Priority:** high — **Status:** **RESOLVED 2026-06-21 by v4 R3c-b** (Envoy→Kernel bridge; `smoke:authority` green — Envoy is now a read-only Kernel mirror, the Kernel is the sole task authority). Do not reopen.
 
 #### MCP surface exposes no v3 Kernel reads (MEDIUM-HIGH)
 - **Problem:** MCP has no `kernel.canvas.snapshot` / `state_card` / `workflow.region` / `eval` read. An external agent can't see v3 truth via MCP — only Envoy + raw canvas/tile ops.
 - **Proposed scope:** add read-only Kernel query tools to `tools/quantflow-mcp` (snapshot, state cards, regions, receipts, evals).
-- **Layer(s):** mcp adapter, kernel/queries — **Priority:** medium-high — **Status:** captured
+- **Layer(s):** mcp adapter, kernel/queries — **Priority:** medium-high — **Status:** **RESOLVED 2026-06-21 by v4 R3c-a** (`ipc-kernel-reads.ts` + MCP tools `quantflow_kernel_state_cards`/`_workflow_region(s)`/`_run`/`_evals`; 24 MCP tests green). Do not reopen.
 
 #### MCP cable create sets legacy kind, not v3 semantic_type (MEDIUM)
 - **Problem:** `quantflow_cable_create` returns `"kind":"relay"` (v2), not a Goal 7 `semantic_type`. Semantic strings are only settable in the in-app cable inspector. So agents can't create delegation/verification/etc. strings via MCP.
