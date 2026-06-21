@@ -38,6 +38,7 @@
 		"smoke:capability-preflight": "bun test src/main/diagnostics/capability-probes.test.ts src/main/diagnostics/preflight.test.ts src/main/credentials/credential-accessor.test.ts",
 		"smoke:task-atom": "bun scripts/smoke-task-atom.ts",
 		"smoke:dag": "bun scripts/smoke-dag.ts",
+		"smoke:authority": "bun scripts/smoke-authority.ts",
 		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",
 		"postinstall": "node scripts/postinstall.mjs"
 	},

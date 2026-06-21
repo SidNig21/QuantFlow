@@ -10,6 +10,9 @@ import {
 } from "./runtime-state/envoy-repo";
 import { _resetForTesting as resetEvents, listEvents } from "./runtime-state/events-repo";
 import { _resetForTesting as resetConnections, createConnection } from "./runtime-state/connections-repo";
+import { installTestKernelDb, closeTestKernelDb } from "./test-kernel-db";
+import { getKernelDb } from "../../../src/kernel/database";
+import { queryTaskGet } from "../../../src/kernel/tasks/index";
 
 function makeRunner(): EnvoyCliRunner {
   let taskCounter = 0;
@@ -33,6 +36,7 @@ function makeRunner(): EnvoyCliRunner {
 }
 
 beforeEach(() => {
+  installTestKernelDb();
   installTestRuntimeDb();
   resetEvents();
   resetConnections();
@@ -41,6 +45,7 @@ beforeEach(() => {
 
 afterAll(() => {
   closeDb();
+  closeTestKernelDb();
 });
 
 describe("EnvoyTaskService", () => {
@@ -68,6 +73,7 @@ describe("EnvoyTaskService", () => {
     const taskId = created.task.task_id;
     const correlationId = created.task.correlation_id;
     expect(correlationId).toBe("corr-parent");
+    expect(queryTaskGet(getKernelDb(), taskId)?.status).toBe("open");
 
     await service.claimTask({ taskId, claimingTileId: "codex", agentName: "Codex" });
     await expect(service.claimTask({ taskId, claimingTileId: "other" })).rejects.toThrow(/already claimed/);
@@ -77,6 +83,7 @@ describe("EnvoyTaskService", () => {
     const [task] = listEnvoyTasks({ correlationId });
     expect(task?.status).toBe("done");
     expect(task?.claimed_by).toBe("Codex");
+    expect(queryTaskGet(getKernelDb(), taskId)?.status).toBe("complete");
     expect(JSON.parse(task?.artifact_paths ?? "[]")).toEqual(["proof.md"]);
     expect(listEnvoyReceipts({ correlationId })).toHaveLength(4);
     expect(listEvents({ correlationId }).map((event) => event.kind)).toEqual([

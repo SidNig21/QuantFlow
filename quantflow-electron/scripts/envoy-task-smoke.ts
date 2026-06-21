@@ -3,8 +3,12 @@ import { installTestRuntimeDb } from "../src/main/runtime-state/test-sqlite-adap
 import { closeDb } from "../src/main/runtime-state/database";
 import { listEnvoyReceipts, listEnvoyTasks } from "../src/main/runtime-state/envoy-repo";
 import { listEvents } from "../src/main/runtime-state/events-repo";
+import { installTestKernelDb, closeTestKernelDb } from "../src/main/test-kernel-db";
+import { getKernelDb } from "../../src/kernel/database";
+import { queryTaskGet } from "../../src/kernel/tasks/index";
 
 async function main(): Promise<void> {
+  installTestKernelDb();
   installTestRuntimeDb();
 
   const service = new EnvoyTaskService({ startListener: false });
@@ -75,6 +79,7 @@ async function main(): Promise<void> {
         secondClaimRejected &&
         tasks.length === 1 &&
         tasks[0]?.status === "done" &&
+        queryTaskGet(getKernelDb(), taskId)?.status === "complete" &&
         receipts.length >= 4 &&
         events.length >= 4,
       canvas_id: canvasId,
@@ -95,6 +100,7 @@ async function main(): Promise<void> {
     }
   } finally {
     closeDb();
+    closeTestKernelDb();
   }
 }
 

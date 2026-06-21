@@ -188,6 +188,24 @@ export function claimEnvoyTask(params: {
   return getEnvoyTask(params.taskId);
 }
 
+export function patchEnvoyTaskClaim(
+  taskId: string,
+  claimedBy: string,
+  claimedAt: number = Date.now(),
+): EnvoyTaskRow | null {
+  const result = getDb()
+    .prepare(
+      `UPDATE envoy_tasks
+       SET claimed_by = @claimedBy,
+           claimed_at = @claimedAt,
+           updated_at = @now
+       WHERE task_id = @taskId`,
+    )
+    .run({ taskId, claimedBy, claimedAt, now: Date.now() });
+  if (result.changes === 0) return null;
+  return getEnvoyTask(taskId);
+}
+
 export function updateEnvoyTask(
   taskId: string,
   changes: {

@@ -1,11 +1,8 @@
 import {
-  claimEnvoyTask,
   getEnvoyTask,
   insertEnvoyReceipt,
-  insertEnvoyTask,
   listEnvoyReceipts,
   listEnvoyTasks,
-  updateEnvoyTask,
 } from "./runtime-state/envoy-repo";
 import type {
   EnvoyReceiptFilter,
@@ -22,6 +19,14 @@ import {
   newCorrelationId,
 } from "./envoy-service";
 import { ensureEnvoyListener } from "./envoy-listener";
+import {
+  dispatchEnvoyKernel,
+  ensureKernelTile,
+  getKernelTask,
+  refreshMirrorStatus,
+  syncMirrorFromKernel,
+  type MirrorContext,
+} from "./envoy-kernel-bridge";
 
 export interface EnvoyTaskServiceOptions {
   envoy?: EnvoyService;
@@ -76,6 +81,20 @@ function envoyStatusFor(status: EnvoyTaskStatus): "assigned" | "in_progress" | "
   return null;
 }
 
+function mirrorContextFromRow(row: EnvoyTaskRow): MirrorContext {
+  return {
+    canvasId: row.canvas_id,
+    envoySpaceId: row.envoy_space_id,
+    sourceTileId: row.source_tile_id,
+    targetTileId: row.target_tile_id,
+    connectionId: row.connection_id,
+    envoyTaskId: row.envoy_task_id,
+    title: row.title,
+    instruction: row.instruction,
+    acceptanceCriteria: parseJsonArray(row.acceptance_criteria),
+  };
+}
+
 export class EnvoyTaskService {
   private readonly envoy: EnvoyService;
   private readonly startListener: boolean;
@@ -100,6 +119,25 @@ export class EnvoyTaskService {
     }
 
     const correlationId = input.correlationId?.trim() || newCorrelationId();
+
+    // Kernel decides — create authoritative task first (R3c-b).
+    const kernelCreated = await dispatchEnvoyKernel("kernel.task.create", {
+      title: input.title,
+      objective: input.instruction,
+      correlationId,
+      metadata: {
+        canvasId: input.canvasId,
+        sourceTileId: input.sourceTileId,
+        targetTileId: input.targetTileId ?? null,
+        connectionId: input.connectionId ?? null,
+        acceptanceCriteria: input.acceptanceCriteria ?? [],
+      },
+    });
+    if (!kernelCreated.ok || !kernelCreated.id) {
+      throw new Error(kernelCreated.error ?? "kernel.task.create failed");
+    }
+    const kernelTaskId = kernelCreated.id;
+
     const body = JSON.stringify({
       schema: "quantflow.envoy_task.v1",
       canvas_id: input.canvasId,
@@ -107,29 +145,30 @@ export class EnvoyTaskService {
       target_tile_id: input.targetTileId ?? null,
       connection_id: input.connectionId ?? null,
       correlation_id: correlationId,
+      task_id: kernelTaskId,
       title: input.title,
       instruction: input.instruction,
       acceptance_criteria: input.acceptanceCriteria ?? [],
     });
     const post = await this.envoy.postTask({ envoySpaceId: space.envoy_space_id, body });
 
-    const task = insertEnvoyTask({
-      envoyTaskId: post.envoyMessageId,
+    const mirrorCtx: MirrorContext = {
       canvasId: input.canvasId,
       envoySpaceId: space.envoy_space_id,
       sourceTileId: input.sourceTileId,
       targetTileId: input.targetTileId ?? null,
       connectionId: input.connectionId ?? null,
-      correlationId,
+      envoyTaskId: post.envoyMessageId,
       title: input.title,
       instruction: input.instruction,
       acceptanceCriteria: input.acceptanceCriteria ?? [],
-    });
+    };
+    const task = syncMirrorFromKernel(kernelTaskId, mirrorCtx);
     const receipt = this.recordReceipt(task, {
       kind: "create",
       actorTileId: input.sourceTileId,
       envoyMessageId: post.envoyMessageId,
-      payload: { body, raw: post.raw },
+      payload: { body, raw: post.raw, kernel_task_id: kernelTaskId },
     });
     this.recordEvent("envoy.task.create", task, receipt);
     return {
@@ -139,7 +178,11 @@ export class EnvoyTaskService {
   }
 
   listTasks(filter: EnvoyTaskFilter = {}): Record<string, unknown> {
-    return { tasks: listEnvoyTasks(filter).map(publicTask) };
+    const tasks = listEnvoyTasks(filter).map((row) => {
+      const refreshed = refreshMirrorStatus(row.task_id) ?? row;
+      return publicTask(refreshed);
+    });
+    return { tasks };
   }
 
   async claimTask(input: {
@@ -147,20 +190,44 @@ export class EnvoyTaskService {
     claimingTileId: string;
     agentName?: string | null;
   }): Promise<Record<string, unknown>> {
-    const claimed = claimEnvoyTask(input);
-    if (!claimed) {
+    const mirror = this.requireTask(input.taskId);
+    const claimedBy = input.agentName ?? input.claimingTileId;
+
+    const kernel = getKernelTask(input.taskId);
+    if (!kernel) {
+      throw new Error(`Kernel task not found for envoy task ${input.taskId}`);
+    }
+    if (kernel.status !== "open" && kernel.status !== "claimed") {
       throw new Error(`Task ${input.taskId} is already claimed or unavailable`);
     }
-    await this.syncEnvoyStatus(claimed, "claimed");
-    const receipt = this.recordReceipt(claimed, {
+
+    await ensureKernelTile(input.claimingTileId);
+    const claim = await dispatchEnvoyKernel("kernel.task.claim", {
+      taskId: input.taskId,
+      tileId: input.claimingTileId,
+    });
+    if (!claim.ok) {
+      throw new Error(claim.error ?? `Task ${input.taskId} is already claimed or unavailable`);
+    }
+    const start = await dispatchEnvoyKernel("kernel.task.start", { taskId: input.taskId });
+    if (!start.ok) {
+      throw new Error(start.error ?? "kernel.task.start failed");
+    }
+
+    const updated = syncMirrorFromKernel(input.taskId, mirrorContextFromRow(mirror), {
+      claimedBy,
+      claimedAt: Date.now(),
+    });
+    await this.syncEnvoyStatus(updated, "claimed");
+    const receipt = this.recordReceipt(updated, {
       kind: "claim",
       actorTileId: input.claimingTileId,
       agentName: input.agentName ?? null,
-      payload: { claimed_by: input.agentName ?? input.claimingTileId },
+      payload: { claimed_by: claimedBy },
     });
-    this.recordEvent("envoy.task.claim", claimed, receipt);
+    this.recordEvent("envoy.task.claim", updated, receipt);
     return {
-      task: publicTask(getEnvoyTask(claimed.task_id) ?? claimed),
+      task: publicTask(getEnvoyTask(updated.task_id) ?? updated),
       receipt: publicReceipt(receipt),
     };
   }
@@ -171,8 +238,17 @@ export class EnvoyTaskService {
     actorTileId?: string | null;
     agentName?: string | null;
   }): Promise<Record<string, unknown>> {
-    const existing = this.requireTask(input.taskId);
-    const updated = updateEnvoyTask(input.taskId, { status: "working" }) ?? existing;
+    const mirror = this.requireTask(input.taskId);
+    const kernel = getKernelTask(input.taskId);
+    if (!kernel) {
+      throw new Error(`Kernel task not found for envoy task ${input.taskId}`);
+    }
+    if (kernel.status === "claimed") {
+      const start = await dispatchEnvoyKernel("kernel.task.start", { taskId: input.taskId });
+      if (!start.ok) throw new Error(start.error ?? "kernel.task.start failed");
+    }
+
+    const updated = syncMirrorFromKernel(input.taskId, mirrorContextFromRow(mirror));
     await this.syncEnvoyStatus(updated, "working");
     const receipt = this.recordReceipt(updated, {
       kind: "progress",
@@ -194,12 +270,30 @@ export class EnvoyTaskService {
     actorTileId?: string | null;
     agentName?: string | null;
   }): Promise<Record<string, unknown>> {
-    const existing = this.requireTask(input.taskId);
-    const updated = updateEnvoyTask(input.taskId, {
-      status: "done",
+    const mirror = this.requireTask(input.taskId);
+    const kernel = getKernelTask(input.taskId);
+    if (!kernel) {
+      throw new Error(`Kernel task not found for envoy task ${input.taskId}`);
+    }
+
+    // Legacy Envoy complete → Kernel complete with documented bypass (Hermes/MCP compat).
+    if (kernel.status === "working" || kernel.status === "claimed") {
+      const complete = await dispatchEnvoyKernel("kernel.task.complete", {
+        taskId: input.taskId,
+        legacy: true,
+        summary: input.resultSummary,
+      });
+      if (!complete.ok) {
+        throw new Error(complete.error ?? "kernel.task.complete failed");
+      }
+    } else if (kernel.status !== "complete") {
+      throw new Error(`Task ${input.taskId} cannot complete from status ${kernel.status}`);
+    }
+
+    const updated = syncMirrorFromKernel(input.taskId, mirrorContextFromRow(mirror), {
       resultSummary: input.resultSummary,
       artifactPaths: input.artifactPaths ?? [],
-    }) ?? existing;
+    });
     await this.syncEnvoyStatus(updated, "done");
     const receipt = this.recordReceipt(updated, {
       kind: "complete",
@@ -223,6 +317,11 @@ export class EnvoyTaskService {
     actorTileId?: string | null;
     agentName?: string | null;
   }): Promise<Record<string, unknown>> {
+    const block = await dispatchEnvoyKernel("kernel.task.block", {
+      taskId: input.taskId,
+      reason: input.reason,
+    });
+    if (!block.ok) throw new Error(block.error ?? "kernel.task.block failed");
     return this.closeWithStatus("blocked", "envoy.task.block", input.taskId, {
       reason: input.reason,
       actorTileId: input.actorTileId,
@@ -236,6 +335,11 @@ export class EnvoyTaskService {
     actorTileId?: string | null;
     agentName?: string | null;
   }): Promise<Record<string, unknown>> {
+    const fail = await dispatchEnvoyKernel("kernel.task.fail", {
+      taskId: input.taskId,
+      reason: input.reason,
+    });
+    if (!fail.ok) throw new Error(fail.error ?? "kernel.task.fail failed");
     return this.closeWithStatus("failed", "envoy.task.fail", input.taskId, {
       reason: input.reason,
       actorTileId: input.actorTileId,
@@ -361,11 +465,10 @@ export class EnvoyTaskService {
       agentName?: string | null;
     },
   ): Promise<Record<string, unknown>> {
-    const existing = this.requireTask(taskId);
-    const updated = updateEnvoyTask(taskId, {
-      status,
+    const mirror = this.requireTask(taskId);
+    const updated = syncMirrorFromKernel(taskId, mirrorContextFromRow(mirror), {
       resultSummary: params.reason,
-    }) ?? existing;
+    });
     await this.syncEnvoyStatus(updated, status);
     const receipt = this.recordReceipt(updated, {
       kind: status,

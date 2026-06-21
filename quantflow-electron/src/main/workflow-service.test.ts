@@ -8,6 +8,9 @@ import { installTestRuntimeDb } from "./runtime-state/test-sqlite-adapter";
 import { closeDb } from "./runtime-state/database";
 import { _resetForTesting as resetEnvoy, listEnvoyTasks } from "./runtime-state/envoy-repo";
 import { _resetForTesting as resetEvents, listEvents } from "./runtime-state/events-repo";
+import { installTestKernelDb, closeTestKernelDb } from "./test-kernel-db";
+import { getKernelDb } from "../../../src/kernel/database";
+import { queryTaskGet } from "../../../src/kernel/tasks/index";
 import {
   CANVAS_SKILL_RELATIVE_PATH,
   WORKFLOW_SOURCE_TILE_ID,
@@ -100,6 +103,7 @@ function makeTaskService(): EnvoyTaskService {
 
 describe("createWorkflowTask", () => {
   beforeEach(() => {
+    installTestKernelDb();
     installTestRuntimeDb();
     resetEvents();
     resetEnvoy();
@@ -107,6 +111,7 @@ describe("createWorkflowTask", () => {
 
   afterAll(() => {
     closeDb();
+    closeTestKernelDb();
   });
 
   test("creates an operator-sourced Envoy task before any spawn", async () => {
@@ -125,6 +130,8 @@ describe("createWorkflowTask", () => {
     expect(tasks[0].instruction).toBe("Ship the workflow slice\nDetails here.");
     expect(tasks[0].status).toBe("inbox");
     expect(tasks[0].correlation_id).toBe(result.correlationId);
+    expect(queryTaskGet(getKernelDb(), result.taskId)?.status).toBe("open");
+    expect(queryTaskGet(getKernelDb(), result.taskId)?.correlationId).toBe(result.correlationId);
 
     const kinds = listEvents({ correlationId: result.correlationId })
       .map((event) => event.kind);
