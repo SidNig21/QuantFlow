@@ -950,6 +950,40 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "quantflow_kernel_state_cards",
+    description: "Read-only: Kernel State Cards (current per-tile reality). Optional workflowId filter.",
+    schema: { workflowId: { kind: "string", default: "" } },
+    handle: (rpc) => async ({ workflowId = "" }) =>
+      jsonText(await rpc("kernel.stateCardList", workflowId ? { workflowId } : {})),
+  },
+  {
+    name: "quantflow_kernel_workflow_region",
+    description: "Read-only: one workflow's canvas region projection (status, member tiles, counts, blockers).",
+    schema: { workflowId: { kind: "string" } },
+    handle: (rpc) => async ({ workflowId }) =>
+      jsonText(await rpc("kernel.workflowRegion", { workflowId })),
+  },
+  {
+    name: "quantflow_kernel_workflow_regions",
+    description: "Read-only: all workflow region projections.",
+    schema: {},
+    handle: (rpc) => async () => jsonText(await rpc("kernel.workflowRegionList", {})),
+  },
+  {
+    name: "quantflow_kernel_run",
+    description: "Read-only: the Run projection for a workflow (run_id ≡ workflow_id; references only — task/artifact/receipt ids + instance fields).",
+    schema: { workflowId: { kind: "string" } },
+    handle: (rpc) => async ({ workflowId }) =>
+      jsonText(await rpc("kernel.run", { workflowId })),
+  },
+  {
+    name: "quantflow_kernel_evals",
+    description: "Read-only: Kernel evaluation rows (non-authoritative, cross-run). Optional workflowId filter.",
+    schema: { workflowId: { kind: "string", default: "" } },
+    handle: (rpc) => async ({ workflowId = "" }) =>
+      jsonText(await rpc("kernel.evalList", workflowId ? { workflowId } : {})),
+  },
+  {
     name: "quantflow_notify",
     description: "Send a desktop notification through QuantFlow",
     schema: {

@@ -53,6 +53,11 @@ const REQUIRED_TOOLS = [
   "quantflow_context_pin",
   "quantflow_context_inject",
   "quantflow_watchtower_snapshot",
+  "quantflow_kernel_state_cards",
+  "quantflow_kernel_workflow_region",
+  "quantflow_kernel_workflow_regions",
+  "quantflow_kernel_run",
+  "quantflow_kernel_evals",
   "quantflow_notify",
   "quantflow_ping",
 ];
@@ -303,6 +308,32 @@ test("maps Kernel task gate tools (submit/verify/reject) to Kernel JSON-RPC", as
       method: "kernel.taskReject",
       params: { taskId: "task-2", reason: "needs rework", operatorOverride: false },
     },
+  ]);
+});
+
+test("maps Kernel read tools (R3c) to read-only Kernel JSON-RPC", async () => {
+  const { calls, rpc } = makeRpcStub({
+    "kernel.stateCardList": [],
+    "kernel.workflowRegion": { id: "wf1" },
+    "kernel.workflowRegionList": [],
+    "kernel.run": { runId: "wf1", workflowId: "wf1", taskIds: [], artifactIds: [], receiptIds: [] },
+    "kernel.evalList": [],
+  });
+
+  await getToolDefinition("quantflow_kernel_state_cards").handle(rpc)({ workflowId: "wf1" });
+  await getToolDefinition("quantflow_kernel_state_cards").handle(rpc)({}); // no filter
+  await getToolDefinition("quantflow_kernel_workflow_region").handle(rpc)({ workflowId: "wf1" });
+  await getToolDefinition("quantflow_kernel_workflow_regions").handle(rpc)({});
+  await getToolDefinition("quantflow_kernel_run").handle(rpc)({ workflowId: "wf1" });
+  await getToolDefinition("quantflow_kernel_evals").handle(rpc)({});
+
+  assert.deepEqual(calls, [
+    { method: "kernel.stateCardList", params: { workflowId: "wf1" } },
+    { method: "kernel.stateCardList", params: {} },
+    { method: "kernel.workflowRegion", params: { workflowId: "wf1" } },
+    { method: "kernel.workflowRegionList", params: {} },
+    { method: "kernel.run", params: { workflowId: "wf1" } },
+    { method: "kernel.evalList", params: {} },
   ]);
 });
 
