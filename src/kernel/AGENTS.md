@@ -21,6 +21,7 @@ All canonical state and the mutation/query boundary:
 - `tasks/validators.ts` — Lifecycle guards: complete requires verifying + verification_passed receipt (or documented legacy bypass); self-verification refused. (Goal 3)
 - `tasks/index.ts` — Task command handlers (create/claim/start/submit/verify/reject/complete/block/fail) + task queries. Posts a receipt for every transition. (Goal 3)
 - `receipts/index.ts` — Append-only receipt store: `postReceipt`, `kernel.receipt.post`, `kernel.artifact.create`, receipt-chain query. (Goal 3)
+- `context/envelope.ts` — R2 ContextEnvelope v0 projection. Read-only, imports only `queries/index.ts`, and carries upstream artifact references/metadata, never artifact contents.
 - `state-cards/index.ts` and `watchers/index.ts` — Kernel-owned StateCard upserts/queries and the event watcher that promotes task, receipt, and tile events into current tile summaries. (Goal 4)
 - `worker-instances/index.ts` — Kernel-authoritative worker identity. `ensureWorkerInstanceForTile` (one default worker per tile, harness=local-shell + default model when seeded), `spawnWorkerForTile` (role/harness/model + status='spawning'), `updateWorkerInstance` (status + herdr_pane_id/envoy_space_id), `seedHarnessRegistry` (harnesses + default model from src/harness config), worker queries. (Goal 4 link → Goal 6A authority)
 - `commands/worker-commands.ts` — `kernel.worker.spawn` / `status_update` / `stop`. The shell role-spawn + herdr status paths route through these; the Kernel authorizes worker identity/status before/around the runtime, never mirroring after the fact. (Goal 6A)
@@ -92,6 +93,12 @@ After meaningful changes: update this file if local rules or owned scope changed
 - `artifacts/verify.ts` owns structural artifact verification with injectable fs: linked artifact row, under artifact root, non-empty readable file, optional sha256 match.
 - `tasks/index.ts` rejects submit without `artifactId`/`artifactRefs`, records optional `attemptId` on submit/verify receipts, and runs structural verification before `verification_passed`.
 - `worker_instances.assigned_task_id` is an additive reverse link set on task claim and cleared on verified/legacy completion, failure, or worker stop when the column exists.
+
+## v4 R2 Addendum
+
+- Migration `006-r2-artifact-lineage.sql` adds `artifacts.derived_from`, a JSON array of upstream artifact ids. It is lineage only: do not copy upstream artifact content into artifacts or envelopes.
+- `queries/index.ts` owns `queryUpstreamArtifacts(taskId)`, which reads only `context_from` dependencies and returns complete + `verification_passed` upstream artifact references. Sensitive artifacts are default-denied unless a future caller explicitly opts in.
+- `context/envelope.ts` builds ContextEnvelope v0 as a pure projection over Kernel queries. It must not import conductor, renderer, harness adapters, or mutation handlers.
 
 ## v4 R4 Addendum
 

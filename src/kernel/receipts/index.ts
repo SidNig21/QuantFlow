@@ -28,6 +28,24 @@ function safeJsonObject(s: string): Record<string, unknown> {
   }
 }
 
+function hasArtifactColumn(db: KernelDB, name: string): boolean {
+  const rows = db.prepare("PRAGMA table_info('artifacts')").all() as Array<{ name: string }>;
+  return rows.some((row) => row.name === name);
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  const raw = typeof value === 'string'
+    ? safeJsonArray(value)
+    : Array.isArray(value)
+      ? value
+      : [];
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item === 'string' && item.trim()) out.push(item.trim());
+  }
+  return [...new Set(out)];
+}
+
 export interface PostReceiptInput {
   type: ReceiptType;
   taskId?: string | null;
@@ -127,6 +145,7 @@ export function handleArtifactCommand(
   const kind = payload['kind'] as string | undefined;
   if (!kind) return { ok: false, error: 'artifact.create: kind required' };
   const metadata = (payload['metadata'] as Record<string, unknown> | undefined) ?? {};
+  const derivedFrom = normalizeStringArray(payload['derivedFrom'] ?? payload['derived_from']);
   const attemptId = typeof metadata['attemptId'] === 'string' && metadata['attemptId'].trim()
     ? metadata['attemptId'].trim()
     : null;
@@ -152,27 +171,52 @@ export function handleArtifactCommand(
   const id = randomUUID();
   const now = Date.now();
   try {
-    db.prepare(
-      `INSERT INTO artifacts
-         (id, workflow_id, task_id, worker_id, tile_id, receipt_id, kind, uri,
-          summary, content_hash, media_type, size_bytes, created_at, metadata_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      id,
-      (payload['workflowId'] as string | null) ?? null,
-      taskId,
-      (payload['workerId'] as string | null) ?? null,
-      (payload['tileId'] as string | null) ?? null,
-      null, // receipt_id backfilled below via the artifact_created receipt
-      kind,
-      (payload['uri'] as string | null) ?? null,
-      (payload['summary'] as string | null) ?? null,
-      (payload['contentHash'] as string | null) ?? null,
-      (payload['mediaType'] as string | null) ?? null,
-      (payload['sizeBytes'] as number | null) ?? null,
-      now,
-      JSON.stringify(metadata),
-    );
+    if (hasArtifactColumn(db, 'derived_from')) {
+      db.prepare(
+        `INSERT INTO artifacts
+           (id, workflow_id, task_id, worker_id, tile_id, receipt_id, kind, uri,
+            summary, content_hash, media_type, size_bytes, derived_from, created_at, metadata_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        (payload['workflowId'] as string | null) ?? null,
+        taskId,
+        (payload['workerId'] as string | null) ?? null,
+        (payload['tileId'] as string | null) ?? null,
+        null, // receipt_id backfilled below via the artifact_created receipt
+        kind,
+        (payload['uri'] as string | null) ?? null,
+        (payload['summary'] as string | null) ?? null,
+        (payload['contentHash'] as string | null) ?? null,
+        (payload['mediaType'] as string | null) ?? null,
+        (payload['sizeBytes'] as number | null) ?? null,
+        JSON.stringify(derivedFrom),
+        now,
+        JSON.stringify(metadata),
+      );
+    } else {
+      db.prepare(
+        `INSERT INTO artifacts
+           (id, workflow_id, task_id, worker_id, tile_id, receipt_id, kind, uri,
+            summary, content_hash, media_type, size_bytes, created_at, metadata_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        (payload['workflowId'] as string | null) ?? null,
+        taskId,
+        (payload['workerId'] as string | null) ?? null,
+        (payload['tileId'] as string | null) ?? null,
+        null, // receipt_id backfilled below via the artifact_created receipt
+        kind,
+        (payload['uri'] as string | null) ?? null,
+        (payload['summary'] as string | null) ?? null,
+        (payload['contentHash'] as string | null) ?? null,
+        (payload['mediaType'] as string | null) ?? null,
+        (payload['sizeBytes'] as number | null) ?? null,
+        now,
+        JSON.stringify(metadata),
+      );
+    }
 
     const receiptId = postReceipt(db, {
       type: 'artifact_created',
@@ -183,7 +227,7 @@ export function handleArtifactCommand(
       summary: (payload['summary'] as string | undefined) ?? `artifact: ${kind}`,
       artifactRefs: [id],
       correlationId: (payload['correlationId'] as string | null) ?? null,
-      metadata: { ...metadata, artifactId: id, kind },
+      metadata: { ...metadata, artifactId: id, kind, derivedFrom },
     });
     db.prepare('UPDATE artifacts SET receipt_id = ? WHERE id = ?').run(receiptId, id);
 
@@ -278,6 +322,7 @@ export interface ArtifactSnapshot {
   contentHash: string | null;
   mediaType: string | null;
   sizeBytes: number | null;
+  derivedFrom: string[];
   createdAt: number;
   metadata: Record<string, unknown>;
 }
@@ -296,6 +341,7 @@ function rowToArtifact(r: Record<string, unknown>): ArtifactSnapshot {
     contentHash: (r['content_hash'] as string | null) ?? null,
     mediaType: (r['media_type'] as string | null) ?? null,
     sizeBytes: (r['size_bytes'] as number | null) ?? null,
+    derivedFrom: normalizeStringArray(r['derived_from'] ?? []),
     createdAt: r['created_at'] as number,
     metadata: safeJsonObject((r['metadata_json'] as string) ?? '{}'),
   };

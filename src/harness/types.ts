@@ -70,6 +70,7 @@ export interface WorkerMessage {
   workflowId?: string | null;
   artifactRoot?: string | null;
   artifactFileName?: string | null;
+  contextEnvelope?: unknown;
 }
 
 /** A partial State Card projection read from Kernel truth (never log scraping). */

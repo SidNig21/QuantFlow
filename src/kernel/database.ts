@@ -7,6 +7,7 @@ import evaluationsSql from './migrations/002-evaluations.sql?raw';
 import r1WorkerTaskBindingSql from './migrations/003-r1-worker-task-binding.sql?raw';
 import r3WorkflowInstanceSql from './migrations/004-r3-workflow-instance.sql?raw';
 import r4RuntimeSql from './migrations/005-r4-runtime.sql?raw';
+import r2ArtifactLineageSql from './migrations/006-r2-artifact-lineage.sql?raw';
 
 /**
  * Ordered Kernel migrations. Each entry's SQL records its own `schema_migrations`
@@ -20,6 +21,7 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
   { version: 3, sql: r1WorkerTaskBindingSql },
   { version: 4, sql: r3WorkflowInstanceSql },
   { version: 5, sql: r4RuntimeSql },
+  { version: 6, sql: r2ArtifactLineageSql },
 ];
 
 let _db: BetterSqliteDatabase | null = null;

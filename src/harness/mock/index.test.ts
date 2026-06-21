@@ -18,7 +18,7 @@ describe('mock harness', () => {
       artifactRoot,
     });
 
-    expect(harness.getRecordedSends()).toEqual([
+    expect(harness.getRecordedSends()).toMatchObject([
       { workerId: 'mock-worker-tile1', text: 'Do one thing', taskId: 'task1' },
     ]);
     expect((await harness.readState(handle)).status).toBe('complete');

@@ -303,6 +303,7 @@ Durable outputs produced during tasks.
 | `content_hash` | TEXT | SHA-256 of content (nullable) |
 | `media_type` | TEXT | MIME type (nullable) |
 | `size_bytes` | INTEGER | Nullable |
+| `derived_from` | TEXT | `[]` — R2 JSON array of upstream artifact IDs, references only |
 | `created_at` | INTEGER | ms since epoch |
 | `metadata_json` | TEXT | `{}` |
 

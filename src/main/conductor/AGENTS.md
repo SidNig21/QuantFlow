@@ -110,6 +110,11 @@ After meaningful changes: update this file if local rules or owned scope changed
 - Mock delivery may auto-run for CI. Real harness delivery requires explicit operator approval (`operatorApproved` or `approvalToken`).
 - The Conductor still never writes artifact/task truth directly; all truth writes remain Kernel commands.
 
+## v4 R2 Addendum
+
+- `assign_task deliver:true` builds the R2 ContextEnvelope after claim/start and passes it through `harness.send` as `message.contextEnvelope`; do not send context through terminal writes or a second channel.
+- Artifacts produced from a context envelope record `derivedFrom` upstream artifact ids via `kernel.artifact.create`. The Conductor still posts only Kernel commands and never stores lineage itself.
+
 ## v4 R4 Addendum
 
 - `conductor-loop.ts` enforces declared Workflow/Run budgets when wired with `readRun`: max workers, wallclock, spend, tool calls, retries, and checkpoint requirement.

@@ -246,6 +246,8 @@ export interface ArtifactRow {
   content_hash: string | null;
   media_type: string | null;
   size_bytes: number | null;
+  /** R2 lineage: JSON array of upstream artifact ids. */
+  derived_from: string;
   created_at: number;
   metadata_json: string;
 }

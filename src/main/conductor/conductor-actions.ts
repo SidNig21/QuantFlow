@@ -19,6 +19,7 @@
  */
 
 import { dispatchKernelCommand, type CommandResult } from '../../kernel/commands/index';
+import { buildContextEnvelope, type ContextEnvelopeV0 } from '../../kernel/context/envelope';
 import type { TaskSnapshot } from '../../kernel/tasks/index';
 import type { WorkerSnapshot } from '../../kernel/worker-instances/index';
 import type { HarnessKind, ReceiptDraft, WorkerHandle, WorkerHarness } from '../../harness/types';
@@ -44,6 +45,7 @@ export interface ConductorActionDeps {
   getTask?: (taskId: string) => TaskSnapshot | null | Promise<TaskSnapshot | null>;
   getWorker?: (workerId: string) => WorkerSnapshot | null | Promise<WorkerSnapshot | null>;
   getWorkerHarness?: (kind: HarnessKind) => WorkerHarness;
+  buildContextEnvelope?: (taskId: string) => ContextEnvelopeV0 | null | Promise<ContextEnvelopeV0 | null>;
 }
 
 export const CONDUCTOR_ACTIONS = [
@@ -175,18 +177,21 @@ async function deliverAssignedTask(
   };
   const harness = deps.getWorkerHarness(harnessKind);
   const instruction = [task.title, '', task.objective].join('\n').trim();
+  const contextEnvelope = await maybeBuildContextEnvelope(taskId, deps);
+  const derivedFrom = contextEnvelope?.upstream_artifacts.map((artifact) => artifact.artifact_id) ?? [];
   await harness.send(handle, {
     text: instruction,
     taskId,
     workflowId: task.workflowId,
     artifactRoot: (args['artifactRoot'] as string | null) ?? null,
+    contextEnvelope: contextEnvelope ?? undefined,
   });
   await harness.readState(handle);
   const drafts = await harness.collectReceipts(handle);
   const artifactIds: string[] = [];
   for (const draft of drafts) {
     if (!draft.artifactFilePath) continue;
-    const created = await createArtifactFromDraft(cmd, task, handle, draft, args);
+    const created = await createArtifactFromDraft(cmd, task, handle, draft, args, derivedFrom);
     if (!created.ok) return created;
     const data = (created.data && typeof created.data === 'object')
       ? created.data as Record<string, unknown>
@@ -208,7 +213,30 @@ async function deliverAssignedTask(
     attemptId: args['attemptId'],
   });
   if (!submitted.ok) return submitted;
-  return { ok: true, id: taskId, data: { artifactIds, eveSessionId: handle.eveSessionId ?? null } };
+  return {
+    ok: true,
+    id: taskId,
+    data: {
+      artifactIds,
+      derivedFrom,
+      contextEnvelope,
+      eveSessionId: handle.eveSessionId ?? null,
+    },
+  };
+}
+
+async function maybeBuildContextEnvelope(
+  taskId: string,
+  deps: ConductorActionDeps,
+): Promise<ContextEnvelopeV0 | null> {
+  try {
+    const builder = deps.buildContextEnvelope ?? buildContextEnvelope;
+    return await builder(taskId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('KernelDB not initialized')) return null;
+    throw err;
+  }
 }
 
 async function createArtifactFromDraft(
@@ -217,6 +245,7 @@ async function createArtifactFromDraft(
   handle: WorkerHandle,
   draft: ReceiptDraft,
   args: Record<string, unknown>,
+  derivedFrom: string[],
 ): Promise<CommandResult> {
   const attemptId = typeof args['attemptId'] === 'string' && args['attemptId'].trim()
     ? args['attemptId'].trim()
@@ -232,6 +261,7 @@ async function createArtifactFromDraft(
     contentHash: draft.contentHash ?? null,
     mediaType: draft.mediaType ?? null,
     sizeBytes: draft.sizeBytes ?? null,
+    derivedFrom,
     correlationId: task.correlationId,
     metadata: attemptId ? { ...(draft.metadata ?? {}), attemptId } : draft.metadata ?? {},
   });

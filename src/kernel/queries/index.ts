@@ -1,6 +1,11 @@
 import { getKernelDb } from '../database';
 import type { TaskStatus } from '../schema/types';
-import { queryTaskList as taskList, queryTaskGet as taskGet, type TaskSnapshot } from '../tasks/index';
+import {
+  queryTaskDependencies as taskDependencies,
+  queryTaskList as taskList,
+  queryTaskGet as taskGet,
+  type TaskSnapshot,
+} from '../tasks/index';
 import {
   queryReceiptList as receiptList,
   queryArtifactList as artifactList,
@@ -24,8 +29,10 @@ import {
   type WorkerSnapshot,
 } from '../worker-instances/index';
 import {
+  queryRun as runGet,
   queryWorkflowRegion as workflowRegion,
   queryWorkflowRegionList as workflowRegionList,
+  type WorkflowRun,
   type WorkflowRegion,
 } from '../workflows/index';
 import {
@@ -155,6 +162,74 @@ export function queryArtifactList(params: { workflowId?: string; taskId?: string
 
 export type { ArtifactSnapshot };
 
+export interface UpstreamArtifactSnapshot {
+  artifactId: string;
+  title: string;
+  uri: string | null;
+  kind: string;
+  verificationStatus: 'verified';
+  producedByTask: string;
+  producedByTaskTitle: string;
+  contentHash: string | null;
+  mediaType: string | null;
+  sizeBytes: number | null;
+}
+
+function sensitivityOf(artifact: ArtifactSnapshot): string {
+  const sensitivity = artifact.metadata['sensitivity'];
+  return typeof sensitivity === 'string' && sensitivity.trim() ? sensitivity.trim() : 'normal';
+}
+
+function verifiedArtifactIds(receipts: ReceiptSnapshot[]): Set<string> {
+  const ids = new Set<string>();
+  for (const receipt of receipts) {
+    if (receipt.type !== 'verification_passed') continue;
+    for (const ref of receipt.artifactRefs) {
+      if (typeof ref === 'string' && ref.trim()) ids.add(ref.trim());
+    }
+  }
+  return ids;
+}
+
+export function queryUpstreamArtifacts(
+  taskId: string,
+  options: { includeSensitive?: boolean } = {},
+): UpstreamArtifactSnapshot[] {
+  const db = getKernelDb();
+  const deps = taskDependencies(db).filter((dep) => dep.taskId === taskId && dep.kind === 'context_from');
+  const results: UpstreamArtifactSnapshot[] = [];
+  const seen = new Set<string>();
+
+  for (const dep of deps) {
+    const upstream = taskGet(db, dep.dependsOnTaskId);
+    if (!upstream || upstream.status !== 'complete') continue;
+
+    const receipts = receiptList(db, { taskId: dep.dependsOnTaskId, limit: 500 });
+    const verifiedIds = verifiedArtifactIds(receipts);
+    if (verifiedIds.size === 0) continue;
+
+    for (const artifact of artifactList(db, { taskId: dep.dependsOnTaskId })) {
+      if (!verifiedIds.has(artifact.id)) continue;
+      if (!options.includeSensitive && sensitivityOf(artifact) !== 'normal') continue;
+      if (seen.has(artifact.id)) continue;
+      seen.add(artifact.id);
+      results.push({
+        artifactId: artifact.id,
+        title: artifact.summary ?? upstream.title,
+        uri: artifact.uri,
+        kind: artifact.kind,
+        verificationStatus: 'verified',
+        producedByTask: upstream.id,
+        producedByTaskTitle: upstream.title,
+        contentHash: artifact.contentHash,
+        mediaType: artifact.mediaType,
+        sizeBytes: artifact.sizeBytes,
+      });
+    }
+  }
+  return results;
+}
+
 export function queryStateCardList(params: { workflowId?: string } = {}): StateCardSnapshot[] {
   return stateCardList(getKernelDb(), params);
 }
@@ -198,11 +273,15 @@ export function queryWorkflowRegion(workflowId: string): WorkflowRegion | null {
   return workflowRegion(getKernelDb(), workflowId);
 }
 
+export function queryRun(workflowId: string): WorkflowRun | null {
+  return runGet(getKernelDb(), workflowId);
+}
+
 export function queryWorkflowRegionList(): WorkflowRegion[] {
   return workflowRegionList(getKernelDb());
 }
 
-export type { WorkflowRegion };
+export type { WorkflowRegion, WorkflowRun };
 
 // ---------------------------------------------------------------------------
 // Evaluation queries (Goal 9) — read-only derived analysis

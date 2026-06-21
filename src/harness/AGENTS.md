@@ -104,6 +104,11 @@ After meaningful changes: update this file if local rules or owned scope changed
 - `eve/index.ts` is a minimal HTTP translator for local `quantflow-eve`: open session, send instruction, read one workspace artifact, return one draft plus path. Durability, recovery, subagents, and HITL are out of scope.
 - Harness adapters still never call `kernel.*`; callers post drafts through Kernel commands.
 
+## v4 R2 Addendum
+
+- `WorkerMessage.contextEnvelope` is the only harness delivery surface for R2 context. Adapters may receive it, but must not mutate Kernel state or synthesize artifact lineage themselves.
+- The deterministic mock harness records the full message for smoke assertions but keeps artifact content based on the task instruction, not copied upstream artifact bodies.
+
 ## v4 R4 Addendum
 
 - `runtime-manager/index.ts` is an injected control plane for cancel/restart/stale/recover. It may call injected runtime stop/start hooks, but every durable mutation goes through injected Kernel command dispatch.

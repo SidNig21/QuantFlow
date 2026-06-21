@@ -26,7 +26,13 @@ interface MockState {
 }
 
 export interface MockWorkerHarness extends WorkerHarness {
-  getRecordedSends(): Array<{ workerId: string; text: string; taskId: string | null }>;
+  getRecordedSends(): Array<{
+    workerId: string;
+    text: string;
+    taskId: string | null;
+    message: WorkerMessage;
+    contextEnvelope: unknown | null;
+  }>;
 }
 
 export interface MockHarnessOptions {
@@ -35,7 +41,13 @@ export interface MockHarnessOptions {
 
 export function createMockHarness(options: MockHarnessOptions = {}): MockWorkerHarness {
   const states = new Map<string, MockState>();
-  const sent: Array<{ workerId: string; text: string; taskId: string | null }> = [];
+  const sent: Array<{
+    workerId: string;
+    text: string;
+    taskId: string | null;
+    message: WorkerMessage;
+    contextEnvelope: unknown | null;
+  }> = [];
 
   function getState(handle: WorkerHandle): MockState {
     let state = states.get(handle.workerId);
@@ -64,7 +76,13 @@ export function createMockHarness(options: MockHarnessOptions = {}): MockWorkerH
       const state = getState(handle);
       state.status = 'working';
       state.sent.push(message);
-      sent.push({ workerId: handle.workerId, text: message.text, taskId: message.taskId ?? null });
+      sent.push({
+        workerId: handle.workerId,
+        text: message.text,
+        taskId: message.taskId ?? null,
+        message,
+        contextEnvelope: message.contextEnvelope ?? null,
+      });
 
       const artifactRoot = resolve(message.artifactRoot ?? options.artifactRoot ?? join(process.cwd(), 'artifacts'));
       mkdirSync(artifactRoot, { recursive: true });
