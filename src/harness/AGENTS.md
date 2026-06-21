@@ -108,3 +108,4 @@ After meaningful changes: update this file if local rules or owned scope changed
 
 - `runtime-manager/index.ts` is an injected control plane for cancel/restart/stale/recover. It may call injected runtime stop/start hooks, but every durable mutation goes through injected Kernel command dispatch.
 - The manager must not import Electron or write SQLite directly. Stale workers are marked through `kernel.worker.status_update`; recovered work goes through `kernel.task.recover`.
+- `sim/index.ts` is a deterministic smoke harness that wraps `mock`; do not register it as a separate production harness or duplicate mock artifact-writing logic.
