@@ -217,6 +217,37 @@ second MCP server beside `tools/quantflow-mcp`.
 
 ---
 
+## Operator spawn model — Mode 1 vs Mode 2 (decided 2026-06-20)
+
+The "two lanes / herdr vs eve / harness kind" framing was builder jargon and
+caused a real UX mistake in R8. The operator vocabulary is **two spawn modes**:
+
+| Mode | What happens | Used by |
+| --- | --- | --- |
+| **Mode 1 — terminal summon** (default for **all** agents incl. Eve) | legend click → **terminal tile** → the operator chats/works directly | the **legend bar** + settings inventory, every day |
+| **Mode 2 — background task** (optional, automation) | Conductor `assign_task` → `eve-harness` (headless) → artifact verify | the **Conductor/DAG** path (R1), when the Kernel must prove completion |
+
+Rules that follow:
+- **Legend bar = Mode 1 only.** A legend click opens a terminal tile the operator
+  drives — identical feel for Codex, Claude, Python, **and Eve** (Eve = `eve dev`
+  TUI in its package folder, same as any CLI recipe).
+- **`eve-harness` is Mode 2 only** — it is **not** the default Eve spawn path. Keep
+  it (R1 proof + future pods/automation depend on it); never wire it to a dock click.
+- **`herdr` is plumbing, not an agent** — "this terminal runs in WSL." It is an
+  implementation detail of Mode 1, never part of the operator model.
+- Three verbs on the same agent, kept distinct: **author** (Eve package =
+  `instructions.md` + `tools/`), **summon** (Mode 1, legend), **automate** (Mode 2,
+  Conductor). R8 owns *summon*; Eve-first *authoring* is the R8.5 follow-on; R1 owns
+  *automate*.
+
+> **R8 correction:** R8 shipped Eve as Mode 2 (idle headless tile) on a legend
+> click. The fix is to make the Eve recipe spawn a **Mode 1 terminal tile** like a
+> CLI role (`commandTemplate` + `cwd` + `runtimeTarget: local-shell`), and stop
+> using `harnessKind: eve-harness` for the dock click. This is an **R8 scope
+> clarification, not a rewrite** — R0/R1/the R8 registry all stand.
+
+---
+
 # v4 Goal Status
 
 This section is the durable progress ledger for the v4 branch.
@@ -231,7 +262,7 @@ This section is the durable progress ledger for the v4 branch.
 | R5 — Human checkpoint / deepen loop | Scoped / awaiting authorization | — | — | — | Pausable/resumable run; candidate-set artifact; token-bound human selection; deepening tasks spawn. Enforces the decision-authority rule. |
 | R6 — Run templates | Scoped / awaiting authorization | — | — | — | Scout / Research / Deep as saved plan-layer Conductor plans (DAG + roles + budgets + stop + artifact expectations + per-phase attention profiles). |
 | R7 — Judgment & compounding | Scoped / awaiting authorization | — | — | — | Run Replay (projection), semantic verification escalation, typed research artifacts + provenance, decision/outcome/lesson logs, eval auto-trigger, RL schema prep. |
-| R8 — One-click agent/tool onboarding (legend bar) | **Machine proof ✅ verified · product proof pending (operator UI run)** | Cursor | Claude | 2026-06-20 (machine) | **Operator-added** (beyond the territory-map spine). Diff `24f26db..98c32bf` (15 files, no Kernel/schema) verified against code: data-driven registry `legend-recipes.ts` (`BUILT_IN_LEGEND_RECIPES` 7 seeds + `QUANTFLOW_DIR/roles/*.json` + `QUANTFLOW_DIR/eve-packages/*/manifest.json`); "+ Add" form → `legendCreate` IPC → disk write → refresh (no rebuild); **real** readiness badge via `runPreflight()` → `mapHealthLevelToBadge` (healthy/degraded/down → green/amber/red); **one spawn path** (`spawnLegendRecipeViaRolePath → spawnRoleTileAt`, `harnessKind` the only Eve/CLI fork; Eve row makes the worker available, not run-task); R1 `eve-harness` made dock-selectable. Machine proof green: legend-dock 12 / legend-spawn 9 / legend-recipes 5 + full cumulative regression (444 pass / 0 fail, `qa/r8-section5-regression-output.log`). **Disclosed trims:** `legend:update` plumbed in main IPC but not preload-wired (create/remove is the tested contract; wire update when an edit-UI is needed); not-ready = spawnable-but-flagged (handoff-permitted). **Remaining:** operator runs the live UI product proof (+ Add → badge → spawn tile) → then flip to Complete. Built by Cursor (Codex rate-limited). |
+| R8 — One-click agent/tool onboarding (legend bar) | **Engine ✅ verified · Mode-1 spawn correction pending** (see Operator spawn model) | Cursor | Claude | 2026-06-20 (engine) | **Operator-added** (beyond the territory-map spine). **Engine verified** (diff `24f26db..98c32bf`, 15 files, no Kernel/schema): data-driven registry `legend-recipes.ts` (7 seeds + `roles/*.json` + `eve-packages/*/manifest.json`); "+ Add" disk write + refresh (no rebuild); **real** readiness badge via `runPreflight()`; shared spawn path; machine proof green (legend-dock 12 / legend-spawn 9 / legend-recipes 5; 444/0 regression). **CORRECTION REQUIRED before Complete (decided 2026-06-20):** R8 wired an Eve legend click to **Mode 2** (`harnessKind: eve-harness` → idle headless tile). Legend must be **Mode 1** (terminal summon) for *all* agents incl. Eve. Fix: Eve recipe spawns a terminal tile like a CLI role (`commandTemplate`+`cwd`+`runtimeTarget: local-shell`), remove the eve-harness fork from the dock click, update R8 tests to expect terminal spawn; **keep `eve-harness` for Mode 2 (Conductor) only**. Product proof = legend-click Eve opens a working `eve dev` TUI tile. **Carried trims:** `legend:update` not preload-wired; not-ready = spawnable-but-flagged. The "+ Add" modal is also being demoted in favor of Eve-first *authoring* (→ R8.5, `docs/v4/INCOMING_GOALS.md`). |
 
 > **Operator priority (reliability + extensibility over run-time):** the operator
 > has set the focus on **reliable parallel orchestration** and **easy addition of
@@ -242,6 +273,13 @@ This section is the durable progress ledger for the v4 branch.
 > matters (an edge-finder must not act on unchecked evidence); R7's *RL/lessons
 > compounding* and any run-time/latency tuning are explicitly deprioritized.
 > Suggested near-term order: **R0 → R1 → R8 → R3 → R4** (then R5/R6, R7-verify).
+>
+> **Dogfooding axis (updated 2026-06-20, after the Mode-1/Mode-2 clarification):**
+> for *daily-use feel* the order is **finish R8 (Mode-1 Eve summon) → R8.5 (settings
+> agent inventory + Eve-first authoring) → R3 (DAG/pods) → R4 (durability)**. **R2
+> (Context Envelope) is paused** — it serves Mode-2 multi-worker handoffs and does
+> **not** block legend summon. R1 stays Complete; this reorders only the dogfooding
+> track, not the structural value rungs.
 
 > **Eve substrate (decided 2026-06-19) — see the § Eve Integration section below.**
 > Eve = the durable worker substrate behind the harness; Kernel still owns truth
@@ -1897,11 +1935,16 @@ cases. Readiness is **derived** from the R0 probe per row (Eve row checks
 - A custom recipe resolves to its `roleId` and spawns through the shared
   role-spawn path (asserted with a fake spawn) — no special path.
 
-### Product proof (manual)
+### Product proof (manual) — Mode 1 (terminal summon)
 
-The operator clicks **"+ Add"**, defines a new agent/tool (e.g. a `python`
-"odds-scraper" script tile, or a second `researcher`), it appears in the bar with
-a readiness badge, and spawns a working tile — **no source edit, no rebuild**.
+A new agent/tool appears in the bar with a readiness badge and **spawns a working
+**Mode-1 terminal tile** — **no source edit, no rebuild**:
+- A **CLI recipe** (e.g. a `python` "odds-scraper") → terminal tile.
+- An **Eve recipe** → a **terminal tile running the `eve dev` TUI** in its package
+  folder (NOT an idle headless tile). Eve summons exactly like Codex.
+> The headless `eve-harness` path is **Mode 2** (Conductor automation) and is
+> proven separately by R1 — it is **not** what a legend click does. See
+> § "Operator spawn model — Mode 1 vs Mode 2".
 
 ### Regression Guard
 
