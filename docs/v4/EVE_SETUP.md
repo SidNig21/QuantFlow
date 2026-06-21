@@ -38,6 +38,27 @@ Hard-won gotchas:
 - `@openrouter/ai-sdk-provider` targets `ai@^6` and does NOT fit Eve's `ai@7-beta`; use `@ai-sdk/openai-compatible` (works for OpenRouter too — just swap `baseURL`/key).
 - Model menu (bare ids): `deepseek-v4-pro`/`-flash` · `glm-5.2`/`5.1`/`5` · `kimi-k2.7-code`/`k2.6` · `qwen3.7-max`/`-plus` · `minimax-m3`/`m2.7` · `mimo-v2.5-pro`.
 
+## eve-harness wiring (R1+) — how QuantFlow talks to this agent
+
+R1 shipped a minimal `eve-harness` (`src/harness/eve/index.ts`) that drives this
+agent over HTTP. It is configured by two env vars (with sensible defaults):
+
+| Env var | Default | What it is |
+| --- | --- | --- |
+| `QF_EVE_BASE_URL` | `http://127.0.0.1:3000` | Where the `eve dev` server is listening. **Eve's scaffold default is `:3000`; set this if you run on another port.** |
+| `QF_EVE_WORKSPACE` | process cwd | The folder the Eve agent writes artifacts into; structural verify reads the bytes back from here. |
+
+> **Proven R1 product-proof config (2026-06-20):** the agent ran on **port 2000**,
+> so the proof set `QF_EVE_BASE_URL=http://127.0.0.1:2000` and
+> `QF_EVE_WORKSPACE=C:\Users\rybow\quantflow-eve\qf-artifacts`. Confirm your actual
+> `eve dev` port (the TUI prints it on start) and set `QF_EVE_BASE_URL` to match —
+> the code default is `:3000`, so a `:2000` instance **needs** the override.
+
+The harness opens the Eve session on the **first `send`** (the task text is the
+first model turn), reads the NDJSON stream, parses the pinned `ARTIFACT_PATH:`
+line, reads that file from the workspace, and returns a `ReceiptDraft` — it never
+writes Kernel state (F4). The caller posts `artifact.create` + `submit`.
+
 ## When you actually need this
 - **R0:** you need **none** of this. R0's Eve-lane probe only checks reachability +
   that a key is present. Don't set up Eve for R0.
