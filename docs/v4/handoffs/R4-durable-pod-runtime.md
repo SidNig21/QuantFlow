@@ -1,8 +1,8 @@
 # v4 Rung Handoff — R4 — Durable Pod Runtime
 
 **For:** Codex (builder)  ·  **Branch:** `quantflow-v4`  ·  **Verifier:** Claude
-**Depends on:** R0 ✅ · R1 ✅ · R3 (DAG + one task authority) — **operator is finishing
-R3c-b (Envoy→Kernel consolidation) before you start; assume one task authority exists.**
+**Depends on:** R0 ✅ · R1 ✅ · **R3 ✅ — Complete/approved 2026-06-21** (DAG + Workflow-as-Run
++ one task authority; Envoy is now a read-only Kernel mirror, `smoke:authority` green).
 
 > **This is the heaviest rung — weeks, not days.** Design around *partial failure as
 > the norm*, not the happy path. Build it as the ordered sub-milestones in §2 with
@@ -30,6 +30,9 @@ plan wins — flag it, don't silently pick.**
     `queryTaskDependencies` / `queryVerifiedTaskIds`, and `kernel.task.depend`.
   - `src/harness/mock/index.ts` → the deterministic mock harness (multi-task capable;
     resets `collected` per send). **Your `sim` harness EXTENDS this — see §2 R4c (F11).**
+  - **DB test seam (added during R3c-b):** `src/kernel/database.ts` exposes
+    `setKernelDbForTesting` / `loadBetterSqlite3` so smokes inject an in-memory DB. **Use this
+    pattern in `smoke:pod`** (and study `smoke:dag` / `smoke:authority` as the working examples).
   - The R1 idempotency seam: `attemptId` is already threaded onto `submit`/`verify` and
     recorded on receipt metadata — **R4 ENFORCES exactly-once on top of it** (R1 left dedup
     out on purpose).
@@ -151,17 +154,15 @@ bun run smoke:kernel-task && bun run smoke:state-card && bun run smoke:conductor
 bun run smoke:conductor-actions && bun run smoke:conductor-loop && bun run smoke:worker-harness && \
 bun run smoke:harness-interface && bun run smoke:workflow-region && bun run smoke:vault-export && \
 bun run smoke:eval && bun run smoke:capability-preflight && bun run smoke:task-atom && \
-bun run smoke:dag && bun run smoke:pod && \
+bun run smoke:dag && bun run smoke:authority && bun run smoke:pod && \
 bun test src/main/harness-ops.test.ts && bun test src/main/diagnostics/health-runner.test.ts && \
 bun test ../src/main/conductor/dag-scheduler.test.ts && bun run build
 cd ../tools/quantflow-mcp && node --test
 ```
-- **`smoke:dag` and `smoke:task-atom` must stay green** — proves the R3 DAG + R1 atom are
-  intact under the new runtime. The migration is **additive**; existing rows get the new
-  worker columns as NULL/defaults.
-- Note: `smoke:authority` (R3c-b) lands with the operator's Envoy consolidation; include it
-  in the stack **if present** when you run. `smoke:context-flow` (R2) does not exist (R2
-  deferred) — omit it.
+- **`smoke:dag`, `smoke:authority`, and `smoke:task-atom` must stay green** — proves the R3 DAG
+  + one task authority + R1 atom are intact under the new runtime. The migration is **additive**;
+  existing rows get the new worker columns as NULL/defaults.
+- Note: `smoke:context-flow` (R2) does not exist (R2 deferred) — omit it.
 
 ## 5. Verification handoff — paste THIS back (so the verifier needs no repo access)
 1. **Diff** — `git diff <last-approved-ref>..HEAD` (or: changed-files list + full contents of
