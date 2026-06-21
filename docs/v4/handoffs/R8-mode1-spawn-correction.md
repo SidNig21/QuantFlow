@@ -25,29 +25,67 @@ CLI recipe). `eve-harness` is **Mode 2** (Conductor automation) and must be
     `isEveHarness` branch (added in R8) that early-returns an idle tile. **This is
     the Mode-2 leak in the UI spawn path.**
   - `quantflow-electron/src/windows/shell/src/legend-spawn.js` — `spawnLegendRecipeViaRolePath`, recipe→role synthesis.
-  - `quantflow-electron/src/main/legend-recipes.ts` — `manifestToLegendRecipe` (Eve recipe shape), `EvePackageManifest`.
+  - `quantflow-electron/src/main/legend-recipes.ts` — registry assembly:
+    `readCustomLegendRoles` (`roles/*.json`) **and** `readEveManifestRecipes`
+    (`eve-packages/*/manifest.json`) + `manifestToLegendRecipe`. **The manifest path
+    is being collapsed away (see §2.1).**
   - `quantflow-electron/src/main/conductor/conductor-actions.ts` + `harness-service.ts` — the **Mode-2** path (leave intact).
+  - `src/harness/eve/index.ts` (repo-root `src/`, **not** under `quantflow-electron/`) — the Mode-2 harness; reads `QF_EVE_BASE_URL` env. Leave intact.
 
 ## 2. Build (the correction — keep it minimal)
-1. **Eve recipe carries a Mode-1 launch spec.** An Eve package recipe must spawn a
-   terminal like a CLI role. Give the Eve recipe/manifest a launch command + working
-   dir: `commandTemplate` (e.g. `npm run dev` or `eve dev`), `cwd` (the Eve project
-   folder, e.g. `C:\Users\rybow\quantflow-eve`), `runtimeTarget: local-shell`
-   (Eve runs natively on Windows per EVE_SETUP — **not** herdr/WSL). Extend
-   `EvePackageManifest` + `manifestToLegendRecipe` accordingly. `endpoint` /
-   `modelHint` stay on the recipe but are **Mode-2 metadata**, not used for the click.
+
+> **Key insight (operator, 2026-06-20):** for Mode-1 a single Eve persona is **just a
+> `role.json` that runs `npm run dev` in a folder** — there is nothing special about
+> it vs a CLI row. So collapse the registry to **one shape (`roles/*.json`)** and
+> drop the `eve-packages/manifest.json` split from the legend. Multiple
+> provider/model combos = **multiple Eve folders = multiple `role.json` rows**, each
+> with its own `.env.local`. QuantFlow does **not** route models — each row points at
+> a process; the process brings its keys.
+
+1. **Collapse the legend registry to `roles/*.json` only.** Remove the
+   `eve-packages/*/manifest.json` discovery from `legend-recipes.ts`
+   (`readEveManifestRecipes` / `manifestToLegendRecipe` / `EvePackageManifest`) so
+   `roles/*.json` is the **single** source for dock recipes. An **Eve persona** is a
+   normal role row:
+   ```json
+   {
+     "id": "research-opencode",
+     "name": "Research",
+     "description": "Eve · OpenCode deepseek-v4-pro",
+     "commandTemplate": "npm run dev",
+     "cwd": "C:\\Users\\rybow\\agents\\research-opencode",
+     "runtimeTarget": "windows-pty",
+     "icon": "hermes", "color": "#6366f1",
+     "showInLegend": true, "legendType": "agent",
+     "modelHint": "deepseek-v4-pro"
+   }
+   ```
+   `modelHint` is a **dock label only** (real model/provider lives in that folder's
+   `agent.ts` + `.env.local`). `endpoint`/`harnessKind`/manifest are **not** part of
+   the legend recipe anymore. (Mode-2 per-recipe endpoint routing for multiple Eve
+   agents is deferred to **R4**; today Mode-2 uses the single `QF_EVE_BASE_URL`.)
 2. **Remove the Mode-2 fork from the dock spawn.** In `role-tile-spawn.js`, drop the
-   `isEveHarness` early-return (idle tile + `status_update`). An Eve recipe now flows
-   through the **same terminal path as Codex/CLI** (`runtimeTarget` decides
-   local-shell vs herdr; Eve = local-shell). One spawn path, no harnessKind fork in
-   the UI.
-3. **Keep `eve-harness` for Mode 2.** Do **not** delete or alter `src/harness/eve/*`
-   or the Conductor `assign_task`/`harness.send` path. Mode 2 is invoked only by the
-   Conductor, never by a legend click.
-4. **Update R8 tests** to the corrected behavior: an Eve recipe spawns a **terminal
-   tile** (assert the command/cwd reach the terminal spawn), **not** a headless
-   early-return. Fix `legend-spawn.test.ts` / any role-tile-spawn test that asserted
-   the old idle behavior.
+   `isEveHarness` early-return (idle tile + `status_update`) entirely. Every recipe —
+   built-in, CLI, or Eve — flows through the **same terminal path**; `runtimeTarget`
+   alone decides PTY (`windows-pty` → local-shell) vs herdr (`herdr-wsl`). No
+   `harnessKind` fork in the UI spawn.
+3. **Make the recipe's `cwd` reach the spawn.** The PTY path already honors
+   `options.cwd ?? getTerminalCwd()` — ensure `spawnLegendRecipeViaRolePath` /
+   `legend-spawn` passes the recipe's `cwd` into `options.cwd` so `npm run dev` runs
+   in the Eve folder.
+4. **Multiple Eve tiles = multiple ports.** Each `eve dev` binds one port. Support
+   recipes whose `commandTemplate` runs a port-specific script (e.g.
+   `npm run dev:research` → `eve dev --port 3001`). No special handling needed beyond
+   honoring `commandTemplate` verbatim — just don't hardcode a single port.
+5. **Keep `eve-harness` (Mode 2) untouched.** Do **not** delete/alter
+   `src/harness/eve/*` or the Conductor `assign_task`/`harness.send` path. Mode 2 is
+   invoked only by the Conductor, never by a legend click. (It reads `QF_EVE_BASE_URL`
+   from env, so removing the manifest discovery does not affect it.)
+6. **Update R8 tests** to the corrected behavior: an Eve `role.json` spawns a
+   **terminal tile** (assert `commandTemplate`/`cwd`/`runtimeTarget` reach the spawn),
+   **not** a headless early-return. Remove/replace the `eve-packages` manifest
+   discovery tests in `legend-recipes.test.ts`; fix any `legend-spawn`/role-tile-spawn
+   test asserting the old idle behavior.
 
 ## 3. Hard guardrails — do NOT
 - Make a **legend click** open a headless / idle tile for any agent. Legend = Mode 1.
@@ -55,17 +93,25 @@ CLI recipe). `eve-harness` is **Mode 2** (Conductor automation) and must be
   into `role-tile-spawn` for a click.
 - Delete or weaken `eve-harness` / the Conductor Mode-2 path (R1 depends on it).
 - Add a third "lane" / new vocabulary. Mode 1 / Mode 2 only.
-- Touch Kernel or schema. No registry → Kernel truth (roles/manifests stay config).
+- Keep the `eve-packages/manifest.json` discovery in the legend — collapse to one
+  registry shape (`roles/*.json`). (The `EvePackageManifest` type may be removed or
+  left dormant; it must no longer feed the dock.)
+- Make QuantFlow "route models" — each row points at a process that brings its own
+  keys (`.env.local` + `agent.ts`). `modelHint` is a label only.
+- Touch Kernel or schema. No registry → Kernel truth (roles stay config).
 - Build the Settings inventory or Eve-first *authoring* scaffolding — that's R8.5
   (`docs/v4/INCOMING_GOALS.md`), a separate pass.
 - One correction only. Commit locally. **Do NOT push. Do NOT self-approve.**
 
 ## 4. Definition of done (acceptance)
 **Machine proof (CI):**
-- R8 tests updated + green: an Eve recipe resolves to a **terminal spawn** with the
-  right `commandTemplate`/`cwd`/`runtimeTarget: local-shell` (assert via fake spawn);
-  no headless early-return remains. Built-ins + CLI recipes spawn unchanged.
-- The shared spawn path still has **no harnessKind fork in the UI** (one path).
+- R8 tests updated + green: an Eve `role.json` resolves to a **terminal spawn** with
+  the right `commandTemplate`/`cwd`/`runtimeTarget` (assert via fake spawn); no
+  headless early-return remains. Built-ins + CLI recipes spawn unchanged.
+- The registry reads **`roles/*.json` only** (the `eve-packages` manifest discovery
+  is gone); `legend-recipes.test.ts` reflects the single shape.
+- The shared spawn path still has **no harnessKind fork in the UI** (one path), and
+  the recipe `cwd` reaches the spawn.
 
 **Product proof (operator, manual — Mode 1):**
 - Legend click **Eve recipe** → a **terminal tile** opens running the `eve dev` TUI

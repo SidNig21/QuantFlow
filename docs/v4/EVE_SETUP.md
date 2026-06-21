@@ -38,6 +38,51 @@ Hard-won gotchas:
 - `@openrouter/ai-sdk-provider` targets `ai@^6` and does NOT fit Eve's `ai@7-beta`; use `@ai-sdk/openai-compatible` (works for OpenRouter too — just swap `baseURL`/key).
 - Model menu (bare ids): `deepseek-v4-pro`/`-flash` · `glm-5.2`/`5.1`/`5` · `kimi-k2.7-code`/`k2.6` · `qwen3.7-max`/`-plus` · `minimax-m3`/`m2.7` · `mimo-v2.5-pro`.
 
+## Multiple personas / providers — one folder each (the legend model)
+
+Eve gives you **as many provider/model combos as you have agent folders.** There is
+no global "provider hub" — each Eve package is one persona with one default model in
+`defineAgent`, its own `.env.local`, and (in Mode 1) **one legend row**. Want
+OpenCode Go *and* OpenRouter? That's **two folders, two `.env.local`, two rows.**
+
+```text
+C:\Users\rybow\agents\
+  research-opencode\   → OpenCode Go + deepseek-v4-pro   (.env.local: OPENCODE_GO_API_KEY)
+  review-openrouter\   → OpenRouter + claude-sonnet       (.env.local: OPENROUTER_API_KEY)
+  scout-fast\          → OpenRouter + a cheap model       (.env.local: OPENROUTER_API_KEY)
+```
+
+OpenCode Go variant = the proven config above. **OpenRouter variant** (same
+`@ai-sdk/openai-compatible`, just swap baseURL/key/model id):
+```ts
+import { defineAgent } from "eve";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+
+const openrouter = createOpenAICompatible({
+  name: "openrouter",
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+export default defineAgent({
+  model: openrouter("anthropic/claude-sonnet-4"),   // an OpenRouter model id
+  modelContextWindowTokens: 200000,
+});
+```
+
+**Running several at once:** each `eve dev` binds one port. Give each package a
+port-specific script and point its legend recipe's `commandTemplate` at it:
+```jsonc
+// package.json
+"scripts": { "dev:research": "eve dev --port 3001" }
+```
+One persona per port when you run multiple tiles together.
+
+> **Legend recipe = a plain `role.json`** (`commandTemplate: "npm run dev"`, `cwd:
+> <that folder>`, `runtimeTarget: "windows-pty"`, `modelHint` as a label). The model
+> /provider truth lives in the folder's `agent.ts` + `.env.local` — QuantFlow does
+> **not** route models. (See `BUILD_PLAN_V4.md` § Operator spawn model; the
+> `eve-packages/manifest.json` split is being collapsed to `roles/*.json`.)
+
 ## eve-harness wiring (R1+) — how QuantFlow talks to this agent
 
 R1 shipped a minimal `eve-harness` (`src/harness/eve/index.ts`) that drives this
