@@ -185,7 +185,7 @@ export function buildWorkflowActivationLine(params: {
 }): string {
   const skillRef = resolveSkillWslPath(params.skillPath);
   return [
-    "Read the Envoy inbox and claim your task via qf_task_list / qf_task_claim.",
+    "Read your Kernel task and claim it via qf_task_list / qf_task_claim.",
     params.canvasId ? `canvas_id=${params.canvasId}` : "",
     params.envoySpaceId ? `envoy_space_id=${params.envoySpaceId}` : "",
     `correlation_id=${params.correlationId}`,
@@ -217,7 +217,9 @@ export function buildCodexWorkerPrompt(params: {
     params.envoySpaceId ? `envoy_space_id=${params.envoySpaceId}` : "",
     params.claimingTileId ? `claiming_tile_id=${params.claimingTileId}` : "",
     `Read the canvas skill file: ${skillRef}`,
-    "Post progress with qf_task_update and finish with qf_task_complete.",
+    "If you are given a Context Envelope, build on its verified upstream_artifacts — do not redo upstream work.",
+    "Post progress with qf_task_update. Produce a real artifact file, then finish with qf_task_submit (passing your artifact).",
+    "A verifier will qf_task_verify. Do NOT call qf_task_complete — it bypasses verification and breaks downstream tasks.",
   ].filter(Boolean).join(" ");
 }
 

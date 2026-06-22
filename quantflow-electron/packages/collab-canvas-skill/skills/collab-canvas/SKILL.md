@@ -277,6 +277,58 @@ qf terminal read <id> [--lines N]
 
 - `--lines N`: number of lines to capture (default: 50)
 
+## Working in a Workflow (tasks, context, verification)
+
+The `qf` CLI above controls the **canvas** (tiles, layout, cables). When you are a
+**worker in a QuantFlow run**, you also coordinate through the **Kernel** — the source
+of truth for tasks, artifacts, and receipts — using the **MCP tools** (`qf_task_*`,
+`quantflow_kernel_*`). The canvas is what the human sees; the Kernel is what's real.
+
+### The task lifecycle — claim → work → submit → verify
+
+When you are assigned a task, follow this exact sequence. Do **not** invent your own.
+
+1. **Find your task.** `qf_task_list` → the task assigned to you (its `objective`,
+   `acceptance_criteria`, and `status`). Work the task in its objective, not what you
+   assume — if you're unsure, read the context (below) before acting.
+2. **Claim + start** (if not already): `qf_task_claim`, then begin work.
+3. **Produce a real artifact.** Write your deliverable to a **file** (e.g. a markdown
+   note in the vault). A task is not done until there is an artifact on disk.
+4. **Submit with the artifact:** `qf_task_submit` with the artifact reference. **Submitting
+   with no artifact is rejected** — the Kernel requires a real output to verify.
+5. **Verification is done by a different worker**, via `qf_task_verify`. You do not verify
+   your own work.
+
+> **Never call `qf_task_complete`.** That is a legacy bypass that completes a task *without*
+> a `verification_passed` receipt. The run/DAG gates — and every downstream task — require
+> that receipt: a downstream task cannot even be claimed until its upstream is `complete`
+> **and** verified. If you `complete` instead of `submit→verify`, you silently break the
+> pipeline. Always `qf_task_submit`; let a verifier `qf_task_verify`.
+
+### Use the context you're given (don't redo upstream work)
+
+A task you're assigned may arrive with a **Context Envelope** — it lists
+`upstream_artifacts`: the **verified** outputs of the tasks before yours, by
+`artifact_id` + `uri` + `produced_by_task`. **Read them and build on them.** If an
+upstream task already collected the data or wrote the analysis, consume that artifact —
+do not re-collect or re-derive it. When your output is built from an upstream artifact,
+the Kernel records the lineage (`derived_from`) automatically on submit.
+
+### See the real state before you act (don't guess)
+
+Read Kernel truth instead of assuming — these are read-only:
+
+```text
+quantflow_kernel_run              # the run: its tasks, artifacts, receipts, mode, status
+quantflow_kernel_state_cards      # current per-tile reality (who's doing what, blockers)
+quantflow_kernel_workflow_region  # one workflow's status / counts / blocked tasks
+quantflow_kernel_workflow_regions # all workflows
+quantflow_kernel_evals            # evaluation rows (non-authoritative)
+```
+
+If a multi-agent run "feels" wrong (you don't know your task, or what others produced),
+`qf_task_list` + `quantflow_kernel_run` tell you the truth — guessing is how runs misfire.
+
 ## Composition Patterns
 
 ### Side-by-side comparison

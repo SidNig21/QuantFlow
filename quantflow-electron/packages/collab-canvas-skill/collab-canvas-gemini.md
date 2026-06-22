@@ -102,6 +102,27 @@ qf connection log <connection-id> --limit 10
 qf viewport set --pan 0,0 --zoom 0.8
 ```
 
+## Working in a Workflow (Kernel tasks)
+
+The `qf` CLI controls the canvas; task coordination runs through the **Kernel** via the
+MCP tools (`qf_task_*`, `quantflow_kernel_*`). The Kernel is the source of truth.
+
+**Task lifecycle — do not skip steps:**
+1. `qf_task_list` — find your assigned task (`objective`, `acceptance_criteria`, `status`).
+2. `qf_task_claim` → do the work → write a **real artifact file**.
+3. `qf_task_submit` **with the artifact** (submitting with no artifact is rejected).
+4. A **different** worker runs `qf_task_verify`. You do not verify your own work.
+
+**Never call `qf_task_complete`** — it bypasses verification. The run/DAG gates require a
+`verification_passed` receipt, and a downstream task cannot start until its upstream is
+complete **and** verified. Always `submit` → let a verifier `verify`.
+
+**Use the context you're given:** if your task arrives with a Context Envelope, its
+`upstream_artifacts` are the **verified** outputs of prior tasks — build on them, don't redo them.
+
+**See real state, don't guess:** `quantflow_kernel_run` / `quantflow_kernel_state_cards` /
+`quantflow_kernel_workflow_region` show Kernel truth. If a run feels wrong, read it.
+
 ## Conventions
 
 1. Always `qf tile list` first to see existing tiles before creating new ones.

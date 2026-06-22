@@ -204,6 +204,10 @@ describe("worker activation prompts", () => {
 
     expect(prompt).toContain("qf_task_claim");
     expect(prompt).toContain("Do not wait for terminal instructions");
+    // Track A: the worker prompt teaches submit→verify, never the legacy bypass.
+    expect(prompt).toContain("qf_task_submit");
+    expect(prompt).not.toContain("finish with qf_task_complete");
+    expect(prompt).toContain("Do NOT call qf_task_complete");
     expect(command).toContain(" exec ");
     expect(command).toContain("--dangerously-bypass-approvals-and-sandbox");
     expect(command).toContain("--skip-git-repo-check");
