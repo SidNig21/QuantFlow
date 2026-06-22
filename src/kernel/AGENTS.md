@@ -106,3 +106,9 @@ After meaningful changes: update this file if local rules or owned scope changed
 - Worker statuses are runtime statuses only: `spawning`, `active`, `assigned`, `idle`, `stale`, `stopped`, `error`, `failed`. Do not store task-like `working` or `blocked` on workers.
 - `kernel.task.recover` is the Kernel-owned recovery path for returning non-terminal stale work to `open`; runtime managers must call it rather than editing task rows.
 - `attemptId` is the exactly-once key for artifact/create + submit/verify/complete retry handling. Retries with the same attempt must not post duplicate evidence.
+
+## v4 R5 Addendum
+
+- `workflows.checkpoint_state` is the run-instance checkpoint pause field. R5 uses `awaiting-selection` while waiting for an operator choice and `resumed` after a valid selection; `workflows.status = paused` remains mission-level pause state.
+- Candidate sets are Kernel artifacts with `kind = 'candidate'`. They are not mutable UI state.
+- Human checkpoint selections are recorded as append-only `human_decision` receipts. Deepening tasks must be created through Kernel task commands and linked with `kernel.task.depend`.

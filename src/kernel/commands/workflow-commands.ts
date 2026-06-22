@@ -3,6 +3,11 @@ import type { KernelDB } from '../database';
 import { emitKernelEvent } from '../events/index';
 import type { CommandResult } from './types';
 
+function hasWorkflowColumn(db: KernelDB, name: string): boolean {
+  const rows = db.prepare("PRAGMA table_info('workflows')").all() as Array<{ name: string }>;
+  return rows.some((row) => row.name === name);
+}
+
 export function handleWorkflowCommand(
   db: KernelDB,
   type: string,
@@ -50,6 +55,10 @@ function workflowUpdate(db: KernelDB, payload: Record<string, unknown>): Command
     if (payload['name'] !== undefined) { fields.push('name = ?'); values.push(payload['name']); }
     if (payload['objective'] !== undefined) { fields.push('objective = ?'); values.push(payload['objective']); }
     if (payload['status'] !== undefined) { fields.push('status = ?'); values.push(payload['status']); }
+    if (payload['checkpointState'] !== undefined && hasWorkflowColumn(db, 'checkpoint_state')) {
+      fields.push('checkpoint_state = ?');
+      values.push((payload['checkpointState'] as string | null) ?? null);
+    }
     if (fields.length === 0) return { ok: false, error: 'workflow.update: no fields to update' };
     fields.push('updated_at = ?');
     values.push(Date.now());

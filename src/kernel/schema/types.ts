@@ -68,6 +68,7 @@ export type ReceiptType =
   | 'verification_failed'
   | 'task_completed'
   | 'task_failed'
+  | 'human_decision'
   // Conductor planning evidence (Goal 5A). The read-only Conductor records its
   // plan/reads/blockers/next-action as an append-only planning receipt. It is
   // not a task transition — it never advances a task.

@@ -86,12 +86,16 @@ verification_passed
 verification_failed
 task_completed
 task_failed
+human_decision
 planning
 ```
 
 The `planning` receipt (Goal 5A) is the read-only Conductor's evidence of a plan
 (reads/blockers/next action). It is append-only like all receipts and never
 advances a task — it is not a task transition.
+
+The `human_decision` receipt (v4 R5) is the append-only evidence of a
+token-bound operator selection at a checkpoint.
 
 ---
 

@@ -11,9 +11,9 @@
 import { ipcMain } from 'electron';
 import { readConductorView, runConductorPlan } from './conductor-reader';
 import { createConductorActions, type ConductorSpawnRole } from './conductor-actions';
-import { createConductorLoop, proposeNextAction } from './conductor-loop';
+import { createConductorLoop, proposeNextAction, type CheckpointRequest } from './conductor-loop';
 import { dispatchKernelCommand } from '../../kernel/commands/index';
-import { queryConductorContext, queryReceiptList } from '../../kernel/queries/index';
+import { queryArtifactList, queryConductorContext, queryReceiptList } from '../../kernel/queries/index';
 import { getKernelDb } from '../../kernel/database';
 import { queryRun } from '../../kernel/workflows/index';
 
@@ -52,6 +52,41 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
     readRun: (workflowId) => queryRun(getKernelDb(), workflowId),
     pauseRun: (workflowId, reason) =>
       dispatchKernelCommand('kernel.workflow.update', { id: workflowId, status: 'paused', reason }, 'conductor'),
+    setCheckpointState: (workflowId, checkpointState) =>
+      dispatchKernelCommand('kernel.workflow.update', { id: workflowId, checkpointState }, 'conductor'),
+    createCandidateArtifact: async ({ workflowId, checkpoint, proposalToken }) => {
+      const existing = queryArtifactList(workflowId ? { workflowId } : {})
+        .find((artifact) =>
+          artifact.kind === 'candidate'
+          && artifact.metadata?.['checkpointId'] === checkpoint.checkpointId
+          && artifact.metadata?.['proposalToken'] === proposalToken);
+      if (existing) return { ok: true, id: existing.id, data: { artifactId: existing.id, idempotent: true } };
+      return dispatchKernelCommand('kernel.artifact.create', {
+        workflowId: workflowId ?? null,
+        kind: 'candidate',
+        summary: checkpoint.summary ?? `candidate set for ${checkpoint.checkpointId}`,
+        metadata: {
+          checkpointId: checkpoint.checkpointId,
+          proposalToken,
+          candidates: checkpoint.candidates,
+        },
+      }, 'conductor');
+    },
+    linkTaskDependency: ({ taskId, dependsOnTaskId, kind }) =>
+      dispatchKernelCommand('kernel.task.depend', { taskId, dependsOnTaskId, kind }, 'conductor'),
+    postHumanDecision: ({ workflowId, checkpoint, candidateArtifactId, selectedCandidateIds, proposalToken }) =>
+      dispatchKernelCommand('kernel.receipt.post', {
+        workflowId: workflowId ?? null,
+        type: 'human_decision',
+        summary: `selected ${selectedCandidateIds.join(', ')} at checkpoint ${checkpoint.checkpointId}`,
+        artifactRefs: [candidateArtifactId],
+        metadata: {
+          checkpointId: checkpoint.checkpointId,
+          candidateArtifactId,
+          selectedCandidateIds,
+          proposalToken,
+        },
+      }, 'conductor'),
     propose: proposeNextAction,
     runAction: (action, args) => actions.runAction(action, args),
     hasPendingApproval: ({ workflowId, proposalToken }) => {
@@ -59,7 +94,8 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
       const latestForToken = receipts.find(
         (r) => r.type === 'planning' && r.metadata?.['proposalToken'] === proposalToken,
       );
-      return latestForToken?.metadata?.['phase'] === 'awaiting-approval'
+      return (latestForToken?.metadata?.['phase'] === 'awaiting-approval'
+          || latestForToken?.metadata?.['phase'] === 'awaiting-selection')
         && latestForToken?.metadata?.['requestApproval'] === true;
     },
     postDecision: ({ workflowId, summary, phase, proposal, proposalToken, requestApproval }) =>
@@ -81,7 +117,13 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
     'conductor:loop-step',
     async (
       _event,
-      input: { workflowId?: string; approve?: boolean; proposalToken?: string } = {},
+      input: {
+        workflowId?: string;
+        approve?: boolean;
+        proposalToken?: string;
+        checkpoint?: CheckpointRequest;
+        selectedCandidateIds?: string[];
+      } = {},
     ) => loop.step(input),
   );
 }

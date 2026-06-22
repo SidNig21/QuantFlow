@@ -201,6 +201,7 @@ CREATE TABLE receipts (
   -- canonical: task_created, task_claimed, task_started, progress, artifact_created,
   --            task_blocked, task_submitted, verification_started, verification_passed,
   --            verification_failed, task_completed, task_failed,
+  --            human_decision (R5 checkpoint selection),
   --            planning (Goal 5A: Conductor planning evidence; not a task transition)
   summary           TEXT NOT NULL DEFAULT '',
   artifact_refs_json TEXT NOT NULL DEFAULT '[]',

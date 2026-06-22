@@ -119,3 +119,9 @@ After meaningful changes: update this file if local rules or owned scope changed
 
 - `conductor-loop.ts` enforces declared Workflow/Run budgets when wired with `readRun`: max workers, wallclock, spend, tool calls, retries, and checkpoint requirement.
 - Budget exhaustion pauses through the Kernel workflow update hook and records a `budget-paused` planning receipt before any new proposal or action executes.
+
+## v4 R5 Addendum
+
+- `conductor-loop.ts` owns the transient checkpoint-selection phase. It reuses the existing `proposalToken` field and pending-planning-receipt check for token-bound candidate selection; do not add a second token scheme.
+- A checkpoint with no selection returns `awaiting-selection` and must not spawn work. Forged, stale, drifted, or replayed selection tokens return `stale`.
+- Valid selections post a `human_decision` receipt, create only selected deepening tasks, link them with `kernel.task.depend`, and set `workflows.checkpoint_state` to `resumed`.

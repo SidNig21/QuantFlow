@@ -255,6 +255,7 @@ verification_passed
 verification_failed
 task_completed
 task_failed
+human_decision   (R5: token-bound operator selection at a checkpoint)
 planning          (Goal 5A: Conductor planning evidence; not a task transition)
 ```
 
