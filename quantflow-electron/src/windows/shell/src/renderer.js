@@ -43,7 +43,7 @@ import {
 } from "./canvas-rpc.js";
 import { createTileManager } from "./tile-manager.js";
 import { createToastController } from "./toast-controller.js";
-import { createOperationalEventLog } from "./operational-event-log.js";
+import { createKernelEventLog, createOperationalEventLog } from "./operational-event-log.js";
 import { resolveCableDrop } from "./cable-drop.js";
 import {
 	formatContextPreviewDetail,
@@ -70,12 +70,9 @@ import {
 	WATCHTOWER_MESSAGE_FILTERS,
 	WATCHTOWER_TABS,
 	createConnectionCounts,
-	createWatchtowerQueueDepthsFromDb,
 	createWatchtowerSummary,
-	dbEventsToWatchtowerEvents,
 	formatWatchtowerDiagnostics,
 	formatWatchtowerFilterLabel,
-	groupEventsByCorrelation,
 	getWatchtowerRetryRequest,
 	renderWatchtowerAgents,
 	renderWatchtowerAlerts,
@@ -122,6 +119,7 @@ const loadingFlowCube = document.getElementById("loading-flow-cube");
 canvasEl.tabIndex = -1;
 const toasts = createToastController({ document });
 const operationalEvents = createOperationalEventLog({ limit: 120 });
+const kernelEventLog = createKernelEventLog({ limit: 120 });
 const viewport = createViewport(canvasEl, gridCanvas, tiles);
 createFlowCubeWatermark(flowCubeWatermark, {
 	getTileCount: () => tiles.length,
@@ -2233,8 +2231,8 @@ async function init() {
 				</span>
 			</div>
 			<div class="wt-status-pills" aria-label="Watchtower sources">
-				<span class="wt-status-pill wt-status-pill-live">Socket</span>
-				<span class="wt-status-pill">MCP :9811</span>
+				<span class="wt-status-pill wt-status-pill-live">Kernel live</span>
+				<span class="wt-status-pill">Relay legacy</span>
 			</div>
 			<div class="wt-tabs">
 				${WATCHTOWER_TABS.map((tab) => `
@@ -2287,6 +2285,7 @@ async function init() {
 	});
 
 	watchtowerEl.querySelector(".wt-clear").addEventListener("click", () => {
+		kernelEventLog.clear();
 		operationalEvents.clear();
 		refreshWatchtower();
 	});
@@ -2327,7 +2326,10 @@ async function init() {
 				agents: Array.isArray(items) ? items : [],
 				connections,
 				relayLogs: Array.isArray(relayLogs) ? relayLogs : [],
-				operationalEvents: operationalEvents.list(),
+				operationalEvents: [
+					...kernelEventLog.list(),
+					...operationalEvents.list(),
+				],
 				roles: Array.isArray(roles) ? roles : [],
 			});
 			await navigator.clipboard.writeText(text);
@@ -2511,38 +2513,22 @@ async function init() {
 		renderWatchtowerFilters();
 		const body = watchtowerEl.querySelector(".wt-body");
 		const rail = watchtowerEl.querySelector(".wt-rail-slot");
-		const [
-			items,
-			relayLogs,
-			runtimeEventRows,
-			runtimeConnectionRows,
-			runtimeCorrelationGroups,
-		] = await Promise.all([
+		const [items, relayLogs] = await Promise.all([
 			window.shellApi.watchtowerSnapshot?.() ?? [],
 			window.shellApi.watchtowerRelayLog?.(50) ?? [],
-			window.shellApi.watchtowerRuntimeEvents?.({ limit: 120 }) ?? [],
-			window.shellApi.watchtowerRuntimeConnections?.({ limit: 200 }) ?? [],
-			window.shellApi.watchtowerRuntimeEventCorrelationGroups?.({ limit: 120 }) ?? [],
 		]);
 		watchtowerRelayLogCache = Array.isArray(relayLogs) ? relayLogs : [];
 		const agentItems = Array.isArray(items) ? items : [];
-		const dbEventRows = Array.isArray(runtimeEventRows) ? runtimeEventRows : [];
-		const dbConnectionRows = Array.isArray(runtimeConnectionRows) ? runtimeConnectionRows : [];
-		const dbCorrelationGroups = Array.isArray(runtimeCorrelationGroups) && runtimeCorrelationGroups.length
-			? runtimeCorrelationGroups
-			: groupEventsByCorrelation(dbEventRows);
-		const eventItems = [
+		const eventItems = kernelEventLog.list();
+		const alertEvents = [
+			...eventItems,
 			...operationalEvents.list(),
-			...dbEventsToWatchtowerEvents(dbEventRows),
 		];
-		const dbQueueDepths = createWatchtowerQueueDepthsFromDb(dbConnectionRows);
 		const summary = createWatchtowerSummary({
 			agents: agentItems,
 			relayLogs: watchtowerRelayLogCache,
 			operationalEvents: eventItems,
 			connections,
-			queueDepths: dbQueueDepths.length ? dbQueueDepths : undefined,
-			correlationGroups: dbCorrelationGroups,
 		});
 		updateWatchtowerTabs(summary);
 		rail.innerHTML = renderWatchtowerRail({
@@ -2550,12 +2536,10 @@ async function init() {
 			relayLogs: watchtowerRelayLogCache,
 			operationalEvents: eventItems,
 			connections,
-			queueDepths: dbQueueDepths.length ? dbQueueDepths : undefined,
-			correlationGroups: dbCorrelationGroups,
 		});
 		syncTerminalTileStatuses(agentItems);
 		const attentionHtml = renderWatchtowerAttention(watchtowerRelayLogCache, {
-			operationalEvents: eventItems,
+			operationalEvents: alertEvents,
 		});
 		if (watchtowerTab === "agents") {
 			body.innerHTML = attentionHtml + renderWatchtowerAgents(agentItems, {
@@ -2564,13 +2548,13 @@ async function init() {
 				query: watchtowerQuery,
 			});
 		} else if (watchtowerTab === "events") {
-			body.innerHTML = attentionHtml + renderWatchtowerEvents(eventItems, {
+			body.innerHTML = renderWatchtowerEvents(eventItems, {
 				filter: watchtowerEventFilter,
 				query: watchtowerQuery,
 			});
 		} else if (watchtowerTab === "alerts") {
 			body.innerHTML = renderWatchtowerAlerts(watchtowerRelayLogCache, {
-				operationalEvents: eventItems,
+				operationalEvents: alertEvents,
 				filter: watchtowerAlertFilter,
 				query: watchtowerQuery,
 			});
@@ -2850,7 +2834,7 @@ async function init() {
 			{
 				id: "watchtower-toggle",
 				title: watchtowerVisible ? "Hide Watchtower" : "Open Watchtower",
-				subtitle: "Agents, relay messages, and operational events",
+				subtitle: "Live Kernel events and legacy relay diagnostics",
 				section: "Watchtower",
 				keywords: ["status", "relay", "events", "monitor"],
 				run: () => {
@@ -3615,6 +3599,7 @@ async function init() {
 	if (window.kernelApi) {
 		window.kernelApi.onEvent((payload) => {
 			const data = payload.data ?? {};
+			const watchtowerEvent = kernelEventLog.record(payload);
 			const t = payload.tileId
 				? tiles.find((x) => x.id === payload.tileId)
 				: null;
@@ -3692,7 +3677,7 @@ async function init() {
 			) {
 				void refreshWorkflowProjection();
 			}
-			if (watchtowerVisible && !watchtowerPaused && projectionKinds.has(kind)) {
+			if (watchtowerVisible && !watchtowerPaused && watchtowerEvent) {
 				void refreshWatchtower();
 			}
 		});

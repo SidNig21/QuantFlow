@@ -34,8 +34,6 @@ export const WATCHTOWER_ALERT_FILTERS = [
 ];
 export const WATCHTOWER_TABS = [
 	"events",
-	"queues",
-	"agents",
 	"alerts",
 ];
 
@@ -647,7 +645,7 @@ export function renderWatchtowerEvents(
 	);
 	if (!filtered.length) {
 		const label = filter === "all" ? "" : `${filter} `;
-		return `<p class="wt-empty">No ${escapeHtml(label)}operational events.</p>`;
+		return `<p class="wt-empty">No ${escapeHtml(label)}Kernel events.</p>`;
 	}
 	return filtered.slice(-limit).reverse().map((event) => {
 		const meta = event?.meta && typeof event.meta === "object" ? event.meta : {};
@@ -894,16 +892,16 @@ export function renderWatchtowerRail({
 	return `
 		<aside class="wt-rail" aria-label="Watchtower metrics">
 			<section class="wt-rail-card">
-				<div class="wt-rail-label">Throughput</div>
+				<div class="wt-rail-label">Legacy Relay</div>
 				<div class="wt-sparkline">${sparkHtml}</div>
 				<div class="wt-rail-value">${escapeHtml(relayLogs.length)} relay events</div>
 			</section>
 			<section class="wt-rail-card">
-				<div class="wt-rail-label">Queues</div>
+				<div class="wt-rail-label">Legacy Queues</div>
 				${queueHtml}
 			</section>
 			<section class="wt-rail-card">
-				<div class="wt-rail-label">Agents</div>
+				<div class="wt-rail-label">Legacy Agents</div>
 				<div class="wt-agent-rollup">
 					<span>${escapeHtml(summary.activeAgents)} live</span>
 					<span>${escapeHtml(agents.length)} total</span>

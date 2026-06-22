@@ -35,6 +35,10 @@ import {
 	runWatchtowerFocusPlan,
 	shouldRenderWatchtowerRetry,
 } from "./watchtower-view.js";
+import {
+	createKernelEventLog,
+	kernelEventToWatchtowerEvent,
+} from "./operational-event-log.js";
 
 describe("escapeHtml", () => {
 	test("escapes terminal and relay text before rendering", () => {
@@ -159,8 +163,6 @@ describe("Watchtower redesign summary helpers", () => {
 	test("defines the Events-first tab model and alert filters", () => {
 		expect(WATCHTOWER_TABS).toEqual([
 			"events",
-			"queues",
-			"agents",
 			"alerts",
 		]);
 		expect(WATCHTOWER_ALERT_FILTERS).toEqual([
@@ -817,6 +819,69 @@ describe("renderWatchtowerMessages", () => {
 });
 
 describe("renderWatchtowerEvents", () => {
+	test("renders bounded live Kernel events newest first", () => {
+		const log = createKernelEventLog({ limit: 2, now: () => 10_000 });
+		log.record({
+			kind: "task.created",
+			taskId: "task-old",
+			timestamp: 1_000,
+			data: { summary: "old task" },
+		});
+		log.record({
+			kind: "artifact.created",
+			artifactId: "artifact-1",
+			taskId: "task-1",
+			timestamp: 2_000,
+			data: { summary: "artifact ready" },
+		});
+		log.record({
+			kind: "checkpoint.awaiting-selection",
+			taskId: "task-2",
+			timestamp: 3_000,
+			data: { proposalToken: "proposal-1" },
+		});
+
+		const events = log.list();
+		const html = renderWatchtowerEvents(events, { now: 5_000 });
+
+		expect(events).toHaveLength(2);
+		expect(events.map((event) => event.type)).toEqual([
+			"artifact.created",
+			"checkpoint.awaiting-selection",
+		]);
+		expect(html.indexOf("checkpoint.awaiting-selection")).toBeLessThan(
+			html.indexOf("artifact.created"),
+		);
+		expect(html).toContain("artifact ready");
+		expect(html).toContain("data-tile-id=\"\"");
+		expect(html).not.toContain("task-old");
+	});
+
+	test("maps synthetic Kernel events without persisted runtime rows", () => {
+		const event = kernelEventToWatchtowerEvent({
+			kind: "human_decision",
+			taskId: "task-1",
+			workflowId: "workflow-1",
+			data: {
+				summary: "operator picked proposal",
+				proposalToken: "proposal-1",
+			},
+		}, 4_000);
+
+		expect(event).toMatchObject({
+			type: "human_decision",
+			severity: "info",
+			timestamp: 4_000,
+			summary: "operator picked proposal",
+			meta: {
+				taskId: "task-1",
+				workflowId: "workflow-1",
+				proposalToken: "proposal-1",
+			},
+		});
+		expect(kernelEventToWatchtowerEvent({ kind: "relay.sent" }, 4_000)).toBeNull();
+	});
+
 	test("renders escaped operational event rows with route metadata", () => {
 		const html = renderWatchtowerEvents([
 			{
@@ -843,7 +908,7 @@ describe("renderWatchtowerEvents", () => {
 
 	test("renders filtered empty state", () => {
 		expect(renderWatchtowerEvents([], { filter: "error" }))
-			.toContain("No error operational events.");
+			.toContain("No error Kernel events.");
 	});
 });
 
@@ -976,10 +1041,12 @@ describe("renderWatchtowerRail", () => {
 			],
 		});
 
-		expect(html).toContain("Throughput");
+		expect(html).toContain("Legacy Relay");
 		expect(html).toContain("9 relay events");
+		expect(html).toContain("Legacy Queues");
 		expect(html).toContain("hot cable");
 		expect(html).toContain("is-hot");
+		expect(html).toContain("Legacy Agents");
 		expect(html).toContain("1 live");
 		expect(html).toContain("1 failed relays");
 		expect(html).toContain("1 correlations");
