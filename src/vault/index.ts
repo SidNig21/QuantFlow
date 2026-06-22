@@ -145,3 +145,20 @@ export async function exportWorkflowToVault(
   if (!bundle) return null;
   return writeVaultExports(renderVaultExport(bundle), outDir, ops, join);
 }
+
+/**
+ * R7 lesson mirror trigger. The lesson artifact remains Kernel truth; this
+ * merely writes the workflow's OKF mirror after at least one lesson artifact
+ * exists for the workflow.
+ */
+export async function mirrorLessonArtifactsToVault(
+  db: KernelDB,
+  workflowId: string,
+  outDir: string,
+  ops: VaultFsOps,
+  join: (...parts: string[]) => string,
+): Promise<string[] | null> {
+  const lessons = queryArtifactList(db, { workflowId }).filter((artifact) => artifact.kind === 'lesson');
+  if (lessons.length === 0) return null;
+  return exportWorkflowToVault(db, workflowId, outDir, ops, join);
+}

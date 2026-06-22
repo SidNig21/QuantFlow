@@ -134,3 +134,7 @@ After meaningful changes: update this file if local rules or owned scope changed
 - Task eligibility must come from `dag-scheduler.ts`. Do not add a second scheduler or graph gate in the template runner.
 - Checkpoints must go through `createConductorLoop`'s R5 controller (`awaiting-selection` + `proposalToken` + `human_decision`), with no automatic selection.
 - Attention profile is plan-layer metadata: low phases may batch; high phases are serialized. Medium phases are human-facing and should remain unbatched unless a later approved rung changes that rule.
+
+## v4 R7 Addendum
+
+- `run-replay.ts` is a read-only projection over receipts, artifact rows, and task lifecycle timestamps. It must not read or write the `events` table, and it must never become task/run truth.

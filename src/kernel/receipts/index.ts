@@ -146,6 +146,7 @@ export function handleArtifactCommand(
   if (!kind) return { ok: false, error: 'artifact.create: kind required' };
   const metadata = (payload['metadata'] as Record<string, unknown> | undefined) ?? {};
   const derivedFrom = normalizeStringArray(payload['derivedFrom'] ?? payload['derived_from']);
+  const sourceRefs = normalizeStringArray(payload['sourceRefs'] ?? payload['source_refs']);
   const attemptId = typeof metadata['attemptId'] === 'string' && metadata['attemptId'].trim()
     ? metadata['attemptId'].trim()
     : null;
@@ -171,7 +172,40 @@ export function handleArtifactCommand(
   const id = randomUUID();
   const now = Date.now();
   try {
-    if (hasArtifactColumn(db, 'derived_from')) {
+    const hasDerivedFrom = hasArtifactColumn(db, 'derived_from');
+    const hasProvenance = hasArtifactColumn(db, 'source_refs');
+    if (hasDerivedFrom && hasProvenance) {
+      db.prepare(
+        `INSERT INTO artifacts
+           (id, workflow_id, task_id, worker_id, tile_id, receipt_id, kind, uri,
+            summary, content_hash, media_type, size_bytes, derived_from,
+            source_refs, observed_at, source_kind, confidence, quote_or_snapshot_ref,
+            sensitivity, created_at, metadata_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        (payload['workflowId'] as string | null) ?? null,
+        taskId,
+        (payload['workerId'] as string | null) ?? null,
+        (payload['tileId'] as string | null) ?? null,
+        null, // receipt_id backfilled below via the artifact_created receipt
+        kind,
+        (payload['uri'] as string | null) ?? null,
+        (payload['summary'] as string | null) ?? null,
+        (payload['contentHash'] as string | null) ?? null,
+        (payload['mediaType'] as string | null) ?? null,
+        (payload['sizeBytes'] as number | null) ?? null,
+        JSON.stringify(derivedFrom),
+        JSON.stringify(sourceRefs),
+        (payload['observedAt'] as number | null) ?? null,
+        (payload['sourceKind'] as string | null) ?? null,
+        typeof payload['confidence'] === 'number' ? payload['confidence'] : null,
+        (payload['quoteOrSnapshotRef'] as string | null) ?? null,
+        (payload['sensitivity'] as string | null) ?? 'normal',
+        now,
+        JSON.stringify(metadata),
+      );
+    } else if (hasDerivedFrom) {
       db.prepare(
         `INSERT INTO artifacts
            (id, workflow_id, task_id, worker_id, tile_id, receipt_id, kind, uri,
@@ -323,6 +357,12 @@ export interface ArtifactSnapshot {
   mediaType: string | null;
   sizeBytes: number | null;
   derivedFrom: string[];
+  sourceRefs: string[];
+  observedAt: number | null;
+  sourceKind: string | null;
+  confidence: number | null;
+  quoteOrSnapshotRef: string | null;
+  sensitivity: string;
   createdAt: number;
   metadata: Record<string, unknown>;
 }
@@ -342,6 +382,12 @@ function rowToArtifact(r: Record<string, unknown>): ArtifactSnapshot {
     mediaType: (r['media_type'] as string | null) ?? null,
     sizeBytes: (r['size_bytes'] as number | null) ?? null,
     derivedFrom: normalizeStringArray(r['derived_from'] ?? []),
+    sourceRefs: normalizeStringArray(r['source_refs'] ?? []),
+    observedAt: (r['observed_at'] as number | null) ?? null,
+    sourceKind: (r['source_kind'] as string | null) ?? null,
+    confidence: (r['confidence'] as number | null) ?? null,
+    quoteOrSnapshotRef: (r['quote_or_snapshot_ref'] as string | null) ?? null,
+    sensitivity: (r['sensitivity'] as string | null) ?? 'normal',
     createdAt: r['created_at'] as number,
     metadata: safeJsonObject((r['metadata_json'] as string) ?? '{}'),
   };

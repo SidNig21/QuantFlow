@@ -20,10 +20,11 @@ import type { KernelDB } from '../database';
 import type { TaskRow, TaskStatus } from '../schema/types';
 import { emitKernelEvent } from '../events/index';
 import { postReceipt } from '../receipts/index';
-import { verifyTaskArtifacts } from '../artifacts/verify';
+import { autoTriggerTaskEvaluations } from '../evals/auto-trigger';
 import { assignWorkerToTask, ensureWorkerInstanceForTile } from '../worker-instances/index';
 import type { CommandResult } from '../commands/types';
 import { assertTransition } from './state-machine';
+import { runTaskVerificationStages } from './verification-stages';
 import {
   requireString,
   validateComplete,
@@ -535,19 +536,29 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
       return rejectFromVerifying(db, id, verifierWorkerId, summary, submittedArtifactRefs, metadataBase);
     }
 
-    const structural = verifyTaskArtifacts(db, {
+    const stages = runTaskVerificationStages(db, {
       taskId: id,
       artifactRefs: submittedArtifactRefs,
       artifactRoot: (payload['artifactRoot'] as string | null) ?? null,
     });
-    if (!structural.ok) {
+    if (!stages.structural.ok) {
       return rejectFromVerifying(
         db,
         id,
         verifierWorkerId,
         'verification failed: structural artifact check',
         submittedArtifactRefs,
-        { ...metadataBase, structural },
+        { ...metadataBase, structural: stages.structural, semantic: stages.semantic },
+      );
+    }
+    if (!stages.semantic.ok) {
+      return rejectFromVerifying(
+        db,
+        id,
+        verifierWorkerId,
+        'verification failed: semantic artifact check',
+        submittedArtifactRefs,
+        { ...metadataBase, structural: stages.structural, semantic: stages.semantic },
       );
     }
 
@@ -561,7 +572,7 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
       correlationId: verifying.correlation_id,
       summary,
       artifactRefs: submittedArtifactRefs,
-      metadata: { ...metadataBase, structural },
+      metadata: { ...metadataBase, structural: stages.structural, semantic: stages.semantic },
     });
     emitTaskEvent(verifying, 'task.verification_passed', {});
 
@@ -581,6 +592,15 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
       summary: 'task completed (verified)',
       metadata: { ...metadataBase, verified: true },
     });
+    try {
+      autoTriggerTaskEvaluations(db, {
+        workflowId: completed.workflow_id,
+        taskId: id,
+        workerId: completed.owner_worker_id,
+      });
+    } catch {
+      // Evals are derived and non-authoritative; completion must not depend on them.
+    }
     emitTaskEvent(completed, 'task.completed', { status: 'complete', verified: true });
     return { ok: true, id, data: { status: 'complete', verified: true } };
   } catch (err) {
@@ -699,6 +719,15 @@ function taskComplete(db: KernelDB, payload: Record<string, unknown>): CommandRe
         ? { ...attemptMetadata(payload), legacy: true, bypassedVerification: true }
         : { ...attemptMetadata(payload), verified: true },
     });
+    try {
+      autoTriggerTaskEvaluations(db, {
+        workflowId: completed.workflow_id,
+        taskId: id,
+        workerId: completed.owner_worker_id,
+      });
+    } catch {
+      // Evals are derived and non-authoritative; completion must not depend on them.
+    }
     emitTaskEvent(completed, 'task.completed', { status: 'complete', verified: !legacy, legacy });
     return { ok: true, id, data: { status: 'complete', verified: !legacy, legacy } };
   } catch (err) {

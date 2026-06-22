@@ -41,6 +41,7 @@
 		"smoke:context-flow": "bun scripts/smoke-context-flow.ts",
 		"smoke:checkpoint": "bun scripts/smoke-checkpoint.ts",
 		"smoke:run-template": "bun scripts/smoke-run-template.ts",
+		"smoke:judgment": "bun scripts/smoke-judgment.ts",
 		"smoke:authority": "bun scripts/smoke-authority.ts",
 		"smoke:pod": "bun scripts/smoke-pod.ts",
 		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",

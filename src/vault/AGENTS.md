@@ -75,3 +75,7 @@ This ensures Kernel state and vault exports remain traceable to each other.
 Before editing: walk this chain.
 
 After meaningful changes: update this file if local rules or owned scope changed.
+
+## v4 R7 Addendum
+
+- Lesson cards are Kernel `lesson` artifacts first. `mirrorLessonArtifactsToVault` triggers the existing Goal 8 OKF exporter only as a vault mirror and must preserve Kernel ids.

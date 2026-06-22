@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { KernelDB } from '../database';
 import { emitKernelEvent } from '../events/index';
 import type { CommandResult } from './types';
+import { autoTriggerWorkflowEvaluation } from '../evals/auto-trigger';
 
 function hasWorkflowColumn(db: KernelDB, name: string): boolean {
   const rows = db.prepare("PRAGMA table_info('workflows')").all() as Array<{ name: string }>;
@@ -103,6 +104,13 @@ function workflowUpdate(db: KernelDB, payload: Record<string, unknown>): Command
     values.push(id);
     const info = db.prepare(`UPDATE workflows SET ${fields.join(', ')} WHERE id = ?`).run(...values);
     if (info.changes === 0) return { ok: false, error: `workflow.update: workflow not found: ${id}` };
+    if (payload['status'] === 'complete') {
+      try {
+        autoTriggerWorkflowEvaluation(db, id);
+      } catch {
+        // Evals are derived and non-authoritative; workflow updates do not depend on them.
+      }
+    }
     emitKernelEvent({ kind: 'workflow.updated', workflowId: id, data: payload });
     return { ok: true, id };
   } catch (err) {

@@ -38,6 +38,7 @@ export function formatWorkflowSummary(bundle: VaultExportBundle): string {
   const verifications = verificationReceipts(receipts);
   const decisions = decisionReceipts(receipts);
   const followUps = openFollowUpTasks(tasks);
+  const lessonArtifacts = artifacts.filter((artifact) => artifact.kind === 'lesson');
 
   // Blockers: blocked tasks named by the Kernel region, enriched with the
   // blocker text from the matching State Card / task when available.
@@ -58,6 +59,9 @@ export function formatWorkflowSummary(bundle: VaultExportBundle): string {
   // verifications and standing blockers. Empty is stated, not faked.
   const failedVerifications = verifications.filter((r) => r.type === 'verification_failed');
   const lessons: string[] = [];
+  for (const artifact of lessonArtifacts) {
+    lessons.push(`- Lesson artifact \`${artifact.id}\`: ${oneLine(artifact.summary) || artifact.uri || 'see artifact row'}`);
+  }
   for (const r of failedVerifications) lessons.push(`- Verification failed (\`${r.id}\`): ${oneLine(r.summary) || 'see receipt'}`);
   for (const line of blockerLines) lessons.push(`- Blocked: ${line.replace(/^- /, '')}`);
 

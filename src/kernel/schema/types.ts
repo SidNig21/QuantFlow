@@ -74,6 +74,21 @@ export type ReceiptType =
   // not a task transition — it never advances a task.
   | 'planning';
 
+export type ArtifactKind =
+  | 'file'
+  | 'code'
+  | 'analysis'
+  | 'test_output'
+  | 'image'
+  | 'evidence'
+  | 'candidate'
+  | 'skeptic_note'
+  | 'thesis'
+  | 'decision_log'
+  | 'outcome'
+  | 'lesson'
+  | string;
+
 export type StateCardStatus = 'idle' | 'active' | 'blocked' | 'complete' | 'error';
 
 export type ConnectionStatus = 'active' | 'inactive';
@@ -241,7 +256,7 @@ export interface ArtifactRow {
   worker_id: string | null;
   tile_id: string | null;
   receipt_id: string | null;
-  kind: string;
+  kind: ArtifactKind;
   uri: string | null;
   summary: string | null;
   content_hash: string | null;
@@ -249,6 +264,13 @@ export interface ArtifactRow {
   size_bytes: number | null;
   /** R2 lineage: JSON array of upstream artifact ids. */
   derived_from: string;
+  /** R7 external provenance: JSON array of source ids/URLs/citations. */
+  source_refs: string;
+  observed_at: number | null;
+  source_kind: string | null;
+  confidence: number | null;
+  quote_or_snapshot_ref: string | null;
+  sensitivity: string;
   created_at: number;
   metadata_json: string;
 }

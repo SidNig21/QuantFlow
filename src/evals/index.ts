@@ -16,3 +16,4 @@ export {
   evaluateWorker,
   evaluateWorkflow,
 } from './evaluator';
+export { runSemanticVerificationStage } from './semantic-verification';

@@ -304,9 +304,20 @@ Durable outputs produced during tasks.
 | `content_hash` | TEXT | SHA-256 of content (nullable) |
 | `media_type` | TEXT | MIME type (nullable) |
 | `size_bytes` | INTEGER | Nullable |
+| `source_refs` | TEXT | `[]` - R7 JSON array of external source/citation refs |
+| `observed_at` | INTEGER | R7 external observation timestamp, nullable |
+| `source_kind` | TEXT | R7 external source kind, nullable |
+| `confidence` | REAL | R7 artifact-level confidence, nullable |
+| `quote_or_snapshot_ref` | TEXT | R7 quote/snapshot pointer, nullable |
+| `sensitivity` | TEXT | R7 sensitivity flag, default `normal` |
 | `derived_from` | TEXT | `[]` — R2 JSON array of upstream artifact IDs, references only |
 | `created_at` | INTEGER | ms since epoch |
 | `metadata_json` | TEXT | `{}` |
+
+R7 typed artifact kinds reserve the research/judgment vocabulary:
+`evidence`, `candidate`, `skeptic_note`, `thesis`, `decision_log`, `outcome`,
+and `lesson`. The artifact row remains Kernel truth; files and vault notes are
+storage/mirrors.
 
 ---
 
@@ -327,6 +338,9 @@ Append-only state-transition history. Never deleted. Drives renderer and StateCa
 | `created_at` | INTEGER | ms since epoch |
 
 **Note:** Events are distinct from receipts. Events are ephemeral coordination signals; receipts are durable evidence.
+
+R7 Run Replay is reconstructed from receipts, artifact rows, and task lifecycle
+timestamps. It does not persist or read the `events` table as a timeline store.
 
 ---
 
@@ -426,6 +440,11 @@ task/workflow state. See `docs/v3/EVALS_SPEC.md`.
 | `limitations` | TEXT | Nullable |
 | `created_at` | INTEGER | ms since epoch |
 | `metadata_json` | TEXT | `{}` |
+
+R7 eval/RL prep adds nullable `outcome_artifact_id`, `lesson_artifact_id`, and
+`rl_trajectory_json` to `evaluations`. These are schema preparation only:
+evaluations remain derived, non-authoritative records and no training loop is
+implemented.
 
 ---
 

@@ -3,6 +3,8 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve, normalize } from "node:path";
 import { QUANTFLOW_DIR } from "./paths";
 import { readVaultConfig, type VaultConfig } from "./vault-config";
+import { getKernelDb } from "../../../src/kernel/database";
+import { exportWorkflowToVault } from "../../../src/vault/index";
 
 const CONFIG_PATH = join(QUANTFLOW_DIR, "vault-config.json");
 
@@ -49,5 +51,23 @@ export function registerVaultHandlers(
       throw new Error("Path is outside vault directory");
     }
     return readFile(safe, "utf-8");
+  });
+
+  ipcMain.handle("vault:export-workflow", async (_event, workflowId: string) => {
+    const cfg = await readVaultConfig();
+    if (!cfg.vaultPath) {
+      throw new Error("No vault path configured");
+    }
+    const written = await exportWorkflowToVault(
+      getKernelDb(),
+      workflowId,
+      cfg.vaultPath,
+      {
+        mkdir: (dir) => mkdir(dir, { recursive: true }),
+        writeFile: (path, content) => writeFile(path, content, "utf-8"),
+      },
+      join,
+    );
+    return { ok: written !== null, paths: written ?? [] };
   });
 }

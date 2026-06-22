@@ -118,3 +118,9 @@ After meaningful changes: update this file if local rules or owned scope changed
 - Run templates remain plan-layer config. Do not add Kernel template tables or a new Run primitive for R6.
 - `kernel.workflow.create` / `kernel.workflow.update` may set existing R3 Workflow instance fields (`mode`, `budget_json`) through the command boundary so template runs can declare mode and budgets without direct SQL.
 - Instantiated template work is normal Kernel truth: workflows, tiles, connections, tasks, dependencies, artifacts, and receipts.
+
+## v4 R7 Addendum
+
+- Migration `007-r7-typed-artifacts.sql` adds typed artifact provenance and eval/RL prep fields additively. Artifact rows remain Kernel truth for `decision_log`, `outcome`, and `lesson`; files and vault notes are storage/mirrors.
+- `tasks/verification-stages.ts` owns the structural + semantic verification stage call. `taskVerify` records stage output on verification receipts instead of inlining semantic judgment.
+- Eval auto-triggers may write `evaluations` rows on task/workflow completion, but no task/workflow transition may read eval rows to decide state.

@@ -21,6 +21,7 @@ export const DECISION_TYPES = new Set([
   'verification_started',
   'verification_passed',
   'verification_failed',
+  'human_decision',
   'task_blocked',
   'task_completed',
   'task_failed',
