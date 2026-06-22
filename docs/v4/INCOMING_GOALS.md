@@ -81,6 +81,11 @@ Entry shape:
 - **Status:** captured (spec above) — small fix, high ROI; not a full rung.
 
 ### OKF vault export — built + smoke-proven, no live trigger (fold into R7)
+- **RESOLVED by R7 (commit `d8a8296`, 2026-06-21):** R7 wired the live trigger —
+  `vault:export-workflow` IPC in `ipc-vault.ts` + `mirrorLessonArtifactsToVault`
+  reusing the existing OKF exporters; `smoke:judgment` asserts the vault output
+  contains the lesson artifact id while the artifact row stays Kernel truth. The
+  subsystem is no longer dark. (Remaining below = original intake, kept for history.)
 - **Problem / friction:** the whole OKF export pipeline exists and is machine-proven
   (`src/vault/index.ts` `exportWorkflowToVault`/`collectVaultExport`/`renderVaultExport`,
   `src/vault/exporters/*.ts`, `okf/frontmatter.ts`, spec `docs/v3/VAULT_OKF_SPEC.md`,
