@@ -7,5 +7,5 @@ ALTER TABLE worker_instances
 CREATE INDEX worker_instances_assigned_task_id
   ON worker_instances(assigned_task_id);
 
-INSERT INTO schema_migrations (version, description, applied_at)
+INSERT OR IGNORE INTO schema_migrations (version, description, applied_at)
 VALUES (3, 'r1: worker assigned task binding', unixepoch() * 1000);

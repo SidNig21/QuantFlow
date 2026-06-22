@@ -348,11 +348,13 @@ function taskClaim(db: KernelDB, payload: Record<string, unknown>): CommandResul
 
   // Stale-claim recovery: a claimed task untouched past the threshold is
   // returned to open by the Kernel so it can be reclaimed.
+  let staleReclaim = false;
   if (task.status === 'claimed') {
     const age = Date.now() - (task.claimed_at ?? task.updated_at);
     if (age < STALE_CLAIM_MS) {
       return { ok: false, error: `task already claimed (${id})` };
     }
+    staleReclaim = true;
   } else if (task.status !== 'open') {
     const check = assertTransition(task.status, 'claimed');
     if (!check.ok) return { ok: false, error: check.error };
@@ -375,16 +377,21 @@ function taskClaim(db: KernelDB, payload: Record<string, unknown>): CommandResul
     // Resolve the owning worker: explicit ownerWorkerId wins; otherwise, if a
     // tileId is supplied, ensure/derive the tile's default WorkerInstance so the
     // claimed task surfaces on that tile's State Card (Goal 4 link).
-    let ownerWorkerId =
-      (payload['ownerWorkerId'] as string | null) ?? task.owner_worker_id ?? null;
+    let ownerWorkerId = (payload['ownerWorkerId'] as string | null) ?? null;
     if (!ownerWorkerId && typeof payload['tileId'] === 'string') {
       ownerWorkerId = ensureWorkerInstanceForTile(db, payload['tileId'] as string);
+    }
+    if (!ownerWorkerId && !staleReclaim) {
+      ownerWorkerId = task.owner_worker_id;
     }
     if (!ownerWorkerId) {
       return {
         ok: false,
         error: 'task.claim requires ownerWorkerId or tileId resolving to a WorkerInstance',
       };
+    }
+    if (staleReclaim && task.owner_worker_id && task.owner_worker_id !== ownerWorkerId) {
+      assignWorkerToTask(db, task.owner_worker_id, null);
     }
     setStatus(db, id, 'claimed', {
       owner_worker_id: ownerWorkerId,
@@ -398,7 +405,9 @@ function taskClaim(db: KernelDB, payload: Record<string, unknown>): CommandResul
       workflowId: updated.workflow_id,
       workerId: updated.owner_worker_id,
       correlationId: updated.correlation_id,
-      summary: (payload['summary'] as string | undefined) ?? 'task claimed',
+      summary: (payload['summary'] as string | undefined)
+        ?? (staleReclaim ? 'task reclaimed after stale claim' : 'task claimed'),
+      ...(staleReclaim ? { metadata: { staleReclaim: true } } : {}),
     });
     emitTaskEvent(updated, 'task.claimed', { status: 'claimed' });
     return { ok: true, id };
@@ -443,7 +452,10 @@ function taskSubmit(db: KernelDB, payload: Record<string, unknown>): CommandResu
       return { ok: false, error: `task.submit attemptId already used with different artifact refs: ${attemptId}` };
     }
     const task = getTask(db, taskId);
-    return { ok: true, id: taskId, data: { status: task?.status ?? null, receiptId: existing.id, idempotent: true } };
+    const status = task?.status ?? null;
+    if (status === 'submitted' || status === 'verifying' || status === 'complete') {
+      return { ok: true, id: taskId, data: { status, receiptId: existing.id, idempotent: true } };
+    }
   }
 
   const t = transition(db, payload, 'submitted');
@@ -489,12 +501,16 @@ function taskVerify(db: KernelDB, payload: Record<string, unknown>): CommandResu
   const existingPass = findAttemptReceipt(db, id, 'verification_passed', attemptId);
   if (existingPass && verdict !== 'fail') {
     const current = getTask(db, id);
-    return { ok: true, id, data: { status: current?.status ?? null, verified: true, receiptId: existingPass.id, idempotent: true } };
+    if (current?.status === 'complete') {
+      return { ok: true, id, data: { status: current.status, verified: true, receiptId: existingPass.id, idempotent: true } };
+    }
   }
   const existingFail = findAttemptReceipt(db, id, 'verification_failed', attemptId);
-  if (existingFail) {
+  if (existingFail && verdict === 'fail') {
     const current = getTask(db, id);
-    return { ok: true, id, data: { status: current?.status ?? null, verified: false, receiptId: existingFail.id, idempotent: true } };
+    if (current?.status === 'working') {
+      return { ok: true, id, data: { status: current.status, verified: false, receiptId: existingFail.id, idempotent: true } };
+    }
   }
 
   const verifierWorkerId = (payload['verifierWorkerId'] as string | null) ?? null;
@@ -836,6 +852,7 @@ export interface TaskSnapshot {
   submittedAt: number | null;
   verifiedAt: number | null;
   completedAt: number | null;
+  metadata: Record<string, unknown>;
 }
 
 function rowToTask(r: TaskRow): TaskSnapshot {
@@ -854,6 +871,7 @@ function rowToTask(r: TaskRow): TaskSnapshot {
     submittedAt: r.submitted_at,
     verifiedAt: r.verified_at,
     completedAt: r.completed_at,
+    metadata: parseJsonObject(r.metadata_json),
   };
 }
 

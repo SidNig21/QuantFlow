@@ -90,13 +90,17 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
     propose: proposeNextAction,
     runAction: (action, args) => actions.runAction(action, args),
     hasPendingApproval: ({ workflowId, proposalToken }) => {
-      const receipts = queryReceiptList(workflowId ? { workflowId, limit: 100 } : { limit: 100 });
+      const receipts = queryReceiptList(workflowId ? { workflowId, limit: 500 } : { limit: 500 });
       const latestForToken = receipts.find(
         (r) => r.type === 'planning' && r.metadata?.['proposalToken'] === proposalToken,
       );
-      return (latestForToken?.metadata?.['phase'] === 'awaiting-approval'
-          || latestForToken?.metadata?.['phase'] === 'awaiting-selection')
-        && latestForToken?.metadata?.['requestApproval'] === true;
+      if (!latestForToken) return false;
+      const phase = latestForToken.metadata?.['phase'];
+      if (phase === 'selected' || phase === 'executed' || phase === 'stale' || phase === 'denied') {
+        return false;
+      }
+      return (phase === 'awaiting-approval' || phase === 'awaiting-selection')
+        && latestForToken.metadata?.['requestApproval'] === true;
     },
     postDecision: ({ workflowId, summary, phase, proposal, proposalToken, requestApproval }) =>
       dispatchKernelCommand(

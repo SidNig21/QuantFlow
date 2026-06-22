@@ -241,8 +241,13 @@ check('replay includes task timestamps, receipts, artifacts, and run end', [
   'run.ended',
 ].every((kind) => replayA.entries.some((entry) => entry.kind === kind)));
 check('replay references durable ids only', replayA.receiptIds.length > 0 && replayA.artifactIds.includes(lessonArtifact) && replayA.taskIds.includes('task-r7-one'));
-const eventCount = (db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n;
-check('events table not persisted for replay', eventCount === 0);
+db.prepare(
+  `INSERT INTO events (id, workflow_id, kind, payload_json, created_at)
+   VALUES ('evt-synthetic', 'wf-r7', 'synthetic.coordination', '{"note":"must not affect replay"}', ?)`,
+).run(Date.now());
+const replayWithEvents = buildRunReplay(kdb, 'wf-r7')!;
+check('events table not used for replay', (db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n === 1);
+check('replay unchanged with events present', JSON.stringify(replayWithEvents) === JSON.stringify(replayA));
 
 console.log('\n- typed artifacts, eval auto-trigger, and RL schema prep -');
 const typedArtifact = queryArtifactList(kdb, { workflowId: 'wf-r7' }).find((artifact) => artifact.id === taskOneArtifact)!;

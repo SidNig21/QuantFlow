@@ -128,6 +128,20 @@ Entry shape:
   **not** removable without redoing spawn — but no longer the bus. No code change; recorded
   so nobody re-treats `envoy_tasks` as a source of truth. (External-tooling audit 2026-06-21.)
 
+### (decision) Legacy MCP `qf_task_complete` / Envoy complete — preserved, DAG-safe
+- **Problem:** v4 review (C-01/X-04) flagged `qf_task_complete` → `kernel.task.complete`
+  with `legacy:true` as an external bypass of structural verify.
+- **Decision (2026-06-22):** **Keep** for Hermes/MCP compatibility. Receipts tag
+  `legacy` + `bypassedVerification`. DAG/upstream gating requires `verification_passed`
+  (`isUpstreamSatisfied`), so legacy-complete tasks do **not** unblock downstream `blocks`
+  edges. Operators must use submit→verify for DAG/template runs.
+- **Status:** documented; no retire/gate in v4. Revisit if MCP teaches submit→verify everywhere.
+
+### (note) v4 review punch list — majors fixed 2026-06-22
+- REF sensitivity column filter, R6 workflow completion gate, EO idempotency-after-recover
+  (+ template attempt epoch). See `qa/v4-review-adjudication.md` consolidated list for
+  remaining minors (queryRun.endedAt nit, runner split, etc.).
+
 ### (note) R8 Mode-1 spawn correction — already in BUILD_PLAN_V4, not a candidate
 The Eve-legend-click → terminal-tile fix is an **R8 scope clarification** recorded
 directly in `BUILD_PLAN_V4.md` (§ "Operator spawn model — Mode 1 vs Mode 2" + the

@@ -10,5 +10,5 @@ ALTER TABLE workflows ADD COLUMN mode TEXT;                              -- run 
 ALTER TABLE workflows ADD COLUMN budget_json TEXT NOT NULL DEFAULT '{}'; -- DECLARED here (R3), ENFORCED in R4
 ALTER TABLE workflows ADD COLUMN checkpoint_state TEXT;                  -- R5 human-checkpoint pause state
 
-INSERT INTO schema_migrations (version, description, applied_at)
+INSERT OR IGNORE INTO schema_migrations (version, description, applied_at)
 VALUES (4, 'r3a: workflow run-instance fields (mode/budget/checkpoint_state)', unixepoch() * 1000);

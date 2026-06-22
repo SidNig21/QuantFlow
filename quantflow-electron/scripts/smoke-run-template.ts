@@ -225,5 +225,42 @@ check('no selection returns clean blocker', noSelection.ok === false && /explici
 check('no-selection run remains awaiting-selection', queryRun(kdb, 'wf-r6-no-selection')?.checkpointState === 'awaiting-selection');
 check('no-selection did not spawn deepen task', queryTaskGet(kdb, 'wf-r6-no-selection-scout-pick-lead-deepen-market') === null);
 
+console.log('\n- failed verify blocks workflow completion -');
+const failRunner = createRunTemplateRunner({
+  db: kdb,
+  templateDir,
+  dispatchKernel: dispatch,
+  checkpointLoop: loop,
+  scheduler: (kernelDb, workflowId) => readSchedulableTasks(kernelDb, workflowId),
+  executeTask: async ({ taskId, tileId, attemptId }) => {
+    const assigned = await actions.runAction('assign_task', {
+      taskId,
+      tileId,
+      deliver: true,
+      harnessKind: 'mock',
+      artifactRoot,
+      attemptId,
+    });
+    if (!assigned.ok) return assigned;
+    const verifierTile = queryWorkerList(kdb, { workflowId: 'wf-r6-fail-verify' }).find((worker) => worker.tileId.endsWith('verifier'))?.tileId;
+    const verifierWorkerId = verifierTile ? queryWorkerForTile(kdb, verifierTile) : null;
+    return actions.runAction('verify_task', {
+      taskId,
+      verifierWorkerId,
+      verdict: 'fail',
+      artifactRoot,
+      attemptId,
+    });
+  },
+});
+const failVerify = await failRunner.invoke({
+  templateId: 'research',
+  workflowId: 'wf-r6-fail-verify',
+  objective: 'Structural verify failure must block completion',
+});
+check('failed verify invocation blocked', failVerify.ok === false);
+check('failed-verify workflow not complete', queryRun(kdb, 'wf-r6-fail-verify')?.status !== 'complete');
+check('failed-verify error names stuck tasks', /non-terminal or unverified|expected artifact kind/.test(failVerify.error ?? ''));
+
 console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} - ${failures} failure(s)`);
 process.exit(failures === 0 ? 0 : 1);

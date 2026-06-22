@@ -79,6 +79,12 @@ export function buildContextEnvelope(taskId: string): ContextEnvelopeV0 {
   const stateCards = task.workflowId ? queryStateCardList({ workflowId: task.workflowId }) : [];
   const upstreamArtifacts = queryUpstreamArtifacts(taskId);
 
+  const meta = task.metadata ?? {};
+  const metaString = (key: string): string | null => {
+    const v = meta[key];
+    return typeof v === 'string' && v.trim() ? v.trim() : null;
+  };
+
   const base = {
     version: 'context-envelope/v0' as const,
     run: {
@@ -96,12 +102,13 @@ export function buildContextEnvelope(taskId: string): ContextEnvelopeV0 {
     task: {
       id: task.id,
       objective: task.objective,
-      acceptance_criteria: null,
-      expected_artifact: null,
-      verification_rule: null,
+      acceptance_criteria: metaString('acceptance_criteria') ?? metaString('acceptanceCriteria'),
+      expected_artifact: metaString('expected_artifact') ?? metaString('expectedArtifact'),
+      verification_rule: metaString('verification_rule') ?? metaString('verificationRule'),
     },
     permissions: {
-      summary: 'Kernel-mediated task execution; upstream artifacts are references only.',
+      summary: metaString('permissions_summary')
+        ?? 'Kernel-mediated task execution; upstream artifacts are references only.',
     },
     upstream_artifacts: upstreamArtifacts.map((artifact) => ({
       artifact_id: artifact.artifactId,

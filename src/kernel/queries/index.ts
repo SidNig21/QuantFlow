@@ -176,8 +176,15 @@ export interface UpstreamArtifactSnapshot {
 }
 
 function sensitivityOf(artifact: ArtifactSnapshot): string {
-  const sensitivity = artifact.metadata['sensitivity'];
-  return typeof sensitivity === 'string' && sensitivity.trim() ? sensitivity.trim() : 'normal';
+  const fromColumn = typeof artifact.sensitivity === 'string' && artifact.sensitivity.trim()
+    ? artifact.sensitivity.trim()
+    : 'normal';
+  const fromMeta = artifact.metadata['sensitivity'];
+  const meta = typeof fromMeta === 'string' && fromMeta.trim() ? fromMeta.trim() : 'normal';
+  // Stricter wins: any non-normal on column or metadata ⇒ sensitive.
+  if (fromColumn !== 'normal') return fromColumn;
+  if (meta !== 'normal') return meta;
+  return 'normal';
 }
 
 function verifiedArtifactIds(receipts: ReceiptSnapshot[]): Set<string> {

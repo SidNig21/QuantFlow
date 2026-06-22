@@ -56,6 +56,6 @@ export function runSemanticVerificationStage(
     confidence: 0.65,
     evidenceRefs,
     rationale: `Task ${input.taskId} passed the R7 semantic stage over structurally verified artifact evidence.`,
-    limitations: 'Deterministic stage only; deeper domain judgment remains eval/operator review.',
+    limitations: 'Deterministic scaffold only (v4 review C-02); real domain judgment deferred to eval/operator review.',
   };
 }

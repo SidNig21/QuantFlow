@@ -16,6 +16,7 @@ import { handleTaskCommand, queryTaskGet } from '../../src/kernel/tasks/index';
 import { handleArtifactCommand, handleReceiptCommand, queryArtifactList } from '../../src/kernel/receipts/index';
 import { queryWorkerForTile, queryWorkerGet, seedHarnessRegistry } from '../../src/kernel/worker-instances/index';
 import { buildContextEnvelope } from '../../src/kernel/context/envelope';
+import { queryUpstreamArtifacts } from '../../src/kernel/queries/index';
 import { createConductorActions } from '../../src/main/conductor/conductor-actions';
 import { createMockHarness } from '../../src/harness/mock/index';
 
@@ -40,6 +41,7 @@ for (const migration of [
   '004-r3-workflow-instance.sql',
   '005-r4-runtime.sql',
   '006-r2-artifact-lineage.sql',
+  '007-r7-typed-artifacts.sql',
 ]) {
   db.exec(readFileSync(join(migrationsDir, migration), 'utf-8'));
 }
@@ -169,6 +171,43 @@ function createVerifiedSensitiveTask(): string {
   return artifactId;
 }
 
+function createVerifiedColumnSensitiveTask(): string {
+  const id = 'task_sensitive_column';
+  expectOk('create column-sensitive task', handleTaskCommand(kdb, 'kernel.task.create', {
+    id,
+    workflowId: 'wf1',
+    correlationId: `corr_${id}`,
+    title: 'Column-sensitive upstream',
+    objective: 'Column-sensitive upstream objective',
+  }));
+  expectOk('claim column-sensitive task', handleTaskCommand(kdb, 'kernel.task.claim', { taskId: id, ownerWorkerId: workerId }));
+  expectOk('start column-sensitive task', handleTaskCommand(kdb, 'kernel.task.start', { taskId: id }));
+  const body = 'COLUMN SENSITIVE BODY';
+  const fileName = `${id}.txt`;
+  writeFileSync(join(artifactRoot, fileName), body, 'utf-8');
+  const artifactId = expectOk('create column-sensitive artifact', handleArtifactCommand(kdb, 'kernel.artifact.create', {
+    workflowId: 'wf1',
+    taskId: id,
+    workerId,
+    kind: 'file',
+    uri: fileName,
+    summary: 'column sensitive artifact',
+    contentHash: createHash('sha256').update(body).digest('hex'),
+    mediaType: 'text/plain',
+    sizeBytes: Buffer.byteLength(body),
+    sensitivity: 'restricted',
+    metadata: {},
+  }));
+  expectOk('submit column-sensitive task', handleTaskCommand(kdb, 'kernel.task.submit', { taskId: id, artifactRefs: [artifactId] }));
+  expectOk('verify column-sensitive task', handleTaskCommand(kdb, 'kernel.task.verify', {
+    taskId: id,
+    verifierWorkerId,
+    verdict: 'pass',
+    artifactRoot,
+  }));
+  return artifactId;
+}
+
 console.log('— Task A: mock artifact is structurally verified —');
 const taskAArtifactId = await runMockTask('task_a', 'Task A');
 
@@ -181,6 +220,24 @@ expectOk('create unverified upstream', handleTaskCommand(kdb, 'kernel.task.creat
   objective: 'Unverified upstream objective',
 }));
 const sensitiveArtifactId = createVerifiedSensitiveTask();
+const columnSensitiveArtifactId = createVerifiedColumnSensitiveTask();
+expectOk('create task_b_meta', handleTaskCommand(kdb, 'kernel.task.create', {
+  id: 'task_b_meta',
+  workflowId: 'wf1',
+  correlationId: 'corr_task_b_meta',
+  title: 'Task B meta filter',
+  objective: 'Filter sensitive upstreams.',
+  metadata: {},
+}));
+expectOk('context_from Bmeta<-column-sensitive', handleTaskCommand(kdb, 'kernel.task.depend', {
+  taskId: 'task_b_meta',
+  dependsOnTaskId: 'task_sensitive_column',
+  kind: 'context_from',
+}));
+const columnFiltered = queryUpstreamArtifacts('task_b_meta');
+check('column sensitivity excluded by default', !columnFiltered.some((a) => a.artifactId === columnSensitiveArtifactId));
+check('column sensitivity included with includeSensitive', queryUpstreamArtifacts('task_b_meta', { includeSensitive: true })
+  .some((a) => a.artifactId === columnSensitiveArtifactId));
 
 console.log('\n— Task B: assign delivers envelope and records artifact lineage —');
 expectOk('create task_b', handleTaskCommand(kdb, 'kernel.task.create', {

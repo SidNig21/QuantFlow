@@ -212,5 +212,69 @@ expectReject('self-verification blocked', handleTaskCommand(kdb, 'kernel.task.ve
 }));
 check('self-verify task remains submitted', queryTaskGet(kdb, 'task_self_verify')?.status === 'submitted');
 
+console.log('\n— EO: same attemptId after recover re-runs lifecycle —');
+makeWorkingTask('task_eo_submit');
+const eoArtifact = createArtifact('task_eo_submit', 'eo-submit.txt', 'eo body');
+expectOk('submit eo task', handleTaskCommand(kdb, 'kernel.task.submit', {
+  taskId: 'task_eo_submit',
+  artifactRefs: [eoArtifact],
+  attemptId: 'att-eo-submit',
+}));
+expectOk('recover eo after submit', handleTaskCommand(kdb, 'kernel.task.recover', { taskId: 'task_eo_submit' }));
+check('eo recovered to open', queryTaskGet(kdb, 'task_eo_submit')?.status === 'open');
+expectOk('re-claim eo submit task', handleTaskCommand(kdb, 'kernel.task.claim', {
+  taskId: 'task_eo_submit',
+  ownerWorkerId: queryWorkerForTile(kdb, 'tile_w')!,
+}));
+expectOk('re-start eo submit task', handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task_eo_submit' }));
+expectOk('replay submit after recover', handleTaskCommand(kdb, 'kernel.task.submit', {
+  taskId: 'task_eo_submit',
+  artifactRefs: [eoArtifact],
+  attemptId: 'att-eo-submit',
+}));
+check('replay submit advanced to submitted', queryTaskGet(kdb, 'task_eo_submit')?.status === 'submitted');
+const dupSubmit = handleTaskCommand(kdb, 'kernel.task.submit', {
+  taskId: 'task_eo_submit',
+  artifactRefs: [eoArtifact],
+  attemptId: 'att-eo-submit',
+});
+check('duplicate submit while submitted stays idempotent', dupSubmit.ok === true && dupSubmit.data?.['idempotent'] === true);
+
+makeWorkingTask('task_eo_verify');
+const eoVerifyArtifact = createArtifact('task_eo_verify', 'eo-verify.txt', 'verify body');
+expectOk('submit eo verify task', handleTaskCommand(kdb, 'kernel.task.submit', {
+  taskId: 'task_eo_verify',
+  artifactRefs: [eoVerifyArtifact],
+  attemptId: 'att-eo-verify',
+}));
+const failVerify = handleTaskCommand(kdb, 'kernel.task.verify', {
+  taskId: 'task_eo_verify',
+  verifierWorkerId,
+  verdict: 'fail',
+  artifactRoot,
+  attemptId: 'att-eo-verify',
+});
+check('fail eo verify returns to working', failVerify.ok === true && queryTaskGet(kdb, 'task_eo_verify')?.status === 'working');
+expectOk('recover eo after failed verify', handleTaskCommand(kdb, 'kernel.task.recover', { taskId: 'task_eo_verify' }));
+check('eo verify recovered to open', queryTaskGet(kdb, 'task_eo_verify')?.status === 'open');
+expectOk('re-claim eo verify task', handleTaskCommand(kdb, 'kernel.task.claim', {
+  taskId: 'task_eo_verify',
+  ownerWorkerId: queryWorkerForTile(kdb, 'tile_w')!,
+}));
+expectOk('re-start eo verify task', handleTaskCommand(kdb, 'kernel.task.start', { taskId: 'task_eo_verify' }));
+expectOk('re-submit eo verify task', handleTaskCommand(kdb, 'kernel.task.submit', {
+  taskId: 'task_eo_verify',
+  artifactRefs: [eoVerifyArtifact],
+  attemptId: 'att-eo-verify',
+}));
+expectOk('pass verify after recover/resubmit', handleTaskCommand(kdb, 'kernel.task.verify', {
+  taskId: 'task_eo_verify',
+  verifierWorkerId,
+  verdict: 'pass',
+  artifactRoot,
+  attemptId: 'att-eo-verify',
+}));
+check('replay verify completed task', queryTaskGet(kdb, 'task_eo_verify')?.status === 'complete');
+
 console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} — ${failures} failure(s)`);
 process.exit(failures === 0 ? 0 : 1);

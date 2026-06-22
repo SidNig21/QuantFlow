@@ -384,6 +384,28 @@ function validateArtifactExpectations(db: KernelDB, workflowId: string, template
   return { ok: true, id: workflowId };
 }
 
+function validateAllRunTasksVerifiedComplete(db: KernelDB, workflowId: string): CommandResult {
+  const run = queryRun(db, workflowId);
+  if (!run) return { ok: false, error: `workflow not found: ${workflowId}` };
+  const stuck: string[] = [];
+  for (const taskId of run.taskIds) {
+    const task = queryTaskGet(db, taskId);
+    if (!task) continue;
+    if (task.status !== 'complete') {
+      stuck.push(`${taskId}:${task.status}`);
+      continue;
+    }
+    const verified = db.prepare(
+      "SELECT 1 FROM receipts WHERE task_id = ? AND type = 'verification_passed' LIMIT 1",
+    ).get(taskId);
+    if (!verified) stuck.push(`${taskId}:unverified`);
+  }
+  if (stuck.length > 0) {
+    return { ok: false, error: `template run has non-terminal or unverified tasks: ${stuck.join(', ')}` };
+  }
+  return { ok: true, id: workflowId };
+}
+
 async function asCommandResult(value: CommandResult | Promise<CommandResult>): Promise<CommandResult> {
   return value;
 }
@@ -505,6 +527,7 @@ export function createRunTemplateRunner(deps: RunTemplateRunnerDeps) {
     const selectedCheckpoints = new Set<string>();
     const executionLog: RunTemplateExecutionEvent[] = [];
     let schedulerCalls = 0;
+    const runEpoch = `${now()}`;
 
     async function executePhase(phase: RunTemplateTaskPhase): Promise<CommandResult> {
       const tileId = `${workflowId}-${tileIdForRole(template, phase.roleId)}`;
@@ -516,7 +539,7 @@ export function createRunTemplateRunner(deps: RunTemplateRunnerDeps) {
         roleId: phase.roleId,
         phaseId: phase.id,
         attention: phase.attention,
-        attemptId: `att-${phase.taskId}`,
+        attemptId: `att-${runEpoch}-${phase.taskId}`,
       });
     }
 
@@ -654,6 +677,20 @@ export function createRunTemplateRunner(deps: RunTemplateRunnerDeps) {
         executionLog,
         schedulerCalls,
         error: expected.error,
+      };
+    }
+    const terminal = validateAllRunTasksVerifiedComplete(deps.db, workflowId);
+    if (!terminal.ok) {
+      return {
+        ok: false,
+        workflowId,
+        templateId: template.id,
+        taskIds: queryRun(deps.db, workflowId)?.taskIds ?? [],
+        artifactIds: queryRun(deps.db, workflowId)?.artifactIds ?? [],
+        receiptIds: queryRun(deps.db, workflowId)?.receiptIds ?? [],
+        executionLog,
+        schedulerCalls,
+        error: terminal.error,
       };
     }
     await dispatch('kernel.workflow.update', { id: workflowId, status: 'complete' });
