@@ -8,6 +8,7 @@ The renderer is a visual projector of Kernel state. It is not a database.
 - User intent capture — drag, drop, click, keyboard shortcuts.
 - Tile flip UI — terminal front / StateCard back.
 - Conductor tile display.
+- `canvas/grid.ts` - shared Surface S1 grid tokens for the live shell and future renderer surfaces: 12 columns, 8px baseline, gutters, margins, and string-lane sizing. Tokens only; no Kernel truth.
 - `state/kernel-client.ts` — Typed contract for `window.kernelApi`; wrappers for `sendKernelCommand`, `sendKernelQuery`, `onKernelEvent`. (Goal 2)
 - `canvas/kernel-canvas.ts` — Canvas action wrappers that route through Kernel commands: `spawnTile`, `moveTile`, `resizeTile`, `connectTiles`, `closeTile`. (Goal 2)
 - `components/WorkflowRegion/workflow-region-view.ts` — pure projector: formats a Kernel workflow region into a soft region model + ordered display sections (workflow / objective / status / tiles / tasks / receipts / blockers / strings). (Goal 7)

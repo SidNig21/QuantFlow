@@ -58,13 +58,13 @@ describe("findAutoPlacement", () => {
     expect(pos.y).toBeGreaterThanOrEqual(0);
   });
 
-  test("result snaps to 20px grid", () => {
+  test("result snaps to the shared 8px baseline grid", () => {
     const existing: Tile[] = [
       { x: 0, y: 0, width: 100, height: 100 },
     ];
     const pos = findAutoPlacement(existing, 100, 100);
-    expect(pos.x % 20).toBe(0);
-    expect(pos.y % 20).toBe(0);
+    expect(pos.x % 8).toBe(0);
+    expect(pos.y % 8).toBe(0);
   });
 
   test("handles many tiles without overlapping any", () => {

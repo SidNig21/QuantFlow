@@ -1,4 +1,4 @@
-import { snapToGrid } from "./canvas-state.js";
+import { markUserPlaced, snapToGrid } from "./canvas-state.js";
 
 export const MIN_SIZES = {
   term: { width: 200, height: 120 },
@@ -131,12 +131,14 @@ export function attachDrag(titleBar, tile, {
       if (isGroupDrag) {
         for (const entry of groupCtx) {
           entry.container.classList.remove("tile-dragging");
+          if (moved) markUserPlaced(entry.tile);
           snapToGrid(entry.tile);
           committed.push({
             tile: entry.tile, prevX: entry.startX, prevY: entry.startY,
           });
         }
       } else {
+        if (moved) markUserPlaced(tile);
         snapToGrid(tile);
         committed.push({ tile, prevX: startTX, prevY: startTY });
       }
@@ -370,6 +372,7 @@ export function attachResize(
         for (const wv of webviews) {
           wv.webview.style.pointerEvents = "";
         }
+        markUserPlaced(tile);
         snapToGrid(tile);
         onUpdate();
         if (onResizeEnd) onResizeEnd(tile);

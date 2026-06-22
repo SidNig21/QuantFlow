@@ -1,8 +1,10 @@
+import { buildGridOverlayGeometry, GRID_TOKENS } from "./canvas-grid.js";
+
 export const ZOOM_MIN = 0.25;
 export const ZOOM_MAX = 1;
 const ZOOM_RUBBER_BAND_K = 400;
-const CELL = 20;
-const MAJOR = 80;
+const CELL = GRID_TOKENS.baseline;
+const MAJOR = GRID_TOKENS.majorBaseline;
 const MINOR_PER_MAJOR = MAJOR / CELL;
 
 const isMac = globalThis.window?.shellApi?.getPlatform?.() === "darwin";
@@ -27,6 +29,7 @@ export function createViewport(canvasEl, gridCanvas, tilesRef) {
 	let prevCanvasW = canvasEl.clientWidth;
 	let prevCanvasH = canvasEl.clientHeight;
 	let frameRaf = null;
+	let gridOverlayVisible = false;
 
 	const zoomIndicatorEl = document.getElementById("zoom-indicator");
 
@@ -132,6 +135,38 @@ export function createViewport(canvasEl, gridCanvas, tilesRef) {
 		gridCtx.translate(offX - sizeDev, offY - sizeDev);
 		gridCtx.fillStyle = pattern;
 		gridCtx.fillRect(0, 0, w * dpr + 2 * sizeDev, h * dpr + 2 * sizeDev);
+		gridCtx.restore();
+		drawGridOverlay(w, h);
+	}
+
+	function drawGridOverlay(w, h) {
+		if (!gridOverlayVisible) return;
+		const geometry = buildGridOverlayGeometry(state, { width: w, height: h });
+		gridCtx.save();
+		gridCtx.setTransform(1, 0, 0, 1, 0, 0);
+		gridCtx.fillStyle = isDark()
+			? "rgba(183,255,0,0.045)"
+			: "rgba(0,0,0,0.035)";
+		for (const col of geometry.columns) {
+			gridCtx.fillRect(col.x, 0, col.width, h);
+		}
+		gridCtx.strokeStyle = isDark()
+			? "rgba(183,255,0,0.12)"
+			: "rgba(0,0,0,0.10)";
+		gridCtx.lineWidth = 1;
+		gridCtx.beginPath();
+		for (const col of geometry.columns) {
+			gridCtx.moveTo(Math.round(col.x) + 0.5, 0);
+			gridCtx.lineTo(Math.round(col.x) + 0.5, h);
+			gridCtx.moveTo(Math.round(col.x + col.width) + 0.5, 0);
+			gridCtx.lineTo(Math.round(col.x + col.width) + 0.5, h);
+		}
+		for (let i = 0; i < geometry.baselines.length; i += 4) {
+			const y = Math.round(geometry.baselines[i]) + 0.5;
+			gridCtx.moveTo(0, y);
+			gridCtx.lineTo(w, y);
+		}
+		gridCtx.stroke();
 		gridCtx.restore();
 	}
 
@@ -265,6 +300,19 @@ export function createViewport(canvasEl, gridCanvas, tilesRef) {
 		updateCanvas,
 		redrawGrid: drawGrid,
 		applyZoom,
+		isGridOverlayVisible() {
+			return gridOverlayVisible;
+		},
+		setGridOverlayVisible(visible) {
+			gridOverlayVisible = visible === true;
+			updateCanvas();
+			return gridOverlayVisible;
+		},
+		toggleGridOverlay() {
+			gridOverlayVisible = !gridOverlayVisible;
+			updateCanvas();
+			return gridOverlayVisible;
+		},
 		setPan(x, y) {
 			state.panX = x;
 			state.panY = y;

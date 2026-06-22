@@ -2821,6 +2821,16 @@ async function init() {
 				},
 			},
 			{
+				id: "grid-overlay-toggle",
+				title: viewport.isGridOverlayVisible() ? "Hide Grid Overlay" : "Show Grid Overlay",
+				subtitle: "12 columns, 8px baseline, string lanes",
+				section: "Canvas",
+				keywords: ["grid", "overlay", "alignment", "columns"],
+				run: () => {
+					viewport.toggleGridOverlay();
+				},
+			},
+			{
 				id: "watchtower-toggle",
 				title: watchtowerVisible ? "Hide Watchtower" : "Open Watchtower",
 				subtitle: "Agents, relay messages, and operational events",

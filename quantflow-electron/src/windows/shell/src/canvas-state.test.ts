@@ -273,39 +273,38 @@ describe("bringToFront", () => {
 // -- snapToGrid --
 
 describe("snapToGrid", () => {
-  test("snaps position to 20px grid", () => {
+  test("snaps position to 8px baseline grid", () => {
     const tile = { x: 13, y: 27, width: 405, height: 510 };
     snapToGrid(tile);
-    expect(tile.x).toBe(20);
-    expect(tile.y).toBe(20);
+    expect(tile.x).toBe(16);
+    expect(tile.y).toBe(24);
   });
 
-  test("snaps size to 20px grid", () => {
+  test("snaps size to 8px baseline grid", () => {
     const tile = { x: 0, y: 0, width: 405, height: 513 };
     snapToGrid(tile);
-    expect(tile.width).toBe(400);
-    expect(tile.height).toBe(520);
+    expect(tile.width).toBe(408);
+    expect(tile.height).toBe(512);
   });
 
   test("values exactly on grid remain unchanged", () => {
-    const tile = { x: 40, y: 60, width: 400, height: 500 };
+    const tile = { x: 40, y: 64, width: 400, height: 504 };
     snapToGrid(tile);
     expect(tile.x).toBe(40);
-    expect(tile.y).toBe(60);
+    expect(tile.y).toBe(64);
     expect(tile.width).toBe(400);
-    expect(tile.height).toBe(500);
+    expect(tile.height).toBe(504);
   });
 
   test("rounds to nearest grid line (not always down)", () => {
     const tile = { x: 11, y: 9, width: 100, height: 100 };
     snapToGrid(tile);
-    // 11 rounds to 20, 9 rounds to 0
-    expect(tile.x).toBe(20);
-    expect(tile.y).toBe(0);
+    expect(tile.x).toBe(8);
+    expect(tile.y).toBe(8);
   });
 
   test("handles zero position", () => {
-    const tile = { x: 0, y: 0, width: 20, height: 20 };
+    const tile = { x: 0, y: 0, width: 8, height: 8 };
     snapToGrid(tile);
     expect(tile.x).toBe(0);
     expect(tile.y).toBe(0);
@@ -314,8 +313,14 @@ describe("snapToGrid", () => {
   test("handles negative coordinates", () => {
     const tile = { x: -13, y: -27, width: 100, height: 100 };
     snapToGrid(tile);
-    expect(tile.x).toBe(-20);
-    expect(tile.y).toBe(-20);
+    expect(tile.x).toBe(-16);
+    expect(tile.y).toBe(-24);
+  });
+
+  test("does not move operator-placed tiles", () => {
+    const tile = { x: 13, y: 27, width: 405, height: 513, userPlaced: true };
+    snapToGrid(tile);
+    expect(tile).toMatchObject({ x: 13, y: 27, width: 405, height: 513 });
   });
 });
 

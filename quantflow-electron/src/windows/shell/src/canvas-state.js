@@ -34,8 +34,18 @@
  * @property {{waiting?: string[], blocked?: string[]}} [roleStatusParser] - Role-specific terminal status hints
  * @property {string} [roleStartupSessionId] - Session that already received startup command
  * @property {string} [roleStartupPromptSessionId] - Session that already received startup prompt
+ * @property {boolean} [userPlaced] - Operator-placed tiles are not auto-snapped
+ * @property {boolean} [locked] - Locked tiles are not auto-snapped
  * @property {number} zIndex - Stacking order
  */
+
+export {
+	GRID_TOKENS,
+	markUserPlaced,
+	snapRectToGrid,
+	snapToGrid,
+	verifyCanvasAlignment,
+} from "./canvas-grid.js";
 
 /** @type {Tile[]} */
 export const tiles = [];
@@ -196,16 +206,6 @@ export function normalizeConnection(value) {
 const IMAGE_EXTENSIONS = new Set([
 	".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp",
 ]);
-
-const GRID_CELL = 20;
-
-/** Snap tile position and size to the minor grid. */
-export function snapToGrid(tile) {
-	tile.x = Math.round(tile.x / GRID_CELL) * GRID_CELL;
-	tile.y = Math.round(tile.y / GRID_CELL) * GRID_CELL;
-	tile.width = Math.round(tile.width / GRID_CELL) * GRID_CELL;
-	tile.height = Math.round(tile.height / GRID_CELL) * GRID_CELL;
-}
 
 // ── Selection state ──
 

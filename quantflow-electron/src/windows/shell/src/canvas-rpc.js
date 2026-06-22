@@ -1,5 +1,5 @@
 import {
-	tiles, connections, getTile, defaultSize, snapToGrid,
+	tiles, connections, getTile, defaultSize, snapToGrid, GRID_TOKENS,
 	addConnection, removeConnection, updateConnectionLabel,
 	getConnection, generateId,
 } from "./canvas-state.js";
@@ -420,12 +420,12 @@ export function buildRoleTileOptions(role, params = {}) {
 
 /**
  * Find a non-overlapping position on the canvas for a tile of the
- * given size. Scans on a 20 px grid within a 4000x3000 region.
+ * given size. Scans on the shared baseline grid within a 4000x3000 region.
  */
 export function findAutoPlacement(existingTiles, width, height) {
 	const CANVAS_W = 4000;
 	const CANVAS_H = 3000;
-	const STEP = 20;
+	const STEP = GRID_TOKENS.baseline;
 
 	for (let y = 0; y <= CANVAS_H - height; y += STEP) {
 		for (let x = 0; x <= CANVAS_W - width; x += STEP) {
