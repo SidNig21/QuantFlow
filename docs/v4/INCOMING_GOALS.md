@@ -80,6 +80,49 @@ Entry shape:
 - **Priority:** high — **Track A**, do before/with R2 so the next multi-agent run doesn't misfire.
 - **Status:** captured (spec above) — small fix, high ROI; not a full rung.
 
+### OKF vault export — built + smoke-proven, no live trigger (fold into R7)
+- **Problem / friction:** the whole OKF export pipeline exists and is machine-proven
+  (`src/vault/index.ts` `exportWorkflowToVault`/`collectVaultExport`/`renderVaultExport`,
+  `src/vault/exporters/*.ts`, `okf/frontmatter.ts`, spec `docs/v3/VAULT_OKF_SPEC.md`,
+  smoke `vault-export-smoke.ts`) — but it has **zero live callers**. No IPC, MCP, or
+  menu path reaches it. `ipc-vault.ts` only does get/set-path + pick/read-file. So a
+  finished subsystem is dark: the operator can *read* the vault but can never *trigger*
+  an OKF workflow export from the app. (Distinct from `obsidian-envoy-mirror.ts`, the
+  live polling task-feed writer — that one runs; OKF export does not.)
+- **Evidence:** external-tooling audit (2026-06-21). Grep: `collectVaultExport` appears
+  only in `src/vault/` + the smoke; nothing under `quantflow-electron/src/main` calls it.
+- **Proposed scope:**
+  - Wire **one** trigger — IPC/MCP "export workflow → vault" handler calling
+    `exportWorkflowToVault(workflowId)`. ~one handler; subsystem is already done + tested.
+  - **Fold into R7:** R7's lesson/judgment work needs the lesson→vault mirror seam on
+    this exact path, so land the export trigger there rather than as a standalone fork.
+- **Layer(s):** main (ipc-vault / MCP) · vault (already built)
+- **Priority:** medium — completes built work; natural R7 companion.
+- **Status:** captured — do NOT fork the rung chain; absorb into R7 unless operator
+  wants the export button sooner.
+
+### (cleanup) Cloudflare Workers is not a live dependency — doc prune
+- **Problem / friction:** Cloudflare survives only as an aspirational comment
+  (`src/main/conductor/model-provider.ts:5`) + stale roadmap mentions (`BUILD_PLAN_V3.md`,
+  AGENTS.md) and the operator's "Outside Tooling" note. No `wrangler`, no `workers.dev`,
+  no runtime — it was never built. Listing it as an "outside tool" implies a coupling
+  that doesn't exist. It's the durable-cloud-runtime idea tied to the **parked** Eve/Vercel
+  cloud gate, not a current tool.
+- **Evidence:** external-tooling audit (2026-06-21). Grep `cloudflare|wrangler|workers.dev`
+  → comments/docs only.
+- **Proposed scope:** one-line doc prune — strike Cloudflare from the "outside tools"
+  mental model; keep it only as explicitly-parked future strategy (Eve/Vercel durability gate).
+- **Layer(s):** docs only.
+- **Priority:** low — hygiene; prevents re-treating a non-dependency as live.
+- **Status:** captured.
+
+### (note) Envoy CLI is demoted, not dead — treat as mirror/spawn, not authority
+- After R3c the Kernel owns task truth; the Envoy CLI is now (a) the WSL spawn-lifecycle
+  wrapper (`herdr-envoy-wrap` posts Started/Completed/Failed) and (b) a downstream
+  `envoy_tasks` mirror feeding the Obsidian board. Still load-bearing for Mode-2 spawn —
+  **not** removable without redoing spawn — but no longer the bus. No code change; recorded
+  so nobody re-treats `envoy_tasks` as a source of truth. (External-tooling audit 2026-06-21.)
+
 ### (note) R8 Mode-1 spawn correction — already in BUILD_PLAN_V4, not a candidate
 The Eve-legend-click → terminal-tile fix is an **R8 scope clarification** recorded
 directly in `BUILD_PLAN_V4.md` (§ "Operator spawn model — Mode 1 vs Mode 2" + the
