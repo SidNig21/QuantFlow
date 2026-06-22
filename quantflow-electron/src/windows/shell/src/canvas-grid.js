@@ -64,7 +64,8 @@ export function alignTilesToGrid(layout, options = {}) {
 	let aligned = 0;
 	let skipped = 0;
 	for (const tile of tiles) {
-		if (isGridLocked(tile, options)) {
+		if (tile?.userPlaced === true) markUserPlaced(tile, false);
+		if (tile?.locked === true || lockContains(options.locks, tile?.id)) {
 			skipped++;
 			continue;
 		}

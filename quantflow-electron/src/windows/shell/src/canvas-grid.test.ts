@@ -52,14 +52,20 @@ describe("snapToGrid", () => {
 		expect(tile).toMatchObject({ x: 13, y: 27, width: 405, height: 513 });
 	});
 
-	test("aligns all non-locked tiles and leaves manual placements untouched", () => {
+	test("aligns all tiles after clearing pins but leaves hard locks untouched", () => {
 		const free = markUserPlaced({ id: "free", x: 13, y: 27, width: 405, height: 513 });
 		const locked = { id: "locked", x: 21, y: 31, width: 403, height: 511, locked: true };
 		const normal = { id: "normal", x: 17, y: 19, width: 401, height: 503 };
 		const result = alignTilesToGrid([free, locked, normal]);
 
-		expect(result).toEqual({ aligned: 1, skipped: 2 });
-		expect(free).toMatchObject({ x: 13, y: 27, width: 405, height: 513 });
+		expect(result).toEqual({ aligned: 2, skipped: 1 });
+		expect(free).toMatchObject({
+			x: 16,
+			y: 24,
+			width: 408,
+			height: 512,
+			userPlaced: false,
+		});
 		expect(locked).toMatchObject({ x: 21, y: 31, width: 403, height: 511 });
 		expect(normal).toMatchObject({ x: 16, y: 16, width: 400, height: 504 });
 	});

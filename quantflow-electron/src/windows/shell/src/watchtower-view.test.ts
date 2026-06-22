@@ -882,6 +882,56 @@ describe("renderWatchtowerEvents", () => {
 		expect(kernelEventToWatchtowerEvent({ kind: "relay.sent" }, 4_000)).toBeNull();
 	});
 
+	test("includes structural canvas events but skips move and resize noise", () => {
+		expect(kernelEventToWatchtowerEvent({
+			kind: "tile.created",
+			tileId: "tile-1",
+			data: { summary: "Terminal tile created" },
+		}, 4_000)).toMatchObject({
+			type: "tile.created",
+			summary: "Terminal tile created",
+			meta: { tileId: "tile-1" },
+		});
+		expect(kernelEventToWatchtowerEvent({
+			kind: "connection.created",
+			data: { tileId: "tile-1", summary: "Cable created" },
+		}, 4_000)).toMatchObject({
+			type: "connection.created",
+			meta: { tileId: "tile-1" },
+		});
+		expect(kernelEventToWatchtowerEvent({
+			kind: "tile.status_updated",
+			tileId: "tile-1",
+			data: { status: "running" },
+		}, 4_000)).toMatchObject({
+			type: "tile.status_updated",
+			summary: "running",
+		});
+		expect(kernelEventToWatchtowerEvent({
+			kind: "tile.status",
+			tileId: "tile-1",
+			data: { status: "idle" },
+		}, 4_000)).toMatchObject({
+			type: "tile.status",
+			summary: "idle",
+		});
+		expect(kernelEventToWatchtowerEvent({
+			kind: "tile.removed",
+			tileId: "tile-1",
+		}, 4_000)).toMatchObject({
+			type: "tile.removed",
+			meta: { tileId: "tile-1" },
+		});
+		expect(kernelEventToWatchtowerEvent({
+			kind: "connection.deleted",
+			data: { id: "conn-1" },
+		}, 4_000)).toMatchObject({
+			type: "connection.deleted",
+		});
+		expect(kernelEventToWatchtowerEvent({ kind: "tile.moved" }, 4_000)).toBeNull();
+		expect(kernelEventToWatchtowerEvent({ kind: "tile.resized" }, 4_000)).toBeNull();
+	});
+
 	test("renders escaped operational event rows with route metadata", () => {
 		const html = renderWatchtowerEvents([
 			{

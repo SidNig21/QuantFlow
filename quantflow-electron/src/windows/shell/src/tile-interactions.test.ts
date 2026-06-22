@@ -3,7 +3,14 @@ import { finalizeGridPlacement } from "./tile-interactions.js";
 
 describe("finalizeGridPlacement", () => {
 	test("snaps ordinary drag-end placement to the grid", () => {
-		const tile = { id: "normal", x: 13, y: 27, width: 405, height: 513 };
+		const tile = {
+			id: "normal",
+			x: 13,
+			y: 27,
+			width: 405,
+			height: 513,
+			userPlaced: true,
+		};
 
 		finalizeGridPlacement(tile);
 
@@ -12,8 +19,8 @@ describe("finalizeGridPlacement", () => {
 			y: 24,
 			width: 408,
 			height: 512,
+			userPlaced: false,
 		});
-		expect(tile.userPlaced).toBeUndefined();
 	});
 
 	test("leaves Shift drag-end placement free and marks it user placed", () => {

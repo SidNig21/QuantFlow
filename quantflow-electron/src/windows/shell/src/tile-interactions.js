@@ -14,6 +14,7 @@ export function finalizeGridPlacement(tile, { freePlacement = false } = {}) {
 	if (freePlacement) {
 		return markUserPlaced(tile);
 	}
+	markUserPlaced(tile, false);
 	return snapToGrid(tile);
 }
 
