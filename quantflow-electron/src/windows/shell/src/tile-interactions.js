@@ -10,6 +10,13 @@ export const MIN_SIZES = {
 
 const CLICK_THRESHOLD = 3;
 
+export function finalizeGridPlacement(tile, { freePlacement = false } = {}) {
+	if (freePlacement) {
+		return markUserPlaced(tile);
+	}
+	return snapToGrid(tile);
+}
+
 /**
  * Attach drag behavior to a tile's title bar.
  * Supports single-tile drag, group drag (when tile is in a
@@ -131,15 +138,13 @@ export function attachDrag(titleBar, tile, {
       if (isGroupDrag) {
         for (const entry of groupCtx) {
           entry.container.classList.remove("tile-dragging");
-          if (moved) markUserPlaced(entry.tile);
-          snapToGrid(entry.tile);
+          finalizeGridPlacement(entry.tile, { freePlacement: shiftHeld && moved });
           committed.push({
             tile: entry.tile, prevX: entry.startX, prevY: entry.startY,
           });
         }
       } else {
-        if (moved) markUserPlaced(tile);
-        snapToGrid(tile);
+        finalizeGridPlacement(tile, { freePlacement: shiftHeld && moved });
         committed.push({ tile, prevX: startTX, prevY: startTY });
       }
       onUpdate();
@@ -323,6 +328,7 @@ export function attachResize(
       const startY = tile.y;
       const startW = tile.width;
       const startH = tile.height;
+      const freePlacement = e.shiftKey;
       const min = MIN_SIZES[tile.type] || MIN_SIZES.term;
 
       const webviews = getAllWebviews();
@@ -372,8 +378,7 @@ export function attachResize(
         for (const wv of webviews) {
           wv.webview.style.pointerEvents = "";
         }
-        markUserPlaced(tile);
-        snapToGrid(tile);
+        finalizeGridPlacement(tile, { freePlacement });
         onUpdate();
         if (onResizeEnd) onResizeEnd(tile);
         // Snap/resize was provisional UI; gate the full committed geometry

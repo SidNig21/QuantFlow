@@ -5,7 +5,7 @@ import {
 	tiles, connections, getTile, defaultSize, inferTileType, tileAtPoint,
 	selectTile, clearSelection, getSelectedTiles, getNearestTileInDirection,
 	addConnection, removeConnection, updateConnectionLabel, clearConnections,
-	generateId,
+	generateId, alignTilesToGrid,
 } from "./canvas-state.js";
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
@@ -2828,6 +2828,23 @@ async function init() {
 				keywords: ["grid", "overlay", "alignment", "columns"],
 				run: () => {
 					viewport.toggleGridOverlay();
+				},
+			},
+			{
+				id: "grid-align-all",
+				title: "Align All To Grid",
+				subtitle: "Snap unlocked tiles and keep manual free placements",
+				section: "Canvas",
+				keywords: ["grid", "align", "snap", "tidy"],
+				run: () => {
+					const result = alignTilesToGrid(tiles);
+					tileManager.repositionAllTiles();
+					tileManager.saveCanvasImmediate();
+					updateCables();
+					toasts.show({
+						message: `Aligned ${result.aligned} tile${result.aligned === 1 ? "" : "s"}.`,
+						tone: "info",
+					});
 				},
 			},
 			{

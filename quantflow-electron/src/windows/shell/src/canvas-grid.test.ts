@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	alignTilesToGrid,
 	buildGridOverlayGeometry,
 	GRID_TOKENS,
 	markUserPlaced,
@@ -49,6 +50,18 @@ describe("snapToGrid", () => {
 		const tile = { id: "t1", x: 13, y: 27, width: 405, height: 513 };
 		snapToGrid(tile, { locks: new Set(["t1"]) });
 		expect(tile).toMatchObject({ x: 13, y: 27, width: 405, height: 513 });
+	});
+
+	test("aligns all non-locked tiles and leaves manual placements untouched", () => {
+		const free = markUserPlaced({ id: "free", x: 13, y: 27, width: 405, height: 513 });
+		const locked = { id: "locked", x: 21, y: 31, width: 403, height: 511, locked: true };
+		const normal = { id: "normal", x: 17, y: 19, width: 401, height: 503 };
+		const result = alignTilesToGrid([free, locked, normal]);
+
+		expect(result).toEqual({ aligned: 1, skipped: 2 });
+		expect(free).toMatchObject({ x: 13, y: 27, width: 405, height: 513 });
+		expect(locked).toMatchObject({ x: 21, y: 31, width: 403, height: 511 });
+		expect(normal).toMatchObject({ x: 16, y: 16, width: 400, height: 504 });
 	});
 });
 

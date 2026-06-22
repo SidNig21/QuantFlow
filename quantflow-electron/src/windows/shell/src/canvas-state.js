@@ -40,6 +40,7 @@
  */
 
 export {
+	alignTilesToGrid,
 	GRID_TOKENS,
 	markUserPlaced,
 	snapRectToGrid,

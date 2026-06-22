@@ -59,6 +59,34 @@ export function snapToGrid(target, sizeOrOptions, maybeOptions) {
 	return tile;
 }
 
+export function alignTilesToGrid(layout, options = {}) {
+	const tiles = Array.isArray(layout) ? layout : [];
+	let aligned = 0;
+	let skipped = 0;
+	for (const tile of tiles) {
+		if (isGridLocked(tile, options)) {
+			skipped++;
+			continue;
+		}
+		const before = {
+			x: tile.x,
+			y: tile.y,
+			width: tile.width,
+			height: tile.height,
+		};
+		snapToGrid(tile, options);
+		if (
+			tile.x !== before.x ||
+			tile.y !== before.y ||
+			tile.width !== before.width ||
+			tile.height !== before.height
+		) {
+			aligned++;
+		}
+	}
+	return { aligned, skipped };
+}
+
 export function markUserPlaced(tile, value = true) {
 	if (tile) tile.userPlaced = value;
 	return tile;
