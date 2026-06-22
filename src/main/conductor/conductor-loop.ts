@@ -244,7 +244,7 @@ function candidateIds(checkpoint: CheckpointRequest): Set<string> {
   return new Set(checkpoint.candidates.map((candidate) => candidate.id));
 }
 
-function taskIdForCandidate(checkpoint: CheckpointRequest, candidate: CheckpointCandidate): string {
+export function taskIdForCheckpointCandidate(checkpoint: CheckpointRequest, candidate: CheckpointCandidate): string {
   const raw = `${checkpoint.checkpointId}-deepen-${candidate.id}`.toLowerCase();
   return raw.replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || `deepen-${candidate.id}`;
 }
@@ -379,7 +379,7 @@ export function createConductorLoop(deps: ConductorLoopDeps): ConductorLoop {
     }
 
     for (const candidate of checkpoint.candidates.filter((item) => selected.includes(item.id))) {
-      const taskId = taskIdForCandidate(checkpoint, candidate);
+      const taskId = taskIdForCheckpointCandidate(checkpoint, candidate);
       const created = await deps.runAction('create_task', {
         id: taskId,
         workflowId: input.workflowId,

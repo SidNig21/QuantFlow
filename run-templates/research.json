@@ -1,0 +1,97 @@
+{
+  "id": "research",
+  "name": "Research",
+  "description": "Medium-depth research run with parallel collection, analysis, checkpoint, and selected deepening.",
+  "budget": {
+    "max_workers": 5,
+    "max_wallclock_ms": 3600000,
+    "max_tool_calls": 60,
+    "max_retries": 2
+  },
+  "stopConditions": {
+    "requiredArtifacts": 5
+  },
+  "artifactExpectations": [
+    { "phaseId": "collect-primary", "kind": "file" },
+    { "phaseId": "collect-counter", "kind": "file" },
+    { "phaseId": "analyze-evidence", "kind": "file" },
+    { "phaseId": "checkpoint-theses", "kind": "candidate" },
+    { "phaseId": "deepen-selected", "kind": "file" }
+  ],
+  "tiles": [
+    { "id": "research-primary", "roleId": "codex", "x": 120, "y": 120 },
+    { "id": "research-counter", "roleId": "claude-worker", "x": 440, "y": 120 },
+    { "id": "research-analyst", "roleId": "hermes", "x": 280, "y": 360 },
+    { "id": "research-verifier", "roleId": "shell", "x": 760, "y": 240 }
+  ],
+  "connections": [
+    {
+      "id": "research-primary-to-analysis",
+      "fromTileId": "research-primary",
+      "toTileId": "research-analyst",
+      "semanticType": "context_flow",
+      "label": "primary evidence"
+    },
+    {
+      "id": "research-counter-to-analysis",
+      "fromTileId": "research-counter",
+      "toTileId": "research-analyst",
+      "semanticType": "context_flow",
+      "label": "counter evidence"
+    }
+  ],
+  "phases": [
+    {
+      "id": "collect-primary",
+      "type": "task",
+      "attention": "low",
+      "taskId": "research-collect-primary",
+      "title": "Collect primary evidence",
+      "objective": "Gather the most supportive evidence for the research objective.",
+      "roleId": "codex"
+    },
+    {
+      "id": "collect-counter",
+      "type": "task",
+      "attention": "low",
+      "taskId": "research-collect-counter",
+      "title": "Collect counter evidence",
+      "objective": "Gather objections, disconfirming evidence, and uncertainty.",
+      "roleId": "claude-worker"
+    },
+    {
+      "id": "analyze-evidence",
+      "type": "task",
+      "attention": "low",
+      "taskId": "research-analyze-evidence",
+      "title": "Analyze evidence",
+      "objective": "Compare primary and counter evidence and produce candidate theses.",
+      "roleId": "hermes",
+      "dependsOn": ["research-collect-primary", "research-collect-counter"]
+    },
+    {
+      "id": "checkpoint-theses",
+      "type": "checkpoint",
+      "attention": "medium",
+      "checkpointId": "research-pick-thesis",
+      "summary": "Pick the thesis to deepen.",
+      "dependsOnTaskIds": ["research-analyze-evidence"],
+      "candidates": [
+        {
+          "id": "thesis-a",
+          "title": "Thesis A",
+          "objective": "Deepen Thesis A with the verified evidence context.",
+          "dependsOnTaskId": "research-analyze-evidence",
+          "metadata": { "roleId": "codex", "attention": "low", "phaseId": "deepen-selected" }
+        },
+        {
+          "id": "thesis-b",
+          "title": "Thesis B",
+          "objective": "Deepen Thesis B with the verified evidence context.",
+          "dependsOnTaskId": "research-analyze-evidence",
+          "metadata": { "roleId": "claude-worker", "attention": "low", "phaseId": "deepen-selected" }
+        }
+      ]
+    }
+  ]
+}

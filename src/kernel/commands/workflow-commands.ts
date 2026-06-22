@@ -8,6 +8,20 @@ function hasWorkflowColumn(db: KernelDB, name: string): boolean {
   return rows.some((row) => row.name === name);
 }
 
+function normalizeBudgetJson(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (typeof value === 'string') {
+    try {
+      JSON.parse(value);
+      return value;
+    } catch {
+      return '{}';
+    }
+  }
+  if (value && typeof value === 'object') return JSON.stringify(value);
+  return '{}';
+}
+
 export function handleWorkflowCommand(
   db: KernelDB,
   type: string,
@@ -39,6 +53,21 @@ function workflowCreate(db: KernelDB, payload: Record<string, unknown>): Command
       now,
       now,
     );
+    const patchFields: string[] = [];
+    const patchValues: unknown[] = [];
+    if (payload['mode'] !== undefined && hasWorkflowColumn(db, 'mode')) {
+      patchFields.push('mode = ?');
+      patchValues.push((payload['mode'] as string | null) ?? null);
+    }
+    const budgetJson = normalizeBudgetJson(payload['budgetJson'] ?? payload['budget']);
+    if (budgetJson !== null && hasWorkflowColumn(db, 'budget_json')) {
+      patchFields.push('budget_json = ?');
+      patchValues.push(budgetJson);
+    }
+    if (patchFields.length > 0) {
+      patchValues.push(id);
+      db.prepare(`UPDATE workflows SET ${patchFields.join(', ')} WHERE id = ?`).run(...patchValues);
+    }
     emitKernelEvent({ kind: 'workflow.created', workflowId: id, data: { id, name } });
     return { ok: true, id };
   } catch (err) {
@@ -55,6 +84,15 @@ function workflowUpdate(db: KernelDB, payload: Record<string, unknown>): Command
     if (payload['name'] !== undefined) { fields.push('name = ?'); values.push(payload['name']); }
     if (payload['objective'] !== undefined) { fields.push('objective = ?'); values.push(payload['objective']); }
     if (payload['status'] !== undefined) { fields.push('status = ?'); values.push(payload['status']); }
+    if (payload['mode'] !== undefined && hasWorkflowColumn(db, 'mode')) {
+      fields.push('mode = ?');
+      values.push((payload['mode'] as string | null) ?? null);
+    }
+    const budgetJson = normalizeBudgetJson(payload['budgetJson'] ?? payload['budget']);
+    if (budgetJson !== null && hasWorkflowColumn(db, 'budget_json')) {
+      fields.push('budget_json = ?');
+      values.push(budgetJson);
+    }
     if (payload['checkpointState'] !== undefined && hasWorkflowColumn(db, 'checkpoint_state')) {
       fields.push('checkpoint_state = ?');
       values.push((payload['checkpointState'] as string | null) ?? null);

@@ -1,0 +1,115 @@
+{
+  "id": "deep",
+  "name": "Deep Research",
+  "description": "Deeper run with collection, synthesis, two checkpoints, and selected deepening lanes.",
+  "budget": {
+    "max_workers": 6,
+    "max_wallclock_ms": 14400000,
+    "max_tool_calls": 120,
+    "max_retries": 3
+  },
+  "stopConditions": {
+    "requiredArtifacts": 7
+  },
+  "artifactExpectations": [
+    { "phaseId": "collect-a", "kind": "file" },
+    { "phaseId": "collect-b", "kind": "file" },
+    { "phaseId": "synthesize-map", "kind": "file" },
+    { "phaseId": "checkpoint-branch", "kind": "candidate" },
+    { "phaseId": "checkpoint-final", "kind": "candidate" },
+    { "phaseId": "deepen-selected", "kind": "file" }
+  ],
+  "tiles": [
+    { "id": "deep-collector-a", "roleId": "codex", "x": 120, "y": 120 },
+    { "id": "deep-collector-b", "roleId": "claude-worker", "x": 440, "y": 120 },
+    { "id": "deep-synthesizer", "roleId": "hermes", "x": 280, "y": 360 },
+    { "id": "deep-verifier", "roleId": "shell", "x": 760, "y": 240 }
+  ],
+  "connections": [
+    {
+      "id": "deep-a-to-synth",
+      "fromTileId": "deep-collector-a",
+      "toTileId": "deep-synthesizer",
+      "semanticType": "context_flow",
+      "label": "branch A"
+    },
+    {
+      "id": "deep-b-to-synth",
+      "fromTileId": "deep-collector-b",
+      "toTileId": "deep-synthesizer",
+      "semanticType": "context_flow",
+      "label": "branch B"
+    }
+  ],
+  "phases": [
+    {
+      "id": "collect-a",
+      "type": "task",
+      "attention": "low",
+      "taskId": "deep-collect-a",
+      "title": "Collect branch A",
+      "objective": "Collect the first evidence branch.",
+      "roleId": "codex"
+    },
+    {
+      "id": "collect-b",
+      "type": "task",
+      "attention": "low",
+      "taskId": "deep-collect-b",
+      "title": "Collect branch B",
+      "objective": "Collect the second evidence branch.",
+      "roleId": "claude-worker"
+    },
+    {
+      "id": "synthesize-map",
+      "type": "task",
+      "attention": "low",
+      "taskId": "deep-synthesize-map",
+      "title": "Synthesize evidence map",
+      "objective": "Synthesize both branches into a candidate map.",
+      "roleId": "hermes",
+      "dependsOn": ["deep-collect-a", "deep-collect-b"]
+    },
+    {
+      "id": "checkpoint-branch",
+      "type": "checkpoint",
+      "attention": "medium",
+      "checkpointId": "deep-pick-branches",
+      "summary": "Pick one or more branches to deepen.",
+      "dependsOnTaskIds": ["deep-synthesize-map"],
+      "candidates": [
+        {
+          "id": "branch-a",
+          "title": "Branch A",
+          "objective": "Deepen branch A.",
+          "dependsOnTaskId": "deep-synthesize-map",
+          "metadata": { "roleId": "codex", "attention": "low", "phaseId": "deepen-selected" }
+        },
+        {
+          "id": "branch-b",
+          "title": "Branch B",
+          "objective": "Deepen branch B.",
+          "dependsOnTaskId": "deep-synthesize-map",
+          "metadata": { "roleId": "claude-worker", "attention": "low", "phaseId": "deepen-selected" }
+        }
+      ]
+    },
+    {
+      "id": "checkpoint-final",
+      "type": "checkpoint",
+      "attention": "high",
+      "checkpointId": "deep-final-decision",
+      "summary": "Final human-led decision checkpoint before the run is marked complete.",
+      "dependsOnTaskIds": ["deep-synthesize-map"],
+      "candidates": [
+        {
+          "id": "final-brief",
+          "title": "Final brief",
+          "objective": "Prepare the final deep-research brief.",
+          "dependsOnTaskId": "deep-synthesize-map",
+          "metadata": { "roleId": "hermes", "attention": "low", "phaseId": "deepen-selected" }
+        }
+      ]
+    }
+  ]
+}

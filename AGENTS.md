@@ -142,6 +142,7 @@ src/kernel/AGENTS.md             ← sole truth owner; all state mutations
 src/renderer/AGENTS.md           ← visual projector; no canonical state
 src/main/conductor/AGENTS.md     ← in-process planner; native Kernel tools only
 src/harness/AGENTS.md            ← worker/runtime adapter boundary
+run-templates/AGENTS.md          ← v4 R6 saved run configs; config only
 tools/quantflow-mcp/AGENTS.md    ← external adapter interface
 src/vault/AGENTS.md              ← knowledge mirror; OKF exports
 ```

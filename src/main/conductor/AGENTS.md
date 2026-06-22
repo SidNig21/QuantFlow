@@ -125,3 +125,12 @@ After meaningful changes: update this file if local rules or owned scope changed
 - `conductor-loop.ts` owns the transient checkpoint-selection phase. It reuses the existing `proposalToken` field and pending-planning-receipt check for token-bound candidate selection; do not add a second token scheme.
 - A checkpoint with no selection returns `awaiting-selection` and must not spawn work. Forged, stale, drifted, or replayed selection tokens return `stale`.
 - Valid selections post a `human_decision` receipt, create only selected deepening tasks, link them with `kernel.task.depend`, and set `workflows.checkpoint_state` to `resumed`.
+
+## v4 R6 Addendum
+
+- `run-template-runner.ts` is a compiler/driver over saved config in `run-templates/*.json`.
+- The runner must compile templates into existing Kernel Workflows, tiles, tasks, `blocks` dependencies, and R5 checkpoint requests. It must not create a template table, Run primitive, or private execution store.
+- Template task/checkpoint ids are local config ids; the runner scopes them per Workflow before writing Kernel truth.
+- Task eligibility must come from `dag-scheduler.ts`. Do not add a second scheduler or graph gate in the template runner.
+- Checkpoints must go through `createConductorLoop`'s R5 controller (`awaiting-selection` + `proposalToken` + `human_decision`), with no automatic selection.
+- Attention profile is plan-layer metadata: low phases may batch; high phases are serialized. Medium phases are human-facing and should remain unbatched unless a later approved rung changes that rule.

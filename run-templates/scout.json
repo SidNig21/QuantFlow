@@ -1,0 +1,85 @@
+{
+  "id": "scout",
+  "name": "Scout",
+  "description": "Fast sweep: collect two low-attention leads, checkpoint, deepen the selected lead.",
+  "budget": {
+    "max_workers": 4,
+    "max_wallclock_ms": 900000,
+    "max_tool_calls": 20,
+    "max_retries": 1
+  },
+  "stopConditions": {
+    "requiredArtifacts": 3
+  },
+  "artifactExpectations": [
+    { "phaseId": "collect-market", "kind": "file" },
+    { "phaseId": "collect-sources", "kind": "file" },
+    { "phaseId": "checkpoint-leads", "kind": "candidate" },
+    { "phaseId": "deepen-selected", "kind": "file" }
+  ],
+  "tiles": [
+    { "id": "scout-collector-a", "roleId": "codex", "x": 120, "y": 120 },
+    { "id": "scout-collector-b", "roleId": "claude-worker", "x": 440, "y": 120 },
+    { "id": "scout-verifier", "roleId": "shell", "x": 760, "y": 120 }
+  ],
+  "connections": [
+    {
+      "id": "scout-a-to-checkpoint",
+      "fromTileId": "scout-collector-a",
+      "toTileId": "scout-verifier",
+      "semanticType": "receipt_handoff",
+      "label": "market notes"
+    },
+    {
+      "id": "scout-b-to-checkpoint",
+      "fromTileId": "scout-collector-b",
+      "toTileId": "scout-verifier",
+      "semanticType": "receipt_handoff",
+      "label": "source notes"
+    }
+  ],
+  "phases": [
+    {
+      "id": "collect-market",
+      "type": "task",
+      "attention": "low",
+      "taskId": "scout-collect-market",
+      "title": "Scout market leads",
+      "objective": "Collect shallow candidate leads for the operator to choose from.",
+      "roleId": "codex"
+    },
+    {
+      "id": "collect-sources",
+      "type": "task",
+      "attention": "low",
+      "taskId": "scout-collect-sources",
+      "title": "Scout source leads",
+      "objective": "Collect source-backed candidate leads for the operator checkpoint.",
+      "roleId": "claude-worker"
+    },
+    {
+      "id": "checkpoint-leads",
+      "type": "checkpoint",
+      "attention": "medium",
+      "checkpointId": "scout-pick-lead",
+      "summary": "Pick one scout lead to deepen.",
+      "dependsOnTaskIds": ["scout-collect-market", "scout-collect-sources"],
+      "candidates": [
+        {
+          "id": "market",
+          "title": "Market lead",
+          "objective": "Deepen the market lead into a short evidence-backed brief.",
+          "dependsOnTaskId": "scout-collect-market",
+          "metadata": { "roleId": "codex", "attention": "low", "phaseId": "deepen-selected" }
+        },
+        {
+          "id": "sources",
+          "title": "Source lead",
+          "objective": "Deepen the source lead into a short evidence-backed brief.",
+          "dependsOnTaskId": "scout-collect-sources",
+          "metadata": { "roleId": "claude-worker", "attention": "low", "phaseId": "deepen-selected" }
+        }
+      ]
+    }
+  ]
+}

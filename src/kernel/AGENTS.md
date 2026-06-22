@@ -112,3 +112,9 @@ After meaningful changes: update this file if local rules or owned scope changed
 - `workflows.checkpoint_state` is the run-instance checkpoint pause field. R5 uses `awaiting-selection` while waiting for an operator choice and `resumed` after a valid selection; `workflows.status = paused` remains mission-level pause state.
 - Candidate sets are Kernel artifacts with `kind = 'candidate'`. They are not mutable UI state.
 - Human checkpoint selections are recorded as append-only `human_decision` receipts. Deepening tasks must be created through Kernel task commands and linked with `kernel.task.depend`.
+
+## v4 R6 Addendum
+
+- Run templates remain plan-layer config. Do not add Kernel template tables or a new Run primitive for R6.
+- `kernel.workflow.create` / `kernel.workflow.update` may set existing R3 Workflow instance fields (`mode`, `budget_json`) through the command boundary so template runs can declare mode and budgets without direct SQL.
+- Instantiated template work is normal Kernel truth: workflows, tiles, connections, tasks, dependencies, artifacts, and receipts.
