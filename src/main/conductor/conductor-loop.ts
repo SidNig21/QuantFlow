@@ -21,6 +21,7 @@
 import { createHash } from 'node:crypto';
 import type { CommandResult } from '../../kernel/commands/index';
 import type { ConductorContext } from '../../kernel/conductor/index';
+import { emitKernelEvent } from '../../kernel/events/index';
 import type { WorkflowRun } from '../../kernel/workflows/index';
 import type { ConductorAction } from './conductor-actions';
 import { proposeNextAction, type ActionProposal } from './conductor-planner';
@@ -311,6 +312,17 @@ export function createConductorLoop(deps: ConductorLoopDeps): ConductorLoop {
       return { status: 'failed', proposal, proposalToken: token, result: artifact, canContinue: false };
     }
     await record(input, 'awaiting-selection', proposal, token, true);
+    emitKernelEvent({
+      kind: 'checkpoint.awaiting-selection',
+      workflowId: input.workflowId,
+      data: {
+        checkpointId: checkpoint.checkpointId,
+        proposalToken: token,
+        candidateArtifactId: artifact.id ?? null,
+        candidateCount: checkpoint.candidates.length,
+        dependsOnTaskId: checkpoint.dependsOnTaskId ?? null,
+      },
+    });
     return {
       status: 'awaiting-selection',
       proposal,

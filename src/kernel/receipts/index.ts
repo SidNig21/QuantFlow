@@ -91,6 +91,20 @@ export function postReceipt(db: KernelDB, input: PostReceiptInput): string {
     workflowId: input.workflowId ?? undefined,
     data: { id, type: input.type, summary: input.summary ?? '' },
   });
+  if (input.type === 'human_decision') {
+    emitKernelEvent({
+      kind: 'human_decision',
+      taskId: input.taskId ?? undefined,
+      workflowId: input.workflowId ?? undefined,
+      correlationId: input.correlationId ?? undefined,
+      data: {
+        id,
+        summary: input.summary ?? '',
+        artifactRefs: input.artifactRefs ?? [],
+        metadata: input.metadata ?? {},
+      },
+    });
+  }
   return id;
 }
 
@@ -264,6 +278,21 @@ export function handleArtifactCommand(
       metadata: { ...metadata, artifactId: id, kind, derivedFrom },
     });
     db.prepare('UPDATE artifacts SET receipt_id = ? WHERE id = ?').run(receiptId, id);
+    emitKernelEvent({
+      kind: 'artifact.created',
+      workflowId: (payload['workflowId'] as string | null) ?? undefined,
+      taskId,
+      tileId: (payload['tileId'] as string | null) ?? undefined,
+      correlationId: (payload['correlationId'] as string | null) ?? undefined,
+      data: {
+        artifactId: id,
+        receiptId,
+        kind,
+        uri: (payload['uri'] as string | null) ?? null,
+        workerId: (payload['workerId'] as string | null) ?? null,
+        derivedFrom,
+      },
+    });
 
     return { ok: true, id, data: { artifactId: id, receiptId } };
   } catch (err) {

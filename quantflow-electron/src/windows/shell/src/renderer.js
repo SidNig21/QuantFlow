@@ -2219,7 +2219,6 @@ async function init() {
 	let watchtowerAlertFilter = "all";
 	let watchtowerQuery = "";
 	let watchtowerPaused = false;
-	let watchtowerTimer = null;
 	let watchtowerRelayLogCache = [];
 	const watchtowerEl = document.createElement("div");
 	watchtowerEl.id = "watchtower-panel";
@@ -2230,7 +2229,7 @@ async function init() {
 				<span class="wt-live-dot" aria-hidden="true"></span>
 				<span class="wt-title-copy">
 					<span class="wt-title">Watchtower</span>
-					<span class="wt-source-note">polled every 2s - Gate 3 events.subscribe pending</span>
+					<span class="wt-source-note">live Kernel events - refresh for runtime diagnostics</span>
 				</span>
 			</div>
 			<div class="wt-status-pills" aria-label="Watchtower sources">
@@ -2281,11 +2280,6 @@ async function init() {
 		const button = watchtowerEl.querySelector(".wt-pause");
 		button.textContent = paused ? "Resume" : "Pause";
 		button.setAttribute("aria-pressed", String(paused));
-		clearInterval(watchtowerTimer);
-		watchtowerTimer = null;
-		if (watchtowerVisible && !watchtowerPaused) {
-			watchtowerTimer = setInterval(refreshWatchtower, 2000);
-		}
 	}
 
 	watchtowerEl.querySelector(".wt-refresh").addEventListener("click", () => {
@@ -2592,16 +2586,11 @@ async function init() {
 		watchtowerVisible = true;
 		watchtowerEl.hidden = false;
 		refreshWatchtower();
-		if (!watchtowerPaused && !watchtowerTimer) {
-			watchtowerTimer = setInterval(refreshWatchtower, 2000);
-		}
 	}
 
 	function hideWatchtower() {
 		watchtowerVisible = false;
 		watchtowerEl.hidden = true;
-		clearInterval(watchtowerTimer);
-		watchtowerTimer = null;
 	}
 
 	// -- Conductor panel (Goal 5A): read-only planner surface --
@@ -3653,17 +3642,31 @@ async function init() {
 				tileManager.refreshFlippedStateCard(payload.tileId);
 			}
 
-			// Goal 7: re-project workflow regions + semantic strings whenever
-			// the Kernel reports a change to membership, counts, or string types.
+			// Surface S0: live projection routes stay read-only and re-query
+			// Kernel projections instead of keeping renderer truth.
 			const kind = String(payload.kind ?? "");
+			const projectionKinds = new Set([
+				"artifact.created",
+				"checkpoint.awaiting-selection",
+				"human_decision",
+				"evaluation.created",
+				"conductor.plan_posted",
+				"worker.spawned",
+				"worker.status_updated",
+				"worker.stopped",
+			]);
 			if (
 				kind.startsWith("tile.") ||
 				kind.startsWith("task.") ||
 				kind.startsWith("connection.") ||
 				kind.startsWith("workflow.") ||
-				kind === "receipt.posted"
+				kind === "receipt.posted" ||
+				projectionKinds.has(kind)
 			) {
 				void refreshWorkflowProjection();
+			}
+			if (watchtowerVisible && !watchtowerPaused && projectionKinds.has(kind)) {
+				void refreshWatchtower();
 			}
 		});
 	}
