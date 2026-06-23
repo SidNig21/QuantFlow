@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 import {
 	alignTilesToGrid,
 	buildGridOverlayGeometry,
+	formatRepackTilesToast,
 	GRID_TOKENS,
 	markUserPlaced,
+	repackTilesToGrid,
 	snapRectToGrid,
 	snapToGrid,
 	verifyCanvasAlignment,
@@ -68,6 +70,69 @@ describe("snapToGrid", () => {
 		});
 		expect(locked).toMatchObject({ x: 21, y: 31, width: 403, height: 511 });
 		expect(normal).toMatchObject({ x: 16, y: 16, width: 400, height: 504 });
+	});
+});
+
+function testOverlap(a, b) {
+	return a.x < b.x + b.width &&
+		a.x + a.width > b.x &&
+		a.y < b.y + b.height &&
+		a.y + a.height > b.y;
+}
+
+describe("repackTilesToGrid", () => {
+	test("packs deterministically at column pitch with no overlaps", () => {
+		const first = [
+			{ id: "b", x: 280, y: 200, width: 400, height: 500, zIndex: 2 },
+			{ id: "a", x: 30, y: 10, width: 400, height: 500, zIndex: 1, userPlaced: true },
+			{ id: "c", x: 620, y: 220, width: 280, height: 280, zIndex: 3 },
+		];
+		const second = first.map((tile) => ({ ...tile }));
+		const result = repackTilesToGrid(first, { viewport: { width: 1280 } });
+		const secondResult = repackTilesToGrid(second, { viewport: { width: 1280 } });
+
+		expect(result).toEqual({ tidied: 3, skipped: 0 });
+		expect(secondResult).toEqual(result);
+		expect(first.map(({ x, y, width, height }) => ({ x, y, width, height })))
+			.toEqual(second.map(({ x, y, width, height }) => ({ x, y, width, height })));
+		expect(first[1]).toMatchObject({ x: 32, y: 32, width: 400, height: 504, userPlaced: false });
+		expect(first[0]).toMatchObject({ x: 552, y: 32, width: 400, height: 504 });
+		expect(first[0].x - first[1].x).toBe((GRID_TOKENS.columnWidth + GRID_TOKENS.gutter) * 5);
+		expect(first[2].y).toBeGreaterThan(first[1].y);
+		for (const tile of first) {
+			expect(tile.x % GRID_TOKENS.baseline).toBe(0);
+			expect(tile.y % GRID_TOKENS.baseline).toBe(0);
+			expect(tile.width % GRID_TOKENS.baseline).toBe(0);
+			expect(tile.height % GRID_TOKENS.baseline).toBe(0);
+		}
+		for (let i = 0; i < first.length; i++) {
+			for (let j = i + 1; j < first.length; j++) {
+				expect(testOverlap(first[i], first[j])).toBe(false);
+			}
+		}
+	});
+
+	test("skips hard locks and packs other tiles around them", () => {
+		const locked = { id: "locked", x: 32, y: 32, width: 400, height: 504, locked: true };
+		const softPinned = { id: "soft", x: 35, y: 35, width: 400, height: 500, userPlaced: true };
+		const normal = { id: "normal", x: 70, y: 60, width: 280, height: 280 };
+		const result = repackTilesToGrid([locked, softPinned, normal], {
+			viewport: { width: 980 },
+		});
+
+		expect(result).toEqual({ tidied: 2, skipped: 1 });
+		expect(locked).toMatchObject({ x: 32, y: 32, width: 400, height: 504, locked: true });
+		expect(softPinned.userPlaced).toBe(false);
+		expect(testOverlap(locked, softPinned)).toBe(false);
+		expect(testOverlap(locked, normal)).toBe(false);
+		expect(testOverlap(softPinned, normal)).toBe(false);
+	});
+
+	test("formats informative tidy toast text", () => {
+		expect(formatRepackTilesToast({ tidied: 2, skipped: 0 })).toBe("Tidied 2 tiles");
+		expect(formatRepackTilesToast({ tidied: 1, skipped: 1 })).toBe("Tidied 1 tile; 1 locked skipped");
+		expect(formatRepackTilesToast({ tidied: 0, skipped: 0 })).toBe("No tiles to tidy");
+		expect(formatRepackTilesToast({ tidied: 0, skipped: 2 })).toBe("No tiles to tidy; 2 locked skipped");
 	});
 });
 

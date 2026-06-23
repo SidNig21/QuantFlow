@@ -731,6 +731,7 @@
 	}
 }
 
+.lv1-dock__tidy,
 .lv1-dock__add {
 	margin-left: auto;
 	margin-right: 8px;
@@ -742,6 +743,14 @@
 	font-family: var(--font-ui);
 	font-size: 11px;
 	cursor: pointer;
+}
+
+.lv1-dock__add {
+	margin-left: 0;
+}
+
+.lv1-dock__tidy {
+	margin-right: 6px;
 }
 
 .lv1-recipe__badge {

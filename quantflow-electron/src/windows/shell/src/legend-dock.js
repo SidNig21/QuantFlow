@@ -388,6 +388,7 @@ export function renderDockHtml(state, recipes = LEGEND_RECIPES, readinessByRecip
 		<header class="lv1-dock__header">
 			<span class="lv1-dock__title">QF Dock</span>
 			<span class="lv1-dock__eyebrow">spawn rail</span>
+			<button class="lv1-dock__tidy" type="button" data-action="tidy-grid" title="Tidy tiles to grid">Tidy</button>
 			<button class="lv1-dock__add" type="button" data-action="add-agent" title="Add agent or tool">+ Add</button>
 			${ICONS.legend}
 		</header>
@@ -500,6 +501,10 @@ function bindDockEvents(root, stateStore, options = {}) {
 		options.onAddAgent?.();
 	});
 
+	root.querySelector('[data-action="tidy-grid"]')?.addEventListener("click", () => {
+		options.onTidyGrid?.();
+	});
+
 	root.querySelector(".lv1-template")?.addEventListener("click", () => {
 		stateStore.toggleTemplate(TEMPLATE_ID);
 	});
@@ -535,6 +540,7 @@ export function createLegendDock(options) {
 		onRecipeActivate = null,
 		onRunWorkflow = null,
 		onAddAgent = null,
+		onTidyGrid = null,
 	} = options;
 	if (!document || !container) {
 		throw new Error("createLegendDock requires document and container");
@@ -564,7 +570,13 @@ export function createLegendDock(options) {
 		applyRootAttributes(root, snapshot);
 		root.innerHTML = renderDockHtml(snapshot, getRecipes(), getReadinessByRecipeId());
 		chip.textContent = getSpawnModeChipText(snapshot.spawnMode);
-		bindDockEvents(root, stateStore, { onRecipeActivate, onRunWorkflow, onAddAgent, getRecipes });
+		bindDockEvents(root, stateStore, {
+			onRecipeActivate,
+			onRunWorkflow,
+			onAddAgent,
+			onTidyGrid,
+			getRecipes,
+		});
 		updateEmptyHint();
 	}
 

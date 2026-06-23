@@ -88,6 +88,120 @@ export function alignTilesToGrid(layout, options = {}) {
 	return { aligned, skipped };
 }
 
+function getViewportWorldWidth(viewport, tokens) {
+	const rawWidth = Number.isFinite(viewport?.worldWidth)
+		? viewport.worldWidth
+		: Number.isFinite(viewport?.width)
+			? viewport.width
+			: tokens.columns * (tokens.columnWidth + tokens.gutter) + tokens.margin * 2;
+	const zoom = Number.isFinite(viewport?.zoom) && viewport.zoom > 0 ? viewport.zoom : 1;
+	return viewport?.screenSpace === true ? rawWidth / zoom : rawWidth;
+}
+
+function tileRect(tile) {
+	return {
+		x: finiteOr(tile?.x, 0),
+		y: finiteOr(tile?.y, 0),
+		width: finiteOr(tile?.width, 0),
+		height: finiteOr(tile?.height, 0),
+	};
+}
+
+function stablePackOrder(a, b) {
+	return finiteOr(a?.y, 0) - finiteOr(b?.y, 0) ||
+		finiteOr(a?.x, 0) - finiteOr(b?.x, 0) ||
+		finiteOr(a?.zIndex, 0) - finiteOr(b?.zIndex, 0) ||
+		String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
+}
+
+export function repackTilesToGrid(layout, options = {}) {
+	const tokens = options.tokens ?? GRID_TOKENS;
+	const tiles = Array.isArray(layout) ? layout : [];
+	const pitch = tokens.columnWidth + tokens.gutter;
+	const viewportWidth = Math.max(
+		tokens.margin + tokens.columnWidth,
+		getViewportWorldWidth(options.viewport, tokens),
+	);
+	const rightLimit = viewportWidth - tokens.margin;
+	const lockedRects = tiles
+		.filter((tile) => tile?.locked === true || lockContains(options.locks, tile?.id))
+		.map(tileRect);
+	const movingTiles = tiles
+		.filter((tile) => tile?.locked !== true && !lockContains(options.locks, tile?.id))
+		.slice()
+		.sort(stablePackOrder);
+	const occupied = [...lockedRects];
+	let tidied = 0;
+	let skipped = lockedRects.length;
+	let rowY = tokens.margin;
+	let rowHeight = 0;
+	let col = 0;
+
+	function makeCandidate(tile, column, y) {
+		const x = tokens.margin + column * pitch;
+		return snapRectToGrid({ x, y }, tile, { tokens });
+	}
+
+	function exceedsRow(rect) {
+		return rect.x > tokens.margin && rect.x + rect.width > rightLimit;
+	}
+
+	function nextRow(seedHeight) {
+		const advance = Math.max(rowHeight, finiteOr(seedHeight, 0), tokens.majorBaseline ?? tokens.baseline);
+		rowY = snapNumber(rowY + advance + tokens.gutter, tokens.baseline);
+		rowHeight = 0;
+		col = 0;
+	}
+
+	for (const tile of movingTiles) {
+		const before = tileRect(tile);
+		const wasPinned = tile.userPlaced === true;
+		const snappedSize = snapRectToGrid(tile, tile, { tokens });
+		let candidate = makeCandidate(snappedSize, col, rowY);
+		while (
+			exceedsRow(candidate) ||
+			occupied.some((rect) => overlaps(candidate, rect))
+		) {
+			col++;
+			candidate = makeCandidate(snappedSize, col, rowY);
+			if (exceedsRow(candidate)) {
+				nextRow(snappedSize.height);
+				candidate = makeCandidate(snappedSize, col, rowY);
+			}
+		}
+
+		markUserPlaced(tile, false);
+		tile.x = candidate.x;
+		tile.y = candidate.y;
+		tile.width = candidate.width;
+		tile.height = candidate.height;
+		occupied.push(candidate);
+		rowHeight = Math.max(rowHeight, candidate.height);
+		col += Math.max(1, Math.ceil((candidate.width + tokens.gutter) / pitch));
+		if (
+			wasPinned ||
+			tile.x !== before.x ||
+			tile.y !== before.y ||
+			tile.width !== before.width ||
+			tile.height !== before.height
+		) {
+			tidied++;
+		}
+	}
+
+	return { tidied, skipped };
+}
+
+export function formatRepackTilesToast(result = {}) {
+	const tidied = Math.max(0, Number.isFinite(result.tidied) ? result.tidied : 0);
+	const skipped = Math.max(0, Number.isFinite(result.skipped) ? result.skipped : 0);
+	const base = tidied > 0
+		? `Tidied ${tidied} tile${tidied === 1 ? "" : "s"}`
+		: "No tiles to tidy";
+	if (!skipped) return base;
+	return `${base}; ${skipped} locked skipped`;
+}
+
 export function markUserPlaced(tile, value = true) {
 	if (tile) tile.userPlaced = value;
 	return tile;

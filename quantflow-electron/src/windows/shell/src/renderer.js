@@ -5,7 +5,7 @@ import {
 	tiles, connections, getTile, defaultSize, inferTileType, tileAtPoint,
 	selectTile, clearSelection, getSelectedTiles, getNearestTileInDirection,
 	addConnection, removeConnection, updateConnectionLabel, clearConnections,
-	generateId, alignTilesToGrid,
+	generateId, formatRepackTilesToast, repackTilesToGrid,
 } from "./canvas-state.js";
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
@@ -375,6 +375,9 @@ async function init() {
 		},
 		onAddAgent: () => {
 			addAgentForm.open();
+		},
+		onTidyGrid: () => {
+			tidyTilesToGrid();
 		},
 	});
 	const addAgentForm = createAddAgentForm({
@@ -1456,6 +1459,24 @@ async function init() {
 	// verification, …). Cables read their meaning from the Kernel, not local
 	// canvas-state, so the string carries what the Kernel says it carries.
 	const connectionSemanticTypes = new Map();
+	function tidyTilesToGrid() {
+		const result = repackTilesToGrid(tiles, {
+			viewport: {
+				width: panelViewer.clientWidth,
+				zoom: viewportState.zoom,
+				screenSpace: true,
+			},
+		});
+		tileManager.repositionAllTiles();
+		tileManager.saveCanvasImmediate();
+		updateCables();
+		toasts.show({
+			message: formatRepackTilesToast(result),
+			tone: "info",
+		});
+		return result;
+	}
+
 	function updateCables() {
 		if (cableLayerContent) {
 			renderCables(cableLayerContent, connections, tiles, viewportState, {
@@ -2817,19 +2838,10 @@ async function init() {
 			{
 				id: "grid-align-all",
 				title: "Align All To Grid",
-				subtitle: "Snap unlocked tiles and keep manual free placements",
+				subtitle: "Tidy unlocked tiles into grid columns",
 				section: "Canvas",
 				keywords: ["grid", "align", "snap", "tidy"],
-				run: () => {
-					const result = alignTilesToGrid(tiles);
-					tileManager.repositionAllTiles();
-					tileManager.saveCanvasImmediate();
-					updateCables();
-					toasts.show({
-						message: `Aligned ${result.aligned} tile${result.aligned === 1 ? "" : "s"}.`,
-						tone: "info",
-					});
-				},
+				run: () => tidyTilesToGrid(),
 			},
 			{
 				id: "watchtower-toggle",

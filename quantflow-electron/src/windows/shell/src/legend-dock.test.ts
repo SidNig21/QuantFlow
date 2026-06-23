@@ -196,6 +196,15 @@ describe("LegendState", () => {
 });
 
 describe("Legend registry rendering", () => {
+	test("renders a visible tidy-grid dock action beside add", () => {
+		const html = renderDockHtml(createLegendState({ storage: createStorage() }).getSnapshot());
+		expect(html).toContain('data-action="tidy-grid"');
+		expect(html).toContain('class="lv1-dock__tidy"');
+		expect(html.indexOf('data-action="tidy-grid"')).toBeLessThan(
+			html.indexOf('data-action="add-agent"'),
+		);
+	});
+
 	test("renders injected custom recipes without rebuild", () => {
 		const recipes = [
 			...LEGEND_RECIPES,

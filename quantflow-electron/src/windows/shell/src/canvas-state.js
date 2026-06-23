@@ -41,8 +41,10 @@
 
 export {
 	alignTilesToGrid,
+	formatRepackTilesToast,
 	GRID_TOKENS,
 	markUserPlaced,
+	repackTilesToGrid,
 	snapRectToGrid,
 	snapToGrid,
 	verifyCanvasAlignment,
