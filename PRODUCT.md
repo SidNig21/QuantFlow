@@ -2,7 +2,7 @@
 
 Shared product taste for every agent (Claude, Codex, Cursor, …) touching QuantFlow.
 This is **product context, not architecture**. It does not override
-`BUILD_PLAN_V3.md` or `KERNEL_CONSTITUTION.md`; when they conflict, those win.
+the active build plan (`BUILD_PLAN_V4.md` / `docs/v4/`) or `KERNEL_CONSTITUTION.md`; when they conflict, those win.
 
 Read this before doing UI/UX work so design stops being improvised from
 screenshots and vibe memory.

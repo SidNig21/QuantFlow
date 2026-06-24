@@ -2,7 +2,7 @@
 
 Shared visual taste for agents doing UI/UX work. Pair with `PRODUCT.md` (what we
 are building and for whom). These are **rails, not a runtime dependency**, and they
-never override `BUILD_PLAN_V3.md` or `KERNEL_CONSTITUTION.md`.
+never override `BUILD_PLAN_V4.md` or `KERNEL_CONSTITUTION.md`.
 
 The goal: UI work stops being improvised per-screen. When two agents touch the
 canvas a week apart, the result should look like one product.
@@ -101,11 +101,11 @@ It may be useful for exploring **hard visual pieces before implementing them** â
 workflow region visuals, the semantic string legend, tile flip / State Card
 layout, Conductor panel polish, settings/controls consistency.
 
-Rules, same category as Dosu/Entire in `BUILD_PLAN_V3.md`:
+Rules, same category as Dosu/Entire in `BUILD_PLAN_V4.md`:
 
 - Efecto lives **beside** QuantFlow, never inside it. No runtime dependency, no
   build step, no MCP server wired into the app.
-- It has **no authority** over the Kernel, `BUILD_PLAN_V3.md`, or these docs.
+- It has **no authority** over the Kernel, `BUILD_PLAN_V4.md`, or these docs.
 - Use it to produce reference designs; humans/agents then implement against these
   rails. Exported designs are inspiration, not source of truth.
 - Skip it if it adds friction. It is optional design-ops, not a gate.

@@ -24,17 +24,17 @@ QuantFlow v3 is an authority refactor, not a rewrite.
 Read in order before editing:
 
 1. `AGENTS.md` chain for the target files (this file first, then the child `AGENTS.md` for the target folder)
-2. `BUILD_PLAN_V3.md` — the only execution plan for v3
-3. `KERNEL_CONSTITUTION.md` — authority rules
-4. Current goal scope from `BUILD_PLAN_V3.md`
-5. Relevant repo files (`CONCEPT.md`, `REPO_MAP.md`, `VAULT.md`, `ENVOY.md`)
+2. The active plan for the current branch — on `quantflow-v4`: `BUILD_PLAN_V4.md` + the promoted rung in `docs/v4/` (`SURFACE_LADDER.md` / `PERFORMANCE_LADDER.md`); on `quantflow-v3`: `reference/v3-superseded/BUILD_PLAN_V3.md`
+3. `KERNEL_CONSTITUTION.md` + `docs/v3/{AUTHORITY_RULES,KERNEL_SCHEMA_V1,GLOSSARY}.md` — authority rules (binding on all branches)
+4. Current goal scope from that active plan
+5. Relevant repo files (`PRODUCT.md`, `REPO_MAP.md`, `DESIGN.md`)
 6. For UI/UX work: `PRODUCT.md` (product taste) and `DESIGN.md` (visual rails) — shared taste rails, not runtime deps; they never override the build plan or Kernel Constitution
-7. `BUILD_PLAN_V2.md` for shipped behavior only, when v3 explicitly references it
+7. Superseded context under `reference/` only when the active plan explicitly references it (`reference/v2-shipped-context/` for shipped v2 behavior)
 8. Old vault notes as context only, never as marching orders
 
-Do not build from loose vault notes. Do not execute old v2 goal ladders unless `BUILD_PLAN_V3.md` explicitly points to them.
+Do not build from loose vault notes. Do not execute old v2/v3 goal ladders unless the active build plan explicitly points to them.
 
-Do not create new vocabulary when canonical v3 primitives already exist in `BUILD_PLAN_V3.md` and `docs/v3/GLOSSARY.md`.
+Do not create new vocabulary when canonical primitives already exist in `docs/v3/GLOSSARY.md` and the active build plan.
 
 Do not bypass Kernel commands.
 
@@ -189,6 +189,11 @@ Repo docs win for code scope. Vault root reference files can inform decisions, b
 
 ## Current v3 State
 
+> **Note:** the v3 root authority docs (`BUILD_PLAN_V3.md`, `V3_MIGRATION_NOTES.md`) were
+> archived to `reference/v3-superseded/` on 2026-06-24 when the root was refreshed for v4.
+> References to them below mean that archived copy; the binding v3 base stays at
+> `KERNEL_CONSTITUTION.md` + `docs/v3/`.
+
 **The v3 build ladder is functionally complete (Goals 0–9).** Goal 10
 (cloud/remote tier) is intentionally parked — planning-only until explicitly
 authorized. The project is in the **dogfooding** phase: run the product, capture
@@ -204,9 +209,9 @@ and authorized (one goal at a time).
 
 The following authority docs are installed for v3:
 
-- `BUILD_PLAN_V3.md` - v3 execution plan
+- `reference/v3-superseded/BUILD_PLAN_V3.md` - v3 execution plan (archived; on v4 build from `BUILD_PLAN_V4.md` + `docs/v4/`)
 - `KERNEL_CONSTITUTION.md` - authority rules
-- `V3_MIGRATION_NOTES.md` - v2-to-v3 vocabulary map
+- `reference/v3-superseded/V3_MIGRATION_NOTES.md` - v2-to-v3 vocabulary map (archived)
 - `docs/v3/STATUS.md` - current state + per-goal history (read first for orientation)
 - `docs/v3/INCOMING_GOALS.md` - dogfooding backlog/intake (not authority)
 - `docs/v3/GLOSSARY.md` - canonical v3 term definitions

@@ -61,7 +61,7 @@ Workers may not skip `submitted → verifying` to reach `complete`.
 
 ## Vocabulary Lock
 
-Use only canonical v3 primitives defined in `BUILD_PLAN_V3.md` and `docs/v3/GLOSSARY.md`:
+Use only canonical primitives defined in `docs/v3/GLOSSARY.md`:
 
 ```text
 Workflow, Tile, WorkerInstance, Harness, Model, Role, Task, TaskDependency,
@@ -82,10 +82,10 @@ These documents expand the constitutional definitions above. Read them when touc
 ## Read Order for v3 Sessions
 
 1. Applicable `AGENTS.md` chain (root first, then child for the target folder)
-2. `BUILD_PLAN_V3.md`
+2. The active build plan (`BUILD_PLAN_V4.md`; or `reference/v3-superseded/BUILD_PLAN_V3.md` on `quantflow-v3`)
 3. `KERNEL_CONSTITUTION.md` (this file)
 4. `docs/v3/AUTHORITY_RULES.md` when touching state mutation or task lifecycle
 5. `docs/v3/KERNEL_SCHEMA_V1.md` when touching schema or primitives
 6. Current goal scope
 7. Relevant repo files
-8. `BUILD_PLAN_V2.md` for shipped behavior only, when v3 explicitly references it
+8. `reference/v2-shipped-context/` for shipped v2 behavior only, when explicitly referenced

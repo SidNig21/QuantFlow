@@ -41,7 +41,7 @@ Electron · React · Tailwind · xterm.js · herdr (WSL) · SQLite Kernel · MCP
 
 | Doc | Purpose |
 | --- | --- |
-| [CONCEPT.md](CONCEPT.md) | Product spine |
+| [PRODUCT.md](PRODUCT.md) | Product definition |
 | [BUILD_PLAN_V4.md](BUILD_PLAN_V4.md) | Current v4 rung ladder |
 | [KERNEL_CONSTITUTION.md](KERNEL_CONSTITUTION.md) | Authority rules |
 | [AGENTS.md](AGENTS.md) | Agent entry + DOX chain |
