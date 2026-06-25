@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { KernelDB } from '../database';
 import { emitKernelEvent } from '../events/index';
+import { normalizeWorkflowStatus } from '../workflows/index';
 import type { CommandResult } from './types';
 import { autoTriggerWorkflowEvaluation } from '../evals/auto-trigger';
 
@@ -48,7 +49,7 @@ function workflowCreate(db: KernelDB, payload: Record<string, unknown>): Command
       id,
       name,
       (payload['objective'] as string | undefined) ?? '',
-      (payload['status'] as string | undefined) ?? 'active',
+      payload['status'] !== undefined ? normalizeWorkflowStatus(String(payload['status'])) : 'active',
       (payload['activeCorrelationId'] as string | null) ?? null,
       (payload['vaultPath'] as string | null) ?? null,
       now,
@@ -84,7 +85,8 @@ function workflowUpdate(db: KernelDB, payload: Record<string, unknown>): Command
     const values: unknown[] = [];
     if (payload['name'] !== undefined) { fields.push('name = ?'); values.push(payload['name']); }
     if (payload['objective'] !== undefined) { fields.push('objective = ?'); values.push(payload['objective']); }
-    if (payload['status'] !== undefined) { fields.push('status = ?'); values.push(payload['status']); }
+    const status = payload['status'] !== undefined ? normalizeWorkflowStatus(String(payload['status'])) : null;
+    if (status !== null) { fields.push('status = ?'); values.push(status); }
     if (payload['mode'] !== undefined && hasWorkflowColumn(db, 'mode')) {
       fields.push('mode = ?');
       values.push((payload['mode'] as string | null) ?? null);

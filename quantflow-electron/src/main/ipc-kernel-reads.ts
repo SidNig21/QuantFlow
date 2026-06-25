@@ -20,6 +20,25 @@ function workflowIdOf(params: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+const WORKFLOW_PROJECTION_DESCRIPTION =
+  "Read-only: Workflow projection (references only; run_id ≡ workflow_id)";
+
+function registerWorkflowProjectionReadHandler(): void {
+  const handler = (params: unknown) =>
+    queryRun(getKernelDb(), String(workflowIdOf(params) ?? ""));
+
+  registerMethod("kernel.workflowProjection", handler, {
+    description: WORKFLOW_PROJECTION_DESCRIPTION,
+    params: {},
+  });
+
+  // Deprecated alias — remove after external callers migrate (A3+).
+  registerMethod("kernel.run", handler, {
+    description: `${WORKFLOW_PROJECTION_DESCRIPTION} [deprecated: use kernel.workflowProjection]`,
+    params: {},
+  });
+}
+
 export function registerKernelReadHandlers(): void {
   registerMethod(
     "kernel.stateCardList",
@@ -42,11 +61,7 @@ export function registerKernelReadHandlers(): void {
     { description: "Read-only: all workflow region projections", params: {} },
   );
 
-  registerMethod(
-    "kernel.run",
-    (params) => queryRun(getKernelDb(), String(workflowIdOf(params) ?? "")),
-    { description: "Read-only: the Run projection (references only) for a workflow", params: {} },
-  );
+  registerWorkflowProjectionReadHandler();
 
   registerMethod(
     "kernel.evalList",

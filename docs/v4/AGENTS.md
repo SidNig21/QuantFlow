@@ -25,6 +25,9 @@ Evals judge).
   `P0–P3` priority bands.
 - `GLOSSARY.md` — **canonical v4 vocabulary** (structure-freeze); wins on resolved
   overloaded terms (`run`, `harness`, `pause`). `docs/v3/GLOSSARY.md` remains the v3 base.
+- `KERNEL_CONTRACT.md` — **frozen Kernel strangler contract** (commands, queries,
+  IPC read RPCs, MCP read tools, events). Structure-freeze readers consult this
+  before touching `src/kernel/` or external read adapters.
 
 ## Read order for v4 work
 
@@ -38,7 +41,8 @@ Evals judge).
    regression guard** (Appendix A).
 4. `KERNEL_CONSTITUTION.md` + `docs/v3/AUTHORITY_RULES.md` +
    `docs/v3/KERNEL_SCHEMA_V1.md` + **`docs/v4/GLOSSARY.md`** (live vocabulary;
-   `docs/v3/GLOSSARY.md` for unchanged v3 base terms) — **all still binding.**
+   `docs/v3/GLOSSARY.md` for unchanged v3 base terms) + **`docs/v4/KERNEL_CONTRACT.md`**
+   (when touching Kernel commands/queries/events or IPC/MCP read surface) — **all still binding.**
 5. `BUILD_PLAN_V3.md` — shipped v3 ladder (reference) + the goal-shape convention.
 
 ## Binding rules for v4

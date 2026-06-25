@@ -58,7 +58,7 @@ Each stage lists its chunks. `Layer` is the mandatory `START_HERE.md` §8.7 labe
 | Chunk | Objective | Layer | Key files |
 |---|---|---|---|
 | A1 | Promote v4 glossary; resolve overloaded nouns (`harness`×2, `run`×3, `pause`) — **STATUS: Implemented-unverified** | authority | `docs/v4/GLOSSARY.md` (from `docs/v3/GLOSSARY.md`) |
-| A2 | Freeze Kernel command/query/event **signatures** as the strangler contract (doc cites real signatures) | authority | `src/kernel/commands/`, `queries/`, `events/` |
+| A2 | Freeze Kernel command/query/event **signatures** as the strangler contract (doc cites real signatures) — **STATUS: Implemented-unverified** | authority | `docs/v4/KERNEL_CONTRACT.md`, `src/kernel/commands/`, `queries/`, `events/` |
 | A3 | One mechanical rename codemod enforcing one-word-per-concept; tests green | authority + projection | renamed call sites; codemod commit |
 
 **A1 note (2026-06-25):** founder approved PAUSE tiering, harness split (`eve-harness` KEEP), RUN projection renames, and Stage D exclusion from A3. Rename map in `docs/v4/GLOSSARY.md` is **APPROVED**; G-contract fully closes at A3.

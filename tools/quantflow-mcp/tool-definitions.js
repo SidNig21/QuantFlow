@@ -970,8 +970,17 @@ export const TOOL_DEFINITIONS = [
     handle: (rpc) => async () => jsonText(await rpc("kernel.workflowRegionList", {})),
   },
   {
+    name: "quantflow_kernel_workflow_projection",
+    description:
+      "Read-only: Workflow projection for a workflow (run_id ≡ workflow_id; references only — task/artifact/receipt ids + instance fields).",
+    schema: { workflowId: { kind: "string" } },
+    handle: (rpc) => async ({ workflowId }) =>
+      jsonText(await rpc("kernel.workflowProjection", { workflowId })),
+  },
+  {
     name: "quantflow_kernel_run",
-    description: "Read-only: the Run projection for a workflow (run_id ≡ workflow_id; references only — task/artifact/receipt ids + instance fields).",
+    description:
+      "[Deprecated] Use quantflow_kernel_workflow_projection. Read-only Workflow projection.",
     schema: { workflowId: { kind: "string" } },
     handle: (rpc) => async ({ workflowId }) =>
       jsonText(await rpc("kernel.run", { workflowId })),

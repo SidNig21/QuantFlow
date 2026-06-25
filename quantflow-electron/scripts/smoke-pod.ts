@@ -289,7 +289,7 @@ const loop = createConductorLoop({
 });
 const budget = await loop.step({ workflowId: 'wf1' });
 check('budget exceeded pauses loop', budget.status === 'budget-paused');
-check('workflow status paused', (queryRun(kdb, 'wf1')?.status) === 'paused');
+check('workflow status suspended', (queryRun(kdb, 'wf1')?.status) === 'suspended');
 
 console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} - ${failures} failure(s)`);
 process.exit(failures === 0 ? 0 : 1);

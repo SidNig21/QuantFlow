@@ -161,6 +161,14 @@ export function queryWorkflowRegion(db: KernelDB, workflowId: string): WorkflowR
 }
 
 /**
+ * Normalize legacy DB/API workflow status values for projections.
+ * See docs/v4/KERNEL_CONTRACT.md (WorkflowStatus frozen enum).
+ */
+export function normalizeWorkflowStatus(status: string): string {
+  return status === 'paused' ? 'suspended' : status;
+}
+
+/**
  * The Run projection (R3a). §10.1 is resolved as "extend Workflow" — a Workflow
  * IS the execution instance, so run_id ≡ workflow_id. This is a strictly
  * read-only AGGREGATE OF REFERENCES: the instance fields (mode/status/budget/
@@ -170,7 +178,7 @@ export function queryWorkflowRegion(db: KernelDB, workflowId: string): WorkflowR
  * the workflow does not exist.
  */
 export interface WorkflowRun {
-  /** run_id ≡ workflow_id (Workflow is the run instance). */
+  /** run_id ≡ workflow_id (Workflow is the run instance). A3 removes this alias field. */
   runId: string;
   workflowId: string;
   objective: string;
@@ -186,6 +194,9 @@ export interface WorkflowRun {
   artifactIds: string[];
   receiptIds: string[];
 }
+
+/** Frozen projection type name (KERNEL_CONTRACT.md). Alias until A3 renames call sites. */
+export type WorkflowProjection = WorkflowRun;
 
 export function queryRun(db: KernelDB, workflowId: string): WorkflowRun | null {
   const wf = db
@@ -227,7 +238,7 @@ export function queryRun(db: KernelDB, workflowId: string): WorkflowRun | null {
     runId: wf.id,
     workflowId: wf.id,
     objective: wf.objective,
-    status: wf.status,
+    status: normalizeWorkflowStatus(wf.status),
     mode: wf.mode,
     budget,
     checkpointState: wf.checkpoint_state,

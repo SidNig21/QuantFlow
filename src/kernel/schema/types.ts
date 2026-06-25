@@ -13,7 +13,8 @@
 // Enumerations
 // ---------------------------------------------------------------------------
 
-export type WorkflowStatus = 'active' | 'paused' | 'complete' | 'archived';
+/** Mission-level status. Use `suspended` (not legacy `paused`). See docs/v4/KERNEL_CONTRACT.md. */
+export type WorkflowStatus = 'active' | 'suspended' | 'complete' | 'archived';
 
 export type TileKind = 'worker' | 'conductor' | 'viewer' | 'region';
 

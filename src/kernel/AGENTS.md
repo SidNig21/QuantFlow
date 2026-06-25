@@ -15,7 +15,7 @@ All canonical state and the mutation/query boundary:
 - `commands/tile-commands.ts` — Tile CRUD: create, move, resize, rename, status_update, remove. (Goal 2)
 - `commands/connection-commands.ts` — Connection CRUD: create, update, delete. `create`/`update` coerce `semantic_type` to a known type via `workflows/normalizeSemanticType`; `update` sets a string's semantic type/label after it is drawn. (Goal 2 + Goal 7)
 - `commands/workflow-commands.ts` — Workflow CRUD: create, update. (Goal 2)
-- `workflows/index.ts` — Workflow region projection: `queryWorkflowRegion`/`queryWorkflowRegionList` aggregate a workflow's member tiles (padded bounding box), task/receipt counts, blocked task ids, and semantic-string-type counts. Read-only — a projection of existing truth, not new authority. Owns the canonical `SEMANTIC_CONNECTION_TYPES` set + `normalizeSemanticType`. (Goal 7)
+- `workflows/index.ts` — Workflow region projection + **`queryRun` / `WorkflowProjection`**: read-only aggregate of references (`run_id ≡ workflow_id`). **`normalizeWorkflowStatus()`** maps legacy `'paused'` → `'suspended'` on read. Contract: `docs/v4/KERNEL_CONTRACT.md`. (Goal 7 + R3a)
 - `queries/index.ts` — Read-only queries: canvas snapshot, tile list/get, task list/get, receipt list, state_card list/get, workflow region/region_list. (Goal 2 + Goal 3 + Goal 4 + Goal 7)
 - `tasks/state-machine.ts` — Canonical task transition table + `canTransition`/`assertTransition`. (Goal 3)
 - `tasks/validators.ts` — Lifecycle guards: complete requires verifying + verification_passed receipt (or documented legacy bypass); self-verification refused. (Goal 3)
@@ -76,11 +76,12 @@ Enforce these transitions centrally here. Do not let callers bypass them.
 ## Read Order Before Editing This Subtree
 
 1. Root `AGENTS.md`
-2. `BUILD_PLAN_V3.md`
+2. `REBUILD_QUEUE.md` (structure-freeze) or `BUILD_PLAN_V3.md` (v3 dogfooding)
 3. `KERNEL_CONSTITUTION.md`
-4. `docs/v3/GLOSSARY.md`
-5. This file
-6. Relevant kernel source files
+4. `docs/v4/GLOSSARY.md` + **`docs/v4/KERNEL_CONTRACT.md`** (frozen command/query/event/IPC/MCP signatures)
+5. `docs/v3/AUTHORITY_RULES.md` + `docs/v3/KERNEL_SCHEMA_V1.md`
+6. This file
+7. Relevant kernel source files
 
 ## DOX Rule
 

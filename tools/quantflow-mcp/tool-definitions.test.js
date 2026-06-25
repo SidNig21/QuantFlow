@@ -56,6 +56,7 @@ const REQUIRED_TOOLS = [
   "quantflow_kernel_state_cards",
   "quantflow_kernel_workflow_region",
   "quantflow_kernel_workflow_regions",
+  "quantflow_kernel_workflow_projection",
   "quantflow_kernel_run",
   "quantflow_kernel_evals",
   "quantflow_notify",
@@ -316,6 +317,7 @@ test("maps Kernel read tools (R3c) to read-only Kernel JSON-RPC", async () => {
     "kernel.stateCardList": [],
     "kernel.workflowRegion": { id: "wf1" },
     "kernel.workflowRegionList": [],
+    "kernel.workflowProjection": { runId: "wf1", workflowId: "wf1", taskIds: [], artifactIds: [], receiptIds: [] },
     "kernel.run": { runId: "wf1", workflowId: "wf1", taskIds: [], artifactIds: [], receiptIds: [] },
     "kernel.evalList": [],
   });
@@ -324,6 +326,7 @@ test("maps Kernel read tools (R3c) to read-only Kernel JSON-RPC", async () => {
   await getToolDefinition("quantflow_kernel_state_cards").handle(rpc)({}); // no filter
   await getToolDefinition("quantflow_kernel_workflow_region").handle(rpc)({ workflowId: "wf1" });
   await getToolDefinition("quantflow_kernel_workflow_regions").handle(rpc)({});
+  await getToolDefinition("quantflow_kernel_workflow_projection").handle(rpc)({ workflowId: "wf1" });
   await getToolDefinition("quantflow_kernel_run").handle(rpc)({ workflowId: "wf1" });
   await getToolDefinition("quantflow_kernel_evals").handle(rpc)({});
 
@@ -332,6 +335,7 @@ test("maps Kernel read tools (R3c) to read-only Kernel JSON-RPC", async () => {
     { method: "kernel.stateCardList", params: {} },
     { method: "kernel.workflowRegion", params: { workflowId: "wf1" } },
     { method: "kernel.workflowRegionList", params: {} },
+    { method: "kernel.workflowProjection", params: { workflowId: "wf1" } },
     { method: "kernel.run", params: { workflowId: "wf1" } },
     { method: "kernel.evalList", params: {} },
   ]);

@@ -65,7 +65,9 @@ QuantFlow is a near-identical fork of **collab-public** (an Electron infinite-ca
 
 **Unsure whether any doc is current?** Consult **`DOC_AUTHORITY_MAP.md`** — it classifies every file as CURRENT / REFERENCE / ARCHIVE. A `v3` folder name does **not** mean stale: v4 extends v3, so `docs/v3/` holds the still-binding foundation.
 
-**Stale — do NOT follow:** `ARCHITECTURE.md` (now archived under `reference/v3-superseded/`), `BUILD_PLAN_V2.md`, `BUILD_PLAN_V3.md`, and any v2/v3 *execution* doc. **Live vocabulary:** [`docs/v4/GLOSSARY.md`](docs/v4/GLOSSARY.md) (promoted A1); [`docs/v3/GLOSSARY.md`](docs/v3/GLOSSARY.md) remains the v3 base for unchanged terms.
+**Live docs (structure-freeze):** [`docs/v4/GLOSSARY.md`](docs/v4/GLOSSARY.md) (vocabulary, A1); [`docs/v4/KERNEL_CONTRACT.md`](docs/v4/KERNEL_CONTRACT.md) (frozen command/query/IPC/MCP surface, A2); [`docs/v3/GLOSSARY.md`](docs/v3/GLOSSARY.md) remains the v3 base for unchanged terms.
+
+**Stale — do NOT follow:** `ARCHITECTURE.md` (now archived under `reference/v3-superseded/`), `BUILD_PLAN_V2.md`, `BUILD_PLAN_V3.md`, and any v2/v3 *execution* doc.
 
 `docs/v4/PERF_STACK_AUDIT.md` and `docs/v4/PERFORMANCE_LADDER.md` are the performance source of truth (PF0-first). `DOCS_PRODUCT_ARCHITECTURE_AUDIT.md` is the original diagnosis (background).
 

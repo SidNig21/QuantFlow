@@ -33,6 +33,7 @@ import {
   queryWorkflowRegion as workflowRegion,
   queryWorkflowRegionList as workflowRegionList,
   type WorkflowRun,
+  type WorkflowProjection,
   type WorkflowRegion,
 } from '../workflows/index';
 import {
@@ -288,7 +289,7 @@ export function queryWorkflowRegionList(): WorkflowRegion[] {
   return workflowRegionList(getKernelDb());
 }
 
-export type { WorkflowRegion, WorkflowRun };
+export type { WorkflowRegion, WorkflowRun, WorkflowProjection };
 
 // ---------------------------------------------------------------------------
 // Evaluation queries (Goal 9) — read-only derived analysis
