@@ -1,5 +1,11 @@
 # QuantFlow v4 Build Scope Plan
 
+> **✅ v4 SPINE COMPLETE (R0–R8.5).** This file is the historical record of the v4
+> spine. **The next phase is the Surface / Canvas Reflection Layer (rungs S0–S6) —
+> its authoritative build plan is [`docs/v4/SURFACE_LADDER.md`](docs/v4/SURFACE_LADDER.md).**
+> Workers on a Surface rung read that doc; **do not read the R0–R8.5 goal bodies
+> below** unless a Surface rung explicitly names one for context.
+
 Branch: `quantflow-v4`
 Base branch: `quantflow-v3`
 Planning mode: Goal Sessions (one rung at a time)

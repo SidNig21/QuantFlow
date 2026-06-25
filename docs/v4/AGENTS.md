@@ -11,10 +11,24 @@ Evals judge).
   four bands (A Execution · B Flow · C Control · D Judgment), the 8-rung spine,
   the anti-swamp rule, and the open decisions. Every rung promotion is checked
   against it. It is *reference*, not a per-rung work order.
-- The per-rung **work orders** live in `/BUILD_PLAN_V4.md` (repo root), one
-  section per rung (R0…R7) in the v3 goal-shape convention.
+- The per-rung **work orders** for the **v4 spine** live in `/BUILD_PLAN_V4.md`
+  (repo root), one section per rung (R0…R7) in the v3 goal-shape convention.
+  **The spine (R0–R8.5) is complete** — that file is now mostly a record.
+- `SURFACE_LADDER.md` — the **authoritative build plan for the post-spine Surface
+  / Canvas Reflection phase (rungs S0–S6)**: project the shipped spine onto the
+  canvas. It is self-sufficient; Surface workers read it **instead of** the
+  R0–R8.5 bodies in `/BUILD_PLAN_V4.md`.
+- `PERFORMANCE_LADDER.md` — the **scope plan for the Performance phase (rungs
+  PF0–PF7)**: derived from `PERF_STACK_AUDIT.md` (this folder), it makes the app feel instant
+  (instrument first, kill snapshot-polling, collapse the persistence layers). It is
+  self-sufficient + carries its own parallel-execution waves; `PF#` ≠ the audit's
+  `P0–P3` priority bands.
 
 ## Read order for v4 work
+
+> **Surface-phase (S-rung) work:** follow the short reading order in
+> `SURFACE_LADDER.md` instead — that doc is self-sufficient and you do **not**
+> need the R0–R8.5 goal bodies. The order below is for the (complete) spine.
 
 1. Applicable `AGENTS.md` chain (root → child for the target folder).
 2. `docs/v4/V4_TERRITORY_MAP.md` — territory + open decisions.

@@ -18,6 +18,35 @@ Entry shape:
 
 ## Candidates
 
+### Surface / Canvas Reflection Layer (S0–S6, 7 rungs) — full scope in `docs/v4/SURFACE_LADDER.md`
+- **Problem / friction:** the v4 spine is machine-verified but **not visible on the
+  canvas** — R2/R4/R5/R6/R7 each still carry an open *"live-canvas product proof =
+  operator"* item. The backend changes; the operator can't see what happened without
+  logs/SQLite/DevTools.
+- **Proposed scope:** a 7-rung **projection** ladder (no new Kernel truth) that closes
+  those open proofs (consolidated from an earlier thin 10-rung draft). Two keystones:
+  S0 event-taxonomy/live-projection (makes it *live*) · **S1 Müller-Brockmann Canvas Grid
+  System** (makes it *neat* — tiles snap/align, overlay + alignment verification; source
+  `QuantFlow Vault/S2 Grid Canvas.md`). Then: **S2 Live Run Projection** (region + agent
+  tiles + artifact dock + lineage — closes R1 binding/R2/R3 in one proof) · S3 real template
+  spawn + DAG/role auto-layout snapping to the S1 grid (R4/R6) · S4 Checkpoint surface (R5) ·
+  S5 Run Replay view + local eval badges (R7) · S6 Conductor chat + model binding. Mostly a
+  **rebind** of existing surfaces; genuinely new = grid, artifact dock, checkpoint card, DAG
+  layout, replay view.
+- **Off this ladder:** legend taxonomy cleanup → **R8.5 follow-on** (composes with the
+  `roles/*.json` registry + Settings→Agents pane).
+- **Parked:** Visual Manifest (fixed-dashboard-first when promoted); Braintrust (local
+  eval badges only).
+- **Status:** **PROMOTED — `docs/v4/SURFACE_LADDER.md` is now the authoritative build plan**
+  for this phase (its own ledger + promotion discipline). Intake closed; promote one S-rung
+  at a time into that doc's ledger. The v4 spine (R0–R8.5) record stays in `BUILD_PLAN_V4.md`.
+- **Layer(s):** renderer (shell + `@qf-renderer`) · main (ipc-kernel-reads · run-template
+  seam) · kernel (events audit, additive emissions only).
+- **Priority:** high — operator's stated next ladder; closes the v4 live proofs.
+- **Status:** **scoped (proposal) in `docs/v4/SURFACE_LADDER.md`** — not authorized;
+  promote one S-rung at a time into `BUILD_PLAN_V4.md`. Frame locked by operator: spine =
+  *close the open v4 proofs*; Braintrust deferred; real harness wired at S4.
+
 ### R8.5 — Settings agent inventory + Eve-first authoring
 - **Problem / friction:** (1) Settings only does Canvas Skill install today — there
   is **no place to view/add/edit/remove all agents** (the legend recipe registry).

@@ -5,6 +5,7 @@
 **Revision:** r3 — approved territory. r2 incorporated five review edits (nullable `run_id`, staged permission enforcement, preflight-report-not-Settings for Rung 0, secret-leakage hard problem, reserved research-provenance fields). r3 adds the **Attention Profile** governance concept + the principle *parallelize low-attention work, serialize high-attention work*, and reserves domain-extensible artifact kinds. Treat as the locked reference all rung promotions are checked against. *(Product positioning — "attention-aware OS, not agent-swarm software" — deliberately kept out; it belongs in a separate positioning doc.)*
 **Purpose:** The full scope of the v3 → v4 transition, the cross-cutting objects it introduces, and the discipline that keeps it from becoming a swamp. This is the document we sequence rungs against. Detailed per-rung goal shapes are a *separate* deliverable, promoted one at a time into the v4 build plan.
 **Read after:** `KERNEL_CONSTITUTION.md`, `BUILD_PLAN_V3.md`, `docs/v3/INCOMING_GOALS.md`.
+**Post-spine phase (2026-06-22):** the v4 spine (R0–R8.5) is complete; the next phase is the **Surface / Canvas Reflection Layer** (project the spine onto the canvas, rungs S0–S6) — authoritative plan: `docs/v4/SURFACE_LADDER.md`. This map still governs spine territory; the Surface plan is self-sufficient for S-rung work.
 
 ---
 
