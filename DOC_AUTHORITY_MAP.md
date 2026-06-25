@@ -39,7 +39,8 @@ Every doc is exactly one of:
 | `KERNEL_CONSTITUTION.md` | The one rule (Kernel owns truth) | tracked |
 | `docs/v3/AUTHORITY_RULES.md` | Mutation rules, invariants, violation signals | tracked |
 | `docs/v3/KERNEL_SCHEMA_V1.md` | Canonical Kernel table definitions | tracked |
-| `docs/v3/GLOSSARY.md` | Canonical vocabulary (carries v4 terms; formal promotion to `docs/v4/GLOSSARY.md` = queue chunk A1) | tracked |
+| `docs/v4/GLOSSARY.md` | **Canonical v4 vocabulary** — live for structure-freeze work; wins on resolved terms (`run`, `harness`, `pause`) | tracked |
+| `docs/v3/GLOSSARY.md` | v3 base vocabulary — still binding for terms not superseded by v4 resolutions | tracked |
 | `docs/v4/PERFORMANCE_LADDER.md` | Performance execution authority (PF0/PF1 active in the queue; PF2+ parked) | tracked |
 | `docs/v4/PERF_STACK_AUDIT.md` | Performance diagnosis (the perf source of truth) | tracked |
 | `docs/v4/AGENTS.md` | v4 subtree contract | tracked |
@@ -97,5 +98,6 @@ deliberately git-ignored (see `.gitignore`).
 - `ARCHITECTURE.md` retired from root → archived to `reference/v3-superseded/`. References calling it "the root `ARCHITECTURE.md`" are stale.
 - Receipt/event vocabulary aligned across the four rebuild docs (receipts = proof, not an event-sourcing truth store).
 - `REBUILD_QUEUE.md` created as the single **active execution queue** (reconciles the three phase numberings into Stage A→H); `REBUILD_STRATEGY_AUDIT.md` + `QUANTFLOW_STABILIZATION_PLAN.md` demoted to REFERENCE (*why/governance*); a `G-safe` gate added to `START_HERE.md` §9.
+- `docs/v4/GLOSSARY.md` promoted (chunk A1) as canonical v4 vocabulary; founder approved rename map 2026-06-25 (A2/A3/Stage D split documented in glossary).
 
 *Keep this map short. When a doc's status changes, update the row here in the same change.*

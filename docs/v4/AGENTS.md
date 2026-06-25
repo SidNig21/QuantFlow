@@ -23,6 +23,8 @@ Evals judge).
   (instrument first, kill snapshot-polling, collapse the persistence layers). It is
   self-sufficient + carries its own parallel-execution waves; `PF#` ≠ the audit's
   `P0–P3` priority bands.
+- `GLOSSARY.md` — **canonical v4 vocabulary** (structure-freeze); wins on resolved
+  overloaded terms (`run`, `harness`, `pause`). `docs/v3/GLOSSARY.md` remains the v3 base.
 
 ## Read order for v4 work
 
@@ -35,7 +37,8 @@ Evals judge).
 3. `/BUILD_PLAN_V4.md` — the current rung's goal shape + its **cumulative
    regression guard** (Appendix A).
 4. `KERNEL_CONSTITUTION.md` + `docs/v3/AUTHORITY_RULES.md` +
-   `docs/v3/KERNEL_SCHEMA_V1.md` + `docs/v3/GLOSSARY.md` — **all still binding.**
+   `docs/v3/KERNEL_SCHEMA_V1.md` + **`docs/v4/GLOSSARY.md`** (live vocabulary;
+   `docs/v3/GLOSSARY.md` for unchanged v3 base terms) — **all still binding.**
 5. `BUILD_PLAN_V3.md` — shipped v3 ladder (reference) + the goal-shape convention.
 
 ## Binding rules for v4

@@ -1,3 +1,6 @@
+> **v3 base vocabulary.** Still binding for unchanged terms.
+> **Live v4 vocabulary:** [`docs/v4/GLOSSARY.md`](../v4/GLOSSARY.md) — wins on resolved overloaded terms (`run`, `harness`, `pause`).
+
 # QuantFlow v3 Glossary
 
 Canonical term definitions for v3. Use these terms in code, docs, and agent prompts.
