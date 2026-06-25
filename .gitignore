@@ -15,3 +15,18 @@ Screenshots/
 .worktrees
 quantflow-electron/logs/
 opencode.json
+
+# --- Local agent tooling & generated scratch (not product source) ---
+# Installed agent skills + lockfile (same category as .claude/)
+.agents/
+skills-lock.json
+# Skill-scaffolded experimental app (text-to-lottie); carries its own node_modules
+quantflow-lottie/
+# Generated illustration packs (illo-skill output): large binaries, not product-wired
+assets/flux-illustrations/
+assets/pip-cutouts/
+assets/qubic-cutouts/
+assets/qubic-illustrations/
+# QA evidence is regenerable; track commands + baselines, not raw dumps
+qa/*.png
+qa/*.log
