@@ -2,12 +2,20 @@
 
 ## Active branch routing
 
-- On **`quantflow-v4`**: the active execution plan is **`BUILD_PLAN_V4.md`**
-  (per-rung goal shapes R0–R7) with **`docs/v4/V4_TERRITORY_MAP.md`** as the
-  locked territory reference and **`docs/v4/AGENTS.md`** as the subtree contract.
-  v4 is an **extension** of v3, not a rewrite — the v3 authority docs below
-  (`KERNEL_CONSTITUTION.md`, `docs/v3/*`, the goal-shape convention) remain
-  **fully binding**. Promote and build one rung at a time.
+> **STRUCTURE-FREEZE (current state on `quantflow-v4`).** The active work is
+> **codebase stabilization / strangler completion**, not feature rungs. Entry point:
+> **`START_HERE.md`** (front door — wins all conflicts) → **`REBUILD_QUEUE.md`** (the
+> ordered execution queue, Stage A→H, one chunk at a time). Unsure if a doc is
+> current? **`DOC_AUTHORITY_MAP.md`**. Feature ladders are **paused** until the
+> `START_HERE.md` §9 structure-fix gates are all green.
+
+- On **`quantflow-v4`**: the **active plan is `REBUILD_QUEUE.md`** (read
+  `START_HERE.md` first). `BUILD_PLAN_V4.md` (R0–R8 spine, complete) and
+  `docs/v4/SURFACE_LADDER.md` (S-rungs) are the **paused feature ladders** —
+  reference only until freeze lifts. `docs/v4/V4_TERRITORY_MAP.md` stays the locked
+  territory reference and `docs/v4/AGENTS.md` the subtree contract. v4 **extends**
+  v3 — the v3 authority docs below (`KERNEL_CONSTITUTION.md`, `docs/v3/*`) remain
+  **fully binding**.
 - On **`quantflow-v3`**: `BUILD_PLAN_V3.md` is the execution plan (v3 is in the
   dogfooding phase; the ladder Goals 0–9 are shipped).
 
@@ -24,7 +32,7 @@ QuantFlow v3 is an authority refactor, not a rewrite.
 Read in order before editing:
 
 1. `AGENTS.md` chain for the target files (this file first, then the child `AGENTS.md` for the target folder)
-2. The active plan for the current branch — on `quantflow-v4`: `BUILD_PLAN_V4.md` + the promoted rung in `docs/v4/` (`SURFACE_LADDER.md` / `PERFORMANCE_LADDER.md`); on `quantflow-v3`: `reference/v3-superseded/BUILD_PLAN_V3.md`
+2. The active plan for the current branch — on `quantflow-v4` (**structure-freeze**): `START_HERE.md` → `REBUILD_QUEUE.md` (active); `BUILD_PLAN_V4.md` and the `docs/v4/` ladders (`SURFACE_LADDER.md` / `PERFORMANCE_LADDER.md`) are paused feature reference (PF0/PF1 excepted — they are pulled into the queue); on `quantflow-v3`: `reference/v3-superseded/BUILD_PLAN_V3.md`
 3. `KERNEL_CONSTITUTION.md` + `docs/v3/{AUTHORITY_RULES,KERNEL_SCHEMA_V1,GLOSSARY}.md` — authority rules (binding on all branches)
 4. Current goal scope from that active plan
 5. Relevant repo files (`PRODUCT.md`, `REPO_MAP.md`, `DESIGN.md`)

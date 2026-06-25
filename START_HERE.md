@@ -57,9 +57,11 @@ QuantFlow is a near-identical fork of **collab-public** (an Electron infinite-ca
 
 1. **`START_HERE.md`** (this file) — the rules.
 2. **`KERNEL_CONSTITUTION.md`** — the one rule, in full.
-3. **`REBUILD_STRATEGY_AUDIT.md`** — the decision: finish the strangler. (See §F boundary map, §L agent rules.)
-4. **`QUANTFLOW_STABILIZATION_PLAN.md`** — the phased execution and gates.
+3. **`REBUILD_STRATEGY_AUDIT.md`** — the decision (*why*): finish the strangler. (See §F boundary map, §L agent rules.)
+4. **`REBUILD_QUEUE.md`** — the **active ordered execution queue** (*what next* — Stage A→H, one chunk at a time). **This is the marching order.**
 5. **The contract of whatever module you're touching** (e.g. `src/kernel/AGENTS.md`, `src/harness/AGENTS.md`).
+
+`QUANTFLOW_STABILIZATION_PLAN.md` (governance/rationale) and `DOCS_PRODUCT_ARCHITECTURE_AUDIT.md` (original diagnosis) are **reference background** — the order to execute now lives in `REBUILD_QUEUE.md`.
 
 **Unsure whether any doc is current?** Consult **`DOC_AUTHORITY_MAP.md`** — it classifies every file as CURRENT / REFERENCE / ARCHIVE. A `v3` folder name does **not** mean stale: v4 extends v3, so `docs/v3/` holds the still-binding foundation.
 
@@ -87,13 +89,15 @@ QuantFlow is a near-identical fork of **collab-public** (an Electron infinite-ca
 
 ## 6. What we are doing now / NOT doing now
 
-**Doing (in order — see stabilization plan for full gates):**
-1. **Measure** — PF0 spans + `qa/perf-baseline.json` (so every step proves "no regression").
-2. **Freeze vocabulary + the Kernel contract** (this file + v4 glossary + frozen command/query/event signatures).
-3. **Extract** the monoliths (`renderer.js`, `shell.css`) — behavior-preserving, no rewrites.
-4. **Collapse duplicate truth** — boot from Kernel only; retire `canvas-state.js`, JSON, runtime-state mirror. **This is the centerpiece.**
-5. **Clean projection/event handling** — incremental router, one event path.
-6. **Align visual tokens** — one `Theme.css` spine.
+**Doing — in this order (full per-chunk queue: `REBUILD_QUEUE.md`):**
+1. **Freeze contract & vocabulary** (Stage A) — v4 glossary; frozen Kernel command/query/event signatures; one-word rename codemod.
+2. **Measure + QA bootstrap** (Stage B) — stand up `qa/`; PF0 spans + `qa/perf-baseline.json`; frozen event-taxonomy/span schema; a golden run (so every step proves "no regression").
+3. **Thin seam extraction** (Stage C) — carve the event-router + projection read path out of `renderer.js` (the PF1 enabler). *Thin, not bulk.*
+4. **Collapse duplicate truth** (Stage D) — boot from Kernel only; retire `canvas-state.js`, JSON, runtime-state mirror; divergence test. **This is the centerpiece.**
+5. **Clean projection/event handling** (Stage E) — incremental router, one event path, PTY out of projection.
+6. **Make it safe** (Stage F) — secrets via one accessor; Eve fence + kill switch. (Cheap insurance; SDK adapter contract deferred.)
+7. **Bulk decompose + token spine** (Stage G) — every hot-path file < 800 LOC; merge the Conductor; one `Theme.css` spine.
+8. **QA closeout** (Stage H) — every gate is a re-runnable command.
 
 **NOT doing until §9 is green (hard stop):** cloud/Eve as primary runtime · A2A wire integration · new agent/tile types · collaboration/swarm · semantic verification · browser automation · RL/trading demos · any visual redesign beyond token/z-index consolidation · a clean-slate rewrite of anything.
 
@@ -137,10 +141,11 @@ Structure-freeze lifts (and feature work may resume) only when **all** of these 
 - [ ] **G-extract:** no hot-path file > 800 LOC; full shell test suite unchanged vs the golden run.
 - [ ] **G-one-truth:** boot reads the Kernel only (no read of `canvas-state.json`); a connection round-trips with **no** `runtime.db` write; the **divergence test passes**: Kernel authoritative state, Kernel event-carried projection updates, and canvas-visible projection agree for the same run (receipts provide proof and audit evidence, not independent state authority); `canvas-state.js` is a cache or deleted; Envoy/runtime-state retirement un-deferred.
 - [ ] **G-projection:** 100-event storm → **0** full-snapshot refetches vs baseline; one event path; PTY stream excluded from projection.
+- [ ] **G-safe:** every secret read routes through the single `getCredential()` accessor; the Eve fence conformance test passes (no Kernel-canonical fact originates in Eve) and a kill switch proves the app runs fully with Eve unreachable. *(The full SDK adapter contract is deferred past freeze.)*
 - [ ] **G-tokens:** one `Theme.css` spine; CSS lint rejects literal z-index in shell.
 - [ ] **G-qa:** every gate above has a re-runnable command in `qa/`, not a typed checkmark.
 
-When all seven are green: the boring core is real, the codebase agrees with itself about what is true, and **only then** does the magical canvas (live projection, dense tiles, replayable timelines, governed autonomy, A2A, cloud) get built — on a foundation that can finally hold it.
+When all eight are green: the boring core is real, the codebase agrees with itself about what is true, and **only then** does the magical canvas (live projection, dense tiles, replayable timelines, governed autonomy, A2A, cloud) get built — on a foundation that can finally hold it.
 
 ---
 
