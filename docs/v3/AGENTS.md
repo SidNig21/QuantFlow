@@ -1,6 +1,6 @@
 # docs/v3 — Agent Guide
 
-This directory contains v3 authority and planning documents.
+This directory contains v3 authority and planning documents. On `quantflow-v4` these remain the **binding constitutional base** (v4 extends v3, it does not replace it). For current doc status see `START_HERE.md` and `DOC_AUTHORITY_MAP.md`.
 
 ## What This Subtree Owns
 
@@ -8,7 +8,7 @@ Durable v3 reference documents:
 
 - `README.md` — v3 index and build discipline pointer.
 - `STATUS.md` — current state + per-goal history; agent orientation (read first).
-- `INCOMING_GOALS.md` — dogfooding backlog/intake; candidates, NOT authority until promoted into `BUILD_PLAN_V3.md`.
+- `INCOMING_GOALS.md` — dogfooding backlog/intake; candidates, NOT authority until promoted into the active build plan.
 - `GLOSSARY.md` — canonical v3 term definitions.
 - `KERNEL_SCHEMA_V1.md` — canonical table definitions, field lists, and relationships (Goal 1).
 - `AUTHORITY_RULES.md` — detailed mutation rules, invariants, and violation signals (Goal 1).
@@ -20,14 +20,14 @@ Durable v3 reference documents:
 ## What This Subtree Must Not Do
 
 - Do not put executable or runtime code here.
-- Do not duplicate content already in root `BUILD_PLAN_V3.md`.
+- Do not duplicate content already in the active build plan.
 - Do not create new vocabulary that conflicts with `GLOSSARY.md`.
-- Do not treat docs here as execution authority above `BUILD_PLAN_V3.md`.
+- Do not treat docs here as execution authority above the active build plan (`BUILD_PLAN_V4.md` on v4; `reference/v3-superseded/BUILD_PLAN_V3.md` on v3).
 
 ## Read Order Before Editing This Subtree
 
 1. Root `AGENTS.md`
-2. `BUILD_PLAN_V3.md`
+2. The active build plan (`BUILD_PLAN_V4.md` on v4; `reference/v3-superseded/BUILD_PLAN_V3.md` on v3)
 3. `KERNEL_CONSTITUTION.md`
 4. `docs/v3/GLOSSARY.md`
 5. The specific doc you are editing

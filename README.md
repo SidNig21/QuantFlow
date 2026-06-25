@@ -20,7 +20,7 @@ Early **v4** development on branch `quantflow-v4` (extends the shipped v3 spine)
 
 ## Quickstart (dev)
 
-**Prerequisites:** Node.js 22+, Bun. Windows: PowerShell 7 + WSL2 for herdr-backed tiles. See [WINDOWS_DEV_SETUP.md](WINDOWS_DEV_SETUP.md).
+**Prerequisites:** Node.js 22+ (the Eve cloud-worker path requires Node 24+ — see [docs/v4/EVE_SETUP.md](docs/v4/EVE_SETUP.md)), Bun. Windows: PowerShell 7 + WSL2 for herdr-backed tiles. See [WINDOWS_DEV_SETUP.md](WINDOWS_DEV_SETUP.md).
 
 ```powershell
 git clone https://github.com/SidNig21/QuantFlow.git
