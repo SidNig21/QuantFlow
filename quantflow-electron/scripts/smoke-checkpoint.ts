@@ -149,7 +149,7 @@ const driftedCheckpoint: CheckpointRequest = {
 
 const loop = createConductorLoop({
   readContext: () => queryConductorContext(kdb, { workflowId: 'wf1', receiptLimit: 500 }),
-  readRun: () => queryRun(kdb, 'wf1'),
+  readWorkflowProjection: () => queryRun(kdb, 'wf1'),
   setCheckpointState: (workflowId, checkpointState) =>
     dispatch('kernel.workflow.update', { id: workflowId, checkpointState }),
   createCandidateArtifact: async ({ workflowId, checkpoint, proposalToken }) => {
@@ -177,7 +177,7 @@ const loop = createConductorLoop({
       artifactRefs: [candidateArtifactId],
       metadata: { checkpointId: checkpoint.checkpointId, candidateArtifactId, selectedCandidateIds, proposalToken },
     }),
-  propose: () => ({ kind: 'pause', risk: 'low', rationale: 'checkpoint smoke controls the next step' }),
+  propose: () => ({ kind: 'await_operator', risk: 'low', rationale: 'checkpoint smoke controls the next step' }),
   runAction: (action, args) => actions.runAction(action, args),
   hasPendingApproval: ({ workflowId, proposalToken }) => {
     const latestForToken = queryReceiptList(kdb, { workflowId, limit: 500 }).find((receipt) =>
@@ -190,7 +190,7 @@ const loop = createConductorLoop({
       workflowId: workflowId ?? null,
       summary,
       phase,
-      proposedAction: proposal.kind === 'action' ? proposal.action : 'pause',
+      proposedAction: proposal.kind === 'action' ? proposal.action : 'await_operator',
       proposalToken: proposalToken ?? null,
       nextAction: proposal.rationale,
       requestApproval: requestApproval === true,

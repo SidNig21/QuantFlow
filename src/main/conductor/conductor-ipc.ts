@@ -49,9 +49,9 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
   // each step and posts a decision receipt for every step.
   const loop = createConductorLoop({
     readContext: (workflowId) => queryConductorContext(workflowId ? { workflowId } : {}),
-    readRun: (workflowId) => queryRun(getKernelDb(), workflowId),
-    pauseRun: (workflowId, reason) =>
-      dispatchKernelCommand('kernel.workflow.update', { id: workflowId, status: 'paused', reason }, 'conductor'),
+    readWorkflowProjection: (workflowId) => queryRun(getKernelDb(), workflowId),
+    suspendWorkflow: (workflowId, reason) =>
+      dispatchKernelCommand('kernel.workflow.update', { id: workflowId, status: 'suspended', reason }, 'conductor'),
     setCheckpointState: (workflowId, checkpointState) =>
       dispatchKernelCommand('kernel.workflow.update', { id: workflowId, checkpointState }, 'conductor'),
     createCandidateArtifact: async ({ workflowId, checkpoint, proposalToken }) => {
@@ -109,7 +109,7 @@ export function registerConductorIpc(options: ConductorIpcOptions = {}): void {
           workflowId: workflowId ?? null,
           summary,
           phase,
-          proposedAction: proposal.kind === 'action' ? proposal.action : 'pause',
+          proposedAction: proposal.kind === 'action' ? proposal.action : 'await_operator',
           proposalToken: proposalToken ?? null,
           nextAction: proposal.rationale,
           requestApproval: requestApproval === true,

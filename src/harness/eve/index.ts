@@ -47,7 +47,7 @@ export interface EveHarnessOptions {
 }
 
 interface EveState {
-  sessionId: string | null;
+  eveSessionId: string | null;
   continuationToken: string | null;
   status: 'idle' | 'working' | 'done' | 'stopped';
   workspace: string;
@@ -77,7 +77,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
     let state = states.get(handle.workerId);
     if (!state) {
       state = {
-        sessionId: handle.eveSessionId ?? null,
+        eveSessionId: handle.eveSessionId ?? null,
         continuationToken: null,
         status: handle.eveSessionId ? 'working' : 'idle',
         workspace: resolve(handle.workspacePath ?? fallbackWorkspace),
@@ -103,7 +103,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
         workspacePath: resolve(input.cwd ?? workspace),
       };
       states.set(handle.workerId, {
-        sessionId: null,
+        eveSessionId: null,
         continuationToken: null,
         status: 'idle',
         workspace: handle.workspacePath,
@@ -116,8 +116,8 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
 
     async send(handle: WorkerHandle, message: WorkerMessage): Promise<void> {
       const state = stateFor(handle, message.artifactRoot ?? workspace);
-      const body = state.sessionId
-        ? await postJson(`/eve/v1/session/${state.sessionId}`, {
+      const body = state.eveSessionId
+        ? await postJson(`/eve/v1/session/${state.eveSessionId}`, {
           message: message.text,
           continuationToken: state.continuationToken,
           taskId: message.taskId ?? null,
@@ -129,10 +129,10 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
           taskId: message.taskId ?? null,
           workflowId: message.workflowId ?? null,
         });
-      state.sessionId = extractSessionId(body) ?? state.sessionId;
-      if (!state.sessionId) throw new Error('eve-harness send: missing sessionId from Eve response');
+      state.eveSessionId = extractSessionId(body) ?? state.eveSessionId;
+      if (!state.eveSessionId) throw new Error('eve-harness send: missing sessionId from Eve response');
       state.continuationToken = extractContinuationToken(body) ?? state.continuationToken;
-      handle.eveSessionId = state.sessionId;
+      handle.eveSessionId = state.eveSessionId;
       state.artifactPath = resolveArtifactPath(state.workspace, extractArtifactPath(body)) ?? state.artifactPath;
       state.turnComplete = false;
       state.status = 'working';
@@ -144,7 +144,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
       if (state.status === 'working' && !state.turnComplete) await refreshFromStream(state);
       return {
         status: state.status === 'done' ? 'complete' : state.status === 'stopped' ? 'stopped' : 'active',
-        lastMeaningfulUpdate: state.sessionId ?? null,
+        lastMeaningfulUpdate: state.eveSessionId ?? null,
       };
     },
 
@@ -161,7 +161,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
       state.collected = true;
       return [{
         type: 'task_submitted',
-        summary: `eve artifact from session ${state.sessionId ?? 'unknown'}`,
+        summary: `eve artifact from session ${state.eveSessionId ?? 'unknown'}`,
         artifactFilePath: state.artifactPath,
         artifactKind: 'file',
         contentHash,
@@ -169,7 +169,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
         sizeBytes: bytes.length,
         metadata: {
           harnessKind: 'eve-harness',
-          eveSessionId: state.sessionId ?? null,
+          eveSessionId: state.eveSessionId ?? null,
           workspace: state.workspace,
         },
       }];
@@ -181,11 +181,11 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
   };
 
   async function refreshFromStream(state: EveState): Promise<void> {
-    if (!state.sessionId) return;
+    if (!state.eveSessionId) return;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), streamTimeoutMs);
     try {
-      const res = await fetchImpl(`${baseUrl}/eve/v1/session/${state.sessionId}/stream`, {
+      const res = await fetchImpl(`${baseUrl}/eve/v1/session/${state.eveSessionId}/stream`, {
         method: 'GET',
         headers: { accept: 'application/x-ndjson' },
         signal: controller.signal,

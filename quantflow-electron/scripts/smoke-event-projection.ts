@@ -207,7 +207,7 @@ const checkpoint: CheckpointRequest = {
 };
 const loop = createConductorLoop({
   readContext: () => queryConductorContext(kdb, { workflowId: 'wf_events', receiptLimit: 500 }),
-  readRun: () => queryRun(kdb, 'wf_events'),
+  readWorkflowProjection: () => queryRun(kdb, 'wf_events'),
   setCheckpointState: (workflowId, checkpointState) =>
     dispatch('kernel.workflow.update', { id: workflowId, checkpointState }),
   createCandidateArtifact: async ({ workflowId, checkpoint, proposalToken }) =>
@@ -228,7 +228,7 @@ const loop = createConductorLoop({
       artifactRefs: [candidateArtifactId],
       metadata: { checkpointId: checkpoint.checkpointId, candidateArtifactId, selectedCandidateIds, proposalToken },
     }),
-  propose: () => ({ kind: 'pause', risk: 'low', rationale: 'event smoke controls checkpoint' }),
+  propose: () => ({ kind: 'await_operator', risk: 'low', rationale: 'event smoke controls checkpoint' }),
   runAction: async (action, args) => {
     if (action === 'create_task') {
       return handleTaskCommand(kdb, 'kernel.task.create', args);

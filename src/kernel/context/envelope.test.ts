@@ -119,8 +119,8 @@ describe('ContextEnvelope v0', () => {
 
     expect(after).toEqual(before);
     expect(envelope.version).toBe('context-envelope/v0');
-    expect(envelope.run.run_id).toBe('wf1');
-    expect(envelope.run.mode).toBe('research');
+    expect(envelope.workflow.workflow_id).toBe('wf1');
+    expect(envelope.workflow.mode).toBe('research');
     expect(envelope.role.worker_id).toBe(workerId);
     expect(envelope.upstream_artifacts).toEqual([
       expect.objectContaining({

@@ -117,8 +117,8 @@ After meaningful changes: update this file if local rules or owned scope changed
 
 ## v4 R4 Addendum
 
-- `conductor-loop.ts` enforces declared Workflow/Run budgets when wired with `readRun`: max workers, wallclock, spend, tool calls, retries, and checkpoint requirement.
-- Budget exhaustion pauses through the Kernel workflow update hook and records a `budget-paused` planning receipt before any new proposal or action executes.
+- `conductor-loop.ts` enforces declared Workflow budgets when wired with `readWorkflowProjection`: max workers, wallclock, spend, tool calls, retries, and checkpoint requirement.
+- Budget exhaustion suspends through the Kernel workflow update hook and records a `budget_exceeded` planning receipt before any new proposal or action executes.
 
 ## v4 R5 Addendum
 
@@ -128,7 +128,7 @@ After meaningful changes: update this file if local rules or owned scope changed
 
 ## v4 R6 Addendum
 
-- `run-template-runner.ts` is a compiler/driver over saved config in `run-templates/*.json`.
+- `workflow-template-runner.ts` is a compiler/driver over saved config in `run-templates/*.json`.
 - The runner must compile templates into existing Kernel Workflows, tiles, tasks, `blocks` dependencies, and R5 checkpoint requests. It must not create a template table, Run primitive, or private execution store.
 - Template task/checkpoint ids are local config ids; the runner scopes them per Workflow before writing Kernel truth.
 - Task eligibility must come from `dag-scheduler.ts`. Do not add a second scheduler or graph gate in the template runner.
@@ -137,4 +137,4 @@ After meaningful changes: update this file if local rules or owned scope changed
 
 ## v4 R7 Addendum
 
-- `run-replay.ts` is a read-only projection over receipts, artifact rows, and task lifecycle timestamps. It must not read or write the `events` table, and it must never become task/run truth.
+- `workflow-replay.ts` is a read-only projection over receipts, artifact rows, and task lifecycle timestamps. It must not read or write the `events` table, and it must never become task/workflow truth.

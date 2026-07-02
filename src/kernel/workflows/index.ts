@@ -177,9 +177,8 @@ export function normalizeWorkflowStatus(status: string): string {
  * doing so would make a second store (the R3 failure signal). Returns null when
  * the workflow does not exist.
  */
-export interface WorkflowRun {
+export interface WorkflowProjection {
   /** run_id ≡ workflow_id (Workflow is the run instance). A3 removes this alias field. */
-  runId: string;
   workflowId: string;
   objective: string;
   status: string;
@@ -195,10 +194,7 @@ export interface WorkflowRun {
   receiptIds: string[];
 }
 
-/** Frozen projection type name (KERNEL_CONTRACT.md). Alias until A3 renames call sites. */
-export type WorkflowProjection = WorkflowRun;
-
-export function queryRun(db: KernelDB, workflowId: string): WorkflowRun | null {
+export function queryRun(db: KernelDB, workflowId: string): WorkflowProjection | null {
   const wf = db
     .prepare(
       `SELECT id, objective, status, mode, budget_json, checkpoint_state, created_at, updated_at
@@ -235,7 +231,6 @@ export function queryRun(db: KernelDB, workflowId: string): WorkflowRun | null {
   const ended = wf.status === 'complete' || wf.status === 'archived';
 
   return {
-    runId: wf.id,
     workflowId: wf.id,
     objective: wf.objective,
     status: normalizeWorkflowStatus(wf.status),

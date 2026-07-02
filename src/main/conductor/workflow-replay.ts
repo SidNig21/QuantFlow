@@ -1,5 +1,5 @@
 /**
- * R7 Run Replay projection.
+ * R7 Workflow Replay projection.
  *
  * Read-only, receipt-primary, and never truth. The replay is reconstructed from
  * durable Kernel evidence: workflow/task timestamps, receipt chain, and artifact
@@ -12,7 +12,7 @@ import { queryTaskList } from '../../kernel/tasks/index';
 import { queryRun } from '../../kernel/workflows/index';
 import { queryReceiptList } from '../../kernel/receipts/index';
 
-export type RunReplayEntryKind =
+export type WorkflowReplayEntryKind =
   | 'run.started'
   | 'task.created'
   | 'task.claimed'
@@ -23,8 +23,8 @@ export type RunReplayEntryKind =
   | 'artifact'
   | 'run.ended';
 
-export interface RunReplayEntry {
-  kind: RunReplayEntryKind;
+export interface WorkflowReplayEntry {
+  kind: WorkflowReplayEntryKind;
   timestamp: number;
   workflowId: string;
   taskId: string | null;
@@ -34,24 +34,23 @@ export interface RunReplayEntry {
   evidenceRefs: string[];
 }
 
-export interface RunReplayProjection {
+export interface WorkflowReplayProjection {
   workflowId: string;
-  runId: string;
   status: string;
   source: 'receipt-primary';
   usesEventsTable: false;
   taskIds: string[];
   artifactIds: string[];
   receiptIds: string[];
-  entries: RunReplayEntry[];
+  entries: WorkflowReplayEntry[];
 }
 
 function pushTaskTimestamp(
-  entries: RunReplayEntry[],
+  entries: WorkflowReplayEntry[],
   workflowId: string,
   task: ReturnType<typeof queryTaskList>[number],
   field: 'createdAt' | 'claimedAt' | 'submittedAt' | 'verifiedAt' | 'completedAt',
-  kind: RunReplayEntryKind,
+  kind: WorkflowReplayEntryKind,
   summary: string,
 ): void {
   const timestamp = task[field];
@@ -68,22 +67,22 @@ function pushTaskTimestamp(
   });
 }
 
-export function buildRunReplay(db: KernelDB, workflowId: string): RunReplayProjection | null {
-  const run = queryRun(db, workflowId);
-  if (!run) return null;
+export function buildWorkflowReplay(db: KernelDB, workflowId: string): WorkflowReplayProjection | null {
+  const workflowProjection = queryRun(db, workflowId);
+  if (!workflowProjection) return null;
 
   const tasks = queryTaskList(db, { workflowId, limit: 100000 });
   const receipts = queryReceiptList(db, { workflowId, limit: 100000 });
   const artifacts = queryArtifactList(db, { workflowId });
-  const entries: RunReplayEntry[] = [
+  const entries: WorkflowReplayEntry[] = [
     {
       kind: 'run.started',
-      timestamp: run.startedAt,
+      timestamp: workflowProjection.startedAt,
       workflowId,
       taskId: null,
       receiptId: null,
       artifactId: null,
-      summary: `run started: ${run.objective}`,
+      summary: `workflow started: ${workflowProjection.objective}`,
       evidenceRefs: [workflowId],
     },
   ];
@@ -122,15 +121,15 @@ export function buildRunReplay(db: KernelDB, workflowId: string): RunReplayProje
     });
   }
 
-  if (run.endedAt !== null) {
+  if (workflowProjection.endedAt !== null) {
     entries.push({
       kind: 'run.ended',
-      timestamp: run.endedAt,
+      timestamp: workflowProjection.endedAt,
       workflowId,
       taskId: null,
       receiptId: null,
       artifactId: null,
-      summary: `run ended: ${run.status}`,
+      summary: `workflow ended: ${workflowProjection.status}`,
       evidenceRefs: [workflowId],
     });
   }
@@ -145,13 +144,12 @@ export function buildRunReplay(db: KernelDB, workflowId: string): RunReplayProje
 
   return {
     workflowId,
-    runId: run.runId,
-    status: run.status,
+    status: workflowProjection.status,
     source: 'receipt-primary',
     usesEventsTable: false,
-    taskIds: run.taskIds,
-    artifactIds: run.artifactIds,
-    receiptIds: run.receiptIds,
+    taskIds: workflowProjection.taskIds,
+    artifactIds: workflowProjection.artifactIds,
+    receiptIds: workflowProjection.receiptIds,
     entries,
   };
 }

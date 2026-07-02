@@ -12,14 +12,14 @@ import type { ConductorContext } from '../../kernel/conductor/index';
 import type { ConductorAction } from './conductor-actions';
 
 export interface ActionProposal {
-  kind: 'action' | 'pause';
+  kind: 'action' | 'await_operator';
   /** Present when kind === 'action'. */
   action?: ConductorAction;
   args?: Record<string, unknown>;
   /** Low-risk actions may auto-execute in a step; high-risk needs approval. */
   risk: 'low' | 'high';
   rationale: string;
-  /** Present when kind === 'pause'. */
+  /** Present when kind === 'await_operator'. */
   pauseReason?: string;
 }
 
@@ -39,7 +39,7 @@ export function isHighRisk(action: ConductorAction): boolean {
 }
 
 function pause(pauseReason: string): ActionProposal {
-  return { kind: 'pause', risk: 'low', rationale: pauseReason, pauseReason };
+  return { kind: 'await_operator', risk: 'low', rationale: pauseReason, pauseReason };
 }
 
 /**

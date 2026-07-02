@@ -90,7 +90,7 @@ const loop = createConductorLoop({
       workflowId: workflowId ?? null,
       summary,
       phase,
-      proposedAction: proposal.kind === 'action' ? proposal.action : 'pause',
+      proposedAction: proposal.kind === 'action' ? proposal.action : 'await_operator',
       proposalToken: proposalToken ?? null,
       nextAction: proposal.rationale,
       requestApproval: requestApproval === true,
@@ -109,14 +109,14 @@ const createOverride = (id: string, title: string) => ({
 
 console.log('— no tasks → loop pauses —');
 let r = await loop.step(wf);
-check('paused when nothing to do', r.status === 'paused');
+check('awaiting operator when nothing to do', r.status === 'awaiting_operator');
 
 console.log('\n— create (override) → assign (low, auto) → pause (working) —');
 check('create executed', (await loop.step(createOverride('t1', 'Implement loader'))).status === 'executed');
 r = await loop.step(wf);
 check('assign auto-executed', r.status === 'executed' && r.proposal.action === 'assign_task');
 check('t1 working', queryTaskGet(kdb, 't1')?.status === 'working');
-check('working → paused', (await loop.step(wf)).status === 'paused');
+check('working -> awaiting operator', (await loop.step(wf)).status === 'awaiting_operator');
 
 console.log('\n— high-risk verify is approval-gated; deny needs the token —');
 const artifact1 = createArtifact('t1', 't1-proof.md', 'done');
@@ -159,11 +159,11 @@ await actions.runAction('create_task', { id: 't3', workflowId: 'wf1', title: 'T3
 await actions.runAction('assign_task', { taskId: 't3', tileId: 'tile_w' });
 await actions.runAction('block_task', { taskId: 't3', reason: 'waiting upstream' });
 r = await loop.step(wf);
-check('blocked task pauses the loop', r.status === 'paused' && /blocked/i.test(r.proposal.rationale));
+check('blocked task awaits operator', r.status === 'awaiting_operator' && /blocked/i.test(r.proposal.rationale));
 
 console.log('\n— every decision is on the receipt chain (incl. stale) —');
 const phases = phasesSeen();
-for (const p of ['paused', 'executed', 'awaiting-approval', 'denied', 'stale']) {
+for (const p of ['awaiting_operator', 'executed', 'awaiting-approval', 'denied', 'stale']) {
   check(`receipt recorded phase '${p}'`, phases.includes(p));
 }
 

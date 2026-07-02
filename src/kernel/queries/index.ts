@@ -29,10 +29,9 @@ import {
   type WorkerSnapshot,
 } from '../worker-instances/index';
 import {
-  queryRun as runGet,
+  queryRun as workflowProjection,
   queryWorkflowRegion as workflowRegion,
   queryWorkflowRegionList as workflowRegionList,
-  type WorkflowRun,
   type WorkflowProjection,
   type WorkflowRegion,
 } from '../workflows/index';
@@ -281,15 +280,15 @@ export function queryWorkflowRegion(workflowId: string): WorkflowRegion | null {
   return workflowRegion(getKernelDb(), workflowId);
 }
 
-export function queryRun(workflowId: string): WorkflowRun | null {
-  return runGet(getKernelDb(), workflowId);
+export function queryRun(workflowId: string): WorkflowProjection | null {
+  return workflowProjection(getKernelDb(), workflowId);
 }
 
 export function queryWorkflowRegionList(): WorkflowRegion[] {
   return workflowRegionList(getKernelDb());
 }
 
-export type { WorkflowRegion, WorkflowRun, WorkflowProjection };
+export type { WorkflowRegion, WorkflowProjection };
 
 // ---------------------------------------------------------------------------
 // Evaluation queries (Goal 9) — read-only derived analysis

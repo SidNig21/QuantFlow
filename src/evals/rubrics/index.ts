@@ -315,7 +315,7 @@ export function scoreConductorDecisionQuality(planning: ReceiptSnapshot): Dimens
       `Proposal did not execute (${phase}).`,
     );
   }
-  if (phase === 'paused') {
+  if (phase === 'awaiting_operator') {
     return applicable(
       'conductor_decision_quality',
       2,

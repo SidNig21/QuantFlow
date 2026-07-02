@@ -22,7 +22,7 @@ plan wins — flag it, don't silently pick.**
   + `docs/v3/GLOSSARY.md` (all still binding) — especially the **One Rule** (Kernel owns
   truth) and the **decision-authority rule** (workers never self-complete).
 - **What R3 already built that you build ON (do not re-create):**
-  - `src/kernel/workflows/index.ts` → `queryRun` (the Run projection) + `WorkflowRun`.
+  - `src/kernel/workflows/index.ts` → `queryRun` (the Workflow projection) + `WorkflowProjection`.
     **The Run/budget container already exists:** workflow columns `mode`, `budget_json`,
     `checkpoint_state` shipped in migration `004` (R3a). **Do NOT re-add budget columns.**
   - `src/main/conductor/dag-scheduler.ts` → `schedulableTasks` (pure) + `readSchedulableTasks(db, wfId)`.
@@ -103,7 +103,7 @@ plan wins — flag it, don't silently pick.**
 ### Eve delta — this rung COLLAPSES for the Eve lane (read the Eve Integration § R4 row)
 - **Eve workers get durability / sandbox / recovery / park-resume from Vercel Workflow
   replay — do NOT hand-build it for them.** For the Eve lane the Runtime Manager shrinks to
-  a **thin control + mapping layer**: persist `task ↔ sessionId`, drive Eve cancel/recover
+  a **thin control + mapping layer**: persist `task ↔ eveSessionId`, drive Eve cancel/recover
   via its API, consume `session.*` events → Kernel worker status, restore the mapping on
   reload (the session survives on Vercel).
 - **The heavy durability engine (R4a–R4d above) is for the LOCAL lane**, which gets

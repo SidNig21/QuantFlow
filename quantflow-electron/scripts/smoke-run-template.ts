@@ -22,7 +22,7 @@ import { queryWorkerForTile, queryWorkerGet, queryWorkerList, seedHarnessRegistr
 import { createConductorActions } from '../../src/main/conductor/conductor-actions';
 import { createConductorLoop, type CheckpointRequest } from '../../src/main/conductor/conductor-loop';
 import { readSchedulableTasks } from '../../src/main/conductor/dag-scheduler';
-import { compileRunTemplate, createRunTemplateRunner, listRunTemplates, loadRunTemplate } from '../../src/main/conductor/run-template-runner';
+import { compileRunTemplate, createRunTemplateRunner, listRunTemplates, loadRunTemplate } from '../../src/main/conductor/workflow-template-runner';
 import { createSimHarness } from '../../src/harness/sim/index';
 
 let failures = 0;
@@ -84,7 +84,7 @@ function candidateArtifact(workflowId: string, checkpointId: string, proposalTok
 
 const loop = createConductorLoop({
   readContext: (workflowId) => queryConductorContext(kdb, { workflowId, receiptLimit: 1000 }),
-  readRun: (workflowId) => queryRun(kdb, workflowId),
+  readWorkflowProjection: (workflowId) => queryRun(kdb, workflowId),
   setCheckpointState: (workflowId, checkpointState) =>
     dispatch('kernel.workflow.update', { id: workflowId, checkpointState }),
   createCandidateArtifact: async ({ workflowId, checkpoint, proposalToken }) => {
@@ -112,7 +112,7 @@ const loop = createConductorLoop({
       artifactRefs: [candidateArtifactId],
       metadata: { checkpointId: checkpoint.checkpointId, candidateArtifactId, selectedCandidateIds, proposalToken },
     }),
-  propose: () => ({ kind: 'pause', risk: 'low', rationale: 'run-template smoke drives checkpoints explicitly' }),
+  propose: () => ({ kind: 'await_operator', risk: 'low', rationale: 'run-template smoke drives checkpoints explicitly' }),
   runAction: (action, args) => actions.runAction(action, args),
   hasPendingApproval: ({ workflowId, proposalToken }) => {
     const latestForToken = queryReceiptList(kdb, { workflowId, limit: 1000 }).find((receipt) =>
@@ -125,7 +125,7 @@ const loop = createConductorLoop({
       workflowId: workflowId ?? null,
       summary,
       phase,
-      proposedAction: proposal.kind === 'action' ? proposal.action : 'pause',
+      proposedAction: proposal.kind === 'action' ? proposal.action : 'await_operator',
       proposalToken: proposalToken ?? null,
       nextAction: proposal.rationale,
       requestApproval: requestApproval === true,

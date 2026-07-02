@@ -22,13 +22,13 @@ import { createHash } from 'node:crypto';
 import type { CommandResult } from '../../kernel/commands/index';
 import type { ConductorContext } from '../../kernel/conductor/index';
 import { emitKernelEvent } from '../../kernel/events/index';
-import type { WorkflowRun } from '../../kernel/workflows/index';
+import type { WorkflowProjection } from '../../kernel/workflows/index';
 import type { ConductorAction } from './conductor-actions';
 import { proposeNextAction, type ActionProposal } from './conductor-planner';
 
 export type LoopPhase =
-  | 'paused'
-  | 'budget-paused'
+  | 'awaiting_operator'
+  | 'budget_exceeded'
   | 'awaiting-selection'
   | 'awaiting-approval'
   | 'denied'
@@ -88,14 +88,14 @@ export interface ConductorLoopDeps {
   propose(context: ConductorContext): ActionProposal;
   runAction(action: ConductorAction, args: Record<string, unknown>): Promise<CommandResult>;
   /** Optional R4 budget source: Workflow IS the run; budget lives on workflows.budget_json. */
-  readRun?(workflowId: string): Promise<WorkflowRun | null> | WorkflowRun | null;
-  /** Optional R4 pause hook, normally kernel.workflow.update({ status:'paused' }). */
-  pauseRun?(workflowId: string, reason: string): Promise<CommandResult> | CommandResult;
+  readWorkflowProjection?(workflowId: string): Promise<WorkflowProjection | null> | WorkflowProjection | null;
+  /** Optional R4 suspend hook, normally kernel.workflow.update({ status:'suspended' }). */
+  suspendWorkflow?(workflowId: string, reason: string): Promise<CommandResult> | CommandResult;
   /** Optional R5 checkpoint source. Input checkpoint takes precedence. */
   readCheckpoint?(input: {
     workflowId?: string;
     context: ConductorContext;
-    run: WorkflowRun | null;
+    run: WorkflowProjection | null;
   }): Promise<CheckpointRequest | null> | CheckpointRequest | null;
   /** R5 run-instance pause field: workflows.checkpoint_state. */
   setCheckpointState?(workflowId: string, state: string | null): Promise<CommandResult> | CommandResult;
@@ -171,7 +171,7 @@ function receiptNumber(receipt: { metadata: Record<string, unknown> }, ...keys: 
 
 export function evaluateRunBudget(
   context: ConductorContext,
-  run: WorkflowRun | null,
+  run: WorkflowProjection | null,
   now: number,
 ): BudgetBreach | null {
   if (!run) return null;
@@ -258,7 +258,7 @@ export function createConductorLoop(deps: ConductorLoopDeps): ConductorLoop {
     token: string | null,
     requestApproval = false,
   ): Promise<CommandResult> {
-    const what = proposal.kind === 'action' ? proposal.action : 'pause';
+    const what = proposal.kind === 'action' ? proposal.action : 'await_operator';
     return deps.postDecision({
       workflowId: input.workflowId,
       summary: `[loop:${phase}] ${what}: ${proposal.rationale}`,
@@ -271,7 +271,7 @@ export function createConductorLoop(deps: ConductorLoopDeps): ConductorLoop {
 
   function checkpointProposal(checkpoint: CheckpointRequest): ActionProposal {
     return {
-      kind: 'pause',
+      kind: 'await_operator',
       risk: 'low',
       rationale: checkpoint.summary ?? `Checkpoint "${checkpoint.checkpointId}" awaits human selection.`,
       pauseReason: 'awaiting-selection',
@@ -446,7 +446,7 @@ export function createConductorLoop(deps: ConductorLoopDeps): ConductorLoop {
   return {
     async step(input: LoopStepInput = {}): Promise<LoopStepResult> {
       const context = await deps.readContext(input.workflowId);
-      const run = input.workflowId && deps.readRun ? await deps.readRun(input.workflowId) : null;
+      const run = input.workflowId && deps.readWorkflowProjection ? await deps.readWorkflowProjection(input.workflowId) : null;
       const checkpoint = input.checkpoint
         ?? (deps.readCheckpoint ? await deps.readCheckpoint({ workflowId: input.workflowId, context, run }) : null);
       if (
@@ -465,13 +465,13 @@ export function createConductorLoop(deps: ConductorLoopDeps): ConductorLoop {
         }
         return surfaceCheckpoint(input, checkpoint);
       }
-      if (input.workflowId && deps.readRun) {
+      if (input.workflowId && deps.readWorkflowProjection) {
         const breach = evaluateRunBudget(context, run, Date.now());
         if (breach) {
-          const proposal: ActionProposal = { kind: 'pause', rationale: breach.reason };
-          await deps.pauseRun?.(input.workflowId, breach.reason);
-          await record(input, 'budget-paused', proposal, null);
-          return { status: 'budget-paused', proposal, canContinue: false };
+          const proposal: ActionProposal = { kind: 'await_operator', rationale: breach.reason, risk: 'low' };
+          await deps.suspendWorkflow?.(input.workflowId, breach.reason);
+          await record(input, 'budget_exceeded', proposal, null);
+          return { status: 'budget_exceeded', proposal, canContinue: false };
         }
       }
       const proposal = input.override ?? deps.propose(context);
@@ -495,9 +495,9 @@ export function createConductorLoop(deps: ConductorLoopDeps): ConductorLoop {
         // approve === true and token matches → fall through to execute.
       } else {
         // No decision yet.
-        if (proposal.kind === 'pause' || !proposal.action) {
-          await record(input, 'paused', proposal, null);
-          return { status: 'paused', proposal, canContinue: false };
+        if (proposal.kind === 'await_operator' || !proposal.action) {
+          await record(input, 'awaiting_operator', proposal, null);
+          return { status: 'awaiting_operator', proposal, canContinue: false };
         }
         if (proposal.risk === 'high') {
           await record(input, 'awaiting-approval', proposal, currentToken, true);

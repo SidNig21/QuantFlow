@@ -17,7 +17,7 @@ import { handleTaskCommand, queryTaskGet } from '../../src/kernel/tasks/index';
 import { handleArtifactCommand, handleReceiptCommand, queryArtifactList, queryReceiptList } from '../../src/kernel/receipts/index';
 import { handleEvalCommand, queryEvaluationList } from '../../src/kernel/evals/index';
 import { seedHarnessRegistry } from '../../src/kernel/worker-instances/index';
-import { buildRunReplay } from '../../src/main/conductor/run-replay';
+import { buildWorkflowReplay } from '../../src/main/conductor/workflow-replay';
 import { mirrorLessonArtifactsToVault } from '../../src/vault/index';
 
 let failures = 0;
@@ -228,8 +228,8 @@ check('vault mirror contains lesson artifact id', [...written.values()].some((co
 check('artifact row remains truth for lesson', queryArtifactList(kdb, { workflowId: 'wf-r7' }).some((artifact) => artifact.id === lessonArtifact && artifact.kind === 'lesson'));
 
 console.log('\n- replay is receipt-primary and deterministic -');
-const replayA = buildRunReplay(kdb, 'wf-r7')!;
-const replayB = buildRunReplay(kdb, 'wf-r7')!;
+const replayA = buildWorkflowReplay(kdb, 'wf-r7')!;
+const replayB = buildWorkflowReplay(kdb, 'wf-r7')!;
 check('replay built', !!replayA);
 check('replay declares receipt-primary source', replayA.source === 'receipt-primary' && replayA.usesEventsTable === false);
 check('replay is deterministic', JSON.stringify(replayA) === JSON.stringify(replayB));
@@ -245,7 +245,7 @@ db.prepare(
   `INSERT INTO events (id, workflow_id, kind, payload_json, created_at)
    VALUES ('evt-synthetic', 'wf-r7', 'synthetic.coordination', '{"note":"must not affect replay"}', ?)`,
 ).run(Date.now());
-const replayWithEvents = buildRunReplay(kdb, 'wf-r7')!;
+const replayWithEvents = buildWorkflowReplay(kdb, 'wf-r7')!;
 check('events table not used for replay', (db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n === 1);
 check('replay unchanged with events present', JSON.stringify(replayWithEvents) === JSON.stringify(replayA));
 

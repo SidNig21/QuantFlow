@@ -132,17 +132,17 @@ await runNode('synthesize');
 check('all four tasks complete', ['collect', 'analyze', 'extract', 'synthesize'].every((id) => queryTaskGet(kdb, id)?.status === 'complete'));
 
 console.log('\n— Run projection: aggregates references only; artifacts carry run_id —');
-const run = queryRun(kdb, 'wf1')!;
-check('run_id ≡ workflow_id', run.runId === 'wf1' && run.workflowId === 'wf1');
-check('run mode carried', run.mode === 'research');
-check('run aggregates all 4 task ids', JSON.stringify([...run.taskIds].sort()) === JSON.stringify(['analyze', 'collect', 'extract', 'synthesize']));
+const projection = queryRun(kdb, 'wf1')!;
+check('workflow_id is projection id', projection.workflowId === 'wf1');
+check('workflow mode carried', projection.mode === 'research');
+check('workflow projection aggregates all 4 task ids', JSON.stringify([...projection.taskIds].sort()) === JSON.stringify(['analyze', 'collect', 'extract', 'synthesize']));
 const artifactRows = queryArtifactList(kdb, { workflowId: 'wf1' });
-check('run artifact ids match artifact rows (no dup)', run.artifactIds.length === artifactRows.length && run.artifactIds.length >= 4);
+check('projection artifact ids match artifact rows (no dup)', projection.artifactIds.length === artifactRows.length && projection.artifactIds.length >= 4);
 check('every artifact carries run_id (= workflow_id)', artifactRows.every((a) => a.workflowId === 'wf1'));
 const receiptRows = queryReceiptList(kdb, {});
-check('run receipt ids match receipt rows (no dup)', run.receiptIds.length === receiptRows.filter((r) => r.workflowId === 'wf1').length);
+check('projection receipt ids match receipt rows (no dup)', projection.receiptIds.length === receiptRows.filter((r) => r.workflowId === 'wf1').length);
 // References-only: the Run holds ids, never copies row bodies.
-check('run holds ids, not row objects', run.taskIds.every((t) => typeof t === 'string') && run.artifactIds.every((a) => typeof a === 'string'));
+check('projection holds ids, not row objects', projection.taskIds.every((t) => typeof t === 'string') && projection.artifactIds.every((a) => typeof a === 'string'));
 
 console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} — ${failures} failure(s)`);
 process.exit(failures === 0 ? 0 : 1);

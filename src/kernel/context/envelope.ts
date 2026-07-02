@@ -21,8 +21,8 @@ export interface ContextEnvelopeArtifact {
 
 export interface ContextEnvelopeV0 {
   version: 'context-envelope/v0';
-  run: {
-    run_id: string | null;
+  workflow: {
+    workflow_id: string | null;
     mode: string | null;
     objective: string | null;
   };
@@ -71,7 +71,7 @@ export function buildContextEnvelope(taskId: string): ContextEnvelopeV0 {
   const task = queryTaskGet(taskId);
   if (!task) throw new Error(`context envelope: task not found: ${taskId}`);
 
-  const run = task.workflowId ? queryRun(task.workflowId) : null;
+  const workflowProjection = task.workflowId ? queryRun(task.workflowId) : null;
   const worker = task.ownerWorkerId ? queryWorkerGet(task.ownerWorkerId) : null;
   const receipts = queryReceiptList(
     task.workflowId ? { workflowId: task.workflowId, limit: 20 } : { taskId, limit: 20 },
@@ -87,10 +87,10 @@ export function buildContextEnvelope(taskId: string): ContextEnvelopeV0 {
 
   const base = {
     version: 'context-envelope/v0' as const,
-    run: {
-      run_id: run?.runId ?? task.workflowId,
-      mode: run?.mode ?? null,
-      objective: run?.objective ?? null,
+    workflow: {
+      workflow_id: workflowProjection?.workflowId ?? task.workflowId,
+      mode: workflowProjection?.mode ?? null,
+      objective: workflowProjection?.objective ?? null,
     },
     role: {
       worker_id: task.ownerWorkerId,

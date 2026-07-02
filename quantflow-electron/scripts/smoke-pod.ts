@@ -273,9 +273,9 @@ await dispatch('kernel.conductor.plan', {
 });
 const loop = createConductorLoop({
   readContext: () => queryConductorContext(kdb, { workflowId: 'wf1', receiptLimit: 500 }),
-  readRun: () => queryRun(kdb, 'wf1'),
-  pauseRun: (workflowId, reason) => dispatch('kernel.workflow.update', { id: workflowId, status: 'paused', reason }),
-  propose: () => ({ kind: 'pause', rationale: 'should not be reached' }),
+  readWorkflowProjection: () => queryRun(kdb, 'wf1'),
+  suspendWorkflow: (workflowId, reason) => dispatch('kernel.workflow.update', { id: workflowId, status: 'suspended', reason }),
+  propose: () => ({ kind: 'await_operator', risk: 'low', rationale: 'should not be reached' }),
   runAction: async () => ({ ok: true }),
   hasPendingApproval: () => false,
   postDecision: ({ workflowId, summary, phase, proposal }) =>
@@ -283,12 +283,12 @@ const loop = createConductorLoop({
       workflowId: workflowId ?? null,
       summary,
       phase,
-      proposedAction: proposal.kind === 'action' ? proposal.action : 'pause',
+      proposedAction: proposal.kind === 'action' ? proposal.action : 'await_operator',
       nextAction: proposal.rationale,
     }),
 });
 const budget = await loop.step({ workflowId: 'wf1' });
-check('budget exceeded pauses loop', budget.status === 'budget-paused');
+check('budget exceeded suspends loop', budget.status === 'budget_exceeded');
 check('workflow status suspended', (queryRun(kdb, 'wf1')?.status) === 'suspended');
 
 console.log(`\n${failures === 0 ? 'OK' : 'FAILED'} - ${failures} failure(s)`);
