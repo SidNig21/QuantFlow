@@ -107,6 +107,7 @@ import {
 	createDebouncedProjectionRefresh,
 	routeKernelEvent,
 } from "./renderer-event-router.js";
+import { createProjectionReader } from "./projection.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
 const PLATFORM = window.shellApi.getPlatform();
@@ -1441,6 +1442,11 @@ async function init() {
 		await refreshWorkflowProjection();
 	}
 
+	// Goal 7: Kernel-owned semantic types live in projection.js cache (read path).
+	const projection = createProjectionReader({
+		sendQuery: (name, args) => window.kernelApi?.sendQuery?.(name, args),
+	});
+
 	const cableInspector = createCableInspector({
 		containerEl: canvasEl,
 		viewportState,
@@ -1452,17 +1458,14 @@ async function init() {
 		onRemoveConnection: removeConnectionById,
 		onUpdateLabel: updateCableLabel,
 		onSetSemanticType: setCableSemanticType,
-		getSemanticType: (id) => connectionSemanticTypes.get(id) ?? "manual_connection",
+		getSemanticType: (id) =>
+			projection.getConnectionSemanticTypes().get(id) ?? "manual_connection",
 		onGetFocusedTileId: () => tileManager.getFocusedTileId(),
 		onStateChanged: () => updateCables(),
 	});
 
 	// -- Cable layer (SVG renderer + inspector) --
 	const cableLayerContent = document.getElementById("cable-layer-content");
-	// Goal 7: Kernel-owned semantic type per connection id (delegation,
-	// verification, …). Cables read their meaning from the Kernel, not local
-	// canvas-state, so the string carries what the Kernel says it carries.
-	const connectionSemanticTypes = new Map();
 	function tidyTilesToGrid() {
 		const result = repackTilesToGrid(tiles, {
 			viewport: {
@@ -1498,7 +1501,8 @@ async function init() {
 					cableInspector.openContextMenu(id, event.clientX, event.clientY),
 				selectedConnectionId: cableInspector.getSelectedConnectionId(),
 				getRelayState: (id) => cableInspector.getRelayState(id),
-				getSemanticType: (id) => connectionSemanticTypes.get(id) ?? null,
+				getSemanticType: (id) =>
+					projection.getConnectionSemanticTypes().get(id) ?? null,
 			});
 		}
 	}
@@ -1508,36 +1512,26 @@ async function init() {
 	// Kernel truth. We cache the last Kernel read and re-render on viewport
 	// changes; we re-fetch on Kernel events that can change membership/counts.
 	const regionLayerContent = document.getElementById("region-layer-content");
-	let workflowRegions = [];
 	function renderRegions() {
 		if (regionLayerContent) {
-			renderWorkflowRegions(regionLayerContent, workflowRegions, viewportState);
+			renderWorkflowRegions(
+				regionLayerContent,
+				projection.getRegions(),
+				viewportState,
+			);
 		}
 	}
 	async function refreshWorkflowProjection() {
-		if (!window.kernelApi?.sendQuery) return;
 		const projectionStarted = performance.now();
-		try {
-			const [regions, snapshot] = await Promise.all([
-				window.kernelApi.sendQuery("kernel.workflow.region_list", {}),
-				window.kernelApi.sendQuery("kernel.canvas.snapshot", {}),
-			]);
-			workflowRegions = Array.isArray(regions) ? regions : [];
-			connectionSemanticTypes.clear();
-			for (const conn of snapshot?.connections ?? []) {
-				if (conn?.id) connectionSemanticTypes.set(conn.id, conn.semanticType ?? null);
-			}
-		} catch {
-			// Read-only projection: a failed read just leaves the last frame.
-		} finally {
-			const durationMs = performance.now() - projectionStarted;
-			window.shellApi?.recordPerfSpan?.({
-				name: "renderer.projection.refresh",
-				layer: "canvas",
-				duration_ms: durationMs,
-				started_at: Date.now() - durationMs,
-			});
-		}
+		const ran = await projection.refreshWorkflowProjectionCache();
+		if (!ran) return;
+		const durationMs = performance.now() - projectionStarted;
+		window.shellApi?.recordPerfSpan?.({
+			name: "renderer.projection.refresh",
+			layer: "canvas",
+			duration_ms: durationMs,
+			started_at: Date.now() - durationMs,
+		});
 		renderRegions();
 		updateCables();
 	}
