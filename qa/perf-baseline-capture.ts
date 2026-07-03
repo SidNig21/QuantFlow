@@ -28,8 +28,8 @@ import {
   type PerfBaseline,
 } from "./lib/perf-baseline-schema";
 import {
-  REFETCH_TRIGGER_KINDS,
-  shouldTriggerSnapshotRefetch,
+  REFETCH_TRIGGER_KINDS_BASELINE,
+  shouldTriggerSnapshotRefetchBaseline,
 } from "./lib/refetch-policy";
 
 const TRIALS = 5;
@@ -159,7 +159,7 @@ async function benchmarkB3(): Promise<BenchmarkEntry> {
 async function benchmarkB4(): Promise<B4BenchmarkEntry> {
   const trialsMs: number[] = [];
   const refetchCounts: number[] = [];
-  const triggerKinds = [...REFETCH_TRIGGER_KINDS];
+  const triggerKinds = [...REFETCH_TRIGGER_KINDS_BASELINE];
   const methodKinds = triggerKinds.join(", ");
 
   for (let t = 0; t < TRIALS; t += 1) {
@@ -167,7 +167,7 @@ async function benchmarkB4(): Promise<B4BenchmarkEntry> {
     setKernelDbForTesting(kdb);
     let refetchCount = 0;
     const listener = (payload: KernelEventPayload) => {
-      if (shouldTriggerSnapshotRefetch(String(payload.kind ?? ""))) {
+      if (shouldTriggerSnapshotRefetchBaseline(String(payload.kind ?? ""))) {
         refetchCount += 1;
       }
     };

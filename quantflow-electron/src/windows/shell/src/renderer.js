@@ -103,7 +103,10 @@ import {
 	resolveLegendRecipeRole,
 } from "./legend-spawn.js";
 import { updateCanvasWatermark } from "./canvas-watermark.js";
-import { routeKernelEvent } from "./renderer-event-router.js";
+import {
+	createDebouncedProjectionRefresh,
+	routeKernelEvent,
+} from "./renderer-event-router.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
 const PLATFORM = window.shellApi.getPlatform();
@@ -3619,6 +3622,12 @@ async function init() {
 	// the event, so reconciliation is a harmless no-op; for externally-driven
 	// Kernel writes the renderer updates to match Kernel.
 	if (window.kernelApi) {
+		const debouncedProjectionRefresh = createDebouncedProjectionRefresh(
+			() => {
+				void refreshWorkflowProjection();
+			},
+		);
+
 		const kernelEventHandlers = {
 			recordEvent: (payload) => kernelEventLog.record(payload),
 			resolveTile: (tileId) => tiles.find((x) => x.id === tileId) ?? null,
@@ -3677,8 +3686,24 @@ async function init() {
 				// Kernel State Card changed → refresh the back face if flipped.
 				tileManager.refreshFlippedStateCard(tileId);
 			},
+			// PF1 targeted projection — no kernel.canvas.snapshot / region_list.
+			// receipt.posted: regions/cables unchanged; watchtower via recordEvent.
+			onReceiptPosted: ({ tileId }) => {
+				if (tileId) tileManager.refreshFlippedStateCard(tileId);
+			},
+			// task.*: Conductor self-refreshes when visible; narrow state-card only.
+			onTaskEvent: ({ tileId }) => {
+				if (tileId) tileManager.refreshFlippedStateCard(tileId);
+			},
+			// worker.*: payload carries tileId — dock list + flipped state card.
+			onWorkerEvent: ({ tileId }) => {
+				if (tileId) {
+					tileManager.refreshFlippedStateCard(tileId);
+					syncTileList();
+				}
+			},
 			refreshProjection: () => {
-				void refreshWorkflowProjection();
+				debouncedProjectionRefresh.schedule();
 			},
 			shouldRefreshWatchtower: (watchtowerEvent) =>
 				watchtowerVisible && !watchtowerPaused && watchtowerEvent,

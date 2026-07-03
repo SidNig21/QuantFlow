@@ -152,6 +152,15 @@ const checks: Check[] = [
       return compareGoldenReceipts();
     },
   },
+  {
+    name: "storm",
+    description:
+      "PF1 storm: 100 receipt.posted → 0 full refetches; tile burst coalesces to 1",
+    async run() {
+      const { runStormCheck } = await import("./lib/storm-check");
+      return runStormCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));
