@@ -28,6 +28,11 @@ export function registerCanvasHandlers(
     async (_event, state) => canvasPersistence.saveState(state),
   );
 
+  ipcMain.handle(
+    "canvas:export-state",
+    async (_event, targetPath?: string) => canvasPersistence.exportState(targetPath),
+  );
+
   // Canvas pinch forwarding
   ipcMain.on(
     "canvas:forward-pinch",

@@ -170,6 +170,15 @@ const checks: Check[] = [
       return runOneTruthBootCheck();
     },
   },
+  {
+    name: "one-truth-save",
+    description:
+      "D2 save demotion: flag-ON writes ephemeral cache only; export + downgrade parity",
+    async run() {
+      const { runOneTruthSaveCheck } = await import("./lib/one-truth-save");
+      return runOneTruthSaveCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));

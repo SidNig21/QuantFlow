@@ -262,6 +262,30 @@ export function assembleCanvasStateFromKernel(
   };
 }
 
+/** D2 ephemeral cache document — NOT CanvasState v2 authority. */
+export const EPHEMERAL_CACHE_VERSION = "ephemeral-v1" as const;
+
+export interface EphemeralCacheDocument {
+  version: typeof EPHEMERAL_CACHE_VERSION;
+  tiles: Array<{ id: string } & EphemeralTileOverlay>;
+}
+
+export function buildEphemeralCacheDocument(
+  tiles: TileState[],
+): EphemeralCacheDocument {
+  const cacheTiles: EphemeralCacheDocument["tiles"] = [];
+  for (const tile of tiles) {
+    const ephemeral: EphemeralTileOverlay = {};
+    if (tile.ptySessionId) ephemeral.ptySessionId = tile.ptySessionId;
+    if (tile.herdrPaneId) ephemeral.herdrPaneId = tile.herdrPaneId;
+    if (tile.herdrTerminalId) ephemeral.herdrTerminalId = tile.herdrTerminalId;
+    if (Object.keys(ephemeral).length > 0) {
+      cacheTiles.push({ id: tile.id, ...ephemeral });
+    }
+  }
+  return { version: EPHEMERAL_CACHE_VERSION, tiles: cacheTiles };
+}
+
 /** Parse JSON only for Stage E ephemeral overlay fields — not a truth read. */
 export function extractEphemeralOverlayFromJson(
   raw: string,

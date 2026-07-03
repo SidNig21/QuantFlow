@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, rmSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -16,11 +17,14 @@ import {
 
 const TEST_ROOT = join(tmpdir(), `canvas-one-truth-test-${Date.now()}`);
 const STATE_DIR = join(TEST_ROOT, ".quantflow");
+const STATE_FILE = join(STATE_DIR, "canvas-state.json");
 
 const {
   _setCanvasStateDir,
   loadState,
   saveState,
+  exportState,
+  _getEphemeralCacheFileForTesting,
 } = await import("./canvas-persistence");
 
 let kernelDb: ReturnType<typeof createInMemoryKernelDb> | null = null;
@@ -98,7 +102,8 @@ describe("canvas one-truth boot (QF_ONE_TRUTH=1)", () => {
     expect(_getCanvasKernelAccessCountersForTesting().kernelReadCount).toBeGreaterThan(0);
   });
 
-  test("flag-on overlays ephemeral fields from JSON cache only", async () => {
+  test("flag-on overlays ephemeral fields from ephemeral cache", async () => {
+    process.env.QF_ONE_TRUTH = "1";
     await saveState({
       version: 2,
       tiles: [
@@ -119,7 +124,6 @@ describe("canvas one-truth boot (QF_ONE_TRUTH=1)", () => {
       viewport: { centerX: 0, centerY: 0, zoom: 1 },
     });
 
-    process.env.QF_ONE_TRUTH = "1";
     _resetCanvasKernelAccessForTesting();
     const loaded = await loadState();
 
@@ -227,3 +231,180 @@ describe("canvas kernel parity on save", () => {
 function expectOk(result: { ok: boolean; error?: string }): void {
   if (!result.ok) throw new Error(result.error ?? "command failed");
 }
+
+describe("canvas one-truth save demotion (D2)", () => {
+  test("flag-on save leaves canvas-state.json untouched and writes ephemeral cache", async () => {
+    await saveState({
+      version: 2,
+      tiles: [
+        {
+          id: "tile-stale",
+          type: "note",
+          x: 1,
+          y: 2,
+          width: 100,
+          height: 100,
+          zIndex: 0,
+        },
+      ],
+      connections: [],
+      viewport: { centerX: 0, centerY: 0, zoom: 1 },
+    });
+    const authorityBefore = await readFile(STATE_FILE, "utf-8");
+
+    process.env.QF_ONE_TRUTH = "1";
+    await saveState({
+      version: 2,
+      tiles: [
+        {
+          id: "tile-new",
+          type: "code",
+          x: 50,
+          y: 60,
+          width: 640,
+          height: 480,
+          filePath: "/src/main.ts",
+          ptySessionId: "pty-new",
+          zIndex: 1,
+        },
+      ],
+      connections: [],
+      viewport: { centerX: 10, centerY: 20, zoom: 1.5 },
+    });
+
+    expect(await readFile(STATE_FILE, "utf-8")).toBe(authorityBefore);
+    expect(existsSync(_getEphemeralCacheFileForTesting())).toBe(true);
+    const cache = JSON.parse(await readFile(_getEphemeralCacheFileForTesting(), "utf-8"));
+    expect(cache.version).toBe("ephemeral-v1");
+    expect(cache.tiles).toEqual([
+      { id: "tile-new", ptySessionId: "pty-new" },
+    ]);
+  });
+
+  test("flag-off save clears ephemeral cache and writes full authority JSON", async () => {
+    process.env.QF_ONE_TRUTH = "1";
+    await saveState({
+      version: 2,
+      tiles: [
+        {
+          id: "tile-temp",
+          type: "term",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 240,
+          ptySessionId: "pty-temp",
+          zIndex: 0,
+        },
+      ],
+      connections: [],
+      viewport: { centerX: 0, centerY: 0, zoom: 1 },
+    });
+    expect(existsSync(_getEphemeralCacheFileForTesting())).toBe(true);
+
+    delete process.env.QF_ONE_TRUTH;
+    await saveState({
+      version: 2,
+      tiles: [
+        {
+          id: "tile-temp",
+          type: "term",
+          x: 0,
+          y: 0,
+          width: 320,
+          height: 240,
+          ptySessionId: "pty-temp",
+          zIndex: 0,
+        },
+      ],
+      connections: [],
+      viewport: { centerX: 0, centerY: 0, zoom: 1 },
+    });
+
+    expect(existsSync(_getEphemeralCacheFileForTesting())).toBe(false);
+    const saved = JSON.parse(await readFile(STATE_FILE, "utf-8"));
+    expect(saved.version).toBe(2);
+    expect(saved.tiles[0].id).toBe("tile-temp");
+  });
+
+  test("exportState produces full CanvasState v2 matching flag-off save", async () => {
+    const state = {
+      version: 2 as const,
+      tiles: [
+        {
+          id: "tile-export",
+          type: "browser" as const,
+          x: 12,
+          y: 34,
+          width: 800,
+          height: 600,
+          url: "https://example.com",
+          userTitle: "Browser",
+          ptySessionId: "pty-export",
+          zIndex: 3,
+        },
+      ],
+      connections: [
+        {
+          id: "conn-export",
+          tileAId: "tile-export",
+          tileBId: "tile-export",
+          createdAt: 1,
+          updatedAt: 2,
+        },
+      ],
+      viewport: { centerX: 5, centerY: 6, zoom: 2 },
+    };
+
+    process.env.QF_ONE_TRUTH = "1";
+    await saveState(state);
+
+    const exportPath = join(STATE_DIR, "export-test.json");
+    await exportState(exportPath);
+    const exported = JSON.parse(await readFile(exportPath, "utf-8"));
+    expect(exported.version).toBe(2);
+    expect(exported.tiles[0]).toMatchObject({
+      id: "tile-export",
+      type: "browser",
+      url: "https://example.com",
+      ptySessionId: "pty-export",
+    });
+
+    delete process.env.QF_ONE_TRUTH;
+    await saveState(state);
+    const flagOffLoaded = await loadState();
+    expect(flagOffLoaded?.tiles[0]).toMatchObject(exported.tiles[0]);
+  });
+
+  test("downgrade load after flag-on saves returns Kernel-assembled state", async () => {
+    process.env.QF_ONE_TRUTH = "1";
+    await saveState({
+      version: 2,
+      tiles: [
+        {
+          id: "tile-downgrade",
+          type: "note",
+          x: 99,
+          y: 88,
+          width: 300,
+          height: 200,
+          filePath: "/x.md",
+          zIndex: 4,
+        },
+      ],
+      connections: [],
+      viewport: { centerX: 1, centerY: 2, zoom: 1.1 },
+    });
+
+    delete process.env.QF_ONE_TRUTH;
+    const loaded = await loadState();
+    expect(loaded?.tiles[0]).toMatchObject({
+      id: "tile-downgrade",
+      type: "note",
+      x: 99,
+      y: 88,
+      filePath: "/x.md",
+    });
+    expect(loaded?.viewport).toEqual({ centerX: 1, centerY: 2, zoom: 1.1 });
+  });
+});
