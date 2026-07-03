@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { connections, tiles } from "./canvas-state.js";
 import {
 	clampFloatingPosition,
@@ -196,6 +196,13 @@ beforeEach(() => {
 	installDomStub();
 	tiles.length = 0;
 	connections.length = 0;
+});
+
+afterEach(async () => {
+	// cable-overlay defers its popover dismiss listener via setTimeout(0);
+	// flush it while this file's document stub (with addEventListener) is live
+	// so the timer can't fire into a later test file's bare stub.
+	await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
 describe("clampFloatingPosition", () => {
