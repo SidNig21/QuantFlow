@@ -40,6 +40,12 @@ import {
   queryEvaluationGet as evalGet,
   type EvaluationRowSnapshot,
 } from '../evals/index';
+import {
+  queryTileExtensionGet as tileExtensionGet,
+  queryCanvasSettingsGet as canvasSettingsGet,
+  type TileExtensionSnapshot,
+  type CanvasSettingsSnapshot,
+} from '../tile-extensions/index';
 
 export interface TileSnapshot {
   id: string;
@@ -305,3 +311,17 @@ export function queryEvaluationGet(evalId: string): EvaluationRowSnapshot[] {
 }
 
 export type { EvaluationRowSnapshot };
+
+// ---------------------------------------------------------------------------
+// Tile extension queries (D0) — canvas-only fields + viewport
+// ---------------------------------------------------------------------------
+
+export function queryTileExtensionGet(tileId: string): TileExtensionSnapshot | null {
+  return tileExtensionGet(getKernelDb(), tileId);
+}
+
+export function queryCanvasSettingsGet(): CanvasSettingsSnapshot | null {
+  return canvasSettingsGet(getKernelDb());
+}
+
+export type { TileExtensionSnapshot, CanvasSettingsSnapshot };

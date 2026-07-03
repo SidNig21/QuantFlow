@@ -143,6 +143,35 @@ export interface TileRow {
   metadata_json: string;
 }
 
+/** D0 canvas-only tile fields. See docs/v5/TILE_EXTENSION_SCHEMA.md. */
+export interface TileExtensionRow {
+  tile_id: string;
+  canvas_type: string | null;
+  file_path: string | null;
+  folder_path: string | null;
+  url: string | null;
+  workspace_path: string | null;
+  terminal_target: string | null;
+  runtime_target: string | null;
+  user_title: string | null;
+  auto_title: string | null;
+  route_handle: string | null;
+  herdr_agent_name: string | null;
+  herdr_workspace_id: string | null;
+  extra_json: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/** D0 canvas-scoped viewport (singleton id = 'canvas'). */
+export interface CanvasSettingsRow {
+  id: string;
+  center_x: number;
+  center_y: number;
+  zoom: number;
+  updated_at: number;
+}
+
 export interface RoleRow {
   id: string;
   name: string;
@@ -342,6 +371,8 @@ export type KernelCommandType =
   | 'kernel.tile.rename'
   | 'kernel.tile.status_update'
   | 'kernel.tile.remove'
+  | 'kernel.tile_extension.set'
+  | 'kernel.canvas.settings.set'
   | 'kernel.connection.create'
   | 'kernel.connection.delete'
   | 'kernel.worker.spawn'
@@ -371,6 +402,8 @@ export type KernelQueryType =
   | 'kernel.canvas.snapshot'
   | 'kernel.tile.list'
   | 'kernel.tile.get'
+  | 'kernel.tile_extension.get'
+  | 'kernel.canvas.settings.get'
   | 'kernel.task.list'
   | 'kernel.task.get'
   | 'kernel.receipt.list'

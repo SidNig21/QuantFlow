@@ -489,3 +489,47 @@ Additions require:
 4. A note in `V3_MIGRATION_NOTES.md` if any v2 concept is affected.
 
 Do not modify this document to reflect a non-Kernel state source. The Kernel is the only entity whose schema belongs here.
+
+---
+
+## v5 D0 Additive Tables (Stage D — tile-extension schema)
+
+> **Frozen v3 baseline above is unchanged.** These tables are additive extensions
+> documented in `docs/v5/TILE_EXTENSION_SCHEMA.md`. Migration `008-d0-tile-extensions.sql`.
+
+### `tile_extensions`
+
+Canvas-only fields for a tile. One row per tile; geometry stays on `tiles`.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `tile_id` | TEXT PK FK → tiles | `ON DELETE CASCADE` |
+| `canvas_type` | TEXT | `term`, `note`, `code`, `image`, `graph`, `browser` |
+| `file_path` | TEXT | Nullable |
+| `folder_path` | TEXT | Nullable |
+| `url` | TEXT | Nullable |
+| `workspace_path` | TEXT | Nullable |
+| `terminal_target` | TEXT | Nullable |
+| `runtime_target` | TEXT | Nullable |
+| `user_title` | TEXT | Nullable |
+| `auto_title` | TEXT | Nullable |
+| `route_handle` | TEXT | Nullable |
+| `herdr_agent_name` | TEXT | Nullable |
+| `herdr_workspace_id` | TEXT | Nullable |
+| `extra_json` | TEXT | Default `'{}'` |
+| `created_at` | INTEGER | Required |
+| `updated_at` | INTEGER | Required |
+
+Runtime-ephemeral fields (`ptySessionId`, `herdrPaneId`, `herdrTerminalId`) are **not** stored here.
+
+### `canvas_settings`
+
+Singleton canvas viewport (id = `'canvas'`).
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | TEXT PK | Default `'canvas'` |
+| `center_x` | REAL | Default 0 |
+| `center_y` | REAL | Default 0 |
+| `zoom` | REAL | Default 1 |
+| `updated_at` | INTEGER | Required |

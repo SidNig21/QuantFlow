@@ -14,6 +14,7 @@ All canonical state and the mutation/query boundary:
 - `commands/types.ts` — `CommandResult` interface. (Goal 2)
 - `commands/index.ts` — Command dispatcher; writes audit row to `commands` table, routes by prefix. (Goal 2)
 - `commands/tile-commands.ts` — Tile CRUD: create, move, resize, rename, status_update, remove. (Goal 2)
+- `tile-extensions/index.ts` — D0 canvas-only tile fields (`tile_extensions`) + viewport (`canvas_settings`): `kernel.tile_extension.set`/`.get`, `kernel.canvas.settings.set`/`.get`. (Stage D0)
 - `commands/connection-commands.ts` — Connection CRUD: create, update, delete. `create`/`update` coerce `semantic_type` to a known type via `workflows/normalizeSemanticType`; `update` sets a string's semantic type/label after it is drawn. (Goal 2 + Goal 7)
 - `commands/workflow-commands.ts` — Workflow CRUD: create, update. (Goal 2)
 - `workflows/index.ts` — Workflow region projection + **`queryRun` / `WorkflowProjection`**: read-only aggregate of references (`run_id ≡ workflow_id`). **`normalizeWorkflowStatus()`** maps legacy `'paused'` → `'suspended'` on read. Contract: `docs/v4/KERNEL_CONTRACT.md`. (Goal 7 + R3a)
@@ -127,3 +128,13 @@ After meaningful changes: update this file if local rules or owned scope changed
 - Migration `007-r7-typed-artifacts.sql` adds typed artifact provenance and eval/RL prep fields additively. Artifact rows remain Kernel truth for `decision_log`, `outcome`, and `lesson`; files and vault notes are storage/mirrors.
 - `tasks/verification-stages.ts` owns the structural + semantic verification stage call. `taskVerify` records stage output on verification receipts instead of inlining semantic judgment.
 - Eval auto-triggers may write `evaluations` rows on task/workflow completion, but no task/workflow transition may read eval rows to decide state.
+
+## v5 D0 Addendum (additive — does not modify v3 baseline text above)
+
+| Primitive | Table | Owner | Description |
+| --- | --- | --- | --- |
+| Tile extension | `tile_extensions` | Kernel | Canvas-only per-tile fields (content type, paths, titles, transport prefs). FK → `tiles`, cascade on delete. |
+| Canvas settings | `canvas_settings` | Kernel | Singleton viewport (`center_x`, `center_y`, `zoom`). Canvas-scoped, not tile-scoped. |
+
+See `docs/v5/TILE_EXTENSION_SCHEMA.md` for field disposition (canonical vs ephemeral).
+Migration `008-d0-tile-extensions.sql`.

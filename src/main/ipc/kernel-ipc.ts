@@ -18,6 +18,8 @@ import {
   queryWorkflowRegionList,
   queryEvaluationList,
   queryEvaluationGet,
+  queryTileExtensionGet,
+  queryCanvasSettingsGet,
 } from '../../kernel/queries/index';
 import { startStateCardWatcher } from '../../kernel/watchers/index';
 import { seedHarnessRegistry } from '../../kernel/worker-instances/index';
@@ -93,6 +95,10 @@ export function registerKernelIpcHandlers(dataDir: string): void {
           return queryWorkerList({ workflowId: params['workflowId'] as string | undefined });
         case 'kernel.worker.get':
           return queryWorkerGet(params['workerId'] as string);
+        case 'kernel.tile_extension.get':
+          return queryTileExtensionGet(params['tileId'] as string);
+        case 'kernel.canvas.settings.get':
+          return queryCanvasSettingsGet();
         default:
           throw new Error(`Unknown kernel query: ${type}`);
       }

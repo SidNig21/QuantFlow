@@ -83,6 +83,7 @@ function setupDb(): { db: Database; artifactRoot: string } {
     '005-r4-runtime.sql',
     '006-r2-artifact-lineage.sql',
     '007-r7-typed-artifacts.sql',
+    '008-d0-tile-extensions.sql',
   ]) {
     db.exec(readFileSync(join(migrationsDir, file), 'utf-8'));
   }

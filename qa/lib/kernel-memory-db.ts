@@ -13,6 +13,7 @@ export const MIGRATION_FILES = [
   "005-r4-runtime.sql",
   "006-r2-artifact-lineage.sql",
   "007-r7-typed-artifacts.sql",
+  "008-d0-tile-extensions.sql",
 ] as const;
 
 const migrationsDir = join(import.meta.dir, "..", "..", "src", "kernel", "migrations");

@@ -10,6 +10,7 @@ import { handleStateCardCommand } from '../state-cards/index';
 import { handleConductorCommand } from '../conductor/index';
 import { handleWorkerCommand } from './worker-commands';
 import { handleEvalCommand } from '../evals/index';
+import { handleTileExtensionCommand } from '../tile-extensions/index';
 import { traceAsync } from '../perf/trace';
 export type { CommandResult } from './types';
 
@@ -69,6 +70,11 @@ async function dispatchKernelCommandInner(
       result = handleWorkerCommand(db, type as string, payload);
     } else if ((type as string).startsWith('kernel.eval.')) {
       result = handleEvalCommand(db, type as string, payload);
+    } else if (
+      (type as string).startsWith('kernel.tile_extension.')
+      || (type as string).startsWith('kernel.canvas.settings.')
+    ) {
+      result = handleTileExtensionCommand(db, type as string, payload);
     } else {
       result = { ok: false, error: `Unknown command type: ${type}` };
     }

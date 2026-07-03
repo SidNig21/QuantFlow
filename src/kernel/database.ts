@@ -9,6 +9,7 @@ import r3WorkflowInstanceSql from './migrations/004-r3-workflow-instance.sql?raw
 import r4RuntimeSql from './migrations/005-r4-runtime.sql?raw';
 import r2ArtifactLineageSql from './migrations/006-r2-artifact-lineage.sql?raw';
 import r7TypedArtifactsSql from './migrations/007-r7-typed-artifacts.sql?raw';
+import d0TileExtensionsSql from './migrations/008-d0-tile-extensions.sql?raw';
 
 /**
  * Ordered Kernel migrations. Each entry's SQL records its own `schema_migrations`
@@ -24,6 +25,7 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
   { version: 5, sql: r4RuntimeSql },
   { version: 6, sql: r2ArtifactLineageSql },
   { version: 7, sql: r7TypedArtifactsSql },
+  { version: 8, sql: d0TileExtensionsSql },
 ];
 
 let _db: BetterSqliteDatabase | null = null;
