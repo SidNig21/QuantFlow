@@ -47,9 +47,17 @@ describe("tmux helpers", () => {
   });
 
   test("getTmuxConf returns a path ending in tmux.conf", () => {
-    const conf = getTmuxConf();
-    expect(conf.endsWith("tmux.conf")).toBe(true);
-    expect(fs.existsSync(conf)).toBe(true);
+    const packageRoot = join(import.meta.dir, "../..");
+    const originalCwd = process.cwd();
+    try {
+      // getTmuxConf dev fallback resolves resources/tmux.conf from cwd
+      process.chdir(packageRoot);
+      const conf = getTmuxConf();
+      expect(conf.endsWith("tmux.conf")).toBe(true);
+      expect(fs.existsSync(conf)).toBe(true);
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 
   test("writeSessionMeta + readSessionMeta round-trip", () => {
