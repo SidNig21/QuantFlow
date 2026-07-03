@@ -175,10 +175,39 @@ function shellQuote(value: string): string {
 
 const listeners = new Map<string, EnvoyListener>();
 
+export type EnvoyListenerFactory = (options: EnvoyListenerOptions) => EnvoyListener;
+
+let listenerFactoryForTesting: EnvoyListenerFactory | null = null;
+
+export function setEnvoyListenerFactoryForTesting(factory: EnvoyListenerFactory | null): void {
+  listenerFactoryForTesting = factory;
+}
+
+function createNoopChildProcess(): ChildProcessWithoutNullStreams {
+  const stdout = new EventEmitter();
+  const stderr = new EventEmitter();
+  const proc = new EventEmitter() as ChildProcessWithoutNullStreams;
+  Object.assign(proc, {
+    stdout,
+    stderr,
+    kill: () => {},
+  });
+  return proc;
+}
+
+export function createNoopEnvoyListenerForTesting(envoySpaceId: string): EnvoyListener {
+  return new EnvoyListener({
+    envoySpaceId,
+    spawnProcess: () => createNoopChildProcess(),
+  });
+}
+
 export function ensureEnvoyListener(envoySpaceId: string): EnvoyListener {
   const existing = listeners.get(envoySpaceId);
   if (existing) return existing;
-  const listener = new EnvoyListener({ envoySpaceId });
+  const listener = listenerFactoryForTesting
+    ? listenerFactoryForTesting({ envoySpaceId })
+    : new EnvoyListener({ envoySpaceId });
   listeners.set(envoySpaceId, listener);
   listener.start();
   return listener;
@@ -189,4 +218,9 @@ export function stopAllEnvoyListeners(): void {
     listener.stop();
   }
   listeners.clear();
+}
+
+export function resetEnvoyListenerForTesting(): void {
+  stopAllEnvoyListeners();
+  listenerFactoryForTesting = null;
 }

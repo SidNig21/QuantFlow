@@ -12,10 +12,16 @@ import {
   ensureObsidianEnvoyMirror,
   setEnvoyRowSourceForTesting,
 } from "./obsidian-envoy-mirror";
+import {
+  createNoopEnvoyListenerForTesting,
+  resetEnvoyListenerForTesting,
+  setEnvoyListenerFactoryForTesting,
+} from "./envoy-listener";
 
 afterEach(() => {
   _resetObsidianMirrorsForTesting();
   resetEnvoyServiceForTesting();
+  resetEnvoyListenerForTesting();
 });
 
 describe("obsidian envoy mirror", () => {
@@ -38,6 +44,9 @@ describe("obsidian envoy mirror", () => {
       listTasks: () => [],
       listReceipts: () => [],
     });
+    setEnvoyListenerFactoryForTesting(({ envoySpaceId }) =>
+      createNoopEnvoyListenerForTesting(envoySpaceId),
+    );
 
     await ensureObsidianEnvoyMirror({
       canvasId: "main",
