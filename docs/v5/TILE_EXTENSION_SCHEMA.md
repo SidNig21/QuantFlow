@@ -83,8 +83,10 @@ Singleton row (`id = 'canvas'`) — not tile-scoped.
 | Query | `kernel.tile_extension.get` | `src/kernel/tile-extensions/index.ts` |
 | Command | `kernel.canvas.settings.set` | `src/kernel/tile-extensions/index.ts` — viewport upsert; partial update |
 | Query | `kernel.canvas.settings.get` | `src/kernel/tile-extensions/index.ts` |
+| Command | `kernel.tile.layout_sync` (D1) | `src/kernel/commands/tile-commands.ts` — geometry + display title only; never touches status/tile_kind/workflow_id; used by the D1 save-path parity dual-write |
 
-No new event kinds in D0 — extension writes are not yet on the projection hot path.
+No new event kinds in D0/D1 — extension and layout-sync writes are parity writes, not
+projection hot-path events (they deliberately do not fan out to the renderer).
 
 ## Versioning rule
 

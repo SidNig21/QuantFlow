@@ -11,6 +11,12 @@ import {
   getConnection as dbGetConnection,
 } from "./runtime-state/connections-repo";
 import type { ConnectionRow } from "./runtime-state/types";
+import {
+  assembleCanvasStateFromKernel,
+  extractEphemeralOverlayFromJson,
+  syncCanvasStateToKernel,
+  type TileState,
+} from "./canvas-kernel-sync";
 
 let stateDir = QUANTFLOW_DIR;
 
@@ -22,30 +28,7 @@ export function _setCanvasStateDir(dir: string): void {
   stateDir = dir;
 }
 
-interface TileState {
-  id: string;
-  type: "term" | "note" | "code" | "image" | "graph" | "browser";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  filePath?: string;
-  folderPath?: string;
-  url?: string | null;
-  workspacePath?: string;
-  ptySessionId?: string;
-  terminalTarget?: string;
-  runtimeTarget?: string;
-  userTitle?: string;
-  autoTitle?: string;
-  routeHandle?: string;
-  /** herdr pane_id linked to this tile, e.g. "w65190c26215c41-1" */
-  herdrPaneId?: string;
-  herdrAgentName?: string;
-  herdrWorkspaceId?: string;
-  herdrTerminalId?: string;
-  zIndex: number;
-}
+export type { TileState };
 
 export interface ConnectionState {
   id: string;
@@ -64,7 +47,7 @@ interface ConnectionEndpointState {
   side: "N" | "E" | "S" | "W";
 }
 
-interface CanvasState {
+export interface CanvasState {
   version: 1 | 2;
   tiles: TileState[];
   connections: ConnectionState[];
@@ -73,6 +56,10 @@ interface CanvasState {
     centerY: number;
     zoom: number;
   };
+}
+
+function isOneTruthBootEnabled(): boolean {
+  return process.env.QF_ONE_TRUTH === "1";
 }
 
 function sanitizeCoord(v: unknown): number {
@@ -163,6 +150,27 @@ function connectionRowToState(row: ConnectionRow): ConnectionState {
   return conn;
 }
 
+function loadConnectionsFromDb(): ConnectionState[] {
+  try {
+    return dbListConnections().map(connectionRowToState);
+  } catch {
+    return [];
+  }
+}
+
+function mergeJsonAndDbConnections(jsonConnections: ConnectionState[]): ConnectionState[] {
+  const dbConnections = loadConnectionsFromDb();
+  if (dbConnections.length === 0) return jsonConnections;
+
+  const dbById = new Map(dbConnections.map((c) => [c.id, c]));
+  const merged: ConnectionState[] = jsonConnections.map((c) => dbById.get(c.id) ?? c);
+  const jsonIds = new Set(jsonConnections.map((c) => c.id));
+  for (const dbConn of dbConnections) {
+    if (!jsonIds.has(dbConn.id)) merged.push(dbConn);
+  }
+  return merged;
+}
+
 function upsertConnectionToDb(conn: ConnectionState): void {
   const existing = dbGetConnection(conn.id);
   if (existing) {
@@ -191,7 +199,30 @@ function upsertConnectionToDb(conn: ConnectionState): void {
   }
 }
 
-export async function loadState(): Promise<CanvasState | null> {
+async function loadStateFromKernel(): Promise<CanvasState | null> {
+  try {
+    let ephemeralRaw = "";
+    try {
+      ephemeralRaw = await readFile(getStateFile(), "utf-8");
+    } catch {
+      // No JSON cache — Kernel boot proceeds without ephemeral overlay.
+    }
+
+    const ephemeralByTileId = extractEphemeralOverlayFromJson(ephemeralRaw);
+    const kernelState = assembleCanvasStateFromKernel(ephemeralByTileId);
+
+    return {
+      version: 2,
+      tiles: kernelState.tiles,
+      connections: loadConnectionsFromDb(),
+      viewport: kernelState.viewport,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function loadStateFromJson(): Promise<CanvasState | null> {
   try {
     const raw = await readFile(getStateFile(), "utf-8");
     const state = JSON.parse(raw) as CanvasState & {
@@ -208,31 +239,19 @@ export async function loadState(): Promise<CanvasState | null> {
         .filter((conn): conn is ConnectionState => Boolean(conn))
       : [];
 
-    // Merge with DB connections: DB wins for same id; DB-only rows appended.
-    let dbConnections: ConnectionState[] = [];
-    try {
-      dbConnections = dbListConnections().map(connectionRowToState);
-    } catch {
-      // DB unavailable (test environment or first boot) — use JSON only
-    }
-
-    if (dbConnections.length > 0) {
-      const dbById = new Map(dbConnections.map((c) => [c.id, c]));
-      const merged: ConnectionState[] = jsonConnections.map((c) => dbById.get(c.id) ?? c);
-      const jsonIds = new Set(jsonConnections.map((c) => c.id));
-      for (const dbConn of dbConnections) {
-        if (!jsonIds.has(dbConn.id)) merged.push(dbConn);
-      }
-      state.connections = merged;
-    } else {
-      state.connections = jsonConnections;
-    }
-
+    state.connections = mergeJsonAndDbConnections(jsonConnections);
     state.version = 2;
     return state;
   } catch {
     return null;
   }
+}
+
+export async function loadState(): Promise<CanvasState | null> {
+  if (isOneTruthBootEnabled()) {
+    return loadStateFromKernel();
+  }
+  return loadStateFromJson();
 }
 
 export async function saveState(state: CanvasState): Promise<void> {
@@ -264,5 +283,18 @@ export async function saveState(state: CanvasState): Promise<void> {
     }
   } catch {
     // Non-fatal: DB unavailable in test environment or during first boot before migration
+  }
+
+  // D1 dual-write: accumulate Kernel parity while JSON remains authoritative-for-boot.
+  try {
+    await syncCanvasStateToKernel({
+      tiles: state.tiles,
+      viewport: state.viewport,
+    });
+  } catch (err) {
+    console.warn(
+      "[canvas-persistence] Kernel parity sync failed (non-fatal):",
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }

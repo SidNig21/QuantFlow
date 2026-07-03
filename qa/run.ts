@@ -161,6 +161,15 @@ const checks: Check[] = [
       return runStormCheck();
     },
   },
+  {
+    name: "one-truth-boot",
+    description:
+      "D1 boot parity: JSON-authoritative load == Kernel boot (QF_ONE_TRUTH=1) after dual-write",
+    async run() {
+      const { runOneTruthBootCheck } = await import("./lib/one-truth-boot");
+      return runOneTruthBootCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));

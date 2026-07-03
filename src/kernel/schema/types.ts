@@ -371,6 +371,7 @@ export type KernelCommandType =
   | 'kernel.tile.rename'
   | 'kernel.tile.status_update'
   | 'kernel.tile.remove'
+  | 'kernel.tile.layout_sync'
   | 'kernel.tile_extension.set'
   | 'kernel.canvas.settings.set'
   | 'kernel.connection.create'

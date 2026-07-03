@@ -22,6 +22,7 @@ export function handleTileCommand(
     case 'kernel.tile.rename': return tileRename(db, payload);
     case 'kernel.tile.status_update': return tileStatusUpdate(db, payload);
     case 'kernel.tile.remove': return tileRemove(db, payload);
+    case 'kernel.tile.layout_sync': return tileLayoutSync(db, payload);
     default: return { ok: false, error: `Unhandled tile command: ${type}` };
   }
 }
@@ -126,6 +127,57 @@ function tileStatusUpdate(db: KernelDB, payload: Record<string, unknown>): Comma
       .run(status, Date.now(), id);
     if (info.changes === 0) return { ok: false, error: `tile.status_update: tile not found: ${id}` };
     emitKernelEvent({ kind: 'tile.status_updated', tileId: id, data: { status } });
+    return { ok: true, id };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Geometry + display title only — never touches status, tile_kind, or workflow_id. */
+function tileLayoutSync(db: KernelDB, payload: Record<string, unknown>): CommandResult {
+  const id = payload['id'] as string | undefined;
+  if (!id) return { ok: false, error: 'tile.layout_sync: id required' };
+
+  const setParts: string[] = ['updated_at = ?'];
+  const setVals: unknown[] = [Date.now()];
+
+  if ('x' in payload) {
+    setParts.push('x = ?');
+    setVals.push(Number(payload['x'] ?? 0));
+  }
+  if ('y' in payload) {
+    setParts.push('y = ?');
+    setVals.push(Number(payload['y'] ?? 0));
+  }
+  if ('width' in payload) {
+    setParts.push('width = ?');
+    setVals.push(Number(payload['width'] ?? 320));
+  }
+  if ('height' in payload) {
+    setParts.push('height = ?');
+    setVals.push(Number(payload['height'] ?? 240));
+  }
+  if ('zIndex' in payload) {
+    setParts.push('z_index = ?');
+    setVals.push(Number(payload['zIndex'] ?? 0));
+  }
+  if ('displayName' in payload) {
+    const displayName = payload['displayName'] as string | undefined;
+    if (!displayName?.trim()) {
+      return { ok: false, error: 'tile.layout_sync: displayName must be a non-empty string' };
+    }
+    setParts.push('display_name = ?');
+    setVals.push(displayName);
+  }
+
+  if (setParts.length === 1) {
+    return { ok: false, error: 'tile.layout_sync: at least one layout field required' };
+  }
+
+  try {
+    setVals.push(id);
+    const info = db.prepare(`UPDATE tiles SET ${setParts.join(', ')} WHERE id = ?`).run(...setVals);
+    if (info.changes === 0) return { ok: false, error: `tile.layout_sync: tile not found: ${id}` };
     return { ok: true, id };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };

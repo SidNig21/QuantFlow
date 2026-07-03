@@ -125,13 +125,6 @@ function collectTileExtensionUpdates(
   const updates: Partial<Record<TileExtensionPayloadKey, string | null>> = {};
   for (const key of Object.keys(TILE_EXTENSION_COLUMNS) as TileExtensionPayloadKey[]) {
     if (!(key in payload)) continue;
-    const normalized = normalizeOptionalString(payload[key]);
-    if (normalized === undefined && payload[key] !== null) {
-      return { updates, error: `tile_extension.set: ${key} must be a string or null` };
-    }
-    if (key === 'canvasType' && normalized != null && !VALID_CANVAS_TYPES.has(normalized)) {
-      return { updates, error: `tile_extension.set: invalid canvasType: ${normalized}` };
-    }
     if (key === 'extraJson') {
       if (payload[key] === null) {
         updates.extraJson = '{}';
@@ -141,6 +134,13 @@ function collectTileExtensionUpdates(
         return { updates, error: 'tile_extension.set: extraJson must be an object or null' };
       }
       continue;
+    }
+    const normalized = normalizeOptionalString(payload[key]);
+    if (normalized === undefined && payload[key] !== null) {
+      return { updates, error: `tile_extension.set: ${key} must be a string or null` };
+    }
+    if (key === 'canvasType' && normalized != null && !VALID_CANVAS_TYPES.has(normalized)) {
+      return { updates, error: `tile_extension.set: invalid canvasType: ${normalized}` };
     }
     updates[key] = normalized ?? null;
   }
