@@ -312,7 +312,8 @@ describe("cross-backend: reconnectSession defaults correctly", () => {
     expect(error!.message).not.toContain("tmux session");
   });
 
-  test("session with missing metadata defaults to tmux backend", async () => {
+  // Native Windows has no tmux binary; the tmux fall-through path is POSIX-only.
+  test.skipIf(process.platform === "win32")("session with missing metadata defaults to tmux backend", async () => {
     // No metadata on disk — legacy session.  Should default to tmux.
     const { reconnectSession } = await import("./pty");
     let error: Error | null = null;
