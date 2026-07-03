@@ -1,0 +1,17 @@
+{
+  "name": "quantflow-agentos-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "WSL-side AgentOS host for QuantFlow — localhost HTTP bridge",
+  "main": "host.js",
+  "scripts": {
+    "start": "node host.js"
+  },
+  "dependencies": {
+    "@agentos-software/opencode": "0.2.1",
+    "@agentos-software/pi": "0.2.1",
+    "@rivet-dev/agentos-core": "0.2.4",
+    "zod": "4.4.3"
+  }
+}

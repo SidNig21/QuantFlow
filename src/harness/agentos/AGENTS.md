@@ -1,8 +1,7 @@
 # src/harness/agentos — Agent Guide
 
-AgentOS harness-of-record adapter (P5). **Sim-first** in this repo: production
-deps (`@rivet-dev/agentos-core`) live in the WSL **host process** (next chunk),
-not here.
+AgentOS harness-of-record adapter (P5). Production deps (`@rivet-dev/agentos-core`)
+live in the WSL **host process** (`tools/agentos-host/`), not in this repo root.
 
 ## Purpose
 
@@ -10,13 +9,16 @@ not here.
 - Translate ACP `session/update` events → milestone `ReceiptDraft`s only.
 - Bridge toolkit `approval-request` and ACP `onPermissionRequest` through the
   same injected `ApprovalGate` (host wires to Kernel checkpoint + `human_decision`).
-- Expose `AgentOsTransport` — the localhost JSON-RPC seam the host implements.
+- Expose `AgentOsTransport` — the localhost HTTP/SSE seam the WSL host implements.
 
 ## Ownership
 
 | File | Role |
 | --- | --- |
 | `transport.ts` | `AgentOsTransport` interface (createSession, prompt, events, permission, readFile, dispose, health) |
+| `http-transport.ts` | Windows-side HTTP + SSE client (`createHttpAgentOsTransport`) |
+| `host-lifecycle.ts` | WSL spawn, health poll, stop (`startAgentOsHost` / `stopAgentOsHost`) |
+| `credential-order.ts` | Credential precedence helper for live runs |
 | `translator.ts` | Pure ACP → ReceiptDraft mapping; milestones only |
 | `approval-gate.ts` | `ApprovalGate` types + `createSimApprovalGate` for tests |
 | `sim-transport.ts` | Deterministic replay transport (CI / qa) |
@@ -41,22 +43,23 @@ not here.
 ## Version pin policy
 
 AgentOS is **v0.2.x pre-1.0**. All AgentOS API shapes stay behind `AgentOsTransport`
-so npm churn is contained in the WSL host process.
+and the WSL host package (`tools/agentos-host/package.json` exact pins).
 
 ## Verification
 
 ```bash
 bun test src/harness/agentos
 bun qa/run.ts agentos-atom
+bun qa/run.ts agentos-live    # non-blocking; SKIP without credential
 bun qa/run.ts runtime-fence
 bun qa/run.ts kill-switch
 ```
 
-## Host process (next chunk)
+## Host process
 
-Thin Node process in WSL: `AgentOs.create({ software, toolKits })`, localhost
-HTTP/JSON-RPC, toolKit bridge (`receipt-emit`, `artifact-put`, `approval-request`).
-Electron main ↔ host same pattern as herdr/Eve.
+WSL sidecar: `tools/agentos-host/host.js` — see `tools/agentos-host/AGENTS.md`.
+Electron main ↔ host over localhost (same pattern as herdr). Lifecycle:
+`startAgentOsHost()` spawns `wsl -e bash -lc "cd …/tools/agentos-host && node host.js"`.
 
 ## Child DOX Index
 

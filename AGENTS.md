@@ -152,6 +152,7 @@ src/main/conductor/AGENTS.md     ← in-process planner; native Kernel tools onl
 src/harness/AGENTS.md            ← worker/runtime adapter boundary
 run-templates/AGENTS.md          ← v4 R6 saved run configs; config only
 tools/quantflow-mcp/AGENTS.md    ← external adapter interface
+tools/agentos-host/AGENTS.md     ← WSL AgentOS sidecar host (P5.B)
 src/vault/AGENTS.md              ← knowledge mirror; OKF exports
 ```
 

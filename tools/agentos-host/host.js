@@ -1,0 +1,367 @@
+/**
+ * QuantFlow AgentOS host — WSL-only sidecar.
+ * Exposes localhost HTTP + SSE matching src/harness/agentos/transport.ts.
+ * Credentials read from inherited env at session create; never logged.
+ */
+import http from "node:http";
+import { randomUUID } from "node:crypto";
+import { AgentOs, toolKit, hostTool } from "@rivet-dev/agentos-core";
+import pi from "@agentos-software/pi";
+import opencode from "@agentos-software/opencode";
+import { z } from "zod";
+
+const HOST = process.env.AGENTOS_HOST_BIND ?? "0.0.0.0";
+const PORT = Number.parseInt(process.env.AGENTOS_HOST_PORT ?? "7430", 10);
+const PERMISSION_TIMEOUT_MS = 120_000;
+
+/** @type {import('@rivet-dev/agentos-core').AgentOs | null} */
+let vm = null;
+/** @type {Promise<import('@rivet-dev/agentos-core').AgentOs> | null} */
+let vmInitPromise = null;
+
+/** @type {Map<string, { subscribers: Set<import('node:http').ServerResponse>, software: string }>} */
+const sessions = new Map();
+
+/**
+ * @type {Map<string, { sessionId: string, kind: 'toolkit' | 'acp', resolve: (approved: boolean) => void, timer: NodeJS.Timeout }>}
+ */
+const pendingPermissions = new Map();
+
+/** @type {string | null} */
+let activePromptSessionId = null;
+
+function resolveSoftwareAndEnv() {
+  const opencodeKey =
+    (process.env.OPENCODE_API_KEY ?? process.env.OPENCODE_ZEN_API_KEY ?? "").trim();
+  if (opencodeKey) {
+    // OpenCode Zen via pi's custom-provider mechanism. The `opencode` AgentOS
+    // software cannot be used: its bundled ACP adapter hardcodes an Anthropic
+    // catalog and ignores OPENCODE_CONFIG_CONTENT for provider selection
+    // (verified 2026-07-03). Instead we register a `zen` provider in pi's
+    // ~/.pi/agent/models.json inside the VM (written by piVmFiles below) and
+    // pass only OPENCODE_API_KEY as session env.
+    const model = (process.env.AGENTOS_MODEL ?? "big-pickle").trim();
+    return {
+      software: "pi",
+      env: { OPENCODE_API_KEY: opencodeKey },
+      piVmFiles: buildZenPiFiles(model),
+    };
+  }
+  const openrouterKey = (process.env.OPENROUTER_API_KEY ?? "").trim();
+  if (openrouterKey) {
+    return {
+      software: "pi",
+      env: {
+        OPENROUTER_API_KEY: openrouterKey,
+        ANTHROPIC_BASE_URL: "https://openrouter.ai/api",
+        ANTHROPIC_API_KEY: openrouterKey,
+      },
+    };
+  }
+  const anthropicKey = (process.env.ANTHROPIC_API_KEY ?? "").trim();
+  if (anthropicKey) {
+    return { software: "pi", env: { ANTHROPIC_API_KEY: anthropicKey } };
+  }
+  throw new Error(
+    "No AgentOS credential in environment (OPENCODE_API_KEY, OPENROUTER_API_KEY, or ANTHROPIC_API_KEY)",
+  );
+}
+
+/** pi config files written into the VM for the OpenCode Zen provider. */
+function buildZenPiFiles(model) {
+  const modelsJson = JSON.stringify({
+    providers: {
+      zen: {
+        baseUrl: "https://opencode.ai/zen/v1",
+        apiKey: "OPENCODE_API_KEY",
+        api: "openai-completions",
+        models: [
+          { id: model, name: `OpenCode Zen ${model}`, contextWindow: 128000, maxTokens: 8192 },
+        ],
+      },
+    },
+  });
+  const settingsJson = JSON.stringify({ defaultProvider: "zen", defaultModel: model });
+  const files = [];
+  for (const home of ["/root", "/home/agentos"]) {
+    files.push({ path: `${home}/.pi/agent/models.json`, content: modelsJson });
+    files.push({ path: `${home}/.pi/agent/settings.json`, content: settingsJson });
+  }
+  return files;
+}
+
+async function ensureVm() {
+  if (vm) return vm;
+  if (!vmInitPromise) {
+    vmInitPromise = AgentOs.create({
+      software: [pi, opencode],
+      toolKits: [buildQuantflowKit()],
+    }).then((instance) => {
+      vm = instance;
+      return instance;
+    });
+  }
+  return vmInitPromise;
+}
+
+function buildQuantflowKit() {
+  return toolKit({
+    name: "quantflow",
+    description: "QuantFlow kernel bridge — receipt emit and operator approval.",
+    tools: {
+      "receipt-emit": hostTool({
+        description: "Record a receipt milestone in the QuantFlow kernel.",
+        inputSchema: z.object({
+          kind: z.string(),
+          detail: z.string(),
+        }),
+        execute: ({ kind, detail }) => ({ ok: true, kind, detail }),
+      }),
+      "approval-request": hostTool({
+        description: "Ask the operator for approval before a sensitive action. Blocks until answered.",
+        inputSchema: z.object({
+          action: z.string(),
+        }),
+        timeout: PERMISSION_TIMEOUT_MS,
+        execute: async ({ action }) => {
+          const sessionId = activePromptSessionId;
+          if (!sessionId) {
+            throw new Error("approval-request outside active session prompt");
+          }
+          const requestId = randomUUID();
+          emitPermissionRequest(sessionId, {
+            requestId,
+            action,
+            source: "toolkit",
+          });
+          const approved = await waitForPermission(sessionId, requestId, "toolkit");
+          return { approved, action };
+        },
+      }),
+    },
+  });
+}
+
+function waitForPermission(sessionId, requestId, kind) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingPermissions.delete(requestId);
+      reject(new Error(`permission timeout: ${requestId}`));
+    }, PERMISSION_TIMEOUT_MS);
+    pendingPermissions.set(requestId, { sessionId, kind, resolve, timer });
+  });
+}
+
+async function fulfillPermission(sessionId, requestId, approved) {
+  const entry = pendingPermissions.get(requestId);
+  if (!entry || entry.sessionId !== sessionId) {
+    return false;
+  }
+  clearTimeout(entry.timer);
+  pendingPermissions.delete(requestId);
+  if (entry.kind === "acp" && vm) {
+    await vm.respondPermission(sessionId, requestId, approved ? "once" : "reject");
+  }
+  entry.resolve(approved);
+  return true;
+}
+
+function emitSse(res, payload) {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+function broadcastSession(sessionId, payload) {
+  const session = sessions.get(sessionId);
+  if (!session) return;
+  for (const res of session.subscribers) {
+    try {
+      emitSse(res, payload);
+    } catch {
+      session.subscribers.delete(res);
+    }
+  }
+}
+
+function emitPermissionRequest(sessionId, request) {
+  broadcastSession(sessionId, {
+    kind: "permission-request",
+    requestId: request.requestId,
+    action: request.action,
+    source: request.source ?? "acp",
+    toolCallId: request.toolCallId ?? null,
+    raw: request.raw ?? null,
+  });
+}
+
+function wireSessionHandlers(instance, sessionId) {
+  instance.onSessionEvent(sessionId, (event) => {
+    broadcastSession(sessionId, { kind: "session-event", event });
+  });
+
+  instance.onPermissionRequest(sessionId, (request) => {
+    const requestId = request.permissionId;
+    emitPermissionRequest(sessionId, {
+      requestId,
+      action: request.description ?? "acp permission",
+      source: "acp",
+      raw: request,
+    });
+    waitForPermission(sessionId, requestId, "acp").catch(() => {
+      if (vm) {
+        vm.respondPermission(sessionId, requestId, "reject").catch(() => {});
+      }
+    });
+  });
+}
+
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const text = Buffer.concat(chunks).toString("utf8");
+  if (!text.trim()) return {};
+  return JSON.parse(text);
+}
+
+function sendJson(res, status, body) {
+  const payload = JSON.stringify(body);
+  res.writeHead(status, {
+    "content-type": "application/json",
+    "content-length": Buffer.byteLength(payload),
+  });
+  res.end(payload);
+}
+
+async function handleRequest(req, res) {
+  const url = new URL(req.url ?? "/", `http://${HOST}:${PORT}`);
+  const path = url.pathname;
+
+  try {
+    if (req.method === "GET" && path === "/health") {
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/dispose") {
+      if (vm) {
+        await vm.dispose();
+        vm = null;
+        vmInitPromise = null;
+      }
+      sessions.clear();
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (req.method === "GET" && path === "/file") {
+      const filePath = url.searchParams.get("path");
+      if (!filePath) {
+        sendJson(res, 400, { error: "path query required" });
+        return;
+      }
+      const instance = await ensureVm();
+      const raw = await instance.readFile(filePath);
+      const buf = Buffer.from(raw);
+      res.writeHead(200, {
+        "content-type": "application/octet-stream",
+        "content-length": buf.length,
+      });
+      res.end(buf);
+      return;
+    }
+
+    if (req.method === "POST" && path === "/session") {
+      const body = await readJsonBody(req);
+      const picked = resolveSoftwareAndEnv();
+      const instance = await ensureVm();
+      if (picked.piVmFiles) {
+        for (const file of picked.piVmFiles) {
+          try {
+            await instance.writeFile(file.path, file.content);
+          } catch (err) {
+            log(`writeFile ${file.path} failed: ${err?.message ?? err}`);
+          }
+        }
+      }
+      const { sessionId } = await instance.createSession(picked.software, {
+        env: picked.env,
+      });
+      sessions.set(sessionId, { subscribers: new Set(), software: picked.software });
+      wireSessionHandlers(instance, sessionId);
+      sendJson(res, 200, { sessionId, software: picked.software });
+      return;
+    }
+
+    const sessionMatch = path.match(/^\/session\/([^/]+)\/(prompt|permission|events)$/);
+    if (sessionMatch) {
+      const sessionId = decodeURIComponent(sessionMatch[1]);
+      const action = sessionMatch[2];
+
+      if (!sessions.has(sessionId)) {
+        sendJson(res, 404, { error: "session not found" });
+        return;
+      }
+
+      if (action === "events" && req.method === "GET") {
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+        });
+        res.write(": connected\n\n");
+        const session = sessions.get(sessionId);
+        session.subscribers.add(res);
+        req.on("close", () => {
+          session.subscribers.delete(res);
+        });
+        return;
+      }
+
+      if (action === "prompt" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const text = typeof body.text === "string" ? body.text : "";
+        const instance = await ensureVm();
+        activePromptSessionId = sessionId;
+        try {
+          const result = await instance.prompt(sessionId, text);
+          sendJson(res, 200, {
+            ok: true,
+            text: result?.text ?? "",
+            response: result?.response ?? null,
+          });
+        } finally {
+          activePromptSessionId = null;
+        }
+        return;
+      }
+
+      if (action === "permission" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const requestId = typeof body.requestId === "string" ? body.requestId : "";
+        const approved = body.approved === true;
+        if (!requestId) {
+          sendJson(res, 400, { error: "requestId required" });
+          return;
+        }
+        const ok = await fulfillPermission(sessionId, requestId, approved);
+        sendJson(res, ok ? 200 : 404, { ok });
+        return;
+      }
+    }
+
+    sendJson(res, 404, { error: "not found" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    sendJson(res, 500, { error: message });
+  }
+}
+
+const server = http.createServer((req, res) => {
+  handleRequest(req, res).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    sendJson(res, 500, { error: message });
+  });
+});
+
+server.listen(PORT, HOST, () => {
+  console.log(`agentos-host listening on http://${HOST}:${PORT}`);
+});

@@ -264,6 +264,15 @@ const checks: Check[] = [
       return runAgentOsAtomCheck();
     },
   },
+  {
+    name: "agentos-live",
+    description:
+      "P5.B: live AgentOS via WSL host + http-transport (non-blocking; SKIP without credential)",
+    async run() {
+      const { runAgentOsLiveCheck } = await import("./lib/agentos-live");
+      return runAgentOsLiveCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));

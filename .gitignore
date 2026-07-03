@@ -32,3 +32,6 @@ assets/qubic-illustrations/
 # QA evidence is regenerable; track commands + baselines, not raw dumps
 qa/*.png
 qa/*.log
+
+# WSL AgentOS host deps (installed in WSL via npm)
+tools/agentos-host/node_modules/

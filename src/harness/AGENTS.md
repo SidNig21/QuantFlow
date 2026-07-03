@@ -106,7 +106,7 @@ After meaningful changes: update this file if local rules or owned scope changed
 - Registered harness kinds now include `mock`, `eve-harness`, and `agentos` alongside the shell adapters.
 - `mock/index.ts` is deterministic and CI-safe: it records `send`, writes one real artifact under `artifactRoot`, and returns a receipt draft plus artifact file path.
 - `eve/index.ts` is a minimal HTTP translator for local `quantflow-eve`: open session, send instruction, read one workspace artifact, return one draft plus path. Durability, recovery, subagents, and HITL are out of scope.
-- `agentos/index.ts` is the AgentOS harness-of-record adapter (P5): injected `AgentOsTransport`, ACP event translator, approval gate bridge. WSL host process + `@rivet-dev/agentos-core` deps are the **next chunk** — not registered in this repo's package.json. Pi remains intentionally NOT registered (no stable Pi programmatic contract); AgentOS may use `pi` software in the host when `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` is set.
+- `agentos/index.ts` is the AgentOS harness-of-record adapter (P5): injected `AgentOsTransport` (`http-transport.ts` for live WSL host, `sim-transport.ts` for CI), ACP event translator, approval gate bridge. WSL host: `tools/agentos-host/` + `host-lifecycle.ts`. Pi remains intentionally NOT registered (no stable Pi programmatic contract); AgentOS may use `pi` or `opencode` software in the host per credential order.
 - Harness adapters still never call `kernel.*`; callers post drafts through Kernel commands.
 
 ## v4 R2 Addendum
