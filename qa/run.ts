@@ -162,6 +162,15 @@ const checks: Check[] = [
     },
   },
   {
+    name: "pty-flood",
+    description:
+      "E3/PF2 B7: 5000 pty:data chunks → 0 canvas projection churn; O(1) cwd milestones",
+    async run() {
+      const { runPtyFloodCheck } = await import("./lib/pty-flood-check");
+      return runPtyFloodCheck();
+    },
+  },
+  {
     name: "one-truth-boot",
     description:
       "D1 boot parity: JSON-authoritative load == Kernel boot (QF_ONE_TRUTH=1) after dual-write",

@@ -155,6 +155,8 @@ function forwardPtyData(
   senderWebContentsId: number | undefined,
   data: Buffer,
 ): void {
+  // E2/PF2 fence: stream bytes → terminal webview IPC only (+ PF0 byte counter).
+  // No pty:status-changed, canvas save, or Kernel work per chunk.
   ingestPtyStreamBytes(sessionId, data);
   if (!shouldBatchWindowsPowerShellOutput(sessionId)) {
     sendToSender(senderWebContentsId, "pty:data", {
@@ -370,6 +372,7 @@ function attachClient(
 
   disposables.push(
     ptyProcess.onData((data: string) => {
+      // E2: raw tmux attach stream — terminal webview only (see forwardPtyData).
       sendToSender(
         senderWebContentsId,
         "pty:data",

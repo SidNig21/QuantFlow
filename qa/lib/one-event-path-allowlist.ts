@@ -23,7 +23,7 @@ export const DEPRECATED_BUS_LISTENER_ALLOWLIST: OneEventPathAllowlistEntry[] = [
     file: "quantflow-electron/src/windows/shell/src/renderer.js",
     bus: "pty:exit",
     reason:
-      "Harness lifecycle: close term tile on session exit (E2 milestone fence deferred)",
+      "Harness lifecycle milestone: session exit → closeCanvasTile → kernel.tile.remove (E2)",
   },
   {
     file: "quantflow-electron/src/windows/shell/src/renderer.js",

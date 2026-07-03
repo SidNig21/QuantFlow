@@ -19,6 +19,10 @@ import { ensureRouteHandle } from "./tile-route-handles.js";
 import { getRoleStartupWrites } from "./role-startup.js";
 import { renderStateCardBack } from "./tile-state-card.js";
 import { isOneTruthEnabled } from "./canvas-truth.js";
+import {
+	applyPtyCwdMilestone,
+	createPtyCwdCoalescer,
+} from "./pty-canvas-fence.js";
 
 /**
  * Tile lifecycle manager: creation, deletion, persistence, webview
@@ -48,6 +52,24 @@ export function createTileManager({
 	const tileDOMs = new Map();
 	let saveTimer = null;
 	let focusedTileId = null;
+
+	// E2: cwd milestones coalesced — never per pty:data chunk.
+	const ptyCwdCoalescer = createPtyCwdCoalescer({
+		onFlush: ({ tileId, cwd }) => {
+			const currentTile = getTile(tileId);
+			const currentDom = tileDOMs.get(tileId);
+			if (!currentTile || !currentDom) return;
+			applyPtyCwdMilestone(currentTile, cwd, {
+				ensureRouteHandle: (t) => ensureRouteHandle(t, tiles),
+				updateTileTitle: () =>
+					updateTileTitle(currentDom, currentTile),
+				saveCanvasDebounced: () => saveCanvasDebounced(),
+				registerTerminalTileSession: () =>
+					registerTerminalTileSession(currentTile),
+				onTerminalCwdChanged: (c) => onTerminalCwdChanged?.(c),
+			});
+		},
+	});
 
 	// Viewport read-only accessor for tile-interactions
 	const viewport = {
@@ -434,16 +456,8 @@ export function createTileManager({
 			}
 			if (event.channel === "pty-cwd-changed") {
 				const cwd = event.args[1];
-				if (cwd && cwd !== currentTile.autoTitle) {
-					currentTile.cwd = cwd;
-					currentTile.autoTitle = cwd;
-					ensureRouteHandle(currentTile, tiles);
-					updateTileTitle(currentDom, currentTile);
-					saveCanvasDebounced();
-					registerTerminalTileSession(currentTile);
-					if (onTerminalCwdChanged) {
-						onTerminalCwdChanged(cwd);
-					}
+				if (cwd) {
+					ptyCwdCoalescer.schedule(currentTile.id, cwd);
 				}
 			}
 		});

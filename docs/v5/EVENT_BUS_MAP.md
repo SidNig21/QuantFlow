@@ -76,5 +76,18 @@ Kernel mutation → emitKernelEvent → webContents kernel:event
 ```bash
 bun qa/run.ts one-event-path
 bun qa/run.ts storm
+bun qa/run.ts pty-flood
 bun qa/run.ts taxonomy-sync
 ```
+
+## Appendix B — E2 stream consumer audit (PTY + status side-channels)
+
+| Path | Frequency class | Canvas effect today | Disposition |
+| --- | --- | --- | --- |
+| `pty:data` → `universal.ts` → terminal webview `onPtyData` | High (per chunk; 16ms batch on Win PowerShell sidecar only) | xterm write only — **no shell renderer subscriber** | **Keep fenced** — `processPtyDataForCanvas` is explicit no-op |
+| `pty:data` → `pty.ts` `scheduleForegroundCheck` → `pty:status-changed` | Debounced 500ms on fg process change (skipped Win sidecar) | **None** — `onPtyStatusChanged` exported but **not wired** in shell renderer | **Keep** — no canvas leak |
+| Terminal OSC 7 → `notifyCwdChanged` → `pty-cwd-changed` host IPC | Milestone (precmd / cd) | `autoTitle`, tile title DOM, debounced canvas save | **Coalesce (E2)** — `createPtyCwdCoalescer` 200ms; no `syncTileList`/`updateCables` |
+| `pty:exit` → shell `onPtyExit` | Milestone (session exit) | `closeCanvasTile` → `kernel.tile.remove` + local teardown | **Keep** — legitimate milestone; Kernel path verified (D3) |
+| `pty-session-id` / `pty-start-failed` / `pty-restore-stale` webview IPC | Milestone | Status/title/session hooks; save on fail | **Keep** — not stream-derived |
+| Watchtower `syncTerminalTileStatuses` | Low (panel refresh) | `ptyStatus` edge-trigger; batch `syncTileList`+`updateCables` only on change | **Keep** — extracted `applyTerminalStatusMilestones`; not tied to stdout |
+| `herdr:status-changed` → shell renderer | Harness ping | Badge ephemera + `kernel.worker.status_update` | **Keep (E1)** — no `syncTileList`/`updateCables`/projection refresh |

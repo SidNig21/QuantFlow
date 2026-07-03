@@ -7,6 +7,7 @@ import {
 import type { ReplayMessage } from "@collab/shared/replay-types";
 
 // -- PTY listener sets (terminal) ------------------------------------
+// E2/PF2: pty:data is terminal-surface only — never forward to shell canvas.
 
 type PtyDataCallback = (
   payload: { sessionId: string; data: Uint8Array },

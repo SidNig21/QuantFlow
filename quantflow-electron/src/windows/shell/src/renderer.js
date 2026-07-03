@@ -108,6 +108,10 @@ import {
 	createDebouncedProjectionRefresh,
 	routeKernelEvent,
 } from "./renderer-event-router.js";
+import {
+	applyTerminalStatusMilestones,
+	handlePtyExitMilestone,
+} from "./pty-canvas-fence.js";
 import { createProjectionReader } from "./projection.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
@@ -684,22 +688,15 @@ async function init() {
 	}
 
 	function syncTerminalTileStatuses(items) {
-		if (!Array.isArray(items)) return;
-		let changed = false;
-		for (const item of items) {
-			const tile = item?.tileId ? getTile(item.tileId) : null;
-			if (!tile || tile.type !== "term") continue;
-			const next = item.status || "";
-			if (tile.ptyStatus === next) continue;
-			tile.ptyStatus = next;
-			const dom = tileManager.getTileDOMs().get(tile.id);
-			if (dom) updateTileTitle(dom, tile);
-			changed = true;
-		}
-		if (changed) {
-			syncTileList();
-			updateCables();
-		}
+		applyTerminalStatusMilestones(items, {
+			getTile,
+			getTileDOM: (id) => tileManager.getTileDOMs().get(id),
+			updateTileTitle,
+			onBatchChanged: () => {
+				syncTileList();
+				updateCables();
+			},
+		});
 	}
 
 	const tileListEntryFields = [
@@ -3304,17 +3301,11 @@ async function init() {
 
 	// -- PTY lifecycle forwarding --
 
+	// E2 milestone: harness session exit → Kernel tile removal via closeCanvasTile.
 	window.shellApi.onPtyExit((payload) => {
-		for (const [id] of tileManager.getTileDOMs()) {
-			const tile = getTile(id);
-			if (
-				tile?.type === "term" &&
-				tile.ptySessionId === payload.sessionId
-			) {
-				tileManager.closeCanvasTile(id);
-				break;
-			}
-		}
+		handlePtyExitMilestone(payload, tiles, (id) => {
+			void tileManager.closeCanvasTile(id);
+		});
 	});
 
 	// -- Tile list init + click-to-navigate --

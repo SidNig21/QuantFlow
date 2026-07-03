@@ -59,6 +59,13 @@ Parallel buses (`runtime.db` events, `herdr:status-changed`, renderer
 `docs/v5/EVENT_BUS_MAP.md`. Lint: `bun qa/run.ts one-event-path` — allowlist in
 `qa/lib/one-event-path-allowlist.ts`.
 
+### Stage E2 — PTY stream / canvas fence (shell)
+
+Raw PTY bytes (`pty:data`) stay on the terminal webview preload (`universal.ts`);
+the shell renderer never subscribes to `pty:data`. Milestone handlers live in
+`pty-canvas-fence.js` (cwd coalesce, status edge-trigger, exit →
+`closeCanvasTile` → `kernel.tile.remove`). Lint: `bun qa/run.ts pty-flood`.
+
 ## What This Subtree Must Not Do
 
 - Write canonical tile position, status, task, or receipt state to local renderer store only.
