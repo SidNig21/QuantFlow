@@ -210,6 +210,15 @@ const checks: Check[] = [
       return runDivergenceCheck();
     },
   },
+  {
+    name: "one-event-path",
+    description:
+      "E1: single kernel:event projection path; emitKernelEvent allowlist; runtime kinds disjoint from taxonomy",
+    async run() {
+      const { runOneEventPathCheck } = await import("./lib/one-event-path");
+      return runOneEventPathCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));

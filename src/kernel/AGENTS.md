@@ -9,7 +9,7 @@ All canonical state and the mutation/query boundary:
 - `schema/types.ts` — TypeScript interfaces for all canonical primitives.
 - `migrations/001-v3-baseline.sql` — SQLite schema DDL (v3 baseline).
 - `database.ts` — SQLite singleton; opens `kernel.db`, runs baseline migration. (Goal 2)
-- `events/index.ts` — EventEmitter event bus; forwards `KernelEventPayload` to subscribed WebContents. (Goal 2)
+- `events/index.ts` — EventEmitter event bus; forwards `KernelEventPayload` to subscribed WebContents. **E1:** sole `emitKernelEvent` / `kernel:event` fan-out; see `docs/v5/EVENT_BUS_MAP.md`.
 - `events/taxonomy.ts` — Frozen `KERNEL_EVENT_KINDS` + `KernelEventKind`; narrows payload `kind`. Synced with `docs/v4/EVENT_TAXONOMY.md` via `bun qa/run.ts taxonomy-sync`. (B4)
 - `commands/types.ts` — `CommandResult` interface. (Goal 2)
 - `commands/index.ts` — Command dispatcher; writes audit row to `commands` table, routes by prefix. (Goal 2)

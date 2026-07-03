@@ -24,7 +24,7 @@ Main process harness / runtime adapter boundary. Canonical task/tile/connection 
 | `runs-repo` | **K** | `orchestration-service` | `orchestration-service`, tests | Delete after orchestration → Kernel workflows |
 | `artifacts-repo` | **K** | (tests only in prod path) | tests | Kernel artifacts only; repo delete in PF3 |
 | `schemas-repo` | **R** | `ipc-runtime-state` | `ipc-runtime-state` | Keep — runtime payload validation registry |
-| `events-repo` | **E** | `envoy-*`, `workflow-service`, `herdr-*`, `ipc-runtime-state`, `ipc-herdr-spawn` | `ipc-runtime-state`, `envoy-task-service`, tests | Keep — derived audit/relay log |
+| `events-repo` | **E** | `envoy-*`, `workflow-service`, `herdr-*`, `ipc-runtime-state`, `ipc-herdr-spawn` | `ipc-runtime-state`, `envoy-task-service`, tests | Keep — derived audit/relay log; **E1:** kinds disjoint from `KERNEL_EVENT_KINDS`; map in `docs/v5/EVENT_BUS_MAP.md`; lint `bun qa/run.ts one-event-path` |
 | `status-repo` | **R** | `herdr-status-service`, `ipc-runtime-state` | `ipc-runtime-state`, `herdr-status-service` | Keep — pane status transitions |
 | `pty-sessions-repo` | **R** | `pty.ts`, `ipc-runtime-state` | `ipc-runtime-state`, `pty.ts` | Keep — PTY lifecycle mirror |
 | `tiles-runtime-repo` | **R** | `orchestration-service`, `ipc-orchestration` | `orchestration-service`, `diagnostics/probes`, `ipc-orchestration` | Keep — tile presence / last_seen |
@@ -37,6 +37,7 @@ R3c-b bridged task **mutations** to Kernel (`envoy-kernel-bridge.ts`; `task_id �
 ## Verification
 
 - `bun qa/run.ts connection-round-trip` (D4 gate)
+- `bun qa/run.ts one-event-path` (E1 event bus discipline)
 - `quantflow-electron`: `bun test src/main/canvas-one-truth.test.ts`
 
 ## Child DOX Index

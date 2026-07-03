@@ -3651,7 +3651,6 @@ async function init() {
 			tileId: tile.id,
 			status: mapHerdrStatusToWorker(status),
 		});
-		syncTileList();
 	});
 	for (const tile of tiles.filter((t) => t.herdrPaneId)) {
 		void window.shellApi.herdrLinkPane(tile.id, tile.herdrPaneId);

@@ -1,3 +1,9 @@
+/**
+ * NON-CANONICAL renderer-side event logs (Stage E1).
+ * operationalEvents + kernelEventLog feed Watchtower UI only — never drive
+ * canvas cache or projection. Canonical facts arrive via kernelApi.onEvent only.
+ */
+
 export function normalizeOperationalEvent(input = {}, now = Date.now()) {
 	const type = String(input.type ?? "event").trim() || "event";
 	const severity = ["info", "warn", "error"].includes(input.severity)

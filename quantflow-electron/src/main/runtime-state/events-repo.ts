@@ -1,3 +1,9 @@
+/**
+ * NON-CANONICAL runtime audit log (Stage E1).
+ * Append-only telemetry in runtime.db — not Kernel truth, not renderer projection.
+ * Kind strings must stay disjoint from KERNEL_EVENT_KINDS (see qa/run.ts one-event-path).
+ * Canonical canvas/workflow facts reach the renderer only via kernel:event.
+ */
 import { randomUUID } from "node:crypto";
 import { getDb } from "./database";
 import type { EventRow, EventFilter } from "./types";

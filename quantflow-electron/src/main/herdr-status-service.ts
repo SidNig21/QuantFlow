@@ -1,5 +1,8 @@
 /**
  * Gate 3: live herdr tile status from events.subscribe (main process).
+ * NON-CANONICAL harness telemetry (Stage E1): pushes herdr:status-changed IPC
+ * and appends herdr.agent_status to runtime events-repo. Renderer projection for
+ * worker status must follow kernel:event worker.* after kernel.worker.status_update.
  */
 
 import { HerdrEventSubscriber } from "./herdr-event-subscriber";

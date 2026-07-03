@@ -50,6 +50,15 @@ Kernel command already existed but was not called on one path stay always-on.
 Lint guard: `bun qa/run.ts canvas-cache-discipline` — allowlist in
 `qa/lib/canvas-cache-allowlist.ts`.
 
+### Stage E1 — one event path (shell)
+
+Canonical Kernel facts reach the shell renderer **only** via `kernelApi.onEvent`
+→ `routeKernelEvent` (`renderer-event-router.js`) → cache/projection handlers.
+Parallel buses (`runtime.db` events, `herdr:status-changed`, renderer
+`operationalEvents` / `kernelEventLog`) are audit or harness telemetry — see
+`docs/v5/EVENT_BUS_MAP.md`. Lint: `bun qa/run.ts one-event-path` — allowlist in
+`qa/lib/one-event-path-allowlist.ts`.
+
 ## What This Subtree Must Not Do
 
 - Write canonical tile position, status, task, or receipt state to local renderer store only.

@@ -1,3 +1,9 @@
+/**
+ * CANONICAL Kernel event path (Stage E1).
+ * emitKernelEvent is the sole fan-out for KERNEL_EVENT_KINDS → in-process
+ * listeners (onKernelEvent) and renderer IPC (kernel:event). No other module
+ * may send kernel:event or re-emit taxonomy kind strings.
+ */
 import { EventEmitter } from 'node:events';
 import type { WebContents } from 'electron';
 import { traceSync } from '../perf/trace';

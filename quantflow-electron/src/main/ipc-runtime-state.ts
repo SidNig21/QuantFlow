@@ -88,6 +88,7 @@ export function registerRuntimeStateHandlers(): void {
   );
 
   // ── Events ─────────────────────────────────────────────────────────────────
+  // NON-CANONICAL audit log (E1): append/list only — no push to renderer for projection.
 
   ipcMain.handle(
     "qf:runtime:events.append",
