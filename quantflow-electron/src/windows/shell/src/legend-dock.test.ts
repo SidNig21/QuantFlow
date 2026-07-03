@@ -35,6 +35,7 @@ describe("Legend v2 dock recipes", () => {
 			"hermes",
 			"claude",
 			"puffer",
+			"agentos",
 			"python",
 			"memory",
 		]);
@@ -44,6 +45,7 @@ describe("Legend v2 dock recipes", () => {
 			"Hermes",
 			"Claude Code",
 			"PufferLib worker",
+			"AgentOS Worker",
 			"Python script",
 			"Envoy memory",
 		]);
@@ -53,6 +55,7 @@ describe("Legend v2 dock recipes", () => {
 			"hermes",
 			"claude-worker",
 			"puffer",
+			"agentos",
 			"python",
 			"memory",
 		]);

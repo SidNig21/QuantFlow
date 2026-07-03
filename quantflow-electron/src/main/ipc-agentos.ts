@@ -3,6 +3,7 @@ import {
   listPendingAgentOsApprovals,
   resolveAgentOsApproval,
 } from "./agentos-approval";
+import { startAgentOsTask } from "./agentos-run";
 
 export function registerAgentOsHandlers(): void {
   ipcMain.handle("agentos:approvals", () => listPendingAgentOsApprovals());
@@ -16,6 +17,18 @@ export function registerAgentOsHandlers(): void {
       const resolved = resolveAgentOsApproval(requestId, approved);
       if (!resolved) return { ok: false, error: `unknown requestId: ${requestId}` };
       return { ok: true, requestId, approved };
+    },
+  );
+
+  ipcMain.handle(
+    "agentos:run",
+    (_event, payload: { tileId?: string; instruction?: string; workflowId?: string } = {}) => {
+      const tileId = typeof payload.tileId === "string" ? payload.tileId.trim() : "";
+      const instruction = typeof payload.instruction === "string" ? payload.instruction.trim() : "";
+      if (!tileId) return { ok: false, error: "tileId required" };
+      if (!instruction) return { ok: false, error: "instruction required" };
+      const workflowId = typeof payload.workflowId === "string" ? payload.workflowId : undefined;
+      return startAgentOsTask({ tileId, instruction, workflowId });
     },
   );
 }

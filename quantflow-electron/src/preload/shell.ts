@@ -553,6 +553,12 @@ contextBridge.exposeInMainWorld("shellApi", {
     approved: boolean;
   }): Promise<{ ok: boolean; requestId?: string; approved?: boolean; error?: string }> =>
     ipcRenderer.invoke("agentos:approve", params),
+  agentosRun: (params: {
+    tileId: string;
+    instruction: string;
+    workflowId?: string;
+  }): Promise<{ ok: boolean; started?: boolean; error?: string }> =>
+    ipcRenderer.invoke("agentos:run", params),
 
   // ── Run Workflow ──
   workflowSubmit: (params: {

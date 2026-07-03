@@ -2174,6 +2174,94 @@ html.platform-win #panel-viewer::before {
 	word-break: break-word;
 }
 
+.tile-state-card-approval {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px 0 4px;
+	border-bottom: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.tile-state-card-approval-prompt {
+	font-size: 11px;
+	opacity: 0.85;
+}
+
+.tile-state-card-approval-actions {
+	display: flex;
+	gap: 6px;
+}
+
+.tile-state-card-approval-btn {
+	font-size: 11px;
+	padding: 3px 10px;
+	border-radius: var(--r-button);
+	border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+	background: color-mix(in srgb, var(--fg) 6%, transparent);
+	color: var(--fg);
+	cursor: pointer;
+}
+
+.tile-state-card-approval-btn:hover {
+	background: color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.tile-state-card-approval-btn--approve {
+	border-color: color-mix(in srgb, var(--rail-agent, #4fc3ff) 50%, transparent);
+}
+
+.tile-state-card-timeline {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding-top: 6px;
+}
+
+.tile-state-card-timeline-heading {
+	font-size: 10px;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	opacity: 0.5;
+}
+
+.tile-state-card-timeline-empty {
+	font-size: 12px;
+	opacity: 0.6;
+}
+
+.tile-state-card-timeline-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.tile-state-card-receipt-row {
+	display: grid;
+	grid-template-columns: minmax(72px, 0.35fr) 1fr auto;
+	gap: 6px;
+	align-items: baseline;
+	font-size: 11px;
+	padding: 3px 0;
+	border-bottom: 1px solid color-mix(in srgb, var(--fg) 5%, transparent);
+}
+
+.tile-state-card-receipt-type {
+	opacity: 0.65;
+	text-transform: lowercase;
+}
+
+.tile-state-card-receipt-summary {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.tile-state-card-receipt-time {
+	opacity: 0.5;
+	font-size: 10px;
+	white-space: nowrap;
+}
+
 /* -- Conductor panel (Goal 5A) -- read-only planner surface */
 #conductor-panel {
 	position: fixed;

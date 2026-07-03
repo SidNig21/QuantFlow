@@ -18,18 +18,23 @@ describe("legend recipe role mapping", () => {
 			"utf8",
 		);
 
-		expect(source).toContain("requiresHerdrSpawn(role)");
-		expect(source).toContain("await shellApi.herdrSpawnRole");
-		expect(source).toContain("tile.terminalPending = true");
-		expect(source).toContain("Herdr spawn API is unavailable");
-		expect(source.indexOf("Herdr spawn API is unavailable"))
-			.toBeLessThan(source.indexOf("tileManager.createCanvasTile"));
-		expect(source.indexOf("await shellApi.herdrSpawnRole"))
-			.toBeLessThan(source.lastIndexOf("spawnTerminalWebview(tile, true)"));
-		expect(source).not.toContain("connectHerdrRoleTile");
+		const roleSpawnSource = source.slice(
+			0,
+			source.indexOf("export async function spawnAgentOsTileAt"),
+		);
+
+		expect(roleSpawnSource).toContain("requiresHerdrSpawn(role)");
+		expect(roleSpawnSource).toContain("await shellApi.herdrSpawnRole");
+		expect(roleSpawnSource).toContain("tile.terminalPending = true");
+		expect(roleSpawnSource).toContain("Herdr spawn API is unavailable");
+		expect(roleSpawnSource.indexOf("Herdr spawn API is unavailable"))
+			.toBeLessThan(roleSpawnSource.indexOf("tileManager.createCanvasTile"));
+		expect(roleSpawnSource.indexOf("await shellApi.herdrSpawnRole"))
+			.toBeLessThan(roleSpawnSource.lastIndexOf("spawnTerminalWebview(tile, true)"));
+		expect(roleSpawnSource).not.toContain("connectHerdrRoleTile");
 		// Mode-1 correction: no headless eve-harness fork in the UI spawn path.
-		expect(source).not.toContain("isEveHarness");
-		expect(source).not.toContain('ptyStatus = "idle"');
+		expect(roleSpawnSource).not.toContain("isEveHarness");
+		expect(roleSpawnSource).not.toContain('ptyStatus = "idle"');
 	});
 
 	test("renderer delegates role spawn to the shared module", () => {
@@ -42,7 +47,7 @@ describe("legend recipe role mapping", () => {
 			source.indexOf("function handleLegendRecipeActivate"),
 		);
 
-		expect(legendSpawn).toContain("await spawnRoleTileAt");
+		expect(legendSpawn).toMatch(/spawnAgentOsTileAt|await spawnRoleTileAt/);
 		expect(source).toContain('from "./role-tile-spawn.js"');
 	});
 
@@ -53,6 +58,7 @@ describe("legend recipe role mapping", () => {
 			hermes: "hermes",
 			claude: "claude-worker",
 			puffer: "puffer",
+			agentos: "agentos",
 			python: "python",
 			memory: "memory",
 		});

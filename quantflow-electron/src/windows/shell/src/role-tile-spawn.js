@@ -184,3 +184,95 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 
 	return tile;
 }
+
+/**
+ * Spawn an AgentOS worker tile — Kernel worker row + state-card back, no terminal webview.
+ * @param {object} deps
+ * @param {number} x
+ * @param {number} y
+ * @param {object} [options]
+ */
+export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
+	const {
+		tileManager,
+		generateId,
+		getTerminalSize = () => ({}),
+		shellApi,
+		updateRoleTileChrome,
+		onRoleSpawned,
+		onRoleSpawnFailed,
+		createRoleSpawnedEvent,
+		createRoleSpawnFailureEvent,
+		toasts,
+	} = deps;
+
+	const displayName = String(options.displayName ?? "AgentOS Worker").trim();
+	const size = options.size ?? getTerminalSize();
+	const tileId = options.id || generateId();
+	const kapi = kernelApiRef();
+
+	const tile = await tileManager.createCanvasTile("term", x, y, {
+		...size,
+		displayName,
+		id: tileId,
+		runtimeTarget: "agentos",
+		roleName: "AgentOS",
+		userTitle: displayName,
+	});
+
+	if (!tile) {
+		const message = `Kernel rejected tile.create for ${displayName}`;
+		onRoleSpawnFailed?.(createRoleSpawnFailureEvent?.({ id: "agentos", name: displayName }, message));
+		toasts?.show?.({ message, tone: "error" });
+		return null;
+	}
+
+	tile.runtimeTarget = "agentos";
+	tile.terminalPending = false;
+
+	if (kapi) {
+		let spawnResult;
+		try {
+			spawnResult = await kapi.sendCommand("kernel.worker.spawn", {
+				tileId: tile.id,
+				workflowId: options.workflowId ?? null,
+				roleName: "AgentOS",
+				runtimeTarget: "agentos",
+				harnessKind: "agentos",
+			});
+		} catch (err) {
+			spawnResult = { ok: false, error: err instanceof Error ? err.message : String(err) };
+		}
+		if (spawnResult && spawnResult.ok === false) {
+			const message = `Kernel rejected worker spawn for ${displayName}: ${spawnResult.error ?? "unknown error"}`;
+			tile.ptyStatus = "error";
+			tile.ptyError = message;
+			updateRoleTileChrome?.(tile);
+			tileManager.saveCanvasImmediate();
+			onRoleSpawnFailed?.(createRoleSpawnFailureEvent?.({ id: "agentos", name: displayName }, message));
+			toasts?.show?.({ message, tone: "error" });
+			return tile;
+		}
+	}
+
+	onRoleSpawned?.(createRoleSpawnedEvent?.(tile, { id: "agentos", name: displayName }));
+	updateRoleTileChrome?.(tile);
+	tileManager.saveCanvasImmediate();
+
+	if (!tileManager.isTileFlipped(tile.id)) {
+		tileManager.flipTile(tile.id);
+	}
+
+	try {
+		await shellApi?.agentosRun?.({
+			tileId: tile.id,
+			instruction: options.instruction,
+			workflowId: options.workflowId ?? undefined,
+		});
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		toasts?.show?.({ message: `AgentOS run failed to start: ${message}`, tone: "error" });
+	}
+
+	return tile;
+}

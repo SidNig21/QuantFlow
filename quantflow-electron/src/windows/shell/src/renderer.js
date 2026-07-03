@@ -92,7 +92,8 @@ import { formatRoleStartupEvent } from "./role-startup.js";
 import { createLegendDock, LEGEND_RECIPES } from "./legend-dock.js";
 import { createAddAgentForm } from "./add-agent-form.js";
 import { createWorkflowModal } from "./workflow-modal.js";
-import { spawnRoleTileAt as spawnRoleTileAtShared } from "./role-tile-spawn.js";
+import { spawnRoleTileAt as spawnRoleTileAtShared, spawnAgentOsTileAt } from "./role-tile-spawn.js";
+import { AGENTOS_DEFAULT_INSTRUCTION } from "../../../shared/agentos-instruction.js";
 import {
 	createFlowCubeLoadingMark,
 	createFlowCubeWatermark,
@@ -1704,10 +1705,30 @@ async function init() {
 	}
 
 	async function spawnLegendRecipeAt(recipeId, position) {
-		const roles = await window.shellApi.rolesList?.() ?? [];
-		const role = resolveLegendRecipeRole(recipeId, roles, legendRegistry.recipes);
 		const recipe = legendRegistry.recipes.find((entry) => entry.id === recipeId)
 			?? LEGEND_RECIPES.find((entry) => entry.id === recipeId);
+		if (recipeId === "agentos" || recipe?.runtimeTarget === "agentos") {
+			const tile = await spawnAgentOsTileAt({
+				tileManager,
+				generateId,
+				getTerminalSize,
+				shellApi: window.shellApi,
+				updateRoleTileChrome,
+				onRoleSpawned: (event) => operationalEvents.record(event),
+				onRoleSpawnFailed: (event) => operationalEvents.record(event),
+				createRoleSpawnedEvent,
+				createRoleSpawnFailureEvent,
+				toasts,
+			}, position.x, position.y, {
+				size: LEGEND_TILE_SIZE,
+				displayName: recipe?.name ?? "AgentOS Worker",
+				instruction: AGENTOS_DEFAULT_INSTRUCTION,
+			});
+			legendDock.updateEmptyHint();
+			return tile;
+		}
+		const roles = await window.shellApi.rolesList?.() ?? [];
+		const role = resolveLegendRecipeRole(recipeId, roles, legendRegistry.recipes);
 		if (!role) {
 			const message = `Legend recipe role not found: ${recipeId}`;
 			operationalEvents.record({
