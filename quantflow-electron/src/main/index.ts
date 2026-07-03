@@ -63,6 +63,7 @@ import { stopAllObsidianEnvoyMirrors } from "./obsidian-envoy-mirror";
 import { bootstrapHerdrRuntime } from "./herdr-runtime";
 import { stopHerdrStatusService } from "./herdr-status-service";
 import { disposeAgentOsService } from "./agentos-service";
+import { runAgentOsLoopProof } from "./agentos-loop-proof";
 
 const APP_NAME = "QuantFlow";
 const launchStartedAtMs = Date.now();
@@ -129,7 +130,11 @@ process.on("unhandledRejection", (reason) => {
   console.error("[crash] Unhandled rejection:", error);
 });
 
-if (import.meta.env.DEV) {
+// Proof-only: isolated Electron userData (QF_AGENTOS_LOOP_PROOF).
+const proofUserDataDir = process.env.QF_USER_DATA_DIR?.trim();
+if (proofUserDataDir) {
+  app.setPath("userData", proofUserDataDir);
+} else if (import.meta.env.DEV) {
   app.setPath(
     "userData",
     join(app.getPath("userData"), "dev", DEV_WORKTREE_ID ?? "worktree-unknown"),
@@ -964,6 +969,10 @@ app.whenReady().then(async () => {
     });
     app.quit();
     return;
+  }
+
+  if (process.env.QF_AGENTOS_LOOP_PROOF === "1") {
+    void runAgentOsLoopProof(mainWindow!);
   }
 });
 

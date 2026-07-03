@@ -218,10 +218,18 @@ export function resolveAgentOsApproval(requestId: string, approved: boolean): bo
   moduleState.pending.delete(requestId);
   const blockedMs = Date.now() - entry.startedAt;
 
-  void clearApprovalBlocker(entry.pending);
-  void postHumanDecisionReceipt(entry.pending, approved, blockedMs);
+  // Land the Kernel updates BEFORE resuming the adapter: otherwise the
+  // unblocked run's receipt storm can re-render the state card while it still
+  // reads 'blocked', leaving stale approval UI until the next event.
+  void (async () => {
+    try {
+      await clearApprovalBlocker(entry.pending);
+      await postHumanDecisionReceipt(entry.pending, approved, blockedMs);
+    } finally {
+      entry.resolve({ approved, blockedMs });
+    }
+  })();
 
-  entry.resolve({ approved, blockedMs });
   return true;
 }
 

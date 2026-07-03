@@ -34,6 +34,11 @@ export const DEV_WORKTREE_ID = import.meta.env?.DEV
   ? `worktree-${getDevWorktreeId()}`
   : null;
 
-export const QUANTFLOW_DIR = import.meta.env?.DEV
-  ? join(QUANTFLOW_HOME, "dev", DEV_WORKTREE_ID ?? "worktree-unknown")
-  : QUANTFLOW_HOME;
+// Proof-only: isolated data dir for scripted loop proof (QF_AGENTOS_LOOP_PROOF).
+const proofQuantflowDir = process.env.QF_QUANTFLOW_DIR?.trim();
+
+export const QUANTFLOW_DIR = proofQuantflowDir
+  ? proofQuantflowDir
+  : import.meta.env?.DEV
+    ? join(QUANTFLOW_HOME, "dev", DEV_WORKTREE_ID ?? "worktree-unknown")
+    : QUANTFLOW_HOME;

@@ -273,6 +273,20 @@ const checks: Check[] = [
       return runAgentOsLiveCheck();
     },
   },
+  {
+    name: "loop-proof",
+    description:
+      "P6: scripted agentos loop proof (spawn -> approval -> timeline) with screenshots",
+    run() {
+      const result = Bun.spawnSync(["bun", "run", "proof:agentos-loop"], {
+        cwd: join(REPO_ROOT, "quantflow-electron"),
+        stdout: "inherit",
+        stderr: "inherit",
+        stdin: "inherit",
+      });
+      return result.exitCode === 0;
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));

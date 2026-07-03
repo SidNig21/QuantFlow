@@ -47,6 +47,7 @@
 		"smoke:authority": "bun scripts/smoke-authority.ts",
 		"smoke:pod": "bun scripts/smoke-pod.ts",
 		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",
+		"proof:agentos-loop": "bun scripts/proof-agentos-loop.ts",
 		"postinstall": "node scripts/postinstall.mjs"
 	},
 	"build": {

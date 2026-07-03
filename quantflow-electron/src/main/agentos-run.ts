@@ -11,6 +11,7 @@ import { queryWorkerForTile, queryWorkerGet } from "../../../src/kernel/worker-i
 import type { ReceiptDraft, WorkerHandle, WorkerHarness } from "@qf-harness/types";
 import { QUANTFLOW_DIR } from "./paths";
 import { AGENTOS_DEFAULT_INSTRUCTION } from "../shared/agentos-instruction.js";
+import { getAgentOsWorkerHarness } from "./agentos-service";
 
 export { AGENTOS_DEFAULT_INSTRUCTION };
 
@@ -48,10 +49,7 @@ interface AgentOsRunModule {
 
 function defaultDeps(): Required<AgentOsRunDeps> {
   return {
-    getHarness: () => {
-      const { getWorkerHarness } = require("./harness-service") as typeof import("./harness-service");
-      return getWorkerHarness("agentos");
-    },
+    getHarness: () => getAgentOsWorkerHarness(),
     dispatchKernel: (type, payload, requestedBy) =>
       dispatchKernelCommand(type, payload, requestedBy ?? "agentos"),
     getWorkerForTile: (tileId) => queryWorkerForTile(getKernelDb(), tileId),

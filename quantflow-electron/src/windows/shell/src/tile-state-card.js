@@ -196,11 +196,19 @@ function appendReceiptTimeline(body, receipts) {
  * into the back face. Safe to call repeatedly (e.g. on flip and on
  * state_card.updated events).
  */
+let renderToken = 0;
+const renderTokens = new WeakMap();
+
 export async function renderStateCardBack(backEl, tileId) {
   if (!backEl) return;
   backEl.dataset.tileId = tileId;
   const body = backEl.querySelector(".tile-state-card-body");
   if (!body) return;
+
+  // Overlapping renders (flip + event refreshes) race across the awaits below;
+  // only the latest invocation may mutate the body.
+  const token = ++renderToken;
+  renderTokens.set(backEl, token);
 
   let card = null;
   try {
@@ -208,6 +216,8 @@ export async function renderStateCardBack(backEl, tileId) {
   } catch (err) {
     console.warn("[state-card] query failed:", err);
   }
+  const receipts = await fetchReceiptTimeline(tileId);
+  if (renderTokens.get(backEl) !== token) return;
 
   const sections = formatStateCard(card ?? null);
   body.textContent = "";
@@ -219,6 +229,5 @@ export async function renderStateCardBack(backEl, tileId) {
     appendApprovalActions(body, card.blocker);
   }
 
-  const receipts = await fetchReceiptTimeline(tileId);
   appendReceiptTimeline(body, receipts);
 }

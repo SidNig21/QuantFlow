@@ -264,12 +264,21 @@ function resolveTcpHost(options: JsonRpcServerOptions): string {
   );
 }
 
+function resolveTcpPort(options: JsonRpcServerOptions): number {
+  // Proof-only: isolated relay port when QF_RELAY_TCP_PORT is set (0 = ephemeral).
+  const proofPort = Number.parseInt(process.env.QF_RELAY_TCP_PORT ?? "", 10);
+  if (Number.isInteger(proofPort) && proofPort >= 0 && proofPort < 65536) {
+    return proofPort;
+  }
+  return options.tcpPort ?? DEFAULT_TCP_PORT;
+}
+
 export async function startJsonRpcServer(
   options: JsonRpcServerOptions = {},
 ): Promise<JsonRpcServerInfo> {
   const enableSocket = options.enableSocket ?? true;
   const tcpHost = resolveTcpHost(options);
-  const tcpPort = options.tcpPort ?? DEFAULT_TCP_PORT;
+  const tcpPort = resolveTcpPort(options);
 
   if (socketServer || tcpServer) {
     throw new Error("JSON-RPC server is already running");

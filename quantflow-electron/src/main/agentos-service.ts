@@ -8,6 +8,11 @@
 import { createAgentOsHarness } from "@qf-harness/agentos/index";
 import { createHttpAgentOsTransport } from "@qf-harness/agentos/http-transport";
 import {
+  createSimTransport,
+  simStepsFromFixtureEvents,
+} from "@qf-harness/agentos/sim-transport";
+import agentosFixtureRaw from "../../../src/harness/agentos/fixtures/tier2-events-trimmed.jsonl?raw";
+import {
   startAgentOsHost,
   stopAgentOsHost,
   type AgentOsHostHandle,
@@ -161,8 +166,35 @@ function wrapHarness(base: WorkerHarness): WorkerHarness {
   };
 }
 
+function loadSimFixtureEvents(): unknown[] {
+  return agentosFixtureRaw
+    .split(/\r?\n/)
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line) as unknown);
+}
+
+/** Proof-only (QF_AGENTOS_SIM=1): deterministic sim transport, no WSL/network. */
+function buildProofSimTransport(): AgentOsTransport {
+  const events = loadSimFixtureEvents();
+  return createSimTransport({
+    steps: simStepsFromFixtureEvents(events, {
+      permissionAtIndex: 5,
+      permission: {
+        requestId: "perm-loop-proof-1",
+        action: "write tier2 result file",
+        source: "acp",
+      },
+      artifactPath: "/workspace/tier2-result.txt",
+      artifactBody: "bindings-approved-hello",
+    }),
+  });
+}
+
 function buildHarness(): WorkerHarness {
-  const transport = wrapTransportWithLazyHost(createHttpAgentOsTransport());
+  // Proof-only seam — production path unchanged when QF_AGENTOS_SIM is unset.
+  const transport = process.env.QF_AGENTOS_SIM === "1"
+    ? buildProofSimTransport()
+    : wrapTransportWithLazyHost(createHttpAgentOsTransport());
   const credential = resolveAgentOsCredential();
   const base = createAgentOsHarness({
     transport,
