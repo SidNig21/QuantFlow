@@ -20,6 +20,7 @@ import { getRole } from "./role-service";
 import { writeToSession, killSession } from "./pty";
 import { sendToPane } from "./herdr-socket-ops";
 import { createLiveHarnessOps, type LiveHarnessDeps } from "./harness-ops";
+import { getAgentOsWorkerHarness } from "./agentos-service";
 
 export function defaultLiveHarnessDeps(): LiveHarnessDeps {
   return {
@@ -50,5 +51,6 @@ export function defaultLiveHarnessDeps(): LiveHarnessDeps {
 
 /** Build a live worker harness for a kind, wired to the shipped runtime + Kernel. */
 export function getWorkerHarness(kind: HarnessKind): WorkerHarness {
+  if (kind === "agentos") return getAgentOsWorkerHarness();
   return createHarness(kind, createLiveHarnessOps(defaultLiveHarnessDeps()));
 }

@@ -62,6 +62,7 @@ import { stopAllEnvoyListeners } from "./envoy-listener";
 import { stopAllObsidianEnvoyMirrors } from "./obsidian-envoy-mirror";
 import { bootstrapHerdrRuntime } from "./herdr-runtime";
 import { stopHerdrStatusService } from "./herdr-status-service";
+import { disposeAgentOsService } from "./agentos-service";
 
 const APP_NAME = "QuantFlow";
 const launchStartedAtMs = Date.now();
@@ -772,6 +773,7 @@ async function shutdownBackgroundServices(): Promise<void> {
   stopAllObsidianEnvoyMirrors();
   stopAllEnvoyListeners();
   stopHerdrStatusService();
+  await disposeAgentOsService();
   stopImageWorker();
   closeDb();
 }

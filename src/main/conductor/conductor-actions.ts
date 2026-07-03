@@ -68,7 +68,7 @@ function rec(args: unknown): Record<string, unknown> {
 }
 
 function asHarnessKind(value: unknown): HarnessKind {
-  return value === 'mock' || value === 'eve-harness' || value === 'herdr-shell' || value === 'local-shell'
+  return value === 'mock' || value === 'eve-harness' || value === 'agentos' || value === 'herdr-shell' || value === 'local-shell'
     ? value
     : 'local-shell';
 }

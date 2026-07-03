@@ -534,6 +534,26 @@ contextBridge.exposeInMainWorld("shellApi", {
   }): Promise<unknown> =>
     ipcRenderer.invoke("herdr:spawn-role", params),
 
+  // ── AgentOS approvals ──
+  agentosListApprovals: (): Promise<
+    Array<{
+      requestId: string;
+      action: string;
+      source: "toolkit" | "acp";
+      toolCallId?: string | null;
+      startedAt: number;
+      tileId?: string | null;
+      workflowId?: string | null;
+      taskId?: string | null;
+      workerId?: string | null;
+    }>
+  > => ipcRenderer.invoke("agentos:approvals"),
+  agentosApprove: (params: {
+    requestId: string;
+    approved: boolean;
+  }): Promise<{ ok: boolean; requestId?: string; approved?: boolean; error?: string }> =>
+    ipcRenderer.invoke("agentos:approve", params),
+
   // ── Run Workflow ──
   workflowSubmit: (params: {
     canvasId?: string;
