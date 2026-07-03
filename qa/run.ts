@@ -180,6 +180,17 @@ const checks: Check[] = [
     },
   },
   {
+    name: "connection-round-trip",
+    description:
+      "D4 connections: Kernel round-trip with zero runtime.db writes (QF_ONE_TRUTH=1); flag-OFF dual-write sanity",
+    async run() {
+      const { runConnectionRoundTripCheck } = await import(
+        "./lib/connection-round-trip"
+      );
+      return runConnectionRoundTripCheck();
+    },
+  },
+  {
     name: "canvas-cache-discipline",
     description:
       "D3 lint: shell src cache mutations only in documented allowlist (canvas-state reconcile paths)",

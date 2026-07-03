@@ -3,7 +3,8 @@ import { access, readFile, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { basename, join } from "node:path";
 import { getDb, EXPECTED_MIGRATION_VERSIONS } from "../runtime-state/database";
-import { listConnections, QUEUE_DEPTH_MAX } from "../runtime-state/connections-repo";
+import { listConnectionRows } from "../connections-access";
+import { QUEUE_DEPTH_MAX } from "../runtime-state/connections-repo";
 import { listTilesRuntime } from "../runtime-state/tiles-runtime-repo";
 import { SidecarClient } from "../sidecar/client";
 import { SIDECAR_PID_PATH, SIDECAR_SOCKET_PATH } from "../sidecar/protocol";
@@ -327,7 +328,7 @@ async function ptyForegroundPoller(): Promise<ProbeCheckResult> {
 }
 
 async function messagingQueues(ctx: ProbeContext): Promise<ProbeCheckResult> {
-  const rows = listConnections();
+  const rows = listConnectionRows();
   const overflowing = rows.filter((row) => row.queue_depth > QUEUE_DEPTH_MAX);
   const stuck = rows.filter((row) =>
     row.queue_depth > 0 && ctx.now() - row.updated_at > QUEUE_STUCK_MS

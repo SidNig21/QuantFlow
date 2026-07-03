@@ -11,7 +11,7 @@ import type {
   EnvoyTaskRow,
   EnvoyTaskStatus,
 } from "./runtime-state/types";
-import { getConnection } from "./runtime-state/connections-repo";
+import { getConnectionRow } from "./connections-access";
 import { appendEvent, listEvents } from "./runtime-state/events-repo";
 import {
   EnvoyService,
@@ -374,7 +374,7 @@ export class EnvoyTaskService {
     if (!input.targetTileId) {
       throw new Error("targetTileId is required unless operatorOverride is true");
     }
-    const connection = getConnection(input.connectionId);
+    const connection = getConnectionRow(input.connectionId);
     if (!connection) {
       throw new Error(`Connection not found: ${input.connectionId}`);
     }

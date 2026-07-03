@@ -1,6 +1,9 @@
 /**
  * Shared row types for the QuantFlow runtime state layer.
  *
+ * **D4:** runtime.db rows are mirror/ephemeral — not authority when QF_ONE_TRUTH=1.
+ * See `runtime-state/AGENTS.md` and `database.ts` header.
+ *
  * These types define the API surface that both the in-memory stub (Phase 2)
  * and the SQLite implementation (Phase 7) must satisfy. All callers import
  * from here — never from the concrete repo files.

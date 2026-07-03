@@ -10,6 +10,7 @@ import { queryTileExtensionGet } from "../../../src/kernel/tile-extensions/index
 import { createInMemoryKernelDb } from "../../../qa/lib/kernel-memory-db";
 import { installTestRuntimeDb } from "./runtime-state/test-sqlite-adapter";
 import { _resetForTesting as resetConnections } from "./runtime-state/connections-repo";
+import { dispatchConnectionCommand } from "./connections-access";
 import {
   _resetCanvasKernelAccessForTesting,
   _getCanvasKernelAccessCountersForTesting,
@@ -51,7 +52,7 @@ afterEach(() => {
 });
 
 describe("canvas one-truth boot (QF_ONE_TRUTH=1)", () => {
-  test("flag-on assembles tiles, viewport, and connections from Kernel + DB", async () => {
+  test("flag-on assembles tiles, viewport, and connections from Kernel", async () => {
     await saveState({
       version: 2,
       tiles: [
@@ -67,19 +68,18 @@ describe("canvas one-truth boot (QF_ONE_TRUTH=1)", () => {
           zIndex: 3,
         },
       ],
-      connections: [
-        {
-          id: "conn-k1",
-          tileAId: "tile-k1",
-          tileBId: "tile-k1",
-          createdAt: 1,
-          updatedAt: 2,
-        },
-      ],
+      connections: [],
       viewport: { centerX: 50, centerY: 60, zoom: 2 },
     });
 
     process.env.QF_ONE_TRUTH = "1";
+    const created = await dispatchConnectionCommand("kernel.connection.create", {
+      id: "conn-k1",
+      tileAId: "tile-k1",
+      tileBId: "tile-k1",
+    });
+    expect(created.ok).toBe(true);
+
     _resetCanvasKernelAccessForTesting();
     const loaded = await loadState();
 
@@ -357,7 +357,17 @@ describe("canvas one-truth save demotion (D2)", () => {
     };
 
     process.env.QF_ONE_TRUTH = "1";
-    await saveState(state);
+    await saveState({
+      version: 2,
+      tiles: state.tiles,
+      connections: [],
+      viewport: state.viewport,
+    });
+    await dispatchConnectionCommand("kernel.connection.create", {
+      id: "conn-export",
+      tileAId: "tile-export",
+      tileBId: "tile-export",
+    });
 
     const exportPath = join(STATE_DIR, "export-test.json");
     await exportState(exportPath);

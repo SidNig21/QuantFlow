@@ -2,6 +2,20 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "./database";
 import type { ConnectionFilter, ConnectionRow } from "./types";
 
+let writeSpyCount = 0;
+
+export function _resetWriteSpyForTesting(): void {
+  writeSpyCount = 0;
+}
+
+export function _getWriteSpyForTesting(): number {
+  return writeSpyCount;
+}
+
+function noteWrite(): void {
+  writeSpyCount++;
+}
+
 export function createConnection(params: {
   id?: string;
   tileAId: string;
@@ -19,6 +33,7 @@ export function createConnection(params: {
   createdAt?: number;
   updatedAt?: number;
 }): ConnectionRow {
+  noteWrite();
   const now = Date.now();
   const row: ConnectionRow = {
     id: params.id ?? randomUUID(),
@@ -125,6 +140,7 @@ export function updateConnection(
 
   if (sets.length === 0) return existing;
 
+  noteWrite();
   const now = Date.now();
   sets.push("updated_at = @updatedAt");
   params["updatedAt"] = now;
@@ -137,6 +153,7 @@ export function updateConnection(
 }
 
 export function deleteConnection(id: string): boolean {
+  noteWrite();
   const result = getDb()
     .prepare("DELETE FROM connections WHERE id = ?")
     .run(id);

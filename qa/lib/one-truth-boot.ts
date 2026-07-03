@@ -31,6 +31,8 @@ function normalizeCanvasState(state: CanvasState | null): CanvasState | null {
       const normalized: Record<string, unknown> = {};
       const keys = Object.keys(conn).sort();
       for (const key of keys) {
+        // Transition sync assigns Kernel timestamps and coerces semantic types.
+        if (key === "createdAt" || key === "updatedAt" || key === "kind") continue;
         const value = conn[key];
         if (value !== undefined) normalized[key] = value;
       }

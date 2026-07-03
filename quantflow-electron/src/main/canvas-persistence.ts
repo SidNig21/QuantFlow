@@ -6,11 +6,16 @@ import * as crypto from "node:crypto";
 import { QUANTFLOW_DIR } from "./paths";
 import {
   createConnection as dbCreateConnection,
-  listConnections as dbListConnections,
   updateConnection as dbUpdateConnection,
   getConnection as dbGetConnection,
 } from "./runtime-state/connections-repo";
 import type { ConnectionRow } from "./runtime-state/types";
+import {
+  dispatchConnectionCommand,
+  loadConnectionsForCanvas,
+  noteRuntimeConnectionWriteForTesting,
+  shouldSyncConnectionsToRuntimeDb,
+} from "./connections-access";
 import {
   assembleCanvasStateFromKernel,
   buildEphemeralCacheDocument,
@@ -214,15 +219,13 @@ function connectionRowToState(row: ConnectionRow): ConnectionState {
 }
 
 function loadConnectionsFromDb(): ConnectionState[] {
-  try {
-    return dbListConnections().map(connectionRowToState);
-  } catch {
-    return [];
-  }
+  return loadConnectionsForCanvas();
 }
 
 function mergeJsonAndDbConnections(jsonConnections: ConnectionState[]): ConnectionState[] {
-  const dbConnections = loadConnectionsFromDb();
+  if (isOneTruthEnabled()) return jsonConnections;
+
+  const dbConnections = loadConnectionsForCanvas();
   if (dbConnections.length === 0) return jsonConnections;
 
   const dbById = new Map(dbConnections.map((c) => [c.id, c]));
@@ -235,6 +238,7 @@ function mergeJsonAndDbConnections(jsonConnections: ConnectionState[]): Connecti
 }
 
 function upsertConnectionToDb(conn: ConnectionState): void {
+  noteRuntimeConnectionWriteForTesting();
   const existing = dbGetConnection(conn.id);
   if (existing) {
     dbUpdateConnection(conn.id, {
@@ -326,12 +330,41 @@ function normalizeConnectionsFromState(
 }
 
 async function syncConnectionsToDb(connections: ConnectionState[]): Promise<void> {
+  if (!shouldSyncConnectionsToRuntimeDb()) return;
   try {
     for (const conn of connections) {
       upsertConnectionToDb(conn);
     }
   } catch {
     // Non-fatal: DB unavailable in test environment or during first boot before migration
+  }
+}
+
+/** D4: Kernel owns connection facts — upsert on save for boot parity (flag ON/OFF). */
+async function syncConnectionsToKernel(connections: ConnectionState[]): Promise<void> {
+  try {
+    for (const conn of connections) {
+      const created = await dispatchConnectionCommand("kernel.connection.create", {
+        id: conn.id,
+        tileAId: conn.tileAId,
+        tileBId: conn.tileBId,
+        fromTileId: conn.from?.tileId ?? null,
+        toTileId: conn.to?.tileId ?? null,
+        label: conn.label ?? null,
+        semanticType: conn.kind ?? "manual_connection",
+      });
+      if (!created.ok) continue;
+      await dispatchConnectionCommand("kernel.connection.update", {
+        id: conn.id,
+        label: conn.label ?? null,
+        semanticType: conn.kind ?? "manual_connection",
+      });
+    }
+  } catch (err) {
+    console.warn(
+      "[canvas-persistence] Kernel connection sync failed (non-fatal):",
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
 
@@ -362,6 +395,8 @@ export async function saveState(state: CanvasState): Promise<void> {
       err instanceof Error ? err.message : String(err),
     );
   }
+
+  await syncConnectionsToKernel(normalizedConnections);
 
   if (isOneTruthEnabled()) {
     // D2: Kernel holds truth; persist ephemeral overlay only. Authority JSON is

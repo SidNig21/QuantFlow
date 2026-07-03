@@ -1,6 +1,8 @@
 import {
-  getConnection,
-  listConnections,
+  getConnectionRow,
+  listConnectionRows,
+} from "./connections-access";
+import {
   updateConnection,
 } from "./runtime-state/connections-repo";
 import type {
@@ -107,7 +109,7 @@ function parseConfig(row: ConnectionRow): ConnectionConfig {
 export function getSmartStringConfig(
   connectionId: string,
 ): SmartStringConfig | null {
-  const row = getConnection(connectionId);
+  const row = getConnectionRow(connectionId);
   if (!row) return null;
   return parseConfig(row).smartString ?? null;
 }
@@ -119,7 +121,7 @@ export function setSmartStringConfig(
   const validation = validateSmartStringConfig(smartString);
   if (!validation.ok) return validation;
 
-  const row = getConnection(connectionId);
+  const row = getConnectionRow(connectionId);
   if (!row) {
     return { ok: false, errors: [`Connection '${connectionId}' not found`] };
   }
@@ -139,7 +141,7 @@ export function setSmartStringConfig(
 export function clearSmartStringConfig(
   connectionId: string,
 ): { ok: true; connection: ConnectionRow } | { ok: false; errors: string[] } {
-  const row = getConnection(connectionId);
+  const row = getConnectionRow(connectionId);
   if (!row) {
     return { ok: false, errors: [`Connection '${connectionId}' not found`] };
   }
@@ -168,7 +170,7 @@ export function listSmartStrings(filter?: {
   mode?: SmartStringMode;
   enabledOnly?: boolean;
 }): SmartStringEntry[] {
-  const connections = listConnections(
+  const connections = listConnectionRows(
     filter?.tileId ? { tileId: filter.tileId } : {},
   );
 

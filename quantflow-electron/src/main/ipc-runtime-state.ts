@@ -25,11 +25,15 @@ import {
 } from "./runtime-state/schemas-repo";
 import {
   createConnection,
-  getConnection,
-  listConnections,
   updateConnection,
   deleteConnection,
 } from "./runtime-state/connections-repo";
+import {
+  dispatchConnectionCommand,
+  getConnectionRow,
+  isConnectionsKernelCanonical,
+  listConnectionRows,
+} from "./connections-access";
 import {
   appendEvent,
   listEvents,
@@ -198,7 +202,7 @@ export function registerRuntimeStateHandlers(): void {
 
   ipcMain.handle(
     "qf:runtime:connections.create",
-    (
+    async (
       _,
       params: {
         id?: string;
@@ -215,22 +219,37 @@ export function registerRuntimeStateHandlers(): void {
         watcherEnabled?: boolean;
         watcherSyntax?: string;
       },
-    ) => createConnection(params),
+    ) => {
+      if (isConnectionsKernelCanonical()) {
+        const result = await dispatchConnectionCommand("kernel.connection.create", {
+          id: params.id,
+          tileAId: params.tileAId,
+          tileBId: params.tileBId,
+          fromTileId: params.fromTileId,
+          toTileId: params.toTileId,
+          label: params.label,
+          semanticType: params.kind ?? params.type,
+        });
+        if (!result.ok) throw new Error(result.error ?? "kernel.connection.create failed");
+        return getConnectionRow(result.id ?? params.id ?? "");
+      }
+      return createConnection(params);
+    },
   );
 
   ipcMain.handle(
     "qf:runtime:connections.get",
-    (_, id: string) => getConnection(id),
+    (_, id: string) => getConnectionRow(id),
   );
 
   ipcMain.handle(
     "qf:runtime:connections.list",
-    (_, filter: ConnectionFilter = {}) => listConnections(filter),
+    (_, filter: ConnectionFilter = {}) => listConnectionRows(filter),
   );
 
   ipcMain.handle(
     "qf:runtime:connections.update",
-    (
+    async (
       _,
       id: string,
       changes: {
@@ -245,11 +264,29 @@ export function registerRuntimeStateHandlers(): void {
         watcherEnabled?: boolean;
         watcherSyntax?: string;
       },
-    ) => updateConnection(id, changes),
+    ) => {
+      if (isConnectionsKernelCanonical()) {
+        const payload: Record<string, unknown> = { id };
+        if ("label" in changes) payload.label = changes.label ?? null;
+        if ("kind" in changes || "type" in changes) {
+          payload.semanticType = changes.kind ?? changes.type;
+        }
+        const result = await dispatchConnectionCommand("kernel.connection.update", payload);
+        if (!result.ok) return null;
+        return getConnectionRow(id);
+      }
+      return updateConnection(id, changes);
+    },
   );
 
   ipcMain.handle(
     "qf:runtime:connections.delete",
-    (_, id: string) => deleteConnection(id),
+    async (_, id: string) => {
+      if (isConnectionsKernelCanonical()) {
+        const result = await dispatchConnectionCommand("kernel.connection.delete", { id });
+        return result.ok;
+      }
+      return deleteConnection(id);
+    },
   );
 }

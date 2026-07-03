@@ -32,7 +32,7 @@ function normalizeCanvasState(state: CanvasState | null): CanvasState | null {
       const normalized: Record<string, unknown> = {};
       const keys = Object.keys(conn).sort();
       for (const key of keys) {
-        if (key === "updatedAt") continue;
+        if (key === "createdAt" || key === "updatedAt" || key === "kind") continue;
         const value = conn[key];
         if (value !== undefined) normalized[key] = value;
       }

@@ -1,6 +1,11 @@
 /**
  * SQLite singleton for the QuantFlow runtime state layer (Phase 7).
  *
+ * **D4 mirror demotion:** `runtime.db` is a derived, non-authoritative runtime mirror.
+ * Kernel-canonical facts (connections, tasks, artifacts, …) must not originate here
+ * when `QF_ONE_TRUTH=1`. The `connections` table is legacy — kept for flag-OFF
+ * downgrade and runtime-ephemeral fields (e.g. queue_depth) until D5/E collapse.
+ *
  * Opens (or creates) runtime.db in QUANTFLOW_DIR, enables WAL + foreign keys,
  * then runs any pending SQL migration files in order.  All repo modules call
  * getDb() — they never open their own connection.
