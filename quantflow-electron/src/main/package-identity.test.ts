@@ -77,9 +77,10 @@ describe("QuantFlow release identity", () => {
     const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
 
     expect(readme).toContain("# QuantFlow");
-    expect(readme).toContain("![QuantFlow](screenshot.png)");
-    expect(readme).toContain("Open QuantFlow");
-    expect(readme).toContain("`~/.quantflow/`");
+    expect(readme).toContain(
+      "![QuantFlow canvas — Legend dock and agent spawn rail](assets/readme/canvas-hero.png)",
+    );
+    expect(readme).toContain("%USERPROFILE%\\.quantflow\\vault-config.json");
     expect(readme).not.toContain("Collaborator");
     expect(readme).not.toContain("`~/.collaborator/`");
   });

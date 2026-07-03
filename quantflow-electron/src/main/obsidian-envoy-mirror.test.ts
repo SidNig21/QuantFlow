@@ -10,6 +10,7 @@ import {
 import {
   _resetObsidianMirrorsForTesting,
   ensureObsidianEnvoyMirror,
+  setEnvoyRowSourceForTesting,
 } from "./obsidian-envoy-mirror";
 
 afterEach(() => {
@@ -33,6 +34,10 @@ describe("obsidian envoy mirror", () => {
       return { stdout: "{}", stderr: "", exitCode: 0 };
     });
     new EnvoyService();
+    setEnvoyRowSourceForTesting({
+      listTasks: () => [],
+      listReceipts: () => [],
+    });
 
     await ensureObsidianEnvoyMirror({
       canvasId: "main",
@@ -45,7 +50,7 @@ describe("obsidian envoy mirror", () => {
     const history = await readFile(join(dir, "history.md"), "utf-8");
     expect(taskBoard).toContain("# Envoy Task Board");
     expect(taskBoard).toContain("space-test");
-    expect(taskBoard).toContain('{"tasks":[]}');
+    expect(taskBoard).toContain("[]");
     expect(history).toContain("# Envoy Space History");
     expect(history).toContain('{"events":[]}');
   });

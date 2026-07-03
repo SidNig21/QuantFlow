@@ -8,6 +8,23 @@ import { getEnvoyService } from "./envoy-service";
 import { listEnvoyReceipts, listEnvoyTasks } from "./runtime-state/envoy-repo";
 import type { EnvoyReceiptRow, EnvoyTaskRow } from "./runtime-state/types";
 
+type EnvoyRowSource = {
+  listTasks: typeof listEnvoyTasks;
+  listReceipts: typeof listEnvoyReceipts;
+};
+
+let envoyRowSource: EnvoyRowSource = {
+  listTasks: listEnvoyTasks,
+  listReceipts: listEnvoyReceipts,
+};
+
+export function setEnvoyRowSourceForTesting(source: EnvoyRowSource | null): void {
+  envoyRowSource = source ?? {
+    listTasks: listEnvoyTasks,
+    listReceipts: listEnvoyReceipts,
+  };
+}
+
 const POLL_INTERVAL_MS = 2000;
 const LIVE_MAX_LINES = 500;
 
@@ -55,7 +72,7 @@ async function writeTaskBoard(
   envoySpaceId: string,
 ): Promise<void> {
   const tasksJson = JSON.stringify(
-    listEnvoyTasks({ status: "all" }),
+    envoyRowSource.listTasks({ status: "all" }),
     null,
     2,
   );
@@ -202,7 +219,7 @@ export function buildTaskResultNote(task: EnvoyTaskRow, receipts: EnvoyReceiptRo
 }
 
 async function writeRunResults(dir: string): Promise<void> {
-  const tasks = listEnvoyTasks({ status: "all" });
+  const tasks = envoyRowSource.listTasks({ status: "all" });
   const visibleTasks = tasks
     .filter((task) => ["done", "blocked", "failed"].includes(task.status))
     .sort((a, b) => b.updated_at - a.updated_at);
@@ -234,7 +251,7 @@ async function writeRunResults(dir: string): Promise<void> {
   await atomicWrite(join(dir, "run-results.md"), content);
   await mkdir(join(dir, "runs"), { recursive: true });
   await Promise.all(rows.map(async ({ task, fileName }) => {
-    const receipts = listEnvoyReceipts({ taskId: task.task_id });
+    const receipts = envoyRowSource.listReceipts({ taskId: task.task_id });
     await atomicWrite(
       join(dir, "runs", fileName),
       buildTaskResultNote(task, receipts),
@@ -333,4 +350,5 @@ export function stopAllObsidianEnvoyMirrors(): void {
 
 export function _resetObsidianMirrorsForTesting(): void {
   stopAllObsidianEnvoyMirrors();
+  setEnvoyRowSourceForTesting(null);
 }
