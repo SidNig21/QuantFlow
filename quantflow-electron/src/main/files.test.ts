@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { writeFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -134,7 +134,7 @@ describe("atomicWriteFileSync", () => {
     const p = join(tmp, "clean.json");
     atomicWriteFileSync(p, "data");
 
-    const files = Bun.spawnSync(["ls", tmp]).stdout.toString().trim().split("\n");
+    const files = readdirSync(tmp);
     expect(files).toEqual(["clean.json"]);
   });
 

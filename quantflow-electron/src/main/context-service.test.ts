@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { rmSync, mkdirSync } from "node:fs";
 
@@ -55,7 +55,7 @@ describe("pinFile / unpinFile", () => {
 
 describe("vault-relative context pins", () => {
   test("normalizes vault files to relative paths", async () => {
-    expect(toVaultRelativePath("/vault/specs/a.md", "/vault")).toBe("specs/a.md");
+    expect(toVaultRelativePath("/vault/specs/a.md", "/vault")).toBe(join("specs", "a.md"));
   });
 
   test("rejects files outside the vault", () => {
@@ -68,11 +68,11 @@ describe("vault-relative context pins", () => {
     await pinVaultFile("/vault/specs/a.md", "/vault");
 
     const ctx = await getContext();
-    expect(ctx.pinnedFiles).toEqual([{ path: "specs/a.md", mode: "full" }]);
+    expect(ctx.pinnedFiles).toEqual([{ path: join("specs", "a.md"), mode: "full" }]);
   });
 
   test("resolves relative pins under the vault", () => {
-    expect(resolveVaultPinnedPath("specs/a.md", "/vault")).toBe("/vault/specs/a.md");
+    expect(resolveVaultPinnedPath("specs/a.md", "/vault")).toBe(resolve("/vault", "specs/a.md"));
   });
 
   test("rejects relative traversal pins during preview resolution", () => {
@@ -242,7 +242,7 @@ describe("vault-relative preview and compose", () => {
       return "vault file";
     }, 300);
 
-    expect(reads).toEqual(["/vault/specs/a.md"]);
+    expect(reads).toEqual([resolve("/vault", "specs/a.md")]);
     expect(preview.text).toContain("vault file");
 
     const text = await composeForVaultTile("/vault", async (p) => {
