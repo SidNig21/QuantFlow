@@ -103,6 +103,7 @@ import {
 	resolveLegendRecipeRole,
 } from "./legend-spawn.js";
 import { updateCanvasWatermark } from "./canvas-watermark.js";
+import { routeKernelEvent } from "./renderer-event-router.js";
 
 const CANVAS_DBLCLICK_SUPPRESS_MS = 500;
 const PLATFORM = window.shellApi.getPlatform();
@@ -3618,28 +3619,27 @@ async function init() {
 	// the event, so reconciliation is a harmless no-op; for externally-driven
 	// Kernel writes the renderer updates to match Kernel.
 	if (window.kernelApi) {
-		window.kernelApi.onEvent((payload) => {
-			const data = payload.data ?? {};
-			const watchtowerEvent = kernelEventLog.record(payload);
-			const t = payload.tileId
-				? tiles.find((x) => x.id === payload.tileId)
-				: null;
-
-			if (payload.kind === "tile.moved" && t) {
+		const kernelEventHandlers = {
+			recordEvent: (payload) => kernelEventLog.record(payload),
+			resolveTile: (tileId) => tiles.find((x) => x.id === tileId) ?? null,
+			onTileMoved: ({ data, tile: t }) => {
 				t.x = data.x;
 				t.y = data.y;
 				tileManager.repositionAllTiles();
 				updateCables();
-			} else if (payload.kind === "tile.resized" && t) {
+			},
+			onTileResized: ({ data, tile: t }) => {
 				t.width = data.width;
 				t.height = data.height;
 				tileManager.repositionAllTiles();
 				updateCables();
-			} else if (payload.kind === "tile.removed") {
+			},
+			onTileRemoved: ({ tile: t }) => {
 				// Reconcile a Kernel-driven removal. No-op if already gone
 				// locally (self-initiated close removed it first).
 				if (t) void tileManager.closeCanvasTile(t.id);
-			} else if (payload.kind === "tile.created") {
+			},
+			onTileCreated: ({ data, tile: t }) => {
 				// Self/MCP creates already built the tile locally before the
 				// event arrives → no-op. A faithful rebuild from a pure Kernel
 				// create needs tile-type/webview detail not in the v3 tile
@@ -3651,7 +3651,8 @@ async function init() {
 					if (Number.isFinite(data.y)) t.y = data.y;
 					tileManager.repositionAllTiles();
 				}
-			} else if (payload.kind === "connection.created" && data.id) {
+			},
+			onConnectionCreated: ({ data }) => {
 				const exists = connections.some((c) => c.id === data.id);
 				if (!exists && getTile(data.tileAId) && getTile(data.tileBId)) {
 					addConnection({
@@ -3663,44 +3664,31 @@ async function init() {
 					syncConnectionGraph();
 					updateCables();
 				}
-			} else if (payload.kind === "connection.deleted" && data.id) {
+			},
+			onConnectionDeleted: ({ data }) => {
 				const exists = connections.some((c) => c.id === data.id);
 				if (exists) {
 					removeConnection(data.id);
 					syncConnectionGraph();
 					updateCables();
 				}
-			} else if (payload.kind === "state_card.updated" && payload.tileId) {
+			},
+			onStateCardUpdated: ({ tileId }) => {
 				// Kernel State Card changed → refresh the back face if flipped.
-				tileManager.refreshFlippedStateCard(payload.tileId);
-			}
-
-			// Surface S0: live projection routes stay read-only and re-query
-			// Kernel projections instead of keeping renderer truth.
-			const kind = String(payload.kind ?? "");
-			const projectionKinds = new Set([
-				"artifact.created",
-				"checkpoint.awaiting-selection",
-				"human_decision",
-				"evaluation.created",
-				"conductor.plan_posted",
-				"worker.spawned",
-				"worker.status_updated",
-				"worker.stopped",
-			]);
-			if (
-				kind.startsWith("tile.") ||
-				kind.startsWith("task.") ||
-				kind.startsWith("connection.") ||
-				kind.startsWith("workflow.") ||
-				kind === "receipt.posted" ||
-				projectionKinds.has(kind)
-			) {
+				tileManager.refreshFlippedStateCard(tileId);
+			},
+			refreshProjection: () => {
 				void refreshWorkflowProjection();
-			}
-			if (watchtowerVisible && !watchtowerPaused && watchtowerEvent) {
+			},
+			shouldRefreshWatchtower: (watchtowerEvent) =>
+				watchtowerVisible && !watchtowerPaused && watchtowerEvent,
+			refreshWatchtower: () => {
 				void refreshWatchtower();
-			}
+			},
+		};
+
+		window.kernelApi.onEvent((payload) => {
+			routeKernelEvent(payload, kernelEventHandlers);
 		});
 	}
 
