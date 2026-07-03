@@ -41,6 +41,42 @@ import { getWorkerHarness } from "./harness-service";
 import { HARNESS_DESCRIPTORS } from "@qf-harness/registry";
 import type { HarnessKind } from "@qf-harness/types";
 import { QUANTFLOW_DIR } from "./paths";
+import { traceAsync, recordCompletedSpan, isTraceEnabled, wrapIpcInvokeHandler } from "../../../src/kernel/perf";
+
+export type IpcInvokeHandler = (
+  event: import("electron").IpcMainInvokeEvent,
+  ...args: unknown[]
+) => unknown | Promise<unknown>;
+
+export { wrapIpcInvokeHandler };
+
+export function registerTracedIpcHandler(
+  channel: string,
+  handler: IpcInvokeHandler,
+): void {
+  ipcMain.handle(channel, (event, ...args) =>
+    wrapIpcInvokeHandler(channel, (...innerArgs: unknown[]) => handler(event, ...innerArgs))(...args),
+  );
+}
+
+export function registerPerfTraceHandlers(): void {
+  ipcMain.handle("perf:recordSpan", (_event, input: Record<string, unknown>) => {
+    if (!isTraceEnabled()) return { ok: true, skipped: true };
+    const durationMs = typeof input.duration_ms === "number" ? input.duration_ms : 0;
+    const startedAt = typeof input.started_at === "number"
+      ? input.started_at
+      : Date.now() - durationMs;
+    recordCompletedSpan({
+      layer: (input.layer as "canvas") ?? "canvas",
+      name: typeof input.name === "string" ? input.name : "renderer.projection.refresh",
+      started_at: startedAt,
+      duration_ms: durationMs,
+      status: "ok",
+      workflow_id: typeof input.workflow_id === "string" ? input.workflow_id : undefined,
+    });
+    return { ok: true };
+  });
+}
 
 const FS_CHANGE_DELETED = 3;
 
@@ -170,6 +206,7 @@ export function registerIpcHandlers(config: AppConfig): void {
   registerOrchestrationHandlers();
   registerEnvoyHandlers();
   registerWorkflowHandlers();
+  registerPerfTraceHandlers();
   registerKernelIpcHandlers(QUANTFLOW_DIR);
   // Kernel task lifecycle + receipt chain over JSON-RPC (MCP gate tools).
   registerKernelTaskRpc(registerMethod);
@@ -179,10 +216,10 @@ export function registerIpcHandlers(config: AppConfig): void {
   // Goal 6: the live worker-harness seam. Goal 5D will call getWorkerHarness(kind)
   // to spawn/send/readState/collectReceipts/stop workers. These read-only probes
   // prove the live app can construct/use the seam now (no spawn here).
-  ipcMain.handle("harness:list", () =>
+  registerTracedIpcHandler("harness:list", () =>
     HARNESS_DESCRIPTORS.map((d) => ({ kind: d.kind, description: d.description })),
   );
-  ipcMain.handle("harness:probe", (_event, kind: HarnessKind) => ({
+  registerTracedIpcHandler("harness:probe", (_event, kind: HarnessKind) => ({
     kind: getWorkerHarness(kind).kind,
   }));
 

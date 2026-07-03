@@ -10,9 +10,31 @@ import { handleStateCardCommand } from '../state-cards/index';
 import { handleConductorCommand } from '../conductor/index';
 import { handleWorkerCommand } from './worker-commands';
 import { handleEvalCommand } from '../evals/index';
+import { traceAsync } from '../perf/trace';
 export type { CommandResult } from './types';
 
 export async function dispatchKernelCommand(
+  type: KernelCommandType | string,
+  payload: Record<string, unknown>,
+  requestedBy = 'renderer',
+): Promise<import('./types').CommandResult> {
+  return traceAsync(
+    {
+      layer: 'kernel',
+      name: 'kernel.command',
+      phase: String(type),
+      workflow_id: typeof payload['workflowId'] === 'string' ? payload['workflowId'] : undefined,
+      tile_id: typeof payload['tileId'] === 'string' ? payload['tileId'] : undefined,
+      task_id: typeof payload['taskId'] === 'string' ? payload['taskId'] : undefined,
+      worker_id: typeof payload['workerId'] === 'string' ? payload['workerId'] : undefined,
+      correlation_id: typeof payload['correlationId'] === 'string' ? payload['correlationId'] : undefined,
+      payload_size_bytes: JSON.stringify(payload).length,
+    },
+    () => dispatchKernelCommandInner(type, payload, requestedBy),
+  );
+}
+
+async function dispatchKernelCommandInner(
   type: KernelCommandType | string,
   payload: Record<string, unknown>,
   requestedBy = 'renderer',

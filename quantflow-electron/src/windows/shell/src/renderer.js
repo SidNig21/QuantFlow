@@ -1512,6 +1512,7 @@ async function init() {
 	}
 	async function refreshWorkflowProjection() {
 		if (!window.kernelApi?.sendQuery) return;
+		const projectionStarted = performance.now();
 		try {
 			const [regions, snapshot] = await Promise.all([
 				window.kernelApi.sendQuery("kernel.workflow.region_list", {}),
@@ -1524,6 +1525,14 @@ async function init() {
 			}
 		} catch {
 			// Read-only projection: a failed read just leaves the last frame.
+		} finally {
+			const durationMs = performance.now() - projectionStarted;
+			window.shellApi?.recordPerfSpan?.({
+				name: "renderer.projection.refresh",
+				layer: "canvas",
+				duration_ms: durationMs,
+				started_at: Date.now() - durationMs,
+			});
 		}
 		renderRegions();
 		updateCables();

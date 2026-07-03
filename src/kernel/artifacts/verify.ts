@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { KernelDB } from '../database';
 import type { ArtifactRow, TaskRow } from '../schema/types';
+import { traceSync } from '../perf/trace';
 
 export interface ArtifactVerifyFs {
   existsSync?(path: string): boolean;
@@ -68,6 +69,21 @@ export function resolveArtifactRoot(
 }
 
 export function verifyTaskArtifacts(
+  db: KernelDB,
+  options: VerifyTaskArtifactsOptions,
+): StructuralArtifactResult {
+  return traceSync(
+    {
+      layer: 'artifact',
+      name: 'artifact.verify',
+      task_id: options.taskId,
+      payload_size_bytes: options.artifactRefs.length,
+    },
+    () => verifyTaskArtifactsInner(db, options),
+  );
+}
+
+function verifyTaskArtifactsInner(
   db: KernelDB,
   options: VerifyTaskArtifactsOptions,
 ): StructuralArtifactResult {

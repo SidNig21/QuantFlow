@@ -18,6 +18,7 @@ import type { KernelDB } from '../database';
 import type { ReceiptRow, ReceiptType } from '../schema/types';
 import { emitKernelEvent } from '../events/index';
 import type { CommandResult } from '../commands/types';
+import { traceSync } from '../perf/trace';
 
 function safeJsonObject(s: string): Record<string, unknown> {
   try {
@@ -64,6 +65,22 @@ export interface PostReceiptInput {
  * Receipts are immutable once written.
  */
 export function postReceipt(db: KernelDB, input: PostReceiptInput): string {
+  return traceSync(
+    {
+      layer: 'receipt',
+      name: 'receipt.post',
+      phase: input.type,
+      workflow_id: input.workflowId ?? undefined,
+      tile_id: input.tileId ?? undefined,
+      task_id: input.taskId ?? undefined,
+      worker_id: input.workerId ?? undefined,
+      correlation_id: input.correlationId ?? undefined,
+    },
+    () => postReceiptInner(db, input),
+  );
+}
+
+function postReceiptInner(db: KernelDB, input: PostReceiptInput): string {
   const id = randomUUID();
   const now = Date.now();
   db.prepare(
@@ -156,6 +173,25 @@ export function handleArtifactCommand(
   if (type !== 'kernel.artifact.create') {
     return { ok: false, error: `Unhandled artifact command: ${type}` };
   }
+  return traceSync(
+    {
+      layer: 'artifact',
+      name: 'artifact.create',
+      phase: typeof payload['kind'] === 'string' ? payload['kind'] : undefined,
+      workflow_id: typeof payload['workflowId'] === 'string' ? payload['workflowId'] : undefined,
+      tile_id: typeof payload['tileId'] === 'string' ? payload['tileId'] : undefined,
+      task_id: typeof payload['taskId'] === 'string' ? payload['taskId'] : undefined,
+      worker_id: typeof payload['workerId'] === 'string' ? payload['workerId'] : undefined,
+      correlation_id: typeof payload['correlationId'] === 'string' ? payload['correlationId'] : undefined,
+    },
+    () => handleArtifactCreateInner(db, payload),
+  );
+}
+
+function handleArtifactCreateInner(
+  db: KernelDB,
+  payload: Record<string, unknown>,
+): CommandResult {
   const kind = payload['kind'] as string | undefined;
   if (!kind) return { ok: false, error: 'artifact.create: kind required' };
   const metadata = (payload['metadata'] as Record<string, unknown> | undefined) ?? {};

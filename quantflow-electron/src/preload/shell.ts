@@ -36,6 +36,8 @@ ipcRenderer.on("shell:forward", (_event, target, channel, ...args) => {
   pendingForwards.push([target, channel, ...args]);
 });
 
+const perfTraceEnabled = process.env.QUANTFLOW_TRACE === "1" || process.env.QF_PERF_TRACE === "1";
+
 contextBridge.exposeInMainWorld("shellApi", {
   getPlatform: (): NodeJS.Platform => process.platform,
   minimizeWindow: (): void => ipcRenderer.send("window:minimize"),
@@ -45,6 +47,13 @@ contextBridge.exposeInMainWorld("shellApi", {
 
   getViewConfig: (): Promise<AllViewConfigs> =>
     ipcRenderer.invoke("shell:get-view-config"),
+
+  ...(perfTraceEnabled
+    ? {
+        recordPerfSpan: (input: Record<string, unknown>): Promise<unknown> =>
+          ipcRenderer.invoke("perf:recordSpan", input),
+      }
+    : {}),
 
   getPref: (key: string): Promise<unknown> =>
     ipcRenderer.invoke("pref:get", key),

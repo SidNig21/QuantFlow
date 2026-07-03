@@ -21,6 +21,7 @@ All canonical state and the mutation/query boundary:
 - `tasks/validators.ts` — Lifecycle guards: complete requires verifying + verification_passed receipt (or documented legacy bypass); self-verification refused. (Goal 3)
 - `tasks/index.ts` — Task command handlers (create/claim/start/submit/verify/reject/complete/block/fail) + task queries. Posts a receipt for every transition. (Goal 3)
 - `receipts/index.ts` — Append-only receipt store: `postReceipt`, `kernel.receipt.post`, `kernel.artifact.create`, receipt-chain query. (Goal 3)
+- `perf/trace.ts` + `perf/index.ts` — PF0 ephemeral span log gated by `QUANTFLOW_TRACE=1` (JSONL only; not Kernel truth).
 - `context/envelope.ts` — R2 ContextEnvelope v0 projection. Read-only, imports only `queries/index.ts`, and carries upstream artifact references/metadata, never artifact contents.
 - `state-cards/index.ts` and `watchers/index.ts` — Kernel-owned StateCard upserts/queries and the event watcher that promotes task, receipt, and tile events into current tile summaries. (Goal 4)
 - `worker-instances/index.ts` — Kernel-authoritative worker identity. `ensureWorkerInstanceForTile` (one default worker per tile, harness=local-shell + default model when seeded), `spawnWorkerForTile` (role/harness/model + status='spawning'), `updateWorkerInstance` (status + herdr_pane_id/envoy_space_id), `seedHarnessRegistry` (harnesses + default model from src/harness config), worker queries. (Goal 4 link → Goal 6A authority)

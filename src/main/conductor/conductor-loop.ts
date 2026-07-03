@@ -25,6 +25,7 @@ import { emitKernelEvent } from '../../kernel/events/index';
 import type { WorkflowProjection } from '../../kernel/workflows/index';
 import type { ConductorAction } from './conductor-actions';
 import { proposeNextAction, type ActionProposal } from './conductor-planner';
+import { traceAsync } from '../../kernel/perf/trace';
 
 export type LoopPhase =
   | 'awaiting_operator'
@@ -443,9 +444,10 @@ export function createConductorLoop(deps: ConductorLoopDeps): ConductorLoop {
     };
   }
 
-  return {
-    async step(input: LoopStepInput = {}): Promise<LoopStepResult> {
-      const context = await deps.readContext(input.workflowId);
+  async function stepAfterContext(
+    input: LoopStepInput,
+    context: ConductorContext,
+  ): Promise<LoopStepResult> {
       const run = input.workflowId && deps.readWorkflowProjection ? await deps.readWorkflowProjection(input.workflowId) : null;
       const checkpoint = input.checkpoint
         ?? (deps.readCheckpoint ? await deps.readCheckpoint({ workflowId: input.workflowId, context, run }) : null);
@@ -513,6 +515,28 @@ export function createConductorLoop(deps: ConductorLoopDeps): ConductorLoop {
       await record(input, phase, proposal, currentToken);
       const canContinue = result.ok && proposal.risk === 'low';
       return { status: phase, proposal, result, canContinue };
+  }
+
+  return {
+    async step(input: LoopStepInput = {}): Promise<LoopStepResult> {
+      return traceAsync(
+        {
+          layer: 'conductor',
+          name: 'conductor.plan.started',
+          workflow_id: input.workflowId,
+        },
+        async () => {
+          const context = await traceAsync(
+            {
+              layer: 'conductor',
+              name: 'conductor.context.query',
+              workflow_id: input.workflowId,
+            },
+            () => Promise.resolve(deps.readContext(input.workflowId)),
+          );
+          return stepAfterContext(input, context);
+        },
+      );
     },
   };
 }

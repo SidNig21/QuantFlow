@@ -33,6 +33,7 @@ import {
 } from "./sidecar/protocol";
 import { QUANTFLOW_DIR } from "./paths";
 import { resolveTerminalTarget } from "./terminal-target";
+import { traceHarnessSpawn, ingestPtyStreamBytes } from "../../../src/kernel/perf";
 import {
   createPtySession,
   endPtySession,
@@ -154,6 +155,7 @@ function forwardPtyData(
   senderWebContentsId: number | undefined,
   data: Buffer,
 ): void {
+  ingestPtyStreamBytes(sessionId, data);
   if (!shouldBatchWindowsPowerShellOutput(sessionId)) {
     sendToSender(senderWebContentsId, "pty:data", {
       sessionId,
@@ -486,6 +488,28 @@ function injectOsc7Hook(
 }
 
 export async function createSession(
+  cwd?: string,
+  senderWebContentsId?: number,
+  cols?: number,
+  rows?: number,
+  preferredTarget?: TerminalTarget | string,
+  tileId?: string,
+): Promise<{
+  sessionId: string;
+  shell: string;
+  displayName: string;
+  target: string;
+  command: string;
+  args: string[];
+  cwdHostPath: string;
+  cwdGuestPath?: string;
+}> {
+  return traceHarnessSpawn(tileId, () =>
+    createSessionInner(cwd, senderWebContentsId, cols, rows, preferredTarget, tileId),
+  );
+}
+
+async function createSessionInner(
   cwd?: string,
   senderWebContentsId?: number,
   cols?: number,
@@ -1222,4 +1246,9 @@ export function verifyTmuxAvailable(): { ok: true } | { ok: false; message: stri
       : "tmux binary not found or not executable";
     return { ok: false, message };
   }
+}
+
+/** Smoke/test hook — exercises the PTY byte-counter path without Electron IPC. */
+export function ingestPtyDataForTrace(sessionId: string, data: Buffer | string): void {
+  ingestPtyStreamBytes(sessionId, data);
 }

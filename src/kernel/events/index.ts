@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type { WebContents } from 'electron';
+import { traceSync } from '../perf/trace';
 
 export interface KernelEventPayload {
   kind: string;
@@ -14,14 +15,28 @@ const emitter = new EventEmitter();
 const subscribers = new Set<WebContents>();
 
 export function emitKernelEvent(payload: KernelEventPayload): void {
-  emitter.emit('kernel-event', payload);
-  for (const wc of subscribers) {
-    if (!wc.isDestroyed()) {
-      wc.send('kernel:event', payload);
-    } else {
-      subscribers.delete(wc);
-    }
-  }
+  traceSync(
+    {
+      layer: 'kernel',
+      name: 'kernel.event.fanout',
+      phase: payload.kind,
+      workflow_id: payload.workflowId,
+      tile_id: payload.tileId,
+      task_id: payload.taskId,
+      correlation_id: payload.correlationId,
+      payload_size_bytes: payload.data === undefined ? 0 : JSON.stringify(payload.data).length,
+    },
+    () => {
+      emitter.emit('kernel-event', payload);
+      for (const wc of subscribers) {
+        if (!wc.isDestroyed()) {
+          wc.send('kernel:event', payload);
+        } else {
+          subscribers.delete(wc);
+        }
+      }
+    },
+  );
 }
 
 export function subscribeWebContents(wc: WebContents): () => void {
