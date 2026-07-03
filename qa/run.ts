@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "fs";
 import { join, relative } from "path";
+import { validatePerfBaselineFile } from "./lib/perf-baseline-schema";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
@@ -103,6 +104,25 @@ const checks: Check[] = [
     description: "Electron shell unit suite",
     run() {
       return runBunTest([], join(REPO_ROOT, "quantflow-electron"));
+    },
+  },
+  {
+    name: "perf-baseline",
+    description: "recapture qa/perf-baseline.json (5 trials per benchmark)",
+    async run() {
+      const { capturePerfBaseline, writePerfBaseline } = await import(
+        "./perf-baseline-capture"
+      );
+      const baseline = await capturePerfBaseline();
+      writePerfBaseline(baseline);
+      return true;
+    },
+  },
+  {
+    name: "perf-baseline-present",
+    description: "assert qa/perf-baseline.json exists and is well-formed",
+    run() {
+      return validatePerfBaselineFile();
     },
   },
 ];

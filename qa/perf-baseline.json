@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "captured_at": "2026-07-03T05:27:29.452Z",
+  "host": {
+    "platform": "win32",
+    "cpu_model": "Intel(R) Core(TM) i9-10900KF CPU @ 3.70GHz",
+    "bun_version": "1.3.12"
+  },
+  "trials": 5,
+  "benchmarks": {
+    "B1": {
+      "description": "Cold-start proxy: headless kernel DB init, migrations, harness registry, state-card watcher",
+      "method": "headless kernel+watcher bootstrap via bun subprocess; bun:sqlite temp-file kernel.db with all v3 migration SQL, seedHarnessRegistry, startStateCardWatcher; excludes Electron window/renderer paint and better-sqlite3 initKernelDb native path",
+      "unit": "ms",
+      "p50_ms": 95.31269999999999,
+      "p95_ms": 117.99510000000001,
+      "trials_ms": [
+        94.20010000000002,
+        94.85570000000001,
+        95.31269999999999,
+        95.45230000000001,
+        117.99510000000001
+      ]
+    },
+    "B3": {
+      "description": "10-tile multi-drag commit: sequential kernel.tile.move via dispatchKernelCommand",
+      "method": "in-memory kernel DB; workflow + 10 tiles pre-created; elapsed ms for 10 sequential dispatchKernelCommand('kernel.tile.move') calls (mirrors tile-manager.js commitTileMoves loop); excludes drag UI and IPC",
+      "unit": "ms",
+      "p50_ms": 0.8280000000002019,
+      "p95_ms": 1.268100000000004,
+      "trials_ms": [
+        1.268100000000004,
+        0.8280000000002019,
+        0.6941999999999098,
+        0.8730000000000473,
+        0.6031000000000404
+      ]
+    },
+    "B4": {
+      "description": "Receipt event storm: 100 kernel.receipt.post commands with renderer refetch counting",
+      "method": "in-memory kernel DB; onKernelEvent listener counts snapshot refetch when kind matches renderer policy (prefixes: tile.*, task.*, connection.*, workflow.*; exact: receipt.posted; projection kinds: tile.*, task.*, connection.*, workflow.*, receipt.posted, artifact.created, checkpoint.awaiting-selection, human_decision, evaluation.created, conductor.plan_posted, worker.spawned, worker.status_updated, worker.stopped); 100 receipts posted via dispatchKernelCommand within storm window",
+      "unit": "ms",
+      "p50_ms": 6.784200000000055,
+      "p95_ms": 7.995100000000093,
+      "trials_ms": [
+        7.995100000000093,
+        7.544500000000198,
+        6.567900000000009,
+        6.784200000000055,
+        6.533900000000131
+      ],
+      "refetch_count_per_trial": [
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "refetch_trigger_kinds": [
+        "tile.*",
+        "task.*",
+        "connection.*",
+        "workflow.*",
+        "receipt.posted",
+        "artifact.created",
+        "checkpoint.awaiting-selection",
+        "human_decision",
+        "evaluation.created",
+        "conductor.plan_posted",
+        "worker.spawned",
+        "worker.status_updated",
+        "worker.stopped"
+      ]
+    }
+  }
+}
