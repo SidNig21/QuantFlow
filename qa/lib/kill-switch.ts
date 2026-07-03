@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createEveHarness } from '../../src/harness/eve/index';
+import { createAgentOsHarness } from '../../src/harness/agentos/index';
+import { createSimTransport } from '../../src/harness/agentos/sim-transport';
 import { setKernelDbForTesting } from '../../src/kernel/database';
 import { compareGoldenReceipts } from './golden-task-atom';
 
@@ -50,6 +52,33 @@ async function probeEveUnavailable(): Promise<{ ok: boolean; message: string }> 
   return { ok: true, message: 'Eve harness degraded gracefully' };
 }
 
+async function probeAgentOsUnavailable(): Promise<{ ok: boolean; message: string }> {
+  const transport = createSimTransport({ failPrompt: true, failHealth: true });
+  const harness = createAgentOsHarness({
+    transport,
+    workspace: mkdtempSync(join(tmpdir(), 'qf-agentos-kill-')),
+  });
+
+  const handle = await harness.spawn({ tileId: 'tile-agentos-kill', roleId: 'agentos-kill' });
+  try {
+    await harness.send(handle, { text: 'probe', taskId: 'task-agentos-kill' });
+    return { ok: false, message: 'send should have failed against unreachable AgentOS' };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!/unavailable|ECONNREFUSED|health check failed/i.test(msg)) {
+      return { ok: false, message: `unexpected AgentOS error shape: ${msg}` };
+    }
+  }
+
+  const state = await harness.readState(handle);
+  if (state.status === 'complete') {
+    return { ok: false, message: 'readState must not report complete when AgentOS is down' };
+  }
+
+  await harness.stop(handle);
+  return { ok: true, message: 'AgentOS harness degraded gracefully' };
+}
+
 export async function runKillSwitchCheck(): Promise<boolean> {
   let ok = true;
   const rejections: unknown[] = [];
@@ -83,6 +112,12 @@ export async function runKillSwitchCheck(): Promise<boolean> {
     if (!eveProbe.ok) {
       ok = false;
       console.error(`kill-switch: ${eveProbe.message}`);
+    }
+
+    const agentOsProbe = await probeAgentOsUnavailable();
+    if (!agentOsProbe.ok) {
+      ok = false;
+      console.error(`kill-switch: ${agentOsProbe.message}`);
     }
   } finally {
     if (savedEveUrl === undefined) delete process.env.QF_EVE_BASE_URL;

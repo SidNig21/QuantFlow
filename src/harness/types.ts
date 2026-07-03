@@ -12,7 +12,7 @@
  * inject fakes. Harness-specific assumptions must not leak into the Kernel.
  */
 
-export type HarnessKind = 'local-shell' | 'herdr-shell' | 'mock' | 'eve-harness';
+export type HarnessKind = 'local-shell' | 'herdr-shell' | 'mock' | 'eve-harness' | 'agentos';
 
 export interface HarnessDescriptor {
   kind: HarnessKind;
@@ -27,6 +27,7 @@ export interface WorkerRuntimeIds {
   envoySpaceId?: string | null;
   ptySessionId?: string | null;
   eveSessionId?: string | null;
+  agentosSessionId?: string | null;
   workspacePath?: string | null;
 }
 
@@ -59,6 +60,7 @@ export interface WorkerHandle {
   envoySpaceId?: string | null;
   ptySessionId?: string | null;
   eveSessionId?: string | null;
+  agentosSessionId?: string | null;
   workspacePath?: string | null;
 }
 

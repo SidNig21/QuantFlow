@@ -17,18 +17,21 @@ import { localShellHarness, createLocalShellHarness } from './local-shell/index'
 import { herdrShellHarness, createHerdrShellHarness } from './herdr-shell/index';
 import { mockHarness, createMockHarness } from './mock/index';
 import { eveHarness, createEveHarness } from './eve/index';
+import { agentosHarness, createAgentOsHarness } from './agentos/index';
 
 export const HARNESS_DESCRIPTORS: readonly HarnessDescriptor[] = [
   localShellHarness,
   herdrShellHarness,
   mockHarness,
   eveHarness,
+  agentosHarness,
 ];
 
 /** Map a tile/role runtime target to a harness kind. herdr-wsl → herdr-shell. */
 export function resolveHarnessKind(runtimeTarget?: string | null): HarnessKind {
   if (runtimeTarget === 'mock') return 'mock';
   if (runtimeTarget === 'eve' || runtimeTarget === 'eve-harness') return 'eve-harness';
+  if (runtimeTarget === 'agentos') return 'agentos';
   return runtimeTarget === 'herdr-wsl' || runtimeTarget === 'herdr-shell'
     ? 'herdr-shell'
     : 'local-shell';
@@ -55,6 +58,8 @@ export function createHarness(kind: HarnessKind, ops?: HarnessRuntimeOps): Worke
       return createMockHarness();
     case 'eve-harness':
       return createEveHarness();
+    case 'agentos':
+      throw new Error('agentos harness requires injected transport — use createAgentOsHarness(options)');
     default:
       throw new Error(`Unknown harness kind: ${kind as string}`);
   }

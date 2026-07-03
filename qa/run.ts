@@ -255,6 +255,15 @@ const checks: Check[] = [
       return runKillSwitchCheck();
     },
   },
+  {
+    name: "agentos-atom",
+    description:
+      "P5: scripted AgentOS adapter session — milestone receipt chain, approval gate, kernel.receipt.post",
+    async run() {
+      const { runAgentOsAtomCheck } = await import("./lib/agentos-atom");
+      return runAgentOsAtomCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));
