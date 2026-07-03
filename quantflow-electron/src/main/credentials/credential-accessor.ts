@@ -1,9 +1,13 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import electron from "electron";
+import {
+  getCredential as getEnvCredential,
+  type KnownCredentialName,
+} from "../../../../src/vault/credentials";
 import { QUANTFLOW_HOME } from "../paths";
 
-export type CredentialName = "OPENROUTER_API_KEY";
+export type CredentialName = KnownCredentialName;
 
 export interface CredentialStorage {
   isEncryptionAvailable: () => boolean;
@@ -37,11 +41,14 @@ export async function getCredential(
   name: CredentialName,
   storage: CredentialStorage = createSafeStorageCredentialStorage(),
 ): Promise<string | null> {
-  if (!storage.isEncryptionAvailable()) return null;
-  const encrypted = await storage.readEncrypted(name);
-  if (!encrypted) return null;
-  const value = storage.decryptString(encrypted).trim();
-  return value.length > 0 ? value : null;
+  if (storage.isEncryptionAvailable()) {
+    const encrypted = await storage.readEncrypted(name);
+    if (encrypted) {
+      const value = storage.decryptString(encrypted).trim();
+      if (value.length > 0) return value;
+    }
+  }
+  return getEnvCredential(name) ?? null;
 }
 
 export async function hasCredential(

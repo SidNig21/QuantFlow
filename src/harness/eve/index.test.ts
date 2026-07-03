@@ -135,4 +135,19 @@ describe('eve-harness', () => {
     await expect(harness.collectReceipts(handle)).resolves.toEqual([]);
     expect(canceled).toBe(true);
   });
+
+  test('fails fast with unavailable message when Eve endpoint is unreachable', async () => {
+    const harness = createEveHarness({
+      baseUrl: 'http://127.0.0.1:1',
+      workspace: resolve(process.cwd(), 'eve-workspace'),
+      fetch: async () => {
+        throw new Error('ECONNREFUSED');
+      },
+    });
+
+    const handle = await harness.spawn({ tileId: 'tile-down', roleId: 'eve-down' });
+    await expect(
+      harness.send(handle, { text: 'probe', taskId: 'task-down' }),
+    ).rejects.toThrow(/eve-harness unavailable/);
+  });
 });

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
+import { getCredential } from "../../src/vault/credentials-core.js";
 
 export function resolveQuantflowHome() {
   if (process.env.QUANTFLOW_HOME?.trim()) {
@@ -22,10 +23,10 @@ export function relayTokenCandidates() {
 }
 
 export function readRelayToken() {
-  const envToken = process.env.QUANTFLOW_RELAY_TOKEN?.trim();
+  const envToken = getCredential("QUANTFLOW_RELAY_TOKEN");
   if (envToken) return envToken;
 
-  const tokenFile = process.env.QUANTFLOW_RELAY_TOKEN_FILE?.trim();
+  const tokenFile = getCredential("QUANTFLOW_RELAY_TOKEN_FILE");
   if (tokenFile) {
     try {
       return fs.readFileSync(tokenFile, "utf8").trim() || null;

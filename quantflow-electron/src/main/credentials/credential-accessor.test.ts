@@ -32,10 +32,31 @@ describe("credential accessor", () => {
     )).resolves.toBe(false);
   });
 
-  test("does not read credentials when encryption is unavailable", async () => {
-    await expect(getCredential(
-      "OPENROUTER_API_KEY",
-      storage({ available: false, value: "sk-or-test" }),
-    )).resolves.toBeNull();
+  test('falls back to env when safeStorage is unavailable', async () => {
+    const prev = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = 'env-fallback-key';
+    try {
+      await expect(getCredential(
+        "OPENROUTER_API_KEY",
+        storage({ available: false, value: null }),
+      )).resolves.toBe("env-fallback-key");
+    } finally {
+      if (prev === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = prev;
+    }
+  });
+
+  test('returns null when storage and env both absent', async () => {
+    const prev = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    try {
+      await expect(getCredential(
+        "OPENROUTER_API_KEY",
+        storage({ available: false, value: null }),
+      )).resolves.toBeNull();
+    } finally {
+      if (prev === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = prev;
+    }
   });
 });

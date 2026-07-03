@@ -109,6 +109,12 @@ After meaningful changes: update this file if local rules or owned scope changed
 - `WorkerMessage.contextEnvelope` is the only harness delivery surface for R2 context. Adapters may receive it, but must not mutate Kernel state or synthesize artifact lineage themselves.
 - The deterministic mock harness records the full message for smoke assertions but keeps artifact content based on the task instruction, not copied upstream artifact bodies.
 
+## v5 F2 Addendum — external-runtime fence
+
+- **Eve, AgentOS, and future cloud harnesses are evidence feeds behind the fence**, never authority. They return `ReceiptDraft` / status facts; callers post through Kernel commands only.
+- Harness adapters must not call `emitKernelEvent`, `handle*Command`, or write Kernel SQLite directly. QA: `bun qa/run.ts runtime-fence`.
+- When an external runtime is unreachable, harnesses report unavailable/degraded status — they must not block app boot or corrupt Kernel truth. QA: `bun qa/run.ts kill-switch`.
+
 ## v4 R4 Addendum
 
 - `runtime-manager/index.ts` is an injected control plane for cancel/restart/stale/recover. It may call injected runtime stop/start hooks, but every durable mutation goes through injected Kernel command dispatch.

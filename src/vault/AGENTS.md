@@ -79,3 +79,8 @@ After meaningful changes: update this file if local rules or owned scope changed
 ## v4 R7 Addendum
 
 - Lesson cards are Kernel `lesson` artifacts first. `mirrorLessonArtifactsToVault` triggers the existing Goal 8 OKF exporter only as a vault mirror and must preserve Kernel ids.
+
+## v5 F1 Addendum — credentials boundary
+
+- `credentials.ts` + `credentials-core.js` — single host-side `getCredential()` accessor (env reads). See `docs/v5/SECRETS_BOUNDARY.md`.
+- QA: `bun qa/run.ts secrets-accessor`. Electron safeStorage layer in `quantflow-electron/src/main/credentials/` delegates env fallback to the vault accessor.

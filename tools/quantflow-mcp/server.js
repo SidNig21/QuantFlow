@@ -9,8 +9,9 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
+import { getCredential } from "../../src/vault/credentials-core.js";
 import { TOOL_DEFINITIONS } from "./tool-definitions.js";
-import { withRelayToken } from "./relay-token.js";
+import { withRelayToken, readRelayToken } from "./relay-token.js";
 
 const execFileAsync = promisify(execFile);
 const RPC_ONCE_SCRIPT = fileURLToPath(new URL("./rpc-once.js", import.meta.url));
@@ -42,25 +43,7 @@ function toWindowsPath(path) {
 }
 
 function readRelayTokenForProxy() {
-  const envToken = process.env.QUANTFLOW_RELAY_TOKEN?.trim();
-  if (envToken) return envToken;
-
-  const envTokenFile = process.env.QUANTFLOW_RELAY_TOKEN_FILE?.trim();
-  const candidates = [
-    envTokenFile,
-    `${os.homedir()}/.quantflow/relay-token`,
-    "/mnt/c/Users/rybow/.quantflow/relay-token",
-  ].filter(Boolean);
-
-  for (const candidate of candidates) {
-    try {
-      const token = fs.readFileSync(candidate, "utf8").trim();
-      if (token) return token;
-    } catch {
-      // Try the next candidate.
-    }
-  }
-  return "";
+  return readRelayToken() ?? "";
 }
 
 const RELAY_PORT = Number.parseInt(process.env.QUANTFLOW_RELAY_PORT || "9811", 10);

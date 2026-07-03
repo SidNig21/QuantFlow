@@ -32,7 +32,8 @@ const product = pkg.build.productName;
 const owner = pkg.build.publish[0].owner;
 const repo = pkg.build.publish[0].repo;
 
-const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+const { getCredential } = require("../../src/vault/credentials-core.js");
+const token = getCredential("GH_TOKEN") ?? getCredential("GITHUB_TOKEN");
 if (!token) {
   console.error("No GitHub token. Set GH_TOKEN or GITHUB_TOKEN.");
   process.exit(1);

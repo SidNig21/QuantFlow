@@ -1,3 +1,11 @@
+/**
+ * Eve harness — external-runtime evidence feed (Stage F2 fence).
+ *
+ * HTTP translator for local quantflow-eve. Reports facts via ReceiptDraft only;
+ * never writes Kernel state or calls emitKernelEvent. Callers post drafts through
+ * Kernel commands. When Eve is unreachable, operations fail fast with explicit
+ * errors — they do not block app boot or corrupt Kernel truth.
+ */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
@@ -65,12 +73,16 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
   const states = new Map<string, EveState>();
 
   async function postJson(path: string, payload: Record<string, unknown>): Promise<unknown> {
-    const res = await fetchImpl(`${baseUrl}${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return parseResponse(res);
+    try {
+      const res = await fetchImpl(`${baseUrl}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return parseResponse(res);
+    } catch (error) {
+      throw new Error(formatEveUnavailable(error));
+    }
   }
 
   function stateFor(handle: WorkerHandle, fallbackWorkspace = workspace): EveState {
@@ -198,7 +210,7 @@ export function createEveHarness(options: EveHarnessOptions = {}): WorkerHarness
       processStreamText(state, await parseText(res));
     } catch (error) {
       if (controller.signal.aborted) throw new Error(`eve-harness stream timed out after ${streamTimeoutMs}ms`);
-      throw error;
+      throw new Error(formatEveUnavailable(error));
     } finally {
       clearTimeout(timeout);
     }
@@ -364,4 +376,9 @@ function isTurnBoundaryEvent(value: unknown): boolean {
 
 function stripTrailingSlash(s: string): string {
   return s.endsWith('/') ? s.slice(0, -1) : s;
+}
+
+function formatEveUnavailable(error: unknown): string {
+  const detail = error instanceof Error ? error.message : String(error);
+  return `eve-harness unavailable: ${detail}`;
 }

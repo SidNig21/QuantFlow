@@ -228,6 +228,33 @@ const checks: Check[] = [
       return runOneEventPathCheck();
     },
   },
+  {
+    name: "secrets-accessor",
+    description:
+      "F1: all secret env reads route through src/vault/credentials; no secret literals in source",
+    async run() {
+      const { runSecretsAccessorCheck } = await import("./lib/secrets-accessor");
+      return runSecretsAccessorCheck();
+    },
+  },
+  {
+    name: "runtime-fence",
+    description:
+      "F2: no Kernel-canonical fact originates outside Kernel command handlers",
+    async run() {
+      const { runRuntimeFenceCheck } = await import("./lib/runtime-fence");
+      return runRuntimeFenceCheck();
+    },
+  },
+  {
+    name: "kill-switch",
+    description:
+      "F2: app core runs with Eve and AgentOS unreachable — golden + one-truth + graceful Eve degradation",
+    async run() {
+      const { runKillSwitchCheck } = await import("./lib/kill-switch");
+      return runKillSwitchCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));
