@@ -774,6 +774,18 @@ export function createCanvasRpc({
 					}
 					const tileA = getTile(conn?.tileAId);
 					const tileB = getTile(conn?.tileBId);
+					if (window.kernelApi) {
+						const kr = await window.kernelApi.sendCommand(
+							"kernel.connection.delete", { id: params.id },
+						);
+						if (kr && kr.ok === false) {
+							respondError(
+								requestId, 5,
+								`Kernel rejected connection.delete: ${kr.error}`,
+							);
+							return;
+						}
+					}
 					removeConnection(params.id);
 					onConnectionRemoved?.(conn, tileA, tileB);
 					tileManager.saveCanvasImmediate();
@@ -781,8 +793,8 @@ export function createCanvasRpc({
 					break;
 				}
 				case "connectionUpdateLabel": {
-					const conn = updateConnectionLabel(params.id, params.label);
-					if (!conn) {
+					const existing = getConnection(params.id);
+					if (!existing) {
 						onConnectionFailed?.(
 							createConnectionFailureEvent(
 								"Connection not found.",
@@ -792,6 +804,20 @@ export function createCanvasRpc({
 						respondError(requestId, 3, "Connection not found");
 						return;
 					}
+					if (window.kernelApi) {
+						const kr = await window.kernelApi.sendCommand(
+							"kernel.connection.update",
+							{ id: params.id, label: params.label },
+						);
+						if (kr && kr.ok === false) {
+							respondError(
+								requestId, 5,
+								`Kernel rejected connection.update: ${kr.error}`,
+							);
+							return;
+						}
+					}
+					const conn = updateConnectionLabel(params.id, params.label);
 					onConnectionUpdated?.(
 						conn,
 						getTile(conn.tileAId),

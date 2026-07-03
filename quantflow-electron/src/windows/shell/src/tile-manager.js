@@ -18,6 +18,7 @@ import { findAutoPlacement } from "./canvas-rpc.js";
 import { ensureRouteHandle } from "./tile-route-handles.js";
 import { getRoleStartupWrites } from "./role-startup.js";
 import { renderStateCardBack } from "./tile-state-card.js";
+import { isOneTruthEnabled } from "./canvas-truth.js";
 
 /**
  * Tile lifecycle manager: creation, deletion, persistence, webview
@@ -59,6 +60,17 @@ export function createTileManager({
 
 	function safeCoord(v) {
 		return Number.isFinite(v) ? v : 0;
+	}
+
+	async function syncBrowserUrlToKernel(tile, url) {
+		if (!isOneTruthEnabled() || !window.kernelApi || tile.type !== "browser") {
+			return true;
+		}
+		const kr = await window.kernelApi.sendCommand(
+			"kernel.tile_extension.set",
+			{ tileId: tile.id, url },
+		);
+		return !(kr && kr.ok === false);
 	}
 
 	function registerTerminalTileSession(tile) {
@@ -312,6 +324,12 @@ export function createTileManager({
 		const tile = getTile(id);
 		if (tile) {
 			bringToFront(tile);
+			if (isOneTruthEnabled() && window.kernelApi) {
+				void window.kernelApi.sendCommand("kernel.tile.layout_sync", {
+					id: tile.id,
+					zIndex: tile.zIndex,
+				});
+			}
 			repositionAllTiles();
 		}
 		const dom = tileDOMs.get(id);
@@ -597,6 +615,7 @@ export function createTileManager({
 
 		wv.addEventListener("did-navigate", (e) => {
 			tile.url = e.url;
+			void syncBrowserUrlToKernel(tile, e.url);
 			if (dom.urlInput) dom.urlInput.value = e.url;
 			updateTileTitle(dom, tile);
 			updateNavState();
@@ -606,6 +625,7 @@ export function createTileManager({
 		wv.addEventListener("did-navigate-in-page", (e) => {
 			if (e.isMainFrame) {
 				tile.url = e.url;
+				void syncBrowserUrlToKernel(tile, e.url);
 				if (dom.urlInput) dom.urlInput.value = e.url;
 				updateTileTitle(dom, tile);
 				updateNavState();
@@ -726,10 +746,11 @@ export function createTileManager({
 					window.shellApi.selectFile(t.filePath);
 				}
 			},
-			onNavigate: (id, url) => {
+			onNavigate: async (id, url) => {
 				const t = getTile(id);
 				if (!t || t.type !== "browser") return;
 				t.url = url;
+				if (!(await syncBrowserUrlToKernel(t, url))) return;
 				const d = tileDOMs.get(id);
 				if (d?.webview) {
 					d.contentArea.removeChild(d.webview);
@@ -756,13 +777,7 @@ export function createTileManager({
 				const d = tileDOMs.get(id);
 				if (!t || !d) return;
 				startInlineRename(d, t, (newTitle) => {
-					if (newTitle === "") {
-						delete t.userTitle;
-					} else {
-						t.userTitle = newTitle;
-					}
-					updateTileTitle(d, t);
-					saveCanvasImmediate();
+					void applyTileUserTitle(t, newTitle, d);
 				});
 			},
 			onCablePortMouseDown,
@@ -1138,13 +1153,29 @@ export function createTileManager({
 	function renameTile(id, newTitle) {
 		const t = getTile(id);
 		if (!t) return;
+		const d = tileDOMs.get(id);
+		void applyTileUserTitle(t, newTitle, d);
+	}
+
+	async function applyTileUserTitle(t, newTitle, dom) {
 		if (newTitle === "") {
 			delete t.userTitle;
 		} else {
 			t.userTitle = newTitle;
 		}
-		const d = tileDOMs.get(id);
-		if (d) updateTileTitle(d, t);
+		if (isOneTruthEnabled() && window.kernelApi) {
+			await window.kernelApi.sendCommand("kernel.tile_extension.set", {
+				tileId: t.id,
+				userTitle: newTitle === "" ? null : newTitle,
+			});
+			if (newTitle !== "") {
+				await window.kernelApi.sendCommand("kernel.tile.rename", {
+					id: t.id,
+					displayName: newTitle,
+				});
+			}
+		}
+		if (dom) updateTileTitle(dom, t);
 		saveCanvasImmediate();
 		registerTerminalTileSession(t);
 	}

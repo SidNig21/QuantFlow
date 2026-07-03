@@ -54,6 +54,7 @@ import {
 	applyViewportTransform,
 } from "./tile-renderer.js";
 import { formatCableContextRelay } from "./cable-overlay.js";
+import { isOneTruthEnabled } from "./canvas-truth.js";
 import { createCableInspector } from "./cable-inspector.js";
 import { clearCablePreview, renderCablePreview, renderCables } from "./cable-renderer.js";
 import { renderWorkflowRegions } from "./workflow-region-overlay.js";
@@ -1315,10 +1316,22 @@ async function init() {
 
 	// -- Cable overlay --
 
-	function removeConnectionById(id) {
+	async function removeConnectionById(id) {
 		const conn = connections.find((item) => item.id === id);
 		const tileA = getTile(conn?.tileAId);
 		const tileB = getTile(conn?.tileBId);
+		if (window.kernelApi) {
+			const kr = await window.kernelApi.sendCommand(
+				"kernel.connection.delete", { id },
+			);
+			if (kr && kr.ok === false) {
+				toasts.show({
+					message: `Could not remove connection: ${kr.error ?? "delete rejected"}`,
+					tone: "warn",
+				});
+				return;
+			}
+		}
 		removeConnection(id);
 		operationalEvents.record({
 			type: "connection.removed",
@@ -1408,22 +1421,25 @@ async function init() {
 	}
 
 	function updateCableLabel(id, label) {
-		const conn = updateConnectionLabel(id, label);
-		if (conn) {
-			operationalEvents.record(createConnectionLabelEvent(
-				conn,
-				getTile(conn.tileAId),
-				getTile(conn.tileBId),
-				tileEventLabel,
-				"cable-inspector",
-			));
+		if (!isOneTruthEnabled()) {
+			const conn = updateConnectionLabel(id, label);
+			if (conn) {
+				operationalEvents.record(createConnectionLabelEvent(
+					conn,
+					getTile(conn.tileAId),
+					getTile(conn.tileBId),
+					tileEventLabel,
+					"cable-inspector",
+				));
+			}
 		}
-		// Kernel owns the label too (Goal 7): persist it as connection authority,
-		// not only in local canvas-state. The connection.updated event refreshes
-		// the projection.
+		// Kernel owns the label (Goal 7). Under one-truth the cache updates from
+		// connection.updated; flag-off keeps the legacy dual-write for parity.
 		void window.kernelApi?.sendCommand?.("kernel.connection.update", { id, label });
-		tileManager.saveCanvasImmediate();
-		updateCables();
+		if (!isOneTruthEnabled()) {
+			tileManager.saveCanvasImmediate();
+			updateCables();
+		}
 	}
 
 	// Goal 7: set a string's semantic meaning through the Kernel. We do not
@@ -1467,6 +1483,13 @@ async function init() {
 	// -- Cable layer (SVG renderer + inspector) --
 	const cableLayerContent = document.getElementById("cable-layer-content");
 	function tidyTilesToGrid() {
+		const before = tiles.map((t) => ({
+			id: t.id,
+			x: t.x,
+			y: t.y,
+			width: t.width,
+			height: t.height,
+		}));
 		const result = repackTilesToGrid(tiles, {
 			viewport: {
 				width: panelViewer.clientWidth,
@@ -1474,8 +1497,33 @@ async function init() {
 				screenSpace: true,
 			},
 		});
+		if (isOneTruthEnabled() && window.kernelApi) {
+			void (async () => {
+				for (const tile of tiles) {
+					const prev = before.find((b) => b.id === tile.id);
+					if (!prev) continue;
+					if (
+						prev.x === tile.x &&
+						prev.y === tile.y &&
+						prev.width === tile.width &&
+						prev.height === tile.height
+					) {
+						continue;
+					}
+					await window.kernelApi.sendCommand("kernel.tile.layout_sync", {
+						id: tile.id,
+						x: tile.x,
+						y: tile.y,
+						width: tile.width,
+						height: tile.height,
+					});
+				}
+				tileManager.saveCanvasImmediate();
+			})();
+		} else {
+			tileManager.saveCanvasImmediate();
+		}
 		tileManager.repositionAllTiles();
-		tileManager.saveCanvasImmediate();
 		updateCables();
 		toasts.show({
 			message: formatRepackTilesToast(result),
@@ -3675,6 +3723,14 @@ async function init() {
 					syncConnectionGraph();
 					updateCables();
 				}
+			},
+			onConnectionUpdated: ({ data }) => {
+				if (typeof data.label === "string") {
+					updateConnectionLabel(data.id, data.label);
+				}
+				syncConnectionGraph();
+				updateCables();
+				tileManager.saveCanvasImmediate();
 			},
 			onStateCardUpdated: ({ tileId }) => {
 				// Kernel State Card changed → refresh the back face if flipped.

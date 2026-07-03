@@ -565,7 +565,6 @@ export function createCableOverlay({
 			const next = prompt("Cable label:", conn.label ?? "");
 			if (next !== null) {
 				onUpdateLabel?.(conn.id, next);
-				conn.label = next;
 			}
 		});
 		addAction("Remove", () => {

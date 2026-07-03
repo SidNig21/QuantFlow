@@ -33,6 +33,23 @@ Renderer renders Kernel snapshots/events.
 Do not create a second source of truth.
 ```
 
+### Stage D3 — `canvas-state.js` read-through cache (shell)
+
+In `quantflow-electron/src/windows/shell/src/canvas-state.js`, `tiles[]` and
+`connections[]` are a **read-through cache** of Kernel truth — not authoritative
+stores. Durable mutations must route through Kernel commands
+(`kernel.tile.*`, `kernel.connection.*`, `kernel.tile_extension.set`,
+`kernel.canvas.settings.set`) and reconcile into the cache via event handlers or
+post-command updates on success. Selection, drag/resize previews, and PTY session
+handles remain local UI/runtime ephemera.
+
+Behavior-risky cache bypasses are gated on `QF_ONE_TRUTH=1` (exposed to the shell
+renderer as `window.shellApi.isOneTruthEnabled()`). Mechanical fixes where a
+Kernel command already existed but was not called on one path stay always-on.
+
+Lint guard: `bun qa/run.ts canvas-cache-discipline` — allowlist in
+`qa/lib/canvas-cache-allowlist.ts`.
+
 ## What This Subtree Must Not Do
 
 - Write canonical tile position, status, task, or receipt state to local renderer store only.

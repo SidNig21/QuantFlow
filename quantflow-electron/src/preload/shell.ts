@@ -37,9 +37,11 @@ ipcRenderer.on("shell:forward", (_event, target, channel, ...args) => {
 });
 
 const perfTraceEnabled = process.env.QUANTFLOW_TRACE === "1" || process.env.QF_PERF_TRACE === "1";
+const oneTruthEnabled = process.env.QF_ONE_TRUTH === "1";
 
 contextBridge.exposeInMainWorld("shellApi", {
   getPlatform: (): NodeJS.Platform => process.platform,
+  isOneTruthEnabled: (): boolean => oneTruthEnabled,
   minimizeWindow: (): void => ipcRenderer.send("window:minimize"),
   maximizeWindow: (): void => ipcRenderer.send("window:maximize"),
   closeWindow: (): void => ipcRenderer.send("window:close"),

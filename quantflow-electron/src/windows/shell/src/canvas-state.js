@@ -1,4 +1,15 @@
 /**
+ * READ-THROUGH CACHE of Kernel canvas truth (Stage D3).
+ *
+ * `tiles[]` and `connections[]` are renderer projections — not authoritative stores.
+ * Durable mutations (geometry, z-order, membership, labels, extension fields) must
+ * originate from Kernel commands and reconcile here via event handlers or explicit
+ * post-command cache updates on success. Selection state and drag/resize previews
+ * are UI ephemera and may mutate locally without Kernel round-trips.
+ *
+ * Geometry helpers (`canvas-grid.js` re-exports) stay co-located; deletion of this
+ * module is deferred until D5 when projection fully replaces the cache arrays.
+ *
  * @typedef {'term' | 'note' | 'code' | 'image' | 'graph' | 'browser' | 'pdf'} TileType
  *
  * @typedef {Object} Tile

@@ -179,6 +179,17 @@ const checks: Check[] = [
       return runOneTruthSaveCheck();
     },
   },
+  {
+    name: "canvas-cache-discipline",
+    description:
+      "D3 lint: shell src cache mutations only in documented allowlist (canvas-state reconcile paths)",
+    async run() {
+      const { runCanvasCacheDisciplineCheck } = await import(
+        "./lib/canvas-cache-discipline"
+      );
+      return runCanvasCacheDisciplineCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));
