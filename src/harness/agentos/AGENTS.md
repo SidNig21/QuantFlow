@@ -8,7 +8,10 @@ live in the WSL **host process** (`tools/agentos-host/`), not in this repo root.
 - Implement `WorkerHarness` for kind `agentos`.
 - Translate ACP `session/update` events → milestone `ReceiptDraft`s only.
 - Bridge toolkit `approval-request` and ACP `onPermissionRequest` through the
-  same injected `ApprovalGate` (host wires to Kernel checkpoint + `human_decision`).
+  same injected `ApprovalGate`. The production gate lives in Electron main
+  (`quantflow-electron/src/main/agentos-approval.ts`): it surfaces the blocker on
+  the tile state card (`kernel.state_card.update`), posts `approval.requested`
+  progress + `human_decision` receipts, and resolves via `agentos:approve` IPC.
 - Expose `AgentOsTransport` — the localhost HTTP/SSE seam the WSL host implements.
 
 ## Ownership
@@ -60,6 +63,17 @@ bun qa/run.ts kill-switch
 WSL sidecar: `tools/agentos-host/host.js` — see `tools/agentos-host/AGENTS.md`.
 Electron main ↔ host over localhost (same pattern as herdr). Lifecycle:
 `startAgentOsHost()` spawns `wsl -e bash -lc "cd …/tools/agentos-host && node host.js"`.
+
+## Live wiring (Electron main, P6)
+
+- `quantflow-electron/src/main/agentos-service.ts` — lazy singleton behind
+  `getWorkerHarness('agentos')`; the WSL host starts on first transport use,
+  never at boot (kill-switch invariant). `QF_AGENTOS_SIM=1` swaps in the sim
+  transport (scripted loop proof only).
+- `quantflow-electron/src/main/agentos-run.ts` — fire-and-forget run driver
+  (`agentos:run` IPC): spawn → send → collectReceipts → `kernel.receipt.post`.
+- Scripted proof: `bun qa/run.ts loop-proof` (see
+  `quantflow-electron/src/main/agentos-loop-proof.ts`).
 
 ## Child DOX Index
 
