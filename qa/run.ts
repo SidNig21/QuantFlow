@@ -133,6 +133,25 @@ const checks: Check[] = [
       return runTaxonomySyncCheck();
     },
   },
+  {
+    name: "golden-capture",
+    description: "capture normalized task-atom receipt chain to qa/golden/",
+    async run() {
+      const { captureGoldenReceiptsJsonl, writeGoldenReceipts } = await import(
+        "./lib/golden-task-atom"
+      );
+      writeGoldenReceipts(await captureGoldenReceiptsJsonl());
+      return true;
+    },
+  },
+  {
+    name: "golden",
+    description: "byte-diff task-atom receipts against committed golden",
+    async run() {
+      const { compareGoldenReceipts } = await import("./lib/golden-task-atom");
+      return compareGoldenReceipts();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));
