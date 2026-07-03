@@ -3,26 +3,29 @@ import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 let mockAppVersion = "0.1.0";
 
 // Mock electron
-mock.module("electron", () => ({
-  app: {
-    getVersion: () => mockAppVersion,
-    isPackaged: false,
-    on: () => {},
-    quit: () => {},
-  },
-  BrowserWindow: {
-    getAllWindows: () => [
-      { isDestroyed: () => false, webContents: { send: () => {} } },
-    ],
-  },
-  ipcMain: {
-    handle: () => {},
-    on: () => {},
-  },
-  powerMonitor: {
-    on: () => {},
-  },
-}));
+mock.module("electron", () => {
+  const electronMock = {
+    app: {
+      getVersion: () => mockAppVersion,
+      isPackaged: false,
+      on: () => {},
+      quit: () => {},
+    },
+    BrowserWindow: {
+      getAllWindows: () => [
+        { isDestroyed: () => false, webContents: { send: () => {} } },
+      ],
+    },
+    ipcMain: {
+      handle: () => {},
+      on: () => {},
+    },
+    powerMonitor: {
+      on: () => {},
+    },
+  };
+  return { ...electronMock, default: electronMock };
+});
 
 mock.module("../analytics", () => ({
   trackEvent: (event: string, props: unknown) => {

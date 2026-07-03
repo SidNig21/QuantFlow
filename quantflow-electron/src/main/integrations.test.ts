@@ -27,27 +27,30 @@ function setupSkillSource(baseDir: string) {
   );
 }
 
-mock.module("electron", () => ({
-  app: {
-    isPackaged: false,
-    getAppPath: () => FAKE_APP_PATH,
-    getVersion: () => "0.7.0-beta.1",
-    on: () => {},
-    quit: () => {},
-  },
-  BrowserWindow: {
-    getAllWindows: () => [
-      { isDestroyed: () => false, webContents: { send: () => {} } },
-    ],
-  },
-  ipcMain: {
-    handle: () => {},
-    on: () => {},
-  },
-  powerMonitor: {
-    on: () => {},
-  },
-}));
+mock.module("electron", () => {
+  const electronMock = {
+    app: {
+      isPackaged: false,
+      getAppPath: () => FAKE_APP_PATH,
+      getVersion: () => "0.7.0-beta.1",
+      on: () => {},
+      quit: () => {},
+    },
+    BrowserWindow: {
+      getAllWindows: () => [
+        { isDestroyed: () => false, webContents: { send: () => {} } },
+      ],
+    },
+    ipcMain: {
+      handle: () => {},
+      on: () => {},
+    },
+    powerMonitor: {
+      on: () => {},
+    },
+  };
+  return { ...electronMock, default: electronMock };
+});
 
 const {
   _setIntegrationsApp,
