@@ -1,9 +1,13 @@
 import { EventEmitter } from 'node:events';
 import type { WebContents } from 'electron';
 import { traceSync } from '../perf/trace';
+import type { KernelEventKind } from './taxonomy';
+
+export type { KernelEventKind } from './taxonomy';
+export { KERNEL_EVENT_KINDS } from './taxonomy';
 
 export interface KernelEventPayload {
-  kind: string;
+  kind: KernelEventKind;
   correlationId?: string;
   tileId?: string;
   workflowId?: string;

@@ -125,6 +125,14 @@ const checks: Check[] = [
       return validatePerfBaselineFile();
     },
   },
+  {
+    name: "taxonomy-sync",
+    description: "EVENT_TAXONOMY.md kind list == KERNEL_EVENT_KINDS; all kinds have call sites",
+    async run() {
+      const { runTaxonomySyncCheck } = await import("./lib/taxonomy-sync");
+      return runTaxonomySyncCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));

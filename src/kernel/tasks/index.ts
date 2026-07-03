@@ -18,7 +18,7 @@
 import { randomUUID } from 'node:crypto';
 import type { KernelDB } from '../database';
 import type { TaskRow, TaskStatus } from '../schema/types';
-import { emitKernelEvent } from '../events/index';
+import { emitKernelEvent, type KernelEventKind } from '../events/index';
 import { postReceipt } from '../receipts/index';
 import { autoTriggerTaskEvaluations } from '../evals/auto-trigger';
 import { assignWorkerToTask, ensureWorkerInstanceForTile } from '../worker-instances/index';
@@ -137,7 +137,7 @@ function setStatus(
   db.prepare(`UPDATE tasks SET ${cols.join(', ')} WHERE id = ?`).run(...vals);
 }
 
-function emitTaskEvent(task: TaskRow, kind: string, data: Record<string, unknown> = {}): void {
+function emitTaskEvent(task: TaskRow, kind: KernelEventKind, data: Record<string, unknown> = {}): void {
   emitKernelEvent({
     kind,
     taskId: task.id,

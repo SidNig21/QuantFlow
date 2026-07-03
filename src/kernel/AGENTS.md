@@ -10,6 +10,7 @@ All canonical state and the mutation/query boundary:
 - `migrations/001-v3-baseline.sql` — SQLite schema DDL (v3 baseline).
 - `database.ts` — SQLite singleton; opens `kernel.db`, runs baseline migration. (Goal 2)
 - `events/index.ts` — EventEmitter event bus; forwards `KernelEventPayload` to subscribed WebContents. (Goal 2)
+- `events/taxonomy.ts` — Frozen `KERNEL_EVENT_KINDS` + `KernelEventKind`; narrows payload `kind`. Synced with `docs/v4/EVENT_TAXONOMY.md` via `bun qa/run.ts taxonomy-sync`. (B4)
 - `commands/types.ts` — `CommandResult` interface. (Goal 2)
 - `commands/index.ts` — Command dispatcher; writes audit row to `commands` table, routes by prefix. (Goal 2)
 - `commands/tile-commands.ts` — Tile CRUD: create, move, resize, rename, status_update, remove. (Goal 2)
