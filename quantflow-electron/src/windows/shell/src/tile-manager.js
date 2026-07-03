@@ -708,6 +708,34 @@ export function createTileManager({
 				removeTile(tile.id);
 				return null;
 			}
+			if (isOneTruthEnabled()) {
+				const extPayload = { tileId: tile.id, canvasType: type };
+				if (tile.filePath !== undefined) extPayload.filePath = tile.filePath;
+				if (tile.folderPath !== undefined) extPayload.folderPath = tile.folderPath;
+				if (tile.url !== undefined) extPayload.url = tile.url;
+				if (tile.workspacePath !== undefined) {
+					extPayload.workspacePath = tile.workspacePath;
+				}
+				if (tile.terminalTarget !== undefined) {
+					extPayload.terminalTarget = tile.terminalTarget;
+				}
+				if (tile.runtimeTarget !== undefined) {
+					extPayload.runtimeTarget = tile.runtimeTarget;
+				}
+				if (tile.userTitle !== undefined) extPayload.userTitle = tile.userTitle;
+				if (tile.autoTitle !== undefined) extPayload.autoTitle = tile.autoTitle;
+				if (tile.routeHandle !== undefined) extPayload.routeHandle = tile.routeHandle;
+				if (tile.herdrAgentName !== undefined) {
+					extPayload.herdrAgentName = tile.herdrAgentName;
+				}
+				if (tile.herdrWorkspaceId !== undefined) {
+					extPayload.herdrWorkspaceId = tile.herdrWorkspaceId;
+				}
+				await window.kernelApi.sendCommand(
+					"kernel.tile_extension.set",
+					extPayload,
+				);
+			}
 		}
 
 		window.shellApi.trackEvent("tile_created", { type });
@@ -1098,8 +1126,9 @@ export function createTileManager({
 
 	// -- Tile updates for external events --
 
-	function updateTileForRename(oldPath, newPath) {
+	async function updateTileForRename(oldPath, newPath) {
 		let anyUpdated = false;
+		const kernelUpdates = [];
 		for (const t of tiles) {
 			if (t.filePath === oldPath) {
 				t.filePath = newPath;
@@ -1107,6 +1136,13 @@ export function createTileManager({
 				const dom = tileDOMs.get(t.id);
 				if (dom) updateTileTitle(dom, t);
 				anyUpdated = true;
+				if (isOneTruthEnabled()) {
+					kernelUpdates.push({
+						tileId: t.id,
+						filePath: t.filePath,
+						canvasType: t.type,
+					});
+				}
 			}
 			if (
 				t.type === "graph" && t.folderPath &&
@@ -1124,9 +1160,25 @@ export function createTileManager({
 					}
 				}
 				anyUpdated = true;
+				if (isOneTruthEnabled()) {
+					kernelUpdates.push({
+						tileId: t.id,
+						folderPath: t.folderPath,
+					});
+				}
 			}
 		}
-		if (anyUpdated) saveCanvasDebounced();
+		if (anyUpdated) {
+			if (isOneTruthEnabled() && window.kernelApi) {
+				for (const payload of kernelUpdates) {
+					await window.kernelApi.sendCommand(
+						"kernel.tile_extension.set",
+						payload,
+					);
+				}
+			}
+			saveCanvasDebounced();
+		}
 	}
 
 	async function closeTilesForDeletedPaths(deletedPaths) {

@@ -201,6 +201,15 @@ const checks: Check[] = [
       return runCanvasCacheDisciplineCheck();
     },
   },
+  {
+    name: "divergence",
+    description:
+      "D5 capstone: Kernel snapshot == canvas projection == export mirror; events corroborate; receipt-free assembly",
+    async run() {
+      const { runDivergenceCheck } = await import("./lib/divergence");
+      return runDivergenceCheck();
+    },
+  },
 ];
 
 const checkByName = new Map(checks.map((c) => [c.name, c]));
