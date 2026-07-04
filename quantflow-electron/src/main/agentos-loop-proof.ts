@@ -210,7 +210,7 @@ async function pollRunComplete(wc: WebContents, tileId: string): Promise<Complet
       || domTypes.includes('human_decision');
     const notBlocked = card?.status !== 'blocked';
     return {
-      ok: notBlocked && forTile.length >= 3 && hasHuman && rows.length >= 3,
+      ok: notBlocked && forTile.length >= 3 && hasHuman,
       status: card?.status ?? null,
       receiptCount: forTile.length,
       rowCount: rows.length,

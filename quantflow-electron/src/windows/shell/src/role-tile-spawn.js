@@ -186,7 +186,7 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 }
 
 /**
- * Spawn an AgentOS worker tile — Kernel worker row + state-card back, no terminal webview.
+ * Spawn an AgentOS actor as a terminal tile (V1) — interactive xterm front, no auto-flip.
  * @param {object} deps
  * @param {number} x
  * @param {number} y
@@ -228,7 +228,8 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 	}
 
 	tile.runtimeTarget = "agentos";
-	tile.terminalPending = false;
+	tile.terminalPending = true;
+	tile.ptyStatus = "connecting";
 
 	if (kapi) {
 		let spawnResult;
@@ -245,6 +246,7 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 		}
 		if (spawnResult && spawnResult.ok === false) {
 			const message = `Kernel rejected worker spawn for ${displayName}: ${spawnResult.error ?? "unknown error"}`;
+			tile.terminalPending = false;
 			tile.ptyStatus = "error";
 			tile.ptyError = message;
 			updateRoleTileChrome?.(tile);
@@ -256,22 +258,53 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 	}
 
 	onRoleSpawned?.(createRoleSpawnedEvent?.(tile, { id: "agentos", name: displayName }));
-	updateRoleTileChrome?.(tile);
+	tileManager.spawnTerminalWebview(tile, true);
 	tileManager.saveCanvasImmediate();
 
-	if (!tileManager.isTileFlipped(tile.id)) {
-		tileManager.flipTile(tile.id);
-	}
-
 	try {
-		await shellApi?.agentosRun?.({
+		const prepare = await shellApi?.agentosTerminalPrepare?.({
 			tileId: tile.id,
-			instruction: options.instruction,
-			workflowId: options.workflowId ?? undefined,
+			cols: size.width ? Math.max(80, Math.floor(size.width / 8)) : undefined,
+			rows: size.height ? Math.max(24, Math.floor(size.height / 17)) : undefined,
 		});
+		if (!prepare?.ok || !prepare.terminalTarget) {
+			throw new Error(prepare?.error ?? "AgentOS terminal prepare failed");
+		}
+		tile.terminalTarget = prepare.terminalTarget;
+		tile.terminalPending = false;
+		tile.ptyStatus = "running";
+		updateRoleTileChrome?.(tile);
+		tileManager.spawnTerminalWebview(tile, true);
+		tileManager.saveCanvasImmediate();
+		if (kapi) {
+			await kapi.sendCommand("kernel.worker.status_update", {
+				tileId: tile.id,
+				status: "active",
+			});
+		}
+		const instruction = String(options.instruction ?? "").trim();
+		if (instruction) {
+			void shellApi?.agentosRun?.({
+				tileId: tile.id,
+				instruction,
+				workflowId: options.workflowId ?? undefined,
+			});
+		}
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
-		toasts?.show?.({ message: `AgentOS run failed to start: ${message}`, tone: "error" });
+		tile.terminalPending = false;
+		tile.ptyStatus = "error";
+		tile.ptyError = message;
+		updateRoleTileChrome?.(tile);
+		tileManager.saveCanvasImmediate();
+		if (kapi) {
+			await kapi.sendCommand("kernel.worker.status_update", {
+				tileId: tile.id,
+				status: "error",
+			});
+		}
+		onRoleSpawnFailed?.(createRoleSpawnFailureEvent?.({ id: "agentos", name: displayName }, message));
+		toasts?.show?.({ message, tone: "error" });
 	}
 
 	return tile;
