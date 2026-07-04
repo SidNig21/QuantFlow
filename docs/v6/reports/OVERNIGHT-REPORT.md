@@ -13,7 +13,7 @@
 | V3 | `bun qa/run.ts actors-on-agentos` | **GREEN** |
 | V4 | `bun qa/run.ts a2a-cable` | **GREEN** |
 | V5 | `bun qa/run.ts orchestrator` | **GREEN** |
-| V6 | `bun qa/run.ts actors-demo` | **PARTIAL** — one full demo green; 2× consecutive gate hung on 2nd Electron launch |
+| V6 | `bun qa/run.ts actors-demo` | **GREEN** (run-1 + run-2; verified post-commit) |
 
 ## Regression stack (tonight)
 
@@ -76,9 +76,8 @@ None fired. No Kernel schema/migration changes. No §6 founder decisions taken.
 
 ## Deferred / risks
 
-1. **V6 double-run gate** — fix Electron cleanup between consecutive `proof:actors-demo` invocations
-2. **Live model proofs** — scripted green without key; founder witnesses with WSL key
-3. **V4/V5 founder feel** — sim screenshots captured; recommend 5-minute live canvas pass with two actors + one cable
+1. **Live model proofs** — scripted green without key; founder witnesses with WSL key
+2. **V4/V5 founder feel** — sim screenshots captured; recommend 5-minute live canvas pass with two actors + one cable
 
 ## §6 (unchanged)
 
