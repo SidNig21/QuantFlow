@@ -16,9 +16,11 @@ import agentosFixtureRaw from "../../../src/harness/agentos/fixtures/tier2-event
 import {
   startAgentOsHost,
   stopAgentOsHost,
+  resolveAgentOsHealthTimeoutMs,
   type AgentOsHostHandle,
 } from "@qf-harness/agentos/host-lifecycle";
 import { resolveAgentOsCredential } from "@qf-harness/agentos/credential-order";
+import { formatAgentOsUnavailable } from "@qf-harness/agentos/error-messages";
 import type { AgentOsTransport } from "@qf-harness/agentos/transport";
 import type {
   SpawnWorkerInput,
@@ -34,9 +36,11 @@ import {
 } from "./agentos-approval";
 
 let harnessSingleton: WorkerHarness | null = null;
+let transportSingleton: AgentOsTransport | null = null;
 let hostHandle: AgentOsHostHandle | null = null;
 let hostStartPromise: Promise<AgentOsHostHandle> | null = null;
 let prewarmInvoked = false;
+let prewarmDryRun = false;
 
 function shouldSkipLiveHost(): boolean {
   return process.env.QF_AGENTOS_SIM === "1" || process.env.QF_AGENTOS_LOOP_PROOF === "1";
@@ -44,16 +48,16 @@ function shouldSkipLiveHost(): boolean {
 
 function formatUnavailable(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
-  if (/^agentos unavailable:/i.test(detail) || /^agentos-harness unavailable:/i.test(detail)) {
-    return detail.replace(/^agentos-harness unavailable:/i, "agentos unavailable:");
-  }
-  return `agentos unavailable: ${detail}`;
+  if (/^agentos unavailable:/i.test(detail)) return detail;
+  return formatAgentOsUnavailable(detail);
 }
 
 async function ensureHostStarted(): Promise<AgentOsHostHandle> {
   if (hostHandle) return hostHandle;
   if (!hostStartPromise) {
-    hostStartPromise = startAgentOsHost()
+    hostStartPromise = startAgentOsHost({
+      healthTimeoutMs: resolveAgentOsHealthTimeoutMs(),
+    })
       .then((handle) => {
         hostHandle = handle;
         return handle;
@@ -100,6 +104,21 @@ function wrapTransportWithLazyHost(base: AgentOsTransport): AgentOsTransport {
     },
     health() {
       return base.health();
+    },
+    openTerminal(sessionId, cols, rows) {
+      return withHost(() => base.openTerminal(sessionId, cols, rows), true);
+    },
+    writeTerminal(shellId, data) {
+      return withHost(() => base.writeTerminal(shellId, data), false);
+    },
+    resizeTerminal(shellId, cols, rows) {
+      return withHost(() => base.resizeTerminal(shellId, cols, rows), false);
+    },
+    onTerminalData(shellId, handler) {
+      return base.onTerminalData(shellId, handler);
+    },
+    closeTerminal(shellId) {
+      return withHost(() => base.closeTerminal(shellId), false);
     },
   };
 }
@@ -201,6 +220,7 @@ function buildHarness(): WorkerHarness {
   const transport = process.env.QF_AGENTOS_SIM === "1"
     ? buildProofSimTransport()
     : wrapTransportWithLazyHost(createHttpAgentOsTransport());
+  transportSingleton = transport;
   const credential = resolveAgentOsCredential();
   const base = createAgentOsHarness({
     transport,
@@ -211,6 +231,10 @@ function buildHarness(): WorkerHarness {
   return wrapHarness(base);
 }
 
+export function setAgentOsPrewarmDryRun(enabled: boolean): void {
+  prewarmDryRun = enabled;
+}
+
 /**
  * Fire-and-forget WSL host pre-warm after app boot (V0.1). Never blocks startup;
  * failures log as warnings only.
@@ -218,6 +242,7 @@ function buildHarness(): WorkerHarness {
 export function prewarmAgentOsHost(): void {
   if (prewarmInvoked || shouldSkipLiveHost()) return;
   prewarmInvoked = true;
+  if (prewarmDryRun) return;
   void ensureHostStarted().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     console.warn("[agentos] pre-warm did not reach healthy host:", message);
@@ -237,9 +262,18 @@ export function getAgentOsWorkerHarness(): WorkerHarness {
   return harnessSingleton;
 }
 
+export function getAgentOsTransport(): AgentOsTransport {
+  getAgentOsWorkerHarness();
+  if (!transportSingleton) {
+    throw new Error(formatAgentOsUnavailable('transport not initialized'));
+  }
+  return transportSingleton;
+}
+
 /** Stop WSL host and reset singleton; safe when never started. */
 export async function disposeAgentOsService(): Promise<void> {
   harnessSingleton = null;
+  transportSingleton = null;
   setActiveAgentOsContext(null);
   prewarmInvoked = false;
   if (hostHandle) {

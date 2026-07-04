@@ -38,6 +38,9 @@ export interface AgentOsHostHandle {
   child: SpawnHandle;
 }
 
+/** Cold-WSL first boot budget (V0.2). Override via QF_AGENTOS_HEALTH_TIMEOUT_MS. */
+export const DEFAULT_AGENTOS_HEALTH_TIMEOUT_MS = 90_000;
+
 const CREDENTIAL_ENV_NAMES = [
   'OPENCODE_API_KEY',
   'OPENCODE_ZEN_API_KEY',
@@ -66,6 +69,20 @@ function defaultHost(): string {
 function defaultPort(): number {
   const raw = process.env.QF_AGENTOS_PORT ?? process.env.AGENTOS_HOST_PORT ?? '7430';
   return Number.parseInt(raw, 10);
+}
+
+export function resolveAgentOsHealthTimeoutMs(
+  overrideMs?: number,
+): number {
+  if (overrideMs != null && Number.isFinite(overrideMs) && overrideMs > 0) {
+    return overrideMs;
+  }
+  const envRaw = process.env.QF_AGENTOS_HEALTH_TIMEOUT_MS?.trim();
+  if (envRaw) {
+    const parsed = Number.parseInt(envRaw, 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_AGENTOS_HEALTH_TIMEOUT_MS;
 }
 
 function buildSpawnEnv(port: number): NodeJS.ProcessEnv {
@@ -191,7 +208,7 @@ export async function startAgentOsHost(
   const repoRoot = options.repoRoot ?? defaultRepoRoot();
   const host = options.host ?? defaultHost();
   const port = options.port ?? defaultPort();
-  const healthTimeoutMs = options.healthTimeoutMs ?? 30_000;
+  const healthTimeoutMs = resolveAgentOsHealthTimeoutMs(options.healthTimeoutMs);
   const pollIntervalMs = options.pollIntervalMs ?? 500;
   const spawnImpl = options.spawn ?? defaultSpawn;
   const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);

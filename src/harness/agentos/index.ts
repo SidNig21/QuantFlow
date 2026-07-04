@@ -20,6 +20,7 @@ import type {
 import type { ApprovalGate } from './approval-gate';
 import { createSimApprovalGate } from './approval-gate';
 import type { AgentOsPermissionRequest, AgentOsTransport } from './transport';
+import { formatAgentOsUnavailable } from './error-messages';
 import {
   createAcpTranslatorState,
   translateApprovalGranted,
@@ -76,12 +77,14 @@ export function createAgentOsHarness(options: AgentOsHarnessOptions): WorkerHarn
 
   function formatUnavailable(error: unknown): string {
     const detail = error instanceof Error ? error.message : String(error);
-    return `agentos-harness unavailable: ${detail}`;
+    return formatAgentOsUnavailable(detail);
   }
 
   async function ensureHealthy(): Promise<void> {
     const health = await transport.health();
-    if (!health.ok) throw new Error('agentos host health check failed');
+    if (!health.ok) {
+      throw new Error(formatAgentOsUnavailable('agentos host health check failed'));
+    }
   }
 
   function stateFor(handle: WorkerHandle, fallbackWorkspace = workspace): AgentOsState {
