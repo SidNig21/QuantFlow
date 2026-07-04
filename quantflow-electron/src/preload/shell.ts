@@ -559,6 +559,13 @@ contextBridge.exposeInMainWorld("shellApi", {
     workflowId?: string;
   }): Promise<{ ok: boolean; started?: boolean; error?: string }> =>
     ipcRenderer.invoke("agentos:run", params),
+  agentosTerminalPrepare: (params: {
+    tileId: string;
+    cols?: number;
+    rows?: number;
+    instruction?: string;
+  }): Promise<{ ok: boolean; terminalTarget?: string; error?: string }> =>
+    ipcRenderer.invoke("agentos:terminal:prepare", params),
 
   // ── Run Workflow ──
   workflowSubmit: (params: {

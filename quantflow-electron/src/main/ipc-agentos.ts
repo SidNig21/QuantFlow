@@ -4,6 +4,7 @@ import {
   resolveAgentOsApproval,
 } from "./agentos-approval";
 import { startAgentOsTask } from "./agentos-run";
+import { prepareAgentOsTerminalAttach } from "./agentos-terminal-bridge";
 
 export function registerAgentOsHandlers(): void {
   ipcMain.handle("agentos:approvals", () => listPendingAgentOsApprovals());
@@ -17,6 +18,31 @@ export function registerAgentOsHandlers(): void {
       const resolved = resolveAgentOsApproval(requestId, approved);
       if (!resolved) return { ok: false, error: `unknown requestId: ${requestId}` };
       return { ok: true, requestId, approved };
+    },
+  );
+
+  ipcMain.handle(
+    "agentos:terminal:prepare",
+    async (_event, payload: {
+      tileId?: string;
+      cols?: number;
+      rows?: number;
+      instruction?: string;
+    } = {}) => {
+      const tileId = typeof payload.tileId === "string" ? payload.tileId.trim() : "";
+      if (!tileId) return { ok: false, error: "tileId required" };
+      try {
+        const result = await prepareAgentOsTerminalAttach({
+          tileId,
+          cols: typeof payload.cols === "number" ? payload.cols : undefined,
+          rows: typeof payload.rows === "number" ? payload.rows : undefined,
+          instruction: typeof payload.instruction === "string" ? payload.instruction : undefined,
+        });
+        return { ok: true, ...result };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { ok: false, error: message };
+      }
     },
   );
 

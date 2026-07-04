@@ -63,7 +63,9 @@ import { stopAllObsidianEnvoyMirrors } from "./obsidian-envoy-mirror";
 import { bootstrapHerdrRuntime } from "./herdr-runtime";
 import { stopHerdrStatusService } from "./herdr-status-service";
 import { disposeAgentOsService, prewarmAgentOsHost } from "./agentos-service";
+import { disposeAgentOsTerminalBridge } from "./agentos-terminal-bridge";
 import { runAgentOsLoopProof } from "./agentos-loop-proof";
+import { runAgentOsTerminalProof } from "./agentos-terminal-proof";
 
 const APP_NAME = "QuantFlow";
 const launchStartedAtMs = Date.now();
@@ -778,6 +780,7 @@ async function shutdownBackgroundServices(): Promise<void> {
   stopAllObsidianEnvoyMirrors();
   stopAllEnvoyListeners();
   stopHerdrStatusService();
+  await disposeAgentOsTerminalBridge();
   await disposeAgentOsService();
   stopImageWorker();
   closeDb();
@@ -975,6 +978,9 @@ app.whenReady().then(async () => {
 
   if (process.env.QF_AGENTOS_LOOP_PROOF === "1") {
     void runAgentOsLoopProof(mainWindow!);
+  }
+  if (process.env.QF_AGENTOS_TERMINAL_PROOF === "1") {
+    void runAgentOsTerminalProof(mainWindow!);
   }
 });
 

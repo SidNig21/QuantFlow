@@ -15,6 +15,26 @@ export interface SidecarSessionCreateParams {
 }
 
 const HERDR_DISPLAY_TARGET_PREFIX = "herdr-wsl:";
+const AGENTOS_DISPLAY_TARGET_PREFIX = "agentos:";
+
+export function buildAgentOsDisplayTarget(tileId: string): string {
+  return `${AGENTOS_DISPLAY_TARGET_PREFIX}${encodeURIComponent(tileId)}`;
+}
+
+export function parseAgentOsAttachTarget(
+  target: unknown,
+): { tileId: string } | null {
+  if (typeof target !== "string") return null;
+  if (!target.startsWith(AGENTOS_DISPLAY_TARGET_PREFIX)) return null;
+  const encoded = target.slice(AGENTOS_DISPLAY_TARGET_PREFIX.length);
+  if (!encoded) return null;
+  try {
+    const tileId = decodeURIComponent(encoded).trim();
+    return tileId ? { tileId } : null;
+  } catch {
+    return null;
+  }
+}
 
 export function buildHerdrDisplayTarget(terminalId: string): string {
   return `${HERDR_DISPLAY_TARGET_PREFIX}${encodeURIComponent(terminalId)}`;

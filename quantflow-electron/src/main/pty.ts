@@ -42,7 +42,16 @@ import {
   buildHerdrAttachSessionCreateParams,
   buildSidecarSessionCreateParams,
   parseHerdrAttachTarget,
+  parseAgentOsAttachTarget,
 } from "./pty-spawn-params";
+import {
+  bindAgentOsPtySession,
+  isAgentOsPtySession,
+  killAgentOsPtySession,
+  newAgentOsPtySessionId,
+  resizeAgentOsPtySession,
+  writeAgentOsPtySession,
+} from "./agentos-terminal-bridge";
 
 interface PtySession {
   pty: IPty;
@@ -64,6 +73,7 @@ const dataSockets = new Map<string, net.Socket>();
  * touch the `sessions` Map (which holds IPty objects).
  */
 const sidecarSessionIds = new Set<string>();
+const agentosSessionIds = new Set<string>();
 const sidecarPowerShellSessionIds = new Set<string>();
 const pendingPtyData = new Map<string, Buffer[]>();
 const pendingPtyDataTimers = new Map<
@@ -82,6 +92,7 @@ function getSidecarClient(): SidecarClient {
  * Checks in-memory tracking first, then falls back to persisted metadata.
  */
 function sessionBackend(sessionId: string): TerminalMode {
+  if (agentosSessionIds.has(sessionId)) return "sidecar";
   if (sidecarSessionIds.has(sessionId)) return "sidecar";
   if (dataSockets.has(sessionId)) return "sidecar";
   if (sessions.has(sessionId)) return "tmux";
@@ -536,6 +547,50 @@ async function createSessionInner(
 
   const mode = getTerminalMode();
 
+  const agentosAttach = parseAgentOsAttachTarget(preferredTarget);
+  if (agentosAttach) {
+    const sessionId = newAgentOsPtySessionId();
+    await bindAgentOsPtySession({
+      ptySessionId: sessionId,
+      tileId: agentosAttach.tileId,
+      senderWebContentsId,
+      cols: c,
+      rows: r,
+      onData: (sid, sender, data) => forwardPtyData(sid, sender, data),
+    });
+
+    writeSessionMeta(sessionId, {
+      shell: "agentos",
+      cwd: resolvedCwd,
+      createdAt: new Date().toISOString(),
+      target: String(preferredTarget),
+      displayName: "AgentOS",
+      command: "agentos",
+      args: [],
+      cwdHostPath: resolvedCwd,
+      backend: "agentos",
+    });
+
+    agentosSessionIds.add(sessionId);
+    createPtySession({
+      sessionId,
+      tileId: tileId ?? agentosAttach.tileId,
+      shell: "agentos",
+      target: String(preferredTarget),
+      cwd: resolvedCwd,
+    });
+
+    return {
+      sessionId,
+      shell: "agentos",
+      displayName: "AgentOS",
+      target: String(preferredTarget),
+      command: "agentos",
+      args: [],
+      cwdHostPath: resolvedCwd,
+    };
+  }
+
   const herdrAttach = parseHerdrAttachTarget(preferredTarget);
   if (herdrAttach) {
     await ensureSidecar();
@@ -886,6 +941,10 @@ export function writeToSession(
   sessionId: string,
   data: string,
 ): void {
+  if (isAgentOsPtySession(sessionId)) {
+    void writeAgentOsPtySession(sessionId, data);
+    return;
+  }
   const dataSock = dataSockets.get(sessionId);
   if (dataSock && !dataSock.destroyed) {
     dataSock.write(data);
@@ -913,6 +972,10 @@ export async function resizeSession(
   cols: number,
   rows: number,
 ): Promise<void> {
+  if (isAgentOsPtySession(sessionId)) {
+    await resizeAgentOsPtySession(sessionId, cols, rows);
+    return;
+  }
   const backend = sessionBackend(sessionId);
   if (backend === "sidecar") {
     try {
@@ -946,6 +1009,14 @@ export async function killSession(
   sessionId: string,
 ): Promise<void> {
   clearForegroundCache(sessionId);
+  if (isAgentOsPtySession(sessionId)) {
+    await killAgentOsPtySession(sessionId);
+    agentosSessionIds.delete(sessionId);
+    clearPendingPtyData(sessionId);
+    deleteSessionMeta(sessionId);
+    endPtySession(sessionId);
+    return;
+  }
   const backend = sessionBackend(sessionId);
   if (backend === "sidecar") {
     dataSockets.get(sessionId)?.destroy();

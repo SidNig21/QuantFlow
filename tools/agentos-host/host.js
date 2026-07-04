@@ -22,6 +22,9 @@ let vmInitPromise = null;
 /** @type {Map<string, { subscribers: Set<import('node:http').ServerResponse>, software: string }>} */
 const sessions = new Map();
 
+/** @type {Map<string, { sessionId: string, unsub: () => void }>} */
+const terminals = new Map();
+
 /**
  * @type {Map<string, { sessionId: string, kind: 'toolkit' | 'acp', resolve: (approved: boolean) => void, timer: NodeJS.Timeout }>}
  */
@@ -291,10 +294,72 @@ async function handleRequest(req, res) {
       return;
     }
 
-    const sessionMatch = path.match(/^\/session\/([^/]+)\/(prompt|permission|events)$/);
+    const sessionMatch = path.match(/^\/session\/([^/]+)\/(prompt|permission|events|terminal)$/);
+    const terminalShellMatch = path.match(/^\/session\/([^/]+)\/terminal\/([^/]+)\/(write|resize|close)$/);
+    if (terminalShellMatch) {
+      const sessionId = decodeURIComponent(terminalShellMatch[1]);
+      const shellId = decodeURIComponent(terminalShellMatch[2]);
+      const action = terminalShellMatch[3];
+      if (!sessions.has(sessionId)) {
+        sendJson(res, 404, { error: "session not found" });
+        return;
+      }
+      const instance = await ensureVm();
+      if (action === "write" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const data = typeof body.data === "string" ? body.data : "";
+        instance.writeShell(shellId, data);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+      if (action === "resize" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const cols = Number.parseInt(String(body.cols ?? "80"), 10);
+        const rows = Number.parseInt(String(body.rows ?? "24"), 10);
+        instance.resizeShell(shellId, cols, rows);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+      if (action === "close" && req.method === "POST") {
+        const entry = terminals.get(shellId);
+        entry?.unsub?.();
+        terminals.delete(shellId);
+        instance.closeShell(shellId);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+    }
+
     if (sessionMatch) {
       const sessionId = decodeURIComponent(sessionMatch[1]);
       const action = sessionMatch[2];
+
+      if (!sessions.has(sessionId) && action !== "terminal") {
+        sendJson(res, 404, { error: "session not found" });
+        return;
+      }
+
+      if (action === "terminal" && req.method === "POST") {
+        if (!sessions.has(sessionId)) {
+          sendJson(res, 404, { error: "session not found" });
+          return;
+        }
+        const body = await readJsonBody(req);
+        const cols = Number.parseInt(String(body.cols ?? "80"), 10);
+        const rows = Number.parseInt(String(body.rows ?? "24"), 10);
+        const instance = await ensureVm();
+        const { shellId } = instance.openShell({ cols, rows });
+        const unsub = instance.onShellData(shellId, (chunk) => {
+          broadcastSession(sessionId, {
+            kind: "terminal-data",
+            shellId,
+            data: Buffer.from(chunk).toString("base64"),
+          });
+        });
+        terminals.set(shellId, { sessionId, unsub });
+        sendJson(res, 200, { shellId });
+        return;
+      }
 
       if (!sessions.has(sessionId)) {
         sendJson(res, 404, { error: "session not found" });

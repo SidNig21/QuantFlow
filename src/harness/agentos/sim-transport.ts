@@ -32,6 +32,9 @@ export function createSimTransport(options: SimTransportOptions = {}): AgentOsTr
   const eventHandlers = new Map<string, Array<(event: unknown) => void>>();
   const permissionHandlers = new Map<string, Array<(request: AgentOsPermissionRequest) => void>>();
   const artifacts = new Map<string, Uint8Array>();
+  const terminalHandlers = new Map<string, Array<(data: Uint8Array) => void>>();
+  const terminalInput = new Map<string, string>();
+  const shellToSession = new Map<string, string>();
   let disposed = false;
   let replayPromise: Promise<void> | null = null;
 
@@ -58,6 +61,11 @@ export function createSimTransport(options: SimTransportOptions = {}): AgentOsTr
         return;
       }
     }
+  }
+
+  function emitTerminal(shellId: string, text: string): void {
+    const bytes = new TextEncoder().encode(text);
+    for (const handler of terminalHandlers.get(shellId) ?? []) handler(bytes);
   }
 
   return {
@@ -115,6 +123,57 @@ export function createSimTransport(options: SimTransportOptions = {}): AgentOsTr
     async health() {
       if (options.failHealth) return { ok: false };
       return { ok: true };
+    },
+
+    async openTerminal(id, _cols, _rows) {
+      const shellId = `sim-shell-${id}`;
+      shellToSession.set(shellId, id);
+      terminalInput.set(shellId, '');
+      queueMicrotask(() => {
+        emitTerminal(shellId, '\r\nAgentOS actor ready (sim). Type a message and press Enter.\r\n> ');
+      });
+      return { shellId };
+    },
+
+    async writeTerminal(shellId, data) {
+      const prior = terminalInput.get(shellId) ?? '';
+      const next = prior + data;
+      terminalInput.set(shellId, next);
+      if (!next.includes('\r') && !next.includes('\n')) return;
+      const line = next.replace(/[\r\n]+$/, '').trim();
+      terminalInput.set(shellId, '');
+      if (!line) {
+        emitTerminal(shellId, '> ');
+        return;
+      }
+      const session = shellToSession.get(shellId) ?? sessionId;
+      await (async () => {
+        if (options.failPrompt) throw new Error('ECONNREFUSED');
+        promptCalls.push({ sessionId: session, text: line });
+        replayPromise = replay(session);
+        await replayPromise;
+      })();
+      emitTerminal(shellId, `\r\n[sim] received: ${line}\r\n> `);
+    },
+
+    async resizeTerminal(_shellId, _cols, _rows) {
+      // no-op in sim
+    },
+
+    onTerminalData(shellId, handler) {
+      const list = terminalHandlers.get(shellId) ?? [];
+      list.push(handler);
+      terminalHandlers.set(shellId, list);
+      return () => {
+        const current = terminalHandlers.get(shellId) ?? [];
+        terminalHandlers.set(shellId, current.filter((h) => h !== handler));
+      };
+    },
+
+    async closeTerminal(shellId) {
+      terminalHandlers.delete(shellId);
+      terminalInput.delete(shellId);
+      shellToSession.delete(shellId);
     },
   };
 }

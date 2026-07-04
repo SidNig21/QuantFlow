@@ -29,6 +29,7 @@ export interface HttpAgentOsTransportOptions {
 interface SseSessionState {
   eventHandlers: Array<(event: unknown) => void>;
   permissionHandlers: Array<(request: AgentOsPermissionRequest) => void | Promise<void>>;
+  terminalHandlers: Map<string, Array<(data: Uint8Array) => void>>;
   streamAbort: AbortController | null;
   streamPromise: Promise<void> | null;
   streamReady: Promise<void> | null;
@@ -64,6 +65,7 @@ export function createHttpAgentOsTransport(
     ? Promise.resolve(options.host)
     : null;
   const sessions = new Map<string, SseSessionState>();
+  const shellSessions = new Map<string, string>();
   let disposed = false;
 
   async function getHost(): Promise<string> {
@@ -83,6 +85,7 @@ export function createHttpAgentOsTransport(
       state = {
         eventHandlers: [],
         permissionHandlers: [],
+        terminalHandlers: new Map(),
         streamAbort: null,
         streamPromise: null,
         streamReady: null,
@@ -181,6 +184,17 @@ export function createHttpAgentOsTransport(
       for (const handler of state.eventHandlers) {
         handler(event);
       }
+      return;
+    }
+
+    if (kind === 'terminal-data') {
+      const shellId = String((message as { shellId?: unknown }).shellId ?? '');
+      const encoded = String((message as { data?: unknown }).data ?? '');
+      if (!shellId || !encoded) return;
+      const bytes = Uint8Array.from(Buffer.from(encoded, 'base64'));
+      for (const handler of state.terminalHandlers.get(shellId) ?? []) {
+        handler(bytes);
+      }
     }
   }
 
@@ -270,6 +284,67 @@ export function createHttpAgentOsTransport(
       } catch {
         return { ok: false };
       }
+    },
+
+    async openTerminal(sessionId, cols, rows) {
+      if (disposed) throw new Error('transport disposed');
+      await ensureEventStream(sessionId);
+      const res = await fetchImpl(`${await rootUrl()}/session/${encodeURIComponent(sessionId)}/terminal/open`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cols, rows }),
+      });
+      const body = await parseJsonResponse(res) as { shellId?: string };
+      if (!body.shellId) throw new Error('openTerminal missing shellId');
+      shellSessions.set(body.shellId, sessionId);
+      return { shellId: body.shellId };
+    },
+
+    async writeTerminal(shellId, data) {
+      if (disposed) throw new Error('transport disposed');
+      const sessionId = shellSessions.get(shellId);
+      if (!sessionId) throw new Error(`unknown shell: ${shellId}`);
+      const res = await fetchImpl(`${await rootUrl()}/session/${encodeURIComponent(sessionId)}/terminal/${encodeURIComponent(shellId)}/write`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ data }),
+      });
+      await parseJsonResponse(res);
+    },
+
+    async resizeTerminal(shellId, cols, rows) {
+      if (disposed) throw new Error('transport disposed');
+      const sessionId = shellSessions.get(shellId);
+      if (!sessionId) throw new Error(`unknown shell: ${shellId}`);
+      const res = await fetchImpl(`${await rootUrl()}/session/${encodeURIComponent(sessionId)}/terminal/${encodeURIComponent(shellId)}/resize`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cols, rows }),
+      });
+      await parseJsonResponse(res);
+    },
+
+    onTerminalData(shellId, handler) {
+      const sessionId = shellSessions.get(shellId) ?? 'default';
+      const state = sessionState(sessionId);
+      const list = state.terminalHandlers.get(shellId) ?? [];
+      list.push(handler);
+      state.terminalHandlers.set(shellId, list);
+      return () => {
+        const current = state.terminalHandlers.get(shellId) ?? [];
+        state.terminalHandlers.set(shellId, current.filter((h) => h !== handler));
+      };
+    },
+
+    async closeTerminal(shellId) {
+      if (disposed) throw new Error('transport disposed');
+      const sessionId = shellSessions.get(shellId);
+      if (!sessionId) return;
+      const res = await fetchImpl(`${await rootUrl()}/session/${encodeURIComponent(sessionId)}/terminal/${encodeURIComponent(shellId)}/close`, {
+        method: 'POST',
+      });
+      await parseJsonResponse(res);
+      shellSessions.delete(shellId);
     },
   };
 }
