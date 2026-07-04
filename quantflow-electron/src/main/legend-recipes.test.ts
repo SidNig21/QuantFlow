@@ -28,7 +28,7 @@ describe("legend-recipes registry", () => {
     if (tempDir) await rm(tempDir, { recursive: true, force: true });
   });
 
-  test("built-in seed keeps the seven dock recipes", () => {
+  test("built-in seed keeps the eight dock recipes", () => {
     expect(BUILT_IN_LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
       ...BUILT_IN_LEGEND_RECIPE_IDS,
     ]);

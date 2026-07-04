@@ -18,6 +18,7 @@ export const BUILT_IN_LEGEND_RECIPE_IDS = [
   "hermes",
   "claude",
   "puffer",
+  "agentos",
   "python",
   "memory",
 ] as const;
@@ -40,7 +41,7 @@ export interface LegendRecipe {
   commandTemplate?: string;
   cwd?: string;
   runtimeTarget?: RoleRuntimeTarget;
-  harnessKind?: "eve-harness" | "local-shell" | "herdr-shell";
+  harnessKind?: "eve-harness" | "local-shell" | "herdr-shell" | "agentos";
   endpoint?: string;
   modelHint?: string;
 }
@@ -124,6 +125,19 @@ export const BUILT_IN_LEGEND_RECIPES: LegendRecipe[] = [
     runtime: "herdr-wsl",
     color: "var(--rail-worker, #ffc24a)",
     icon: "puffer",
+  },
+  {
+    id: "agentos",
+    roleId: "agentos",
+    group: "spawn",
+    type: "worker",
+    name: "AgentOS Worker",
+    description: "agentos",
+    runtime: "agentos",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    color: "var(--rail-agent, #4fc3ff)",
+    icon: "agentos",
   },
   {
     id: "python",
