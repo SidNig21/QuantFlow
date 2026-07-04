@@ -256,6 +256,24 @@ const checks: Check[] = [
     },
   },
   {
+    name: "agentos-terminal",
+    description:
+      "V1: AgentOS actor spawns as terminal tile — sim bytes + scripted electron screenshot proof",
+    async run() {
+      const { runAgentOsTerminalCheck } = await import("./lib/agentos-terminal");
+      return runAgentOsTerminalCheck();
+    },
+  },
+  {
+    name: "agentos-boot",
+    description:
+      "V0: cold-WSL budget, three distinct AgentOS errors, pre-warm hook, kill-switch green",
+    async run() {
+      const { runAgentOsBootCheck } = await import("./lib/agentos-boot");
+      return runAgentOsBootCheck();
+    },
+  },
+  {
     name: "agentos-atom",
     description:
       "P5: scripted AgentOS adapter session — milestone receipt chain, approval gate, kernel.receipt.post",
