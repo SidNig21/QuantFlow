@@ -62,7 +62,7 @@ import { stopAllEnvoyListeners } from "./envoy-listener";
 import { stopAllObsidianEnvoyMirrors } from "./obsidian-envoy-mirror";
 import { bootstrapHerdrRuntime } from "./herdr-runtime";
 import { stopHerdrStatusService } from "./herdr-status-service";
-import { disposeAgentOsService } from "./agentos-service";
+import { disposeAgentOsService, prewarmAgentOsHost } from "./agentos-service";
 import { runAgentOsLoopProof } from "./agentos-loop-proof";
 
 const APP_NAME = "QuantFlow";
@@ -918,6 +918,8 @@ app.whenReady().then(async () => {
     console.error("Herdr bootstrap failed:", err);
   }
   recordLaunchPhase("runtime.pty-herdr", runtimeStartedAt);
+
+  prewarmAgentOsHost();
 
   const windowStartedAt = Date.now();
   buildAppMenu();

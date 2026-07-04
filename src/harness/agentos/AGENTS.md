@@ -67,9 +67,10 @@ Electron main ↔ host over localhost (same pattern as herdr). Lifecycle:
 ## Live wiring (Electron main, P6)
 
 - `quantflow-electron/src/main/agentos-service.ts` — lazy singleton behind
-  `getWorkerHarness('agentos')`; the WSL host starts on first transport use,
-  never at boot (kill-switch invariant). `QF_AGENTOS_SIM=1` swaps in the sim
-  transport (scripted loop proof only).
+  `getWorkerHarness('agentos')`. V0.1: `prewarmAgentOsHost()` fire-and-forgets
+  WSL host start after app boot (non-blocking; kill-switch invariant preserved).
+  First transport use still starts the host if pre-warm has not finished.
+  `QF_AGENTOS_SIM=1` swaps in the sim transport (scripted loop proof only).
 - `quantflow-electron/src/main/agentos-run.ts` — fire-and-forget run driver
   (`agentos:run` IPC): spawn → send → collectReceipts → `kernel.receipt.post`.
 - Scripted proof: `bun qa/run.ts loop-proof` (see

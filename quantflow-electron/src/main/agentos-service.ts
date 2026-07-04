@@ -1,9 +1,10 @@
 /**
  * AgentOS harness service — lazy singleton for Electron main (P6 chunk A).
  *
- * Does not start the WSL host at app boot; host lifecycle begins on first
- * transport use (send/spawn path). Connection failures surface as
- * `agentos unavailable: …` without blocking app startup.
+ * V0.1: optional fire-and-forget pre-warm on app boot (`prewarmAgentOsHost`).
+ * First transport use still starts the host if pre-warm has not finished.
+ * Connection failures surface as `agentos unavailable: …` without blocking
+ * app startup (kill-switch invariant).
  */
 import { createAgentOsHarness } from "@qf-harness/agentos/index";
 import { createHttpAgentOsTransport } from "@qf-harness/agentos/http-transport";
@@ -35,6 +36,11 @@ import {
 let harnessSingleton: WorkerHarness | null = null;
 let hostHandle: AgentOsHostHandle | null = null;
 let hostStartPromise: Promise<AgentOsHostHandle> | null = null;
+let prewarmInvoked = false;
+
+function shouldSkipLiveHost(): boolean {
+  return process.env.QF_AGENTOS_SIM === "1" || process.env.QF_AGENTOS_LOOP_PROOF === "1";
+}
 
 function formatUnavailable(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
@@ -205,7 +211,25 @@ function buildHarness(): WorkerHarness {
   return wrapHarness(base);
 }
 
-/** Lazy singleton — host is not started until the first transport operation. */
+/**
+ * Fire-and-forget WSL host pre-warm after app boot (V0.1). Never blocks startup;
+ * failures log as warnings only.
+ */
+export function prewarmAgentOsHost(): void {
+  if (prewarmInvoked || shouldSkipLiveHost()) return;
+  prewarmInvoked = true;
+  void ensureHostStarted().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn("[agentos] pre-warm did not reach healthy host:", message);
+  });
+}
+
+/** Proof hook for V0 agentos-boot gate. */
+export function wasAgentOsPrewarmInvoked(): boolean {
+  return prewarmInvoked;
+}
+
+/** Lazy singleton — host starts on pre-warm or first transport operation. */
 export function getAgentOsWorkerHarness(): WorkerHarness {
   if (!harnessSingleton) {
     harnessSingleton = buildHarness();
@@ -217,6 +241,7 @@ export function getAgentOsWorkerHarness(): WorkerHarness {
 export async function disposeAgentOsService(): Promise<void> {
   harnessSingleton = null;
   setActiveAgentOsContext(null);
+  prewarmInvoked = false;
   if (hostHandle) {
     try {
       await stopAgentOsHost(hostHandle);
