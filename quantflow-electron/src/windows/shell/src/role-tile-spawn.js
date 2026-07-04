@@ -266,6 +266,8 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 			tileId: tile.id,
 			cols: size.width ? Math.max(80, Math.floor(size.width / 8)) : undefined,
 			rows: size.height ? Math.max(24, Math.floor(size.height / 17)) : undefined,
+			instruction: String(options.instruction ?? "").trim() || undefined,
+			software: options.software,
 		});
 		if (!prepare?.ok || !prepare.terminalTarget) {
 			throw new Error(prepare?.error ?? "AgentOS terminal prepare failed");

@@ -141,11 +141,37 @@ export function unregisterTileSession(tileId: string): void {
   tileRegistry.delete(tileId);
 }
 
-/** Relay logs retired with v1 string relay — returns empty until A2A. */
-export function getAllRelayLogs(_limit = 50): [] {
-  return [];
+export function getConnectionById(connectionId: string): ConnectionGraphEntry | null {
+  return connectionGraph.get(connectionId) ?? null;
 }
 
-export function getStringLog(_connectionId: string, _limit = 50): [] {
-  return [];
+export function removeConnectionFromGraph(connectionId: string): void {
+  connectionGraph.delete(connectionId);
+}
+
+interface RelayLogEntry {
+  connectionId: string;
+  fromTileId: string;
+  toTileId: string;
+  text: string;
+  ts: number;
+}
+
+const relayLogs = new Map<string, RelayLogEntry[]>();
+
+export function appendRelayLog(entry: Omit<RelayLogEntry, "ts">): void {
+  const list = relayLogs.get(entry.connectionId) ?? [];
+  list.push({ ...entry, ts: Date.now() });
+  relayLogs.set(entry.connectionId, list.slice(-100));
+}
+
+/** Relay logs for watchtower / proof gates (V4 A2A). */
+export function getAllRelayLogs(limit = 50): RelayLogEntry[] {
+  const all = [...relayLogs.values()].flat().sort((a, b) => b.ts - a.ts);
+  return all.slice(0, limit);
+}
+
+export function getStringLog(connectionId: string, limit = 50): RelayLogEntry[] {
+  const list = relayLogs.get(connectionId) ?? [];
+  return list.slice(-limit);
 }

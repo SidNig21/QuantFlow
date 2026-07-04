@@ -470,6 +470,11 @@ contextBridge.exposeInMainWorld("shellApi", {
   rolesGet: (id: string) => ipcRenderer.invoke("roles:get", id),
   legendList: () => ipcRenderer.invoke("legend:list"),
   legendCreate: (payload: Record<string, unknown>) => ipcRenderer.invoke("legend:create", payload),
+  onLegendRegistryChanged: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on("legend:registry-changed", handler);
+    return () => ipcRenderer.removeListener("legend:registry-changed", handler);
+  },
   legendRemove: (id: string) => ipcRenderer.invoke("legend:remove", id),
 
   // ── Obsidian vault ──
@@ -564,6 +569,7 @@ contextBridge.exposeInMainWorld("shellApi", {
     cols?: number;
     rows?: number;
     instruction?: string;
+    software?: string;
   }): Promise<{ ok: boolean; terminalTarget?: string; error?: string }> =>
     ipcRenderer.invoke("agentos:terminal:prepare", params),
 

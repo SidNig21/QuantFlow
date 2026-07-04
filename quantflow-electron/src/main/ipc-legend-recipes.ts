@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { BrowserWindow, ipcMain } from "electron";
 import { registerMethod } from "./json-rpc-server";
 import {
   createLegendRecipe,
@@ -29,6 +29,7 @@ function parseCreateInput(raw: unknown): LegendRecipeCreateInput {
     commandTemplate: typeof input.commandTemplate === "string" ? input.commandTemplate : undefined,
     cwd: typeof input.cwd === "string" && input.cwd.trim() ? input.cwd.trim() : undefined,
     runtimeTarget: input.runtimeTarget === "windows-pty" || input.runtimeTarget === "herdr-wsl"
+      || input.runtimeTarget === "agentos"
       ? input.runtimeTarget
       : undefined,
     defaultShell: input.defaultShell === "powershell" || input.defaultShell === "wsl"
@@ -36,20 +37,45 @@ function parseCreateInput(raw: unknown): LegendRecipeCreateInput {
       ? input.defaultShell
       : undefined,
     startupPrompt: typeof input.startupPrompt === "string" ? input.startupPrompt : undefined,
-    harnessKind: input.harnessKind === "eve-harness" ? "eve-harness" : undefined,
+    harnessKind: input.harnessKind === "eve-harness" || input.harnessKind === "agentos"
+      ? input.harnessKind
+      : undefined,
+    agentosSoftware: input.agentosSoftware === "pi" || input.agentosSoftware === "opencode"
+      || input.agentosSoftware === "claude-code"
+      ? input.agentosSoftware
+      : undefined,
+    agentosInstruction: typeof input.agentosInstruction === "string"
+      ? input.agentosInstruction
+      : undefined,
     endpoint: typeof input.endpoint === "string" ? input.endpoint : undefined,
     modelHint: typeof input.modelHint === "string" ? input.modelHint : undefined,
   };
 }
 
+function notifyLegendRegistryChanged(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send("legend:registry-changed");
+  }
+}
+
 export function registerLegendRecipeHandlers(): void {
   ipcMain.handle("legend:list", async () => listLegendRecipesWithReadiness());
-  ipcMain.handle("legend:create", async (_event, raw: unknown) => createLegendRecipe(parseCreateInput(raw)));
+  ipcMain.handle("legend:create", async (_event, raw: unknown) => {
+    const recipe = await createLegendRecipe(parseCreateInput(raw));
+    notifyLegendRegistryChanged();
+    return recipe;
+  });
   ipcMain.handle("legend:update", async (_event, id: string, raw: unknown) => {
     const patch = parseCreateInput({ ...(raw as Record<string, unknown>), id });
-    return updateLegendRecipe(String(id), patch);
+    const recipe = await updateLegendRecipe(String(id), patch);
+    notifyLegendRegistryChanged();
+    return recipe;
   });
-  ipcMain.handle("legend:remove", async (_event, id: string) => removeLegendRecipe(String(id)));
+  ipcMain.handle("legend:remove", async (_event, id: string) => {
+    const removed = await removeLegendRecipe(String(id));
+    notifyLegendRegistryChanged();
+    return removed;
+  });
 
   registerMethod(
     "legend.list",

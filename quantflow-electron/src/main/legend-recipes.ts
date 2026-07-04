@@ -4,6 +4,7 @@ import type { HealthLevel } from "./diagnostics/types";
 import { runPreflight } from "./diagnostics/preflight";
 import {
   listRoles,
+  type AgentOsSoftware,
   type Role,
   type RoleRuntimeTarget,
   withRoleDiagnostics,
@@ -42,6 +43,8 @@ export interface LegendRecipe {
   cwd?: string;
   runtimeTarget?: RoleRuntimeTarget;
   harnessKind?: "eve-harness" | "local-shell" | "herdr-shell" | "agentos";
+  agentosSoftware?: AgentOsSoftware;
+  agentosInstruction?: string;
   endpoint?: string;
   modelHint?: string;
 }
@@ -60,6 +63,8 @@ export interface LegendRecipeCreateInput {
   defaultShell?: "auto" | "powershell" | "wsl" | "shell";
   startupPrompt?: string;
   harnessKind?: LegendRecipe["harnessKind"];
+  agentosSoftware?: AgentOsSoftware;
+  agentosInstruction?: string;
   endpoint?: string;
   modelHint?: string;
 }
@@ -88,8 +93,11 @@ export const BUILT_IN_LEGEND_RECIPES: LegendRecipe[] = [
     group: "spawn",
     type: "codex",
     name: "Codex CLI",
-    description: "herdr-wsl",
-    runtime: "herdr-wsl",
+    description: "agentos · pi",
+    runtime: "agentos",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    agentosSoftware: "pi",
     color: "var(--rail-codex, #14d9ff)",
     icon: "codex",
   },
@@ -99,8 +107,11 @@ export const BUILT_IN_LEGEND_RECIPES: LegendRecipe[] = [
     group: "spawn",
     type: "agent",
     name: "Hermes",
-    description: "orchestrator",
-    runtime: "herdr-wsl",
+    description: "agentos · pi",
+    runtime: "agentos",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    agentosSoftware: "pi",
     color: "var(--rail-agent, #4fc3ff)",
     icon: "hermes",
   },
@@ -110,8 +121,11 @@ export const BUILT_IN_LEGEND_RECIPES: LegendRecipe[] = [
     group: "spawn",
     type: "worker",
     name: "Claude Code",
-    description: "task-runner",
-    runtime: "herdr-wsl",
+    description: "agentos · claude-code",
+    runtime: "agentos",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    agentosSoftware: "claude-code",
     color: "var(--rail-worker, #ffc24a)",
     icon: "claude",
   },
@@ -194,6 +208,7 @@ export function resolveReadinessForRecipe(
 
 function runtimeLabelForRole(role: Role): string {
   if (role.harnessKind === "eve-harness") return "eve-harness";
+  if (role.runtimeTarget === "agentos") return "agentos";
   if (role.runtimeTarget === "windows-pty") return "windows-pty";
   if (role.runtimeTarget === "herdr-wsl") return "herdr-wsl";
   return role.runtimeTarget ?? "local";
@@ -220,6 +235,8 @@ function roleToLegendRecipe(role: Role & {
     cwd: role.cwd,
     runtimeTarget: role.runtimeTarget,
     harnessKind: role.harnessKind,
+    agentosSoftware: role.agentosSoftware,
+    agentosInstruction: role.agentosInstruction,
     endpoint: role.endpoint,
     modelHint: role.modelHint,
   };
@@ -304,6 +321,8 @@ export async function createLegendRecipe(input: LegendRecipeCreateInput): Promis
     legendType?: LegendRecipeKind;
     showInLegend: boolean;
     harnessKind?: LegendRecipe["harnessKind"];
+    agentosSoftware?: AgentOsSoftware;
+    agentosInstruction?: string;
     endpoint?: string;
     modelHint?: string;
   } = {
@@ -320,7 +339,10 @@ export async function createLegendRecipe(input: LegendRecipeCreateInput): Promis
     defaultShell: input.defaultShell ?? "auto",
     legendType: input.type ?? "tool",
     showInLegend: true,
-    harnessKind: input.harnessKind,
+    harnessKind: input.harnessKind
+      ?? (input.runtimeTarget === "agentos" ? "agentos" : undefined),
+    agentosSoftware: input.agentosSoftware,
+    agentosInstruction: input.agentosInstruction,
     endpoint: input.endpoint,
     modelHint: input.modelHint,
   };
@@ -360,6 +382,8 @@ export async function updateLegendRecipe(
     defaultShell: patch.defaultShell,
     startupPrompt: patch.startupPrompt,
     harnessKind: patch.harnessKind ?? existing.harnessKind,
+    agentosSoftware: patch.agentosSoftware ?? existing.agentosSoftware,
+    agentosInstruction: patch.agentosInstruction ?? existing.agentosInstruction,
     endpoint: patch.endpoint ?? existing.endpoint,
     modelHint: patch.modelHint ?? existing.modelHint,
   };

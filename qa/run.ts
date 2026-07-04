@@ -256,12 +256,57 @@ const checks: Check[] = [
     },
   },
   {
+    name: "legend-agentos",
+    description:
+      "V2: legend transport picker — agentos recipe spawns terminal actor; herdr/pty path preserved",
+    async run() {
+      const { runLegendAgentosCheck } = await import("./lib/legend-agentos");
+      return runLegendAgentosCheck();
+    },
+  },
+  {
     name: "agentos-terminal",
     description:
       "V1: AgentOS actor spawns as terminal tile — sim bytes + scripted electron screenshot proof",
     async run() {
       const { runAgentOsTerminalCheck } = await import("./lib/agentos-terminal");
       return runAgentOsTerminalCheck();
+    },
+  },
+  {
+    name: "actors-on-agentos",
+    description:
+      "V3: codex/hermes/claude on agentos transport — built-in roles + kill-switch + electron proof",
+    async run() {
+      const { runActorsOnAgentosCheck } = await import("./lib/actors-on-agentos");
+      return runActorsOnAgentosCheck();
+    },
+  },
+  {
+    name: "a2a-cable",
+    description:
+      "V4: cable-drawn A2A relay — sim relay round-trip + scripted two-actor canvas proof",
+    async run() {
+      const { runA2aCableCheck } = await import("./lib/a2a-cable");
+      return runA2aCableCheck();
+    },
+  },
+  {
+    name: "orchestrator",
+    description:
+      "V5: Hermes orchestrator spawns worker and delegates via sendConnectionRelay",
+    async run() {
+      const { runOrchestratorCheck } = await import("./lib/orchestrator");
+      return runOrchestratorCheck();
+    },
+  },
+  {
+    name: "actors-demo",
+    description:
+      "V6: full actors stack proof green twice consecutively",
+    async run() {
+      const { runActorsDemoCheck } = await import("./lib/actors-demo");
+      return runActorsDemoCheck();
     },
   },
   {

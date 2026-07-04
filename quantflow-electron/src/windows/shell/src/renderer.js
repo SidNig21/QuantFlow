@@ -359,6 +359,11 @@ async function init() {
 			disabled: entry.disabled,
 			custom: entry.custom,
 			harnessKind: entry.harnessKind,
+			runtimeTarget: entry.runtimeTarget,
+			commandTemplate: entry.commandTemplate,
+			cwd: entry.cwd,
+			agentosSoftware: entry.agentosSoftware,
+			agentosInstruction: entry.agentosInstruction,
 			endpoint: entry.endpoint,
 			modelHint: entry.modelHint,
 		}));
@@ -405,6 +410,7 @@ async function init() {
 		},
 	});
 	void refreshLegendRegistry();
+	window.shellApi.onLegendRegistryChanged?.(() => void refreshLegendRegistry());
 	const workflowModal = createWorkflowModal({ document });
 	const panelAgent = document.getElementById("panel-agent");
 	const agentResizeHandle = document.getElementById("agent-resize");
@@ -1708,6 +1714,9 @@ async function init() {
 		const recipe = legendRegistry.recipes.find((entry) => entry.id === recipeId)
 			?? LEGEND_RECIPES.find((entry) => entry.id === recipeId);
 		if (recipeId === "agentos" || recipe?.runtimeTarget === "agentos") {
+			const instruction = String(
+				recipe?.agentosInstruction ?? AGENTOS_DEFAULT_INSTRUCTION,
+			).trim();
 			const tile = await spawnAgentOsTileAt({
 				tileManager,
 				generateId,
@@ -1722,7 +1731,8 @@ async function init() {
 			}, position.x, position.y, {
 				size: LEGEND_TILE_SIZE,
 				displayName: recipe?.name ?? "AgentOS Worker",
-				instruction: AGENTOS_DEFAULT_INSTRUCTION,
+				instruction,
+				software: recipe?.agentosSoftware ?? "pi",
 			});
 			legendDock.updateEmptyHint();
 			return tile;

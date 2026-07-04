@@ -9,7 +9,9 @@ export function _setRolesDir(dir: string): void {
   rolesDir = dir;
 }
 
-export type RoleRuntimeTarget = "herdr-wsl" | "windows-pty";
+export type RoleRuntimeTarget = "herdr-wsl" | "windows-pty" | "agentos";
+
+export type AgentOsSoftware = "pi" | "opencode" | "claude-code";
 
 export interface Role {
   id: string;
@@ -24,6 +26,12 @@ export interface Role {
   cwdPolicy?: "workspace" | "home" | "inherit";
   defaultShell?: "auto" | "powershell" | "wsl" | "shell";
   runtimeTarget?: RoleRuntimeTarget;
+  /** AgentOS software when runtimeTarget is agentos (V2 legend transport). */
+  agentosSoftware?: AgentOsSoftware;
+  /** Optional boot instruction for AgentOS terminal actors. */
+  agentosInstruction?: string;
+  /** V3 fallback when AgentOS transport is unavailable. */
+  legacyRuntimeTarget?: RoleRuntimeTarget;
   startupPrompt?: string;
   systemPrompt?: string;
   statusParser?: RoleStatusParser;
@@ -34,7 +42,7 @@ export interface Role {
   /** R8 legend registry — config only, not Kernel truth. */
   showInLegend?: boolean;
   legendType?: string;
-  harnessKind?: "eve-harness" | "local-shell" | "herdr-shell";
+  harnessKind?: "eve-harness" | "local-shell" | "herdr-shell" | "agentos";
   endpoint?: string;
   modelHint?: string;
 }
@@ -54,13 +62,16 @@ const BUILT_IN_ROLES: Role[] = [
   {
     id: "hermes",
     name: "Hermes",
-    description: "Sync · gossip rooms",
+    description: "Sync · gossip rooms (AgentOS pi)",
     color: "#06b6d4",
     icon: "send",
     commandTemplate: "hermes",
     cwdPolicy: "workspace",
     defaultShell: "auto",
-    runtimeTarget: "herdr-wsl",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    agentosSoftware: "pi",
+    legacyRuntimeTarget: "herdr-wsl",
     systemPrompt: "Act as Hermes, the run orchestrator for this QuantFlow canvas.",
     envoyProfile: "hermes-agent",
     envoyWrapCommand: false,
@@ -78,13 +89,16 @@ const BUILT_IN_ROLES: Role[] = [
   {
     id: "codex",
     name: "Codex CLI",
-    description: "Local Codex agent",
+    description: "Local Codex agent (AgentOS pi)",
     color: "#38bdf8",
     icon: "bot",
     commandTemplate: "codex",
     cwdPolicy: "workspace",
     defaultShell: "auto",
-    runtimeTarget: "herdr-wsl",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    agentosSoftware: "pi",
+    legacyRuntimeTarget: "herdr-wsl",
     startupPrompt: "Review the current task context and wait for instructions.",
     statusParser: {
       waiting: ["approval required", "continue?", "waiting for", "confirm"],
@@ -96,13 +110,16 @@ const BUILT_IN_ROLES: Role[] = [
   {
     id: "claude-worker",
     name: "Claude Code",
-    description: "Implementation agent",
+    description: "Implementation agent (AgentOS claude-code)",
     color: "#f97316",
     icon: "hammer",
     commandTemplate: "claude",
     cwdPolicy: "workspace",
     defaultShell: "auto",
-    runtimeTarget: "herdr-wsl",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    agentosSoftware: "claude-code",
+    legacyRuntimeTarget: "herdr-wsl",
     startupPrompt: "Act as the implementation worker for this workspace.",
     statusParser: {
       waiting: ["do you want", "proceed?", "continue?", "yes/no"],

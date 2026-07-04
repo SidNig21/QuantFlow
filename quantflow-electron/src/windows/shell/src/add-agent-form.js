@@ -61,6 +61,14 @@ export function createAddAgentForm(options = {}) {
 				<select name="runtimeTarget" class="lv1-add-form__input">
 					<option value="herdr-wsl" selected>herdr-wsl</option>
 					<option value="windows-pty">windows-pty</option>
+					<option value="agentos">agentos</option>
+				</select>
+			`)}
+			${fieldRow("AgentOS software", `
+				<select name="agentosSoftware" class="lv1-add-form__input" data-agentos-only hidden>
+					<option value="pi" selected>pi</option>
+					<option value="opencode">opencode</option>
+					<option value="claude-code">claude-code</option>
 				</select>
 			`)}
 			${fieldRow("Shell", `
@@ -79,6 +87,7 @@ export function createAddAgentForm(options = {}) {
 			`)}
 			${fieldRow("Color", `<input class="lv1-add-form__input" name="color" type="color" value="#6366f1" />`)}
 			${fieldRow("Startup prompt", `<textarea class="lv1-add-form__input lv1-add-form__textarea" name="startupPrompt" rows="2" data-cli-only placeholder="Optional activation prompt"></textarea>`)}
+			${fieldRow("AgentOS instruction", `<textarea class="lv1-add-form__input lv1-add-form__textarea" name="agentosInstruction" rows="2" data-agentos-only placeholder="Optional boot instruction for the AgentOS actor" hidden></textarea>`)}
 		</div>
 		<footer class="lv1-add-form__footer">
 			<button class="lv1-add-form__btn lv1-add-form__btn--ghost" type="button" data-action="cancel">Cancel</button>
@@ -92,14 +101,21 @@ export function createAddAgentForm(options = {}) {
 	const kindSelect = dialog.querySelector('select[name="kind"]');
 	const cliFields = [...dialog.querySelectorAll("[data-cli-only]")];
 	const eveFields = [...dialog.querySelectorAll("[data-eve-only]")];
+	const agentosFields = [...dialog.querySelectorAll("[data-agentos-only]")];
 	const commandInput = dialog.querySelector('input[name="commandTemplate"]');
 	const runtimeSelect = dialog.querySelector('select[name="runtimeTarget"]');
 	const shellSelect = dialog.querySelector('select[name="defaultShell"]');
+	const shellField = dialog.querySelector('select[name="defaultShell"]')?.closest(".lv1-add-form__field");
+	const commandField = commandInput?.closest(".lv1-add-form__field");
 
 	function syncKindFields() {
 		const isEve = kindSelect.value === "eve";
-		for (const field of cliFields) field.hidden = isEve;
+		const isAgentos = !isEve && runtimeSelect.value === "agentos";
+		for (const field of cliFields) field.hidden = isEve || isAgentos;
 		for (const field of eveFields) field.hidden = !isEve;
+		for (const field of agentosFields) field.hidden = !isAgentos;
+		if (shellField) shellField.hidden = isAgentos;
+		if (commandField) commandField.hidden = isEve || isAgentos;
 		// Prefill the proven Eve shape so the operator can't accidentally make a
 		// broken (no-command / wrong-shell) Eve row.
 		if (isEve) {
@@ -110,6 +126,7 @@ export function createAddAgentForm(options = {}) {
 	}
 
 	kindSelect.addEventListener("change", syncKindFields);
+	runtimeSelect.addEventListener("change", syncKindFields);
 	syncKindFields();
 
 	function close() {
@@ -154,7 +171,12 @@ export function createAddAgentForm(options = {}) {
 			defaultShell: String(data.get("defaultShell") ?? "auto"),
 			type: isEve ? "agent" : "tool",
 		};
-		if (isEve) {
+		if (payload.runtimeTarget === "agentos") {
+			payload.harnessKind = "agentos";
+			payload.agentosSoftware = String(data.get("agentosSoftware") ?? "pi");
+			const instruction = String(data.get("agentosInstruction") ?? "").trim();
+			if (instruction) payload.agentosInstruction = instruction;
+		} else if (isEve) {
 			payload.modelHint = String(data.get("modelHint") ?? "").trim() || undefined;
 		} else {
 			payload.startupPrompt = String(data.get("startupPrompt") ?? "").trim() || undefined;

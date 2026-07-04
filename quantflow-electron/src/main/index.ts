@@ -66,6 +66,11 @@ import { disposeAgentOsService, prewarmAgentOsHost } from "./agentos-service";
 import { disposeAgentOsTerminalBridge } from "./agentos-terminal-bridge";
 import { runAgentOsLoopProof } from "./agentos-loop-proof";
 import { runAgentOsTerminalProof } from "./agentos-terminal-proof";
+import { runLegendAgentosProof } from "./agentos-legend-proof";
+import { runActorsOnAgentosProof } from "./agentos-actors-proof";
+import { runA2aCableProof } from "./agentos-a2a-proof";
+import { runOrchestratorProof } from "./agentos-orchestrator-proof";
+import { runActorsDemoProof } from "./agentos-demo-proof";
 
 const APP_NAME = "QuantFlow";
 const launchStartedAtMs = Date.now();
@@ -981,6 +986,21 @@ app.whenReady().then(async () => {
   }
   if (process.env.QF_AGENTOS_TERMINAL_PROOF === "1") {
     void runAgentOsTerminalProof(mainWindow!);
+  }
+  if (process.env.QF_LEGEND_AGENTOS_PROOF === "1") {
+    void runLegendAgentosProof(mainWindow!);
+  }
+  if (process.env.QF_ACTORS_ON_AGENTOS_PROOF === "1") {
+    void runActorsOnAgentosProof(mainWindow!);
+  }
+  if (process.env.QF_A2A_CABLE_PROOF === "1") {
+    void runA2aCableProof(mainWindow!);
+  }
+  if (process.env.QF_ORCHESTRATOR_PROOF === "1") {
+    void runOrchestratorProof(mainWindow!);
+  }
+  if (process.env.QF_ACTORS_DEMO_PROOF === "1") {
+    void runActorsDemoProof(mainWindow!);
   }
 });
 

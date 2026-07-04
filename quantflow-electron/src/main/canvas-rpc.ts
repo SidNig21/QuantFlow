@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { registerMethod } from "./json-rpc-server";
 import { dispatchKernelCommand } from "@qf-kernel/commands/index";
 import { subscribeWebContents } from "@qf-kernel/events/index";
+import { closeConnectionRelayChannel } from "./agentos-a2a-relay";
 
 type PendingRequest = {
   resolve: (value: unknown) => void;
@@ -302,6 +303,7 @@ export function registerCanvasRpc(win: BrowserWindow): void {
         if (!kernelResult.ok) {
           throw new Error(`Kernel rejected connection.delete: ${kernelResult.error}`);
         }
+        closeConnectionRelayChannel(id);
       }
 
       // Canvas visual removal.

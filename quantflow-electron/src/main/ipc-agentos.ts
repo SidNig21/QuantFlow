@@ -28,6 +28,7 @@ export function registerAgentOsHandlers(): void {
       cols?: number;
       rows?: number;
       instruction?: string;
+      software?: string;
     } = {}) => {
       const tileId = typeof payload.tileId === "string" ? payload.tileId.trim() : "";
       if (!tileId) return { ok: false, error: "tileId required" };
@@ -37,6 +38,7 @@ export function registerAgentOsHandlers(): void {
           cols: typeof payload.cols === "number" ? payload.cols : undefined,
           rows: typeof payload.rows === "number" ? payload.rows : undefined,
           instruction: typeof payload.instruction === "string" ? payload.instruction : undefined,
+          software: typeof payload.software === "string" ? payload.software : undefined,
         });
         return { ok: true, ...result };
       } catch (error) {

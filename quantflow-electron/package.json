@@ -49,6 +49,11 @@
 		"proof:herdr-ui": "bun scripts/herdr-ui-proof.ts",
 		"proof:agentos-loop": "bun scripts/proof-agentos-loop.ts",
 		"proof:agentos-terminal": "bun scripts/proof-agentos-terminal.ts",
+		"proof:legend-agentos": "bun scripts/proof-legend-agentos.ts",
+		"proof:actors-on-agentos": "bun scripts/proof-actors-on-agentos.ts",
+		"proof:a2a-cable": "bun scripts/proof-a2a-cable.ts",
+		"proof:orchestrator": "bun scripts/proof-orchestrator.ts",
+		"proof:actors-demo": "bun scripts/proof-actors-demo.ts",
 		"postinstall": "node scripts/postinstall.mjs"
 	},
 	"build": {
