@@ -1,12 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runHermesOrchestrator } from '../../quantflow-electron/src/main/agentos-orchestrator';
-import {
-  disposeAgentOsTerminalBridge,
-  prepareAgentOsTerminalAttach,
-} from '../../quantflow-electron/src/main/agentos-terminal-bridge';
-import { disposeAgentOsService } from '../../quantflow-electron/src/main/agentos-service';
-import { getStringLog, syncConnectionGraph } from '../../quantflow-electron/src/main/tile-session-registry';
+import { getStringLog, registerTileRelayBinding, syncConnectionGraph } from '../../quantflow-electron/src/main/tile-session-registry';
 
 const REPO_ROOT = join(import.meta.dir, '..', '..');
 
@@ -19,58 +14,59 @@ function assertOrchestratorModule(): boolean {
     console.error('orchestrator: missing runHermesOrchestrator');
     return false;
   }
-  if (!source.includes('postHostDelegateSend') && !source.includes('sendConnectionRelay')) {
-    console.error('orchestrator: must delegate via agentos-delegate toolkit bridge');
+  if (!source.includes('sendTileDelegate')) {
+    console.error('orchestrator: must delegate via tile relay dispatcher');
     return false;
   }
-  if (!source.includes('prepareAgentOsTerminalAttach')) {
-    console.error('orchestrator: must spawn workers via legend terminal attach');
+  if (source.includes('prepareAgentOsTerminalAttach')) {
+    console.error('orchestrator: must not force AgentOS attach on herdr tiles');
     return false;
   }
-  console.log('orchestrator: module wires spawn + relay');
+  console.log('orchestrator: module wires tile relay delegation');
   return true;
 }
 
 async function assertSimOrchestratorRun(): Promise<boolean> {
   process.env.QF_AGENTOS_SIM = '1';
-  await disposeAgentOsService();
-  await disposeAgentOsTerminalBridge();
 
   const orchestratorTileId = 'tile-orch';
   const workerTileId = 'tile-worker';
   const connectionId = 'conn-orch-worker';
 
-  try {
-    syncConnectionGraph([{
-      id: connectionId,
-      tileAId: orchestratorTileId,
-      tileBId: workerTileId,
-    }]);
+  registerTileRelayBinding(orchestratorTileId, {
+    runtimeTarget: 'herdr-wsl',
+    herdrPaneId: 'pane-orch',
+  });
+  registerTileRelayBinding(workerTileId, {
+    runtimeTarget: 'herdr-wsl',
+    herdrPaneId: 'pane-worker',
+  });
+  syncConnectionGraph([{
+    id: connectionId,
+    tileAId: orchestratorTileId,
+    tileBId: workerTileId,
+  }]);
 
-    const result = await runHermesOrchestrator({
-      orchestratorTileId,
-      goal: 'Summarize the workspace in one line',
-      workers: [{ tileId: workerTileId, software: 'pi' }],
-      connectionIds: [connectionId],
-    });
+  const result = await runHermesOrchestrator({
+    orchestratorTileId,
+    goal: 'Summarize the workspace in one line',
+    workers: [{ tileId: workerTileId }],
+    connectionIds: [connectionId],
+  });
 
-    if (!result.ok) {
-      console.error('orchestrator: sim run failed', result);
-      return false;
-    }
-
-    const logs = getStringLog(connectionId, 10);
-    if (!logs.some((e) => e.fromTileId === orchestratorTileId && e.toTileId === workerTileId)) {
-      console.error('orchestrator: delegation log missing', logs);
-      return false;
-    }
-
-    console.log('orchestrator: sim Hermes run spawned worker + delegated');
-    return true;
-  } finally {
-    await disposeAgentOsTerminalBridge();
-    await disposeAgentOsService();
+  if (!result.ok) {
+    console.error('orchestrator: sim run failed', result);
+    return false;
   }
+
+  const logs = getStringLog(connectionId, 10);
+  if (!logs.some((e) => e.fromTileId === orchestratorTileId && e.toTileId === workerTileId)) {
+    console.error('orchestrator: delegation log missing', logs);
+    return false;
+  }
+
+  console.log('orchestrator: sim Hermes run delegated via herdr relay');
+  return true;
 }
 
 export async function runOrchestratorCheck(): Promise<boolean> {

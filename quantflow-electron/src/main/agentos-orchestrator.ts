@@ -1,11 +1,9 @@
 /**
- * V5 Hermes orchestrator — recruits worker tiles, delegates via agentos-delegate toolkit (S5).
+ * V5 Hermes orchestrator — delegates across cabled worker tiles via tile relay dispatcher.
  */
-import { postHostDelegateSend, sendConnectionRelay } from './agentos-a2a-relay';
-import { getAgentOsTileAttach, prepareAgentOsTerminalAttach } from './agentos-terminal-bridge';
+import { sendTileDelegate } from './tile-relay-dispatcher';
 import {
   appendRelayLog,
-  registerHostTileSession,
   syncConnectionGraph,
 } from './tile-session-registry';
 import type { AgentOsSoftware } from './role-service';
@@ -56,66 +54,42 @@ export async function runHermesOrchestrator(input: OrchestratorRunInput): Promis
     };
   }
 
-  await prepareAgentOsTerminalAttach({
-    tileId: orchestratorTileId,
-    software: 'pi',
-    instruction: `Hermes orchestrator (interim pi seat). Delegate via agentos-delegate on cabled workers. Goal: ${goal}`,
-  });
-  const orchAttach = getAgentOsTileAttach(orchestratorTileId);
-  if (orchAttach?.sessionId) {
-    await registerHostTileSession(orchestratorTileId, orchAttach.sessionId);
-  }
-
   const delegations: OrchestratorDelegationResult[] = [];
 
   for (let i = 0; i < input.workers.length; i++) {
     const worker = input.workers[i]!;
     const connectionId = input.connectionIds[i]!.trim();
-    await prepareAgentOsTerminalAttach({
-      tileId: worker.tileId,
-      software: worker.software ?? 'pi',
-      instruction: worker.instruction ?? `Worker for: ${goal}`,
-    });
-    const workerAttach = getAgentOsTileAttach(worker.tileId);
-    if (workerAttach?.sessionId) {
-      await registerHostTileSession(worker.tileId, workerAttach.sessionId);
-    }
 
-    // Re-sync right before relay — renderer IPC may have cleared the graph during prepare.
     syncConnectionGraph([{
       id: connectionId,
       tileAId: orchestratorTileId,
       tileBId: worker.tileId,
     }]);
 
-    let relay;
-    if (process.env.QF_AGENTOS_SIM === '1') {
-      relay = await sendConnectionRelay({
-        connectionId,
-        fromTileId: orchestratorTileId,
-        text: goal,
-      });
-    } else {
-      relay = await postHostDelegateSend({
-        fromTileId: orchestratorTileId,
-        connectionId,
-        goal,
-      });
-    }
-    if (relay.ok && relay.reply) {
+    const relay = await sendTileDelegate({
+      fromTileId: orchestratorTileId,
+      toTileId: worker.tileId,
+      cableId: connectionId,
+      text: goal,
+    });
+
+    if (relay.ok) {
       appendRelayLog({
         connectionId,
         fromTileId: orchestratorTileId,
         toTileId: worker.tileId,
         text: goal,
       });
-      appendRelayLog({
-        connectionId,
-        fromTileId: worker.tileId,
-        toTileId: orchestratorTileId,
-        text: relay.reply,
-      });
+      if (relay.reply) {
+        appendRelayLog({
+          connectionId,
+          fromTileId: worker.tileId,
+          toTileId: orchestratorTileId,
+          text: relay.reply,
+        });
+      }
     }
+
     delegations.push({
       workerTileId: worker.tileId,
       connectionId,
