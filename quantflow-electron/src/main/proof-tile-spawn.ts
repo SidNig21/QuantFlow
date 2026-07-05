@@ -4,7 +4,7 @@
 import type { WebContents } from "electron";
 
 const POLL_MS = 400;
-const SPAWN_TIMEOUT_MS = 35_000;
+const SPAWN_TIMEOUT_MS = 45_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

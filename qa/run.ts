@@ -276,7 +276,7 @@ const checks: Check[] = [
   {
     name: "actors-on-agentos",
     description:
-      "V3: codex/hermes/claude on agentos transport — built-in roles + kill-switch + electron proof",
+      "V3: codex/hermes/claude on native herdr rail — built-in roles + kill-switch + electron proof",
     async run() {
       const { runActorsOnAgentosCheck } = await import("./lib/actors-on-agentos");
       return runActorsOnAgentosCheck();
@@ -325,6 +325,15 @@ const checks: Check[] = [
     async run() {
       const { runAgentOsAtomCheck } = await import("./lib/agentos-atom");
       return runAgentOsAtomCheck();
+    },
+  },
+  {
+    name: "tile-relay",
+    description:
+      "Pattern B: tile relay dispatcher routes herdr/ws-pty/agentos backends",
+    async run() {
+      const { runTileRelayCheck } = await import("./lib/tile-relay");
+      return runTileRelayCheck();
     },
   },
   {

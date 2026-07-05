@@ -1,14 +1,13 @@
 /**
- * V3 scripted proof — codex, hermes, claude spawn as AgentOS terminal actors.
+ * V3 scripted proof — codex, hermes, claude spawn as native herdr terminal actors.
  */
 import { app, type BrowserWindow, type WebContents } from "electron";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { saveProofScreenshot, spawnDockRecipeTile } from "./proof-tile-spawn";
 import { SIDECAR_PID_PATH } from "./sidecar/protocol";
 
 const SETTLE_MS = 2500;
-const POLL_MS = 400;
-const SPAWN_TIMEOUT_MS = 30_000;
 const RECIPES = ["codex", "hermes", "claude"] as const;
 
 function logStep(name: string, ok: boolean, detail: string): void {
@@ -39,92 +38,45 @@ async function execJs<T>(wc: WebContents, expression: string): Promise<T> {
   return wc.executeJavaScript(expression, true) as Promise<T>;
 }
 
-async function saveScreenshot(
-  wc: WebContents,
-  evidenceDir: string,
-  filename: string,
-): Promise<boolean> {
-  try {
-    const image = await wc.capturePage();
-    const png = image.toPNG();
-    writeFileSync(join(evidenceDir, filename), png);
-    logStep(`screenshot-${filename}`, true, `${png.byteLength} bytes`);
-    return true;
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    logStep(`screenshot-${filename}`, false, detail);
+async function assertHerdrRailTile(wc: WebContents, tileId: string): Promise<boolean> {
+  const check = await execJs<{
+    ok: boolean;
+    runtimeTarget: string | null;
+    isAgentOs: boolean;
+    isHerdr: boolean;
+  }>(wc, `(async () => {
+    const tileId = ${JSON.stringify(tileId)};
+    const workers = await window.kernelApi?.sendQuery?.('kernel.worker.list', {}) ?? [];
+    const worker = Array.isArray(workers)
+      ? workers.find((entry) => entry?.tileId === tileId)
+      : null;
+    const runtimeTarget = worker?.runtimeTarget ?? worker?.harnessKind ?? null;
+    const tileEl = document.querySelector(\`[data-tile-id="\${tileId}"]\`);
+    const webview = tileEl?.querySelector('webview');
+    const src = webview?.getAttribute('src') ?? '';
+    const decoded = decodeURIComponent(src);
+    const isAgentOs = decoded.includes('target=agentos')
+      || decoded.includes('agentos%3A');
+    const isHerdr = runtimeTarget === 'herdr-wsl'
+      || decoded.includes('herdr-wsl')
+      || decoded.includes('herdr%3A');
+    return {
+      ok: !!webview && !isAgentOs && isHerdr,
+      runtimeTarget,
+      isAgentOs,
+      isHerdr,
+    };
+  })()`);
+  if (!check.ok) {
+    logStep(
+      `herdr-rail-${tileId}`,
+      false,
+      `runtime=${check.runtimeTarget ?? "null"} agentos=${check.isAgentOs} herdr=${check.isHerdr}`,
+    );
     return false;
   }
-}
-
-async function spawnRecipeTerminal(
-  wc: WebContents,
-  recipeId: string,
-  offsetX: number,
-  excludeTileIds: string[] = [],
-): Promise<string | null> {
-  const baseline = await execJs<number>(wc, `(async () => {
-    const workers = await window.kernelApi?.sendQuery?.('kernel.worker.list', {}) ?? [];
-    return Array.isArray(workers) ? workers.length : 0;
-  })()`);
-
-  const clicked = await execJs<{ ok: boolean; error?: string }>(wc, `(() => {
-    const btn = document.querySelector('.lv1-recipe[data-recipe="${recipeId}"]');
-    if (!btn) return { ok: false, error: 'recipe ${recipeId} not found' };
-    btn.click();
-    const panel = document.getElementById('panel-viewer');
-    if (!panel) return { ok: false, error: 'panel-viewer not found' };
-    const rect = panel.getBoundingClientRect();
-    panel.dispatchEvent(new MouseEvent('click', {
-      bubbles: true,
-      cancelable: true,
-      clientX: rect.left + rect.width / 2 + ${offsetX},
-      clientY: rect.top + rect.height / 2,
-    }));
-    return { ok: true };
-  })()`);
-  if (!clicked.ok) {
-    logStep(`spawn-${recipeId}`, false, clicked.error ?? "click failed");
-    return null;
-  }
-
-  const started = Date.now();
-  while (Date.now() - started < SPAWN_TIMEOUT_MS) {
-    const poll = await execJs<{
-      tileId: string | null;
-      hasWebview: boolean;
-      flipped: boolean;
-      runtime: string | null;
-    }>(wc, `(async () => {
-      const workers = await window.kernelApi?.sendQuery?.('kernel.worker.list', {}) ?? [];
-      if (!Array.isArray(workers) || workers.length <= ${baseline}) {
-        return { tileId: null, hasWebview: false, flipped: false, runtime: null };
-      }
-      const exclude = new Set(${JSON.stringify(excludeTileIds)});
-      const tileId = [...workers].reverse().map((w) => w?.tileId).find((id) => id && !exclude.has(id)) ?? null;
-      if (!tileId) return { tileId: null, hasWebview: false, flipped: false, runtime: null };
-      const tileEl = document.querySelector(\`[data-tile-id="\${tileId}"]\`);
-      const webview = tileEl?.querySelector('webview');
-      const flipped = tileEl?.classList.contains('is-flipped') ?? false;
-      const src = webview?.getAttribute('src') ?? '';
-      const isAgentOs = src.includes('target=agentos') || decodeURIComponent(src).includes('agentos%3A');
-      const running = tileEl?.dataset?.ptyStatus === 'running' || !!webview;
-      return {
-        tileId,
-        hasWebview: running,
-        flipped,
-        runtime: isAgentOs ? 'agentos' : (running ? 'pending-agentos' : 'other'),
-      };
-    })()`);
-    if (poll.tileId && poll.hasWebview && !poll.flipped
-      && (poll.runtime === "agentos" || poll.runtime === "pending-agentos")) {
-      logStep(`spawn-${recipeId}`, true, `tileId=${poll.tileId} runtime=${poll.runtime}`);
-      return poll.tileId;
-    }
-    await sleep(POLL_MS);
-  }
-  logStep(`spawn-${recipeId}`, false, "timeout waiting for agentos terminal tile");
-  return null;
+  logStep(`herdr-rail-${tileId}`, true, `runtime=${check.runtimeTarget ?? "herdr-wsl"}`);
+  return true;
 }
 
 export async function runActorsOnAgentosProof(mainWindow: BrowserWindow): Promise<void> {
@@ -138,17 +90,23 @@ export async function runActorsOnAgentosProof(mainWindow: BrowserWindow): Promis
   const spawned: string[] = [];
   for (let i = 0; i < RECIPES.length; i++) {
     const recipeId = RECIPES[i]!;
-    const tileId = await spawnRecipeTerminal(wc, recipeId, i * 120, spawned);
+    const tileId = await spawnDockRecipeTile(wc, recipeId, i * 120, spawned);
     if (!tileId) {
+      logStep(`spawn-${recipeId}`, false, "dock spawn failed");
       exitApp(1);
       return;
     }
+    if (!(await assertHerdrRailTile(wc, tileId))) {
+      exitApp(1);
+      return;
+    }
+    logStep(`spawn-${recipeId}`, true, `tileId=${tileId}`);
     spawned.push(tileId);
     await sleep(500);
   }
 
   logStep("all-actors", true, `recipes=${RECIPES.join(",")} tiles=${spawned.join(",")}`);
-  await saveScreenshot(wc, evidenceDir, "V3-00-actors-on-agentos.png");
+  await saveProofScreenshot(wc, evidenceDir, "V3-00-actors-on-agentos.png", logStep);
   logStep("done", true, evidenceDir);
   exitApp(0);
 }
