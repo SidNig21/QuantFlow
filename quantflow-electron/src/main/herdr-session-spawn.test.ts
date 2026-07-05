@@ -335,4 +335,17 @@ describe("herdr role spawn planning", () => {
       roleName: "Hermes",
     }, async () => ({}))).rejects.toThrow("pane id");
   });
+
+  test("returns deterministic sim identity when QF_AGENTOS_SIM=1", async () => {
+    process.env.QF_AGENTOS_SIM = "1";
+    const result = await spawnHerdrRoleSession({
+      tileId: "tile-sim",
+      roleId: "codex",
+      roleName: "Codex",
+    });
+    expect(result.runtimeTarget).toBe("herdr-wsl");
+    expect(result.herdrPaneId).toContain("sim-pane");
+    expect(result.terminalTarget).toContain("herdr-wsl:");
+    delete process.env.QF_AGENTOS_SIM;
+  });
 });

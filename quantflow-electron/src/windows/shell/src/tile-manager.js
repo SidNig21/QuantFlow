@@ -99,12 +99,20 @@ export function createTileManager({
 		if (tile.type !== "term" || !tile.ptySessionId) return;
 		ensureRouteHandle(tile, tiles);
 		const label = tile.userTitle || tile.autoTitle || tile.id;
+		const relay = tile.runtimeTarget
+			? {
+				runtimeTarget: tile.runtimeTarget,
+				herdrPaneId: tile.herdrPaneId,
+				ptySessionId: tile.ptySessionId,
+			}
+			: undefined;
 		window.shellApi.stringRegisterTileSession?.(
 			tile.id,
 			tile.ptySessionId,
 			label,
 			tile.routeHandle,
 			tile.roleStatusParser,
+			relay,
 		);
 	}
 

@@ -1,4 +1,11 @@
 import { listSessions } from "./pty";
+import type { RoleRuntimeTarget } from "./role-service";
+
+export interface TileRelayBinding {
+  runtimeTarget: RoleRuntimeTarget;
+  herdrPaneId?: string;
+  ptySessionId?: string;
+}
 
 export interface ConnectionGraphEntry {
   id: string;
@@ -35,6 +42,7 @@ interface TileSession {
   label: string;
   routeHandle?: string;
   statusParser?: TileStatusParser;
+  relay?: TileRelayBinding;
   lastLine?: string;
   lastActivityTs?: number;
 }
@@ -176,7 +184,9 @@ export function registerTileSession(
   label: string,
   routeHandle?: string,
   statusParser?: TileStatusParser,
+  relay?: TileRelayBinding,
 ): void {
+  const prior = tileRegistry.get(tileId);
   const entry: TileSession = {
     sessionId,
     label,
@@ -184,7 +194,31 @@ export function registerTileSession(
   };
   if (routeHandle) entry.routeHandle = routeHandle;
   if (statusParser) entry.statusParser = statusParser;
+  if (relay) entry.relay = relay;
+  else if (prior?.relay) entry.relay = prior.relay;
   tileRegistry.set(tileId, entry);
+}
+
+export function registerTileRelayBinding(
+  tileId: string,
+  relay: TileRelayBinding,
+): void {
+  const prior = tileRegistry.get(tileId);
+  if (prior) {
+    prior.relay = relay;
+    tileRegistry.set(tileId, prior);
+    return;
+  }
+  tileRegistry.set(tileId, {
+    sessionId: tileId,
+    label: tileId,
+    relay,
+    lastActivityTs: Date.now(),
+  });
+}
+
+export function getTileRelayBinding(tileId: string): TileRelayBinding | null {
+  return tileRegistry.get(tileId)?.relay ?? null;
 }
 
 export function unregisterTileSession(tileId: string): void {

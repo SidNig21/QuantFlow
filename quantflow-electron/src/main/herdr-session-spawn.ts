@@ -123,7 +123,7 @@ export function extractHerdrTerminalId(
   return candidates.find(Boolean) ?? null;
 }
 
-async function sendHerdrPaneLine(
+export async function sendHerdrPaneLine(
   rpc: HerdrRpc,
   paneId: string,
   text: string,
@@ -134,10 +134,38 @@ async function sendHerdrPaneLine(
   await rpc("pane.send_keys", { pane_id: paneId, keys: ["Enter"] });
 }
 
+/** Proof-only (QF_AGENTOS_SIM=1): deterministic herdr identity, no WSL socket. */
+function isHerdrProofSim(): boolean {
+  return process.env.QF_AGENTOS_SIM === "1";
+}
+
+function buildProofSimHerdrResult(
+  request: HerdrRoleSpawnRequest,
+): HerdrRoleSpawnResult {
+  const herdrAgentName = buildHerdrAgentName(request);
+  const simSuffix = slugPart(request.tileId, "tile");
+  const herdrTerminalId = `sim-terminal-${simSuffix}`;
+  return {
+    runtimeTarget: "herdr-wsl",
+    herdrAgentName,
+    herdrWorkspaceId: `sim-workspace-${simSuffix}`,
+    herdrPaneId: `sim-pane-${simSuffix}`,
+    herdrTerminalId,
+    terminalTarget: buildHerdrDisplayTarget(herdrTerminalId),
+    workspaceCreateResult: { sim: true },
+    paneSplitResult: { sim: true },
+    paneGetResult: { sim: true },
+  };
+}
+
 export async function spawnHerdrRoleSession(
   request: HerdrRoleSpawnRequest,
   rpc: HerdrRpc = callHerdrSocket,
 ): Promise<HerdrRoleSpawnResult> {
+  if (isHerdrProofSim()) {
+    return buildProofSimHerdrResult(request);
+  }
+
   const herdrAgentName = buildHerdrAgentName(request);
   const workspaceCreateResult = await rpc("workspace.create", {
     label: herdrAgentName,

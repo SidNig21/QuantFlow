@@ -19,8 +19,20 @@ export function registerTileRegistryHandlers(): void {
       label: string,
       routeHandle?: string,
       statusParser?: { waiting?: string[]; blocked?: string[] },
+      relay?: {
+        runtimeTarget?: string;
+        herdrPaneId?: string;
+        ptySessionId?: string;
+      },
     ) => {
-      registerTileSession(tileId, sessionId, label, routeHandle, statusParser);
+      const binding = relay?.runtimeTarget
+        ? {
+            runtimeTarget: relay.runtimeTarget as "herdr-wsl" | "windows-pty" | "agentos",
+            herdrPaneId: relay.herdrPaneId,
+            ptySessionId: relay.ptySessionId,
+          }
+        : undefined;
+      registerTileSession(tileId, sessionId, label, routeHandle, statusParser, binding);
       return { ok: true };
     },
   );
