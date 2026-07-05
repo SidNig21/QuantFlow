@@ -1,6 +1,13 @@
 /**
  * AgentOS credential order — first present wins (mirrors FABLED_MISSION §4 P5).
  * Host process duplicates this logic in tools/agentos-host/host.js (WSL env).
+ *
+ * S2 Windows-blindness fix: the founder's key may legitimately live only in the
+ * WSL environment (~/.profile), where the sidecar host CAN see it while the
+ * Windows process env cannot. The host reports a BOOLEAN `hasCredential` on
+ * GET /health; health probes cache that report here and `hasAgentOsCredential`
+ * unions it with the Windows env check. Only a boolean ever crosses — never a
+ * name-with-value, value, or length.
  */
 import { getCredential } from '../../vault/credentials.js';
 
@@ -26,6 +33,32 @@ export function resolveAgentOsCredential(): AgentOsCredentialChoice | null {
   return null;
 }
 
-export function hasAgentOsCredential(): boolean {
+/** Windows-process-env check only (the pre-S2 behavior). */
+export function hasWindowsAgentOsCredential(): boolean {
   return resolveAgentOsCredential() !== null;
+}
+
+/**
+ * Last host-reported credential boolean. `null` = unknown (host unreachable,
+ * never probed, or host predates the report) — callers then fall back to the
+ * Windows env check alone, i.e. pre-S2 behavior.
+ */
+let lastHostCredentialReport: boolean | null = null;
+
+/** Record the host's /health `hasCredential` boolean. Non-boolean → unknown. */
+export function recordHostCredentialReport(report: boolean | null | undefined): void {
+  lastHostCredentialReport = typeof report === 'boolean' ? report : null;
+}
+
+export function getHostCredentialReport(): boolean | null {
+  return lastHostCredentialReport;
+}
+
+/**
+ * Union of Windows env keys and the host's last reachable report. Windows env
+ * keys still count; host-only WSL keys now count too. Host unreachable (null
+ * report) keeps the original Windows-only behavior.
+ */
+export function hasAgentOsCredential(): boolean {
+  return hasWindowsAgentOsCredential() || lastHostCredentialReport === true;
 }

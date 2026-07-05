@@ -33,6 +33,10 @@ export function formatAgentOsUnavailable(
   options: { hasCredential?: boolean } = {},
 ): string {
   const clean = stripAgentOsUnavailablePrefix(detail);
+  // Default = union of Windows env AND the host's /health hasCredential report
+  // (S2): the "no API key" fallback below only fires when BOTH say absent.
+  // A detail the host itself classified as a credential failure still wins —
+  // that IS the host reporting its env lacks a key.
   const hasCredential = options.hasCredential ?? hasAgentOsCredential();
   const kind = classifyAgentOsFailure(clean);
 

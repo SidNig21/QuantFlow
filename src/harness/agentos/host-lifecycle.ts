@@ -7,6 +7,7 @@ import { spawn as nodeSpawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { recordHostCredentialReport } from './credential-order';
 
 const execFileAsync = promisify(execFile);
 
@@ -148,10 +149,48 @@ async function probeHealth(
   try {
     const res = await fetchImpl(`http://${host}:${port}/health`, { signal: controller.signal });
     if (!res.ok) return false;
-    const body = await res.json() as { ok?: boolean };
-    return body.ok === true;
+    const body = await res.json() as { ok?: boolean; hasCredential?: boolean };
+    if (body.ok !== true) return false;
+    // Cache the host's boolean credential report (WSL env visibility).
+    recordHostCredentialReport(typeof body.hasCredential === 'boolean' ? body.hasCredential : null);
+    return true;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Ask a reachable host whether ITS environment (WSL) holds an AgentOS
+ * credential. Returns the host's boolean report, or null when the host is
+ * unreachable, unhealthy, or predates the report. Boolean only — no
+ * credential name-with-value, value, or length ever crosses this seam.
+ * Successful reads are cached via recordHostCredentialReport.
+ */
+export async function probeAgentOsHostCredential(options: {
+  host?: string;
+  port?: number;
+  fetch?: typeof fetch;
+  timeoutMs?: number;
+} = {}): Promise<boolean | null> {
+  const port = options.port ?? defaultPort();
+  const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
+  const timeoutMs = options.timeoutMs ?? 2_000;
+  const host = options.host
+    ?? await resolveAgentOsHostAddress({ port, fetch: fetchImpl });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(`http://${host}:${port}/health`, { signal: controller.signal });
+    if (!res.ok) return null;
+    const body = await res.json() as { ok?: boolean; hasCredential?: boolean };
+    if (body.ok !== true) return null;
+    const report = typeof body.hasCredential === 'boolean' ? body.hasCredential : null;
+    recordHostCredentialReport(report);
+    return report;
+  } catch {
+    return null;
   } finally {
     clearTimeout(timer);
   }

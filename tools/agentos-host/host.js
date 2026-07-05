@@ -70,6 +70,22 @@ function resolveSoftwareAndEnv() {
   );
 }
 
+/**
+ * BOOLEAN ONLY — /health credential report. Mirrors resolveSoftwareAndEnv's
+ * order (OPENCODE_API_KEY/OPENCODE_ZEN_API_KEY → OPENROUTER_API_KEY →
+ * ANTHROPIC_API_KEY) but never exposes which name matched, any value, or any
+ * length. The Windows side is blind to WSL ~/.profile keys; this is its only
+ * window, and it must stay a single boolean.
+ */
+function hostHasCredential() {
+  return Boolean(
+    (process.env.OPENCODE_API_KEY ?? "").trim()
+    || (process.env.OPENCODE_ZEN_API_KEY ?? "").trim()
+    || (process.env.OPENROUTER_API_KEY ?? "").trim()
+    || (process.env.ANTHROPIC_API_KEY ?? "").trim(),
+  );
+}
+
 /** pi config files written into the VM for the OpenCode Zen provider. */
 function buildZenPiFiles(model) {
   const modelsJson = JSON.stringify({
@@ -240,7 +256,8 @@ async function handleRequest(req, res) {
 
   try {
     if (req.method === "GET" && path === "/health") {
-      sendJson(res, 200, { ok: true });
+      // No credential required to answer; hasCredential is a boolean only.
+      sendJson(res, 200, { ok: true, hasCredential: hostHasCredential() });
       return;
     }
 

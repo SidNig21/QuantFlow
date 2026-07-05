@@ -2,6 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import type { Server } from 'bun';
 import { createHttpAgentOsTransport } from './http-transport';
 import type { AgentOsPermissionRequest } from './transport';
+import {
+  getHostCredentialReport,
+  recordHostCredentialReport,
+} from './credential-order';
 
 function sseBody(messages: unknown[]): Uint8Array {
   const text = messages.map((m) => `data: ${JSON.stringify(m)}\n\n`).join('');
@@ -112,5 +116,45 @@ describe('http-agentos-transport', () => {
       },
     });
     expect((await transport.health()).ok).toBe(false);
+  });
+
+  test('health caches the host hasCredential report (boolean only)', async () => {
+    let payload: Record<string, unknown> = { ok: true, hasCredential: true };
+    const server = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/health') return Response.json(payload);
+        return new Response('not found', { status: 404 });
+      },
+    }) as Server;
+
+    const transport = createHttpAgentOsTransport({
+      host: '127.0.0.1',
+      port: server.port!,
+    });
+
+    recordHostCredentialReport(null);
+    expect((await transport.health()).ok).toBe(true);
+    expect(getHostCredentialReport()).toBe(true);
+
+    payload = { ok: true, hasCredential: false };
+    expect((await transport.health()).ok).toBe(true);
+    expect(getHostCredentialReport()).toBe(false);
+
+    // Unhealthy response leaves the cached report untouched.
+    recordHostCredentialReport(true);
+    payload = { ok: false };
+    expect((await transport.health()).ok).toBe(false);
+    expect(getHostCredentialReport()).toBe(true);
+
+    server.stop(true);
+
+    // Unreachable host leaves the cached report untouched.
+    expect((await transport.health()).ok).toBe(false);
+    expect(getHostCredentialReport()).toBe(true);
+
+    recordHostCredentialReport(null);
   });
 });

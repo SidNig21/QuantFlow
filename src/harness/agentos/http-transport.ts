@@ -3,6 +3,7 @@
  */
 import type { AgentOsPermissionRequest, AgentOsTransport } from './transport';
 import { resolveAgentOsHostAddress } from './host-lifecycle';
+import { recordHostCredentialReport } from './credential-order';
 
 export type AgentOsFetch = (
   url: string,
@@ -279,8 +280,14 @@ export function createHttpAgentOsTransport(
       try {
         const res = await fetchImpl(`${await rootUrl()}/health`);
         if (!res.ok) return { ok: false };
-        const body = await res.json() as { ok?: boolean };
-        return { ok: body.ok === true };
+        const body = await res.json() as { ok?: boolean; hasCredential?: boolean };
+        const ok = body.ok === true;
+        if (ok) {
+          // Cache the host's boolean credential report (WSL env visibility)
+          // so the Windows-side credential check can defer to it.
+          recordHostCredentialReport(typeof body.hasCredential === 'boolean' ? body.hasCredential : null);
+        }
+        return { ok };
       } catch {
         return { ok: false };
       }

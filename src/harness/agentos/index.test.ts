@@ -72,6 +72,8 @@ describe('agentos-harness', () => {
     const handle = await harness.spawn({ tileId: 'tile-down', roleId: 'agentos-down' });
     await expect(
       harness.send(handle, { text: 'probe', taskId: 'task-down' }),
-    ).rejects.toThrow(/agentos-harness unavailable/);
+    // V0.3 taxonomy: all unavailable failures format as "AgentOS unavailable: …"
+    // (pre-V0.3 threw a raw "agentos-harness unavailable:" prefix).
+    ).rejects.toThrow(/AgentOS unavailable/);
   });
 });
