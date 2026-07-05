@@ -80,10 +80,10 @@ const BUILT_IN_ROLES: Role[] = [
     commandTemplate: "claude",
     cwdPolicy: "workspace",
     defaultShell: "auto",
-    runtimeTarget: "agentos",
-    harnessKind: "agentos",
+    runtimeTarget: "herdr-wsl",
+    harnessKind: "herdr-shell",
     agentosSoftware: "claude-code",
-    legacyRuntimeTarget: "herdr-wsl",
+    legacyRuntimeTarget: "agentos",
     startupPrompt: "Act as the reviewer. Focus on defects, risks, and missing tests.",
     statusParser: {
       waiting: ["do you want", "proceed?", "continue?", "yes/no"],

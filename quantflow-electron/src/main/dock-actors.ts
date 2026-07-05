@@ -4,11 +4,8 @@
 
  *
 
- * Core spawn-rail actors plus QuantFlow Eve personas on the AgentOS fabric.
-
- * Click → terminal tile. AgentOS for Codex/Hermes/Claude and Eve personas;
-
- * base Eve also supports `npm run dev` via windows-pty when developing locally.
+ * Core spawn-rail actors on native host paths (herdr-wsl / windows-pty).
+ * AgentOS is opt-in coordination — not the default dock runtime.
 
  */
 
@@ -167,9 +164,9 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     name: "Codex",
 
-    description: "Codex on the AgentOS fabric (real codex agent — pending core-compatible pin)",
+    description: "Codex CLI in WSL (native auth · herdr spawn rail)",
 
-    dockSubtitle: "agentos · codex",
+    dockSubtitle: "herdr · codex",
 
     color: "var(--rail-codex, #14d9ff)",
 
@@ -179,13 +176,13 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     kind: "codex",
 
-    runtimeTarget: "agentos",
+    runtimeTarget: "herdr-wsl",
 
-    harnessKind: "agentos",
+    harnessKind: "herdr-shell",
 
     agentosSoftware: "codex",
 
-    legacyRuntimeTarget: "herdr-wsl",
+    legacyRuntimeTarget: "agentos",
 
     commandTemplate: "codex",
 
@@ -213,9 +210,9 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     name: "Claude Code",
 
-    description: "Implementation agent on AgentOS (claude-code)",
+    description: "Claude Code CLI in WSL (native auth · herdr spawn rail)",
 
-    dockSubtitle: "agentos · claude-code",
+    dockSubtitle: "herdr · claude-code",
 
     color: "var(--rail-worker, #ffc24a)",
 
@@ -225,13 +222,13 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     kind: "worker",
 
-    runtimeTarget: "agentos",
+    runtimeTarget: "herdr-wsl",
 
-    harnessKind: "agentos",
+    harnessKind: "herdr-shell",
 
     agentosSoftware: "claude-code",
 
-    legacyRuntimeTarget: "herdr-wsl",
+    legacyRuntimeTarget: "agentos",
 
     commandTemplate: "claude",
 
@@ -259,9 +256,9 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     name: "Hermes",
 
-    description: "Orchestrator on the AgentOS fabric (claude-backed, delegates to worker tiles)",
+    description: "Nous Hermes Agent CLI (hermes harness · delegates via cables)",
 
-    dockSubtitle: "agentos · orchestrator",
+    dockSubtitle: "herdr · hermes",
 
     color: "var(--rail-agent, #4fc3ff)",
 
@@ -271,21 +268,17 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     kind: "agent",
 
-    runtimeTarget: "agentos",
+    runtimeTarget: "herdr-wsl",
 
-    harnessKind: "agentos",
+    harnessKind: "herdr-shell",
 
-    agentosSoftware: "claude-code",
+    legacyRuntimeTarget: "agentos",
 
-    legacyRuntimeTarget: "herdr-wsl",
-
-    commandTemplate: "claude",
+    commandTemplate: "hermes",
 
     cwdPolicy: "workspace",
 
     defaultShell: "auto",
-
-    systemPrompt: "Act as Hermes, the run orchestrator for this QuantFlow canvas.",
 
     envoyProfile: "hermes-agent",
 

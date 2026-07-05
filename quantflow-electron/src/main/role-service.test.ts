@@ -65,7 +65,7 @@ describe("listRoles", () => {
     )).toEqual({
       hermes: {
         name: "Hermes",
-        description: "Orchestrator on the AgentOS fabric (claude-backed, delegates to worker tiles)",
+        description: "Nous Hermes Agent CLI (hermes harness · delegates via cables)",
         color: "#06b6d4",
       },
       puffer: {
@@ -81,12 +81,13 @@ describe("listRoles", () => {
     });
   });
 
-  test("Hermes runs a real claude-backed CLI, not a typed startup prompt", async () => {
+  test("Hermes runs the hermes CLI harness, not claude or a startup prompt", async () => {
     const role = await getRole("hermes");
 
-    expect(role?.commandTemplate).toBe("claude");
+    expect(role?.commandTemplate).toBe("hermes");
     expect(role?.startupPrompt).toBeUndefined();
-    expect(role?.systemPrompt).toContain("Act as Hermes");
+    expect(role?.systemPrompt).toBeUndefined();
+    expect(role?.agentosSoftware).toBeUndefined();
   });
 
   test("each role has identity and launch metadata", async () => {
@@ -105,37 +106,34 @@ describe("listRoles", () => {
     }
   });
 
-  test("AI-agent roles ride the agentos fabric with real identities (S3 roster)", async () => {
+  test("AI-agent roles use native herdr rail with AgentOS opt-in legacy (Pattern B)", async () => {
     const roles = await listRoles();
-    // pi is BANNED from the dock (founder directive 2026-07-05): every agent
-    // seat carries its REAL software identity, never a pi stand-in.
-    const fabric: Array<[string, string]> = [
-      ["hermes", "claude-code"],
+    const fabric: Array<[string, string | undefined]> = [
       ["codex", "codex"],
       ["claude", "claude-code"],
       ["claude-reviewer", "claude-code"],
     ];
     for (const [id, software] of fabric) {
       const role = roles.find((entry) => entry.id === id);
-      expect(role?.runtimeTarget).toBe("agentos");
-      expect(role?.harnessKind).toBe("agentos");
+      expect(role?.runtimeTarget).toBe("herdr-wsl");
+      expect(role?.harnessKind).toBe("herdr-shell");
       expect(role?.agentosSoftware).toBe(software);
-      expect(role?.legacyRuntimeTarget).toBe("herdr-wsl");
-      expect(requiresHerdrSpawn(role)).toBe(false);
+      expect(role?.legacyRuntimeTarget).toBe("agentos");
+      expect(requiresHerdrSpawn(role)).toBe(true);
     }
-    // No pi seats anywhere in the dock.
+    const hermes = roles.find((entry) => entry.id === "hermes");
+    expect(hermes?.commandTemplate).toBe("hermes");
+    expect(hermes?.agentosSoftware).toBeUndefined();
     for (const role of roles) {
       expect(role.agentosSoftware).not.toBe("pi");
     }
-    // Not-yet-live seats must SAY so — silence is the sin the roster policy kills.
-    expect(roles.find((r) => r.id === "codex")?.description).toContain("pending");
   });
 
   test("claude-worker id resolves to the claude dock actor", async () => {
     const role = await getRole("claude-worker");
     expect(role?.id).toBe("claude-worker");
     expect(role?.agentosSoftware).toBe("claude-code");
-    expect(role?.runtimeTarget).toBe("agentos");
+    expect(role?.runtimeTarget).toBe("herdr-wsl");
   });
 
   test("script lanes and reserved roles keep their rails (roster policy)", async () => {

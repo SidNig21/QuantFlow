@@ -34,12 +34,12 @@ describe("dock-actors", () => {
     }
   });
 
-  test("agent actors ride the agentos fabric; Eve personas ride Eve's local rail", () => {
-    // Real AI agents on the fabric — each with its own software identity, no pi.
+  test("agent actors use native herdr rail; Eve personas ride Eve's local rail", () => {
     for (const id of ["codex", "claude", "hermes"] as const) {
       const role = dockActorToRole(getDockActor(id)!);
-      expect(role.runtimeTarget).toBe("agentos");
-      expect(role.harnessKind).toBe("agentos");
+      expect(role.runtimeTarget).toBe("herdr-wsl");
+      expect(role.harnessKind).toBe("herdr-shell");
+      expect(role.legacyRuntimeTarget).toBe("agentos");
       expect(role.agentosSoftware).not.toBe("pi");
     }
     // Eve + Eve personas run locally via npm run dev — NOT AgentOS, NOT pi.
