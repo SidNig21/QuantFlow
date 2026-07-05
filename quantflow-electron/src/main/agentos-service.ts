@@ -236,10 +236,11 @@ export function setAgentOsPrewarmDryRun(enabled: boolean): void {
 }
 
 /**
- * Fire-and-forget WSL host pre-warm after app boot (V0.1). Never blocks startup;
- * failures log as warnings only.
+ * Optional WSL host pre-warm — off by default (Pattern B). Set QF_AGENTOS_PREWARM=1 to enable.
+ * First transport use still starts the host lazily when pre-warm has not finished.
  */
 export function prewarmAgentOsHost(): void {
+  if (process.env.QF_AGENTOS_PREWARM !== "1") return;
   if (prewarmInvoked || shouldSkipLiveHost()) return;
   prewarmInvoked = true;
   if (prewarmDryRun) return;

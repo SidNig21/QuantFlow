@@ -66,7 +66,7 @@ async function assertPrewarmHook(): Promise<boolean> {
     console.error(result.stderr.toString());
     return false;
   }
-  console.log('agentos-boot: pre-warm fires on invoke (unit test PASS)');
+  console.log('agentos-boot: pre-warm opt-in via QF_AGENTOS_PREWARM=1 (unit test PASS)');
   return true;
 }
 

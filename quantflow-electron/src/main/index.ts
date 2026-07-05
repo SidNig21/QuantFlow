@@ -928,7 +928,9 @@ app.whenReady().then(async () => {
   }
   recordLaunchPhase("runtime.pty-herdr", runtimeStartedAt);
 
-  prewarmAgentOsHost();
+  if (process.env.QF_AGENTOS_PREWARM === "1") {
+    prewarmAgentOsHost();
+  }
 
   const windowStartedAt = Date.now();
   buildAppMenu();
