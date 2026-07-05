@@ -61,6 +61,15 @@ function makeDeps() {
 
 const localRole = { id: "r1", name: "Coder", color: "#fff" };
 const herdrRole = { id: "r2", name: "Agent", color: "#0ff", runtimeTarget: "herdr-wsl" };
+const agentosRole = {
+  id: "hermes",
+  name: "Hermes",
+  color: "#06b6d4",
+  runtimeTarget: "agentos",
+  agentosSoftware: "pi",
+  commandTemplate: "hermes",
+  startupPrompt: "Review the current task context and wait for instructions.",
+};
 
 describe("spawnRoleTileAt honors Kernel worker.spawn as the authority gate", () => {
   test("local-shell: Kernel rejection prevents spawnTerminalWebview", async () => {
@@ -115,5 +124,82 @@ describe("spawnRoleTileAt honors Kernel worker.spawn as the authority gate", () 
     const spawnCall = sent.find((c) => c.method === "kernel.worker.spawn");
     expect(spawnCall).toBeDefined();
     expect(spawnCall?.payload.workflowId).toBe("wf-123");
+  });
+});
+
+// T004 (S1): roles with runtimeTarget "agentos" (canvas.roleSpawn — the path
+// MCP quantflow_role_spawn rides) must route through the same seam the legend
+// dock click uses, NEVER the legacy pty/local-shell or herdr paths.
+describe("agentos roles never fall through to the legacy pty path", () => {
+  test("routes through the agentos terminal seam, not pty/herdr", async () => {
+    const sent: { method: string; payload: Record<string, unknown> }[] = [];
+    setKernelApi((method, payload) => {
+      sent.push({ method, payload: payload as Record<string, unknown> });
+      return { ok: true };
+    });
+    const { deps, calls, tile } = makeDeps();
+    const prepared: Record<string, unknown>[] = [];
+    // deno-lint-ignore no-explicit-any
+    (deps.shellApi as any).agentosTerminalPrepare = async (
+      input: Record<string, unknown>,
+    ) => {
+      prepared.push(input);
+      return { ok: true, terminalTarget: `agentos:${input.tileId}` };
+    };
+
+    await spawnRoleTileAt(deps, agentosRole, 0, 0, {});
+
+    // AgentOS seam engaged; legacy runtimes untouched.
+    expect(prepared.length).toBe(1);
+    expect(calls.herdrSpawnRole).toBe(0);
+    expect(tile.runtimeTarget).toBe("agentos");
+    expect(tile.terminalTarget).toBe("agentos:tile-x");
+    expect(tile.ptyStatus).toBe("running");
+    // Startup prompt threads through as the AgentOS instruction.
+    expect(prepared[0]?.instruction).toBe(agentosRole.startupPrompt);
+    // Kernel worker row carries the agentos runtime, not local-shell.
+    const spawnCall = sent.find((c) => c.method === "kernel.worker.spawn");
+    expect(spawnCall?.payload.runtimeTarget).toBe("agentos");
+    expect(spawnCall?.payload.harnessKind).toBe("agentos");
+    expect(spawnCall?.payload.roleName).toBe("Hermes");
+  });
+
+  test("Kernel rejection still prevents any runtime start", async () => {
+    setKernelApi((method) =>
+      method === "kernel.worker.spawn" ? { ok: false, error: "denied" } : { ok: true },
+    );
+    const { deps, calls, tile } = makeDeps();
+    const prepared: unknown[] = [];
+    // deno-lint-ignore no-explicit-any
+    (deps.shellApi as any).agentosTerminalPrepare = async (input: unknown) => {
+      prepared.push(input);
+      return { ok: true, terminalTarget: "agentos:tile-x" };
+    };
+
+    await spawnRoleTileAt(deps, agentosRole, 0, 0, {});
+
+    expect(prepared.length).toBe(0);
+    expect(calls.herdrSpawnRole).toBe(0);
+    expect(calls.onRoleSpawnFailed).toBe(1);
+    expect(tile.ptyStatus).toBe("error");
+  });
+
+  test("bridge failure leaves an explicit error state — never a default pty session", async () => {
+    setKernelApi(() => ({ ok: true }));
+    const { deps, calls, tile } = makeDeps();
+    // deno-lint-ignore no-explicit-any
+    (deps.shellApi as any).agentosTerminalPrepare = async () => ({
+      ok: false,
+      error: "agentos unavailable: host not reachable",
+    });
+
+    await spawnRoleTileAt(deps, agentosRole, 0, 0, {});
+
+    expect(calls.herdrSpawnRole).toBe(0);
+    expect(calls.onRoleSpawnFailed).toBe(1);
+    expect(tile.ptyStatus).toBe("error");
+    expect(String(tile.ptyError)).toContain("agentos unavailable");
+    // No terminal target means no pty session was ever attached.
+    expect(tile.terminalTarget).toBeUndefined();
   });
 });

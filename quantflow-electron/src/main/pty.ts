@@ -88,6 +88,42 @@ function getSidecarClient(): SidecarClient {
 }
 
 /**
+ * Explicit disconnected state for agentos tiles: shown on the terminal
+ * face instead of silently falling back to a default pty shell.
+ */
+export const AGENTOS_DISCONNECTED_MESSAGE =
+  "AgentOS disconnected — respawn to reconnect";
+
+/**
+ * Seam for unit tests: agentos-backed sessions must route through the
+ * agentos terminal bridge (never a default pty backend). Tests inject a
+ * stub binder so no WSL host is needed.
+ */
+let agentOsPtyBinder: typeof bindAgentOsPtySession = bindAgentOsPtySession;
+export function _setAgentOsPtyBinderForTest(
+  binder: typeof bindAgentOsPtySession | null,
+): void {
+  agentOsPtyBinder = binder ?? bindAgentOsPtySession;
+}
+
+/**
+ * An agentos-backed session is recognizable even after an app restart
+ * (in-memory sets empty): by live bridge state, by its session-id prefix,
+ * or by persisted metadata.
+ */
+function isAgentOsBackedSession(
+  sessionId: string,
+  meta: SessionMeta | null,
+): boolean {
+  return (
+    isAgentOsPtySession(sessionId) ||
+    agentosSessionIds.has(sessionId) ||
+    sessionId.startsWith("agentos-pty-") ||
+    (meta?.backend as string | undefined) === "agentos"
+  );
+}
+
+/**
  * Determine which backend owns an existing session.
  * Checks in-memory tracking first, then falls back to persisted metadata.
  */
@@ -550,14 +586,21 @@ async function createSessionInner(
   const agentosAttach = parseAgentOsAttachTarget(preferredTarget);
   if (agentosAttach) {
     const sessionId = newAgentOsPtySessionId();
-    await bindAgentOsPtySession({
-      ptySessionId: sessionId,
-      tileId: agentosAttach.tileId,
-      senderWebContentsId,
-      cols: c,
-      rows: r,
-      onData: (sid, sender, data) => forwardPtyData(sid, sender, data),
-    });
+    try {
+      await agentOsPtyBinder({
+        ptySessionId: sessionId,
+        tileId: agentosAttach.tileId,
+        senderWebContentsId,
+        cols: c,
+        rows: r,
+        onData: (sid, sender, data) => forwardPtyData(sid, sender, data),
+      });
+    } catch (error) {
+      // Never fall back to a default pty for an agentos target — surface
+      // the explicit disconnected state on the terminal face instead.
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`${AGENTOS_DISCONNECTED_MESSAGE} (${detail})`);
+    }
 
     writeSessionMeta(sessionId, {
       shell: "agentos",
@@ -846,6 +889,50 @@ export async function reconnectSession(
   const meta = readSessionMeta(sessionId);
   const backend = sessionBackend(sessionId);
 
+  // AgentOS-backed tiles must NEVER reconnect through a default pty
+  // backend (that produces impostor WSL shells wearing the agentos
+  // label). Re-attach through the agentos terminal bridge when the host
+  // is reachable; otherwise throw the explicit disconnected error and
+  // PRESERVE session metadata so any fallback create stays routed at the
+  // agentos target (which also refuses to become a default pty).
+  if (isAgentOsBackedSession(sessionId, meta)) {
+    const attachTarget = parseAgentOsAttachTarget(meta?.target);
+    if (!attachTarget) {
+      throw new Error(
+        `${AGENTOS_DISCONNECTED_MESSAGE} ` +
+        "(no agentos attach target in session metadata)",
+      );
+    }
+    try {
+      await agentOsPtyBinder({
+        ptySessionId: sessionId,
+        tileId: attachTarget.tileId,
+        senderWebContentsId,
+        cols,
+        rows,
+        onData: (sid, sender, data) => forwardPtyData(sid, sender, data),
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`${AGENTOS_DISCONNECTED_MESSAGE} (${detail})`);
+    }
+    agentosSessionIds.add(sessionId);
+    return withOptionalFields({
+      sessionId,
+      shell: meta?.shell ?? "agentos",
+      displayName: meta?.displayName ?? "AgentOS",
+      meta,
+      scrollback: "",
+      mode: "sidecar",
+    }, {
+      target: meta?.target,
+      command: meta?.command,
+      args: meta?.args,
+      cwdHostPath: meta?.cwdHostPath ?? meta?.cwd,
+      cwdGuestPath: meta?.cwdGuestPath,
+    });
+  }
+
   if (backend === "sidecar") {
     await ensureSidecar();
     const client = getSidecarClient();
@@ -1009,7 +1096,9 @@ export async function killSession(
   sessionId: string,
 ): Promise<void> {
   clearForegroundCache(sessionId);
-  if (isAgentOsPtySession(sessionId)) {
+  // Covers live bridged sessions AND stale agentos sessions after an app
+  // restart (metadata/prefix match) — never route these to sidecar/tmux.
+  if (isAgentOsBackedSession(sessionId, readSessionMeta(sessionId))) {
     await killAgentOsPtySession(sessionId);
     agentosSessionIds.delete(sessionId);
     clearPendingPtyData(sessionId);
@@ -1193,6 +1282,16 @@ export async function discoverSessions(): Promise<DiscoveredSession[]> {
     // Skip metadata from a different backend — it belongs to the
     // sidecar process and must not be deleted or returned here.
     if (meta?.backend === "sidecar") continue;
+
+    // AgentOS bridge sessions have no tmux counterpart. Surface them so
+    // tile restore attempts pty:reconnect (which re-attaches through the
+    // agentos bridge), and never delete their metadata here — it carries
+    // the agentos attach target that keeps any fallback create off the
+    // default pty path.
+    if (meta && isAgentOsBackedSession(sessionId, meta)) {
+      result.push({ sessionId, meta });
+      continue;
+    }
 
     const name = tmuxSessionName(sessionId);
 

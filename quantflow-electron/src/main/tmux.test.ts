@@ -15,6 +15,7 @@ import {
   _setSessionDir,
   tmuxExec,
   tmuxSessionName,
+  type SessionMeta,
 } from "./tmux";
 import {
   createSession,
@@ -24,6 +25,9 @@ import {
   discoverSessions,
   destroyAll,
   verifyTmuxAvailable,
+  reconnectSession,
+  _setAgentOsPtyBinderForTest,
+  AGENTOS_DISCONNECTED_MESSAGE,
 } from "./pty";
 
 const tmuxBackendAvailableInProcess = process.platform === "darwin";
@@ -334,6 +338,124 @@ describe("cross-backend: reconnectSession defaults correctly", () => {
     expect(error).not.toBeNull();
     // Should try the tmux path and fail because no such tmux session.
     expect(error!.message).toContain("tmux session");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AgentOS-backed sessions: the silent legacy-pty fallback is dead.
+//
+// App-restart reconnect must either re-attach through the agentos terminal
+// bridge or throw the explicit disconnected error — never route the session
+// to the default tmux/sidecar pty backends (impostor WSL shells wearing the
+// agentos label). Metadata must survive failed attempts so the renderer's
+// fallback create keeps the agentos target (which also refuses to become a
+// default pty). The binder seam stands in for the WSL host.
+// ---------------------------------------------------------------------------
+
+describe("agentos sessions never fall back to a default pty", () => {
+  const agentosId = "agentos-pty-test-" + Date.now().toString(16);
+  const agentosMeta = {
+    shell: "agentos",
+    cwd: "/tmp",
+    createdAt: new Date().toISOString(),
+    target: "agentos:tile-agent-1",
+    displayName: "AgentOS",
+    command: "agentos",
+    backend: "agentos",
+  } as unknown as SessionMeta;
+
+  afterEach(() => {
+    _setAgentOsPtyBinderForTest(null);
+    deleteSessionMeta(agentosId);
+  });
+
+  test("discoverSessions surfaces agentos sessions and preserves their metadata", async () => {
+    writeSessionMeta(agentosId, agentosMeta);
+
+    const discovered = await discoverSessions();
+
+    const found = discovered.find((s) => s.sessionId === agentosId);
+    expect(found).toBeDefined();
+    // Metadata must survive discovery — it carries the agentos attach
+    // target reconnect needs (the old code deleted it as a stale tmux
+    // session, which is what produced the impostor shells).
+    const meta = readSessionMeta(agentosId);
+    expect(meta).not.toBeNull();
+    expect(meta!.target).toBe("agentos:tile-agent-1");
+  });
+
+  test("reconnectSession re-attaches through the agentos bridge when the host is available", async () => {
+    writeSessionMeta(agentosId, agentosMeta);
+    const bound: { ptySessionId: string; tileId: string }[] = [];
+    _setAgentOsPtyBinderForTest(async (input) => {
+      bound.push({ ptySessionId: input.ptySessionId, tileId: input.tileId });
+    });
+
+    const result = await reconnectSession(agentosId, 80, 24, -1);
+
+    expect(bound.length).toBe(1);
+    expect(bound[0]!.ptySessionId).toBe(agentosId);
+    expect(bound[0]!.tileId).toBe("tile-agent-1");
+    expect(result.shell).toBe("agentos");
+    expect(result.displayName).toBe("AgentOS");
+  });
+
+  test("reconnectSession with host unreachable throws the explicit disconnected error and preserves metadata", async () => {
+    writeSessionMeta(agentosId, agentosMeta);
+    _setAgentOsPtyBinderForTest(async () => {
+      throw new Error("agentos unavailable: host not reachable");
+    });
+
+    let error: Error | null = null;
+    try {
+      await reconnectSession(agentosId, 80, 24, -1);
+    } catch (e) {
+      error = e as Error;
+    }
+
+    expect(error).not.toBeNull();
+    expect(error!.message).toContain(AGENTOS_DISCONNECTED_MESSAGE);
+    // Must not have fallen through to a default backend.
+    expect(error!.message).not.toContain("tmux session");
+    // Metadata survives, so the renderer's fallback create still targets
+    // agentos (never a default pty cwd/shell).
+    expect(readSessionMeta(agentosId)).not.toBeNull();
+  });
+
+  test("reconnectSession without an agentos attach target still refuses default pty fallback", async () => {
+    writeSessionMeta(agentosId, {
+      ...agentosMeta,
+      target: undefined,
+    } as unknown as SessionMeta);
+
+    let error: Error | null = null;
+    try {
+      await reconnectSession(agentosId, 80, 24, -1);
+    } catch (e) {
+      error = e as Error;
+    }
+
+    expect(error).not.toBeNull();
+    expect(error!.message).toContain(AGENTOS_DISCONNECTED_MESSAGE);
+    expect(error!.message).not.toContain("tmux session");
+  });
+
+  test("createSession with an agentos target fails explicitly when the bridge fails — never a default pty", async () => {
+    _setAgentOsPtyBinderForTest(async () => {
+      throw new Error("agentos unavailable: host not reachable");
+    });
+
+    let error: Error | null = null;
+    try {
+      await createSession(
+        "/tmp", -1, 80, 24, "agentos:tile-agent-1", "tile-agent-1",
+      );
+    } catch (e) {
+      error = e as Error;
+    }
+
+    expect(error).not.toBeNull();
+    expect(error!.message).toContain(AGENTOS_DISCONNECTED_MESSAGE);
   });
 });
 

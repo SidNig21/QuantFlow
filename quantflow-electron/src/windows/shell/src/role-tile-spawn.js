@@ -47,6 +47,24 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 	const displayName = String(options.displayName ?? "").trim()
 		|| resolveRoleDisplayName(tiles, role);
 
+	// AgentOS roles must NEVER fall through to the legacy pty/local-shell
+	// path (impostor terminals). Route them through the same seam the
+	// legend dock click uses; failures surface as explicit AgentOS errors,
+	// never a default pty session. Command availability is a Windows-side
+	// check and does not apply — the software runs inside the AgentOS VM.
+	if (role.runtimeTarget === "agentos") {
+		return spawnAgentOsTileAt(deps, x, y, {
+			id: options.id,
+			size: options.size,
+			workflowId: options.workflowId,
+			displayName,
+			roleName: role.name,
+			instruction: String(options.instruction ?? role.startupPrompt ?? "").trim()
+				|| undefined,
+			software: role.agentosSoftware,
+		});
+	}
+
 	if (isMissingRoleCommand?.(role)) {
 		const message = `${displayName} is missing command: ${getRoleCommandName?.(role)}`;
 		onRoleSpawnFailed?.(createRoleSpawnFailureEvent(role, message));
@@ -207,6 +225,7 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 	} = deps;
 
 	const displayName = String(options.displayName ?? "AgentOS Worker").trim();
+	const roleName = String(options.roleName ?? "").trim() || "AgentOS";
 	const size = options.size ?? getTerminalSize();
 	const tileId = options.id || generateId();
 	const kapi = kernelApiRef();
@@ -216,7 +235,7 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 		displayName,
 		id: tileId,
 		runtimeTarget: "agentos",
-		roleName: "AgentOS",
+		roleName,
 		userTitle: displayName,
 	});
 
@@ -237,7 +256,7 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 			spawnResult = await kapi.sendCommand("kernel.worker.spawn", {
 				tileId: tile.id,
 				workflowId: options.workflowId ?? null,
-				roleName: "AgentOS",
+				roleName,
 				runtimeTarget: "agentos",
 				harnessKind: "agentos",
 			});
