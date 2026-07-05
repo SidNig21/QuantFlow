@@ -64,7 +64,7 @@ describe("listRoles", () => {
     )).toEqual({
       hermes: {
         name: "Hermes",
-        description: "Sync · gossip rooms",
+        description: "Sync · gossip rooms (AgentOS pi)",
         color: "#06b6d4",
       },
       puffer: {
@@ -104,10 +104,29 @@ describe("listRoles", () => {
     }
   });
 
-  test("WSL legend agents use herdr-wsl runtimeTarget", async () => {
+  test("AI-agent roles ride the agentos fabric with real identities (S3 roster)", async () => {
     const roles = await listRoles();
-    const herdrIds = ["hermes", "codex", "claude-worker", "opencode", "python", "puffer"];
-    for (const id of herdrIds) {
+    const fabric: Array<[string, string]> = [
+      ["hermes", "pi"], // labeled interim seat (orchestrator; T009 gates real hermes-in-VM)
+      ["codex", "pi"], // labeled interim seat (codex pkg 0.3.1 is a stub)
+      ["claude-worker", "claude-code"],
+      ["claude-reviewer", "claude-code"],
+    ];
+    for (const [id, software] of fabric) {
+      const role = roles.find((entry) => entry.id === id);
+      expect(role?.runtimeTarget).toBe("agentos");
+      expect(role?.harnessKind).toBe("agentos");
+      expect(role?.agentosSoftware).toBe(software);
+      expect(role?.legacyRuntimeTarget).toBe("herdr-wsl");
+      expect(requiresHerdrSpawn(role)).toBe(false);
+    }
+    // Interim seats must SAY so — silence is the sin S3 exists to kill.
+    expect(roles.find((r) => r.id === "codex")?.description).toContain("interim");
+  });
+
+  test("script lanes and reserved roles keep their rails (roster policy)", async () => {
+    const roles = await listRoles();
+    for (const id of ["opencode", "python", "puffer"]) {
       const role = roles.find((entry) => entry.id === id);
       expect(role?.runtimeTarget).toBe("herdr-wsl");
       expect(requiresHerdrSpawn(role)).toBe(true);

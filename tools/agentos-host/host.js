@@ -5,9 +5,10 @@
  */
 import http from "node:http";
 import { randomUUID } from "node:crypto";
-import { AgentOs, toolKit, hostTool } from "@rivet-dev/agentos-core";
+import { AgentOs, toolKit, hostTool, nodeModulesMount } from "@rivet-dev/agentos-core";
 import pi from "@agentos-software/pi";
 import opencode from "@agentos-software/opencode";
+import claudeCode from "@agentos-software/claude-code";
 import { z } from "zod";
 
 const HOST = process.env.AGENTOS_HOST_BIND ?? "0.0.0.0";
@@ -70,6 +71,65 @@ function resolveSoftwareAndEnv() {
   );
 }
 
+/** Error whose message is safe to return to the client as a 400. */
+class SessionConfigError extends Error {}
+
+/**
+ * S3 — honor the software requested by the role/tile instead of forcing the
+ * credential-order default onto every session. Named tiles get their real
+ * identities; unavailable software is rejected EXPLICITLY (never silently pi).
+ */
+function resolveSessionConfig(requested) {
+  const software = (requested ?? "").trim();
+  if (!software || software === "pi") {
+    return resolveSoftwareAndEnv();
+  }
+  if (software === "claude" || software === "claude-code") {
+    // First choice: the founder's own Claude subscription. `claude setup-token`
+    // mints a long-lived OAuth token the CLI accepts headlessly — no API key,
+    // no third-party billing.
+    const oauthToken = (process.env.CLAUDE_CODE_OAUTH_TOKEN ?? "").trim();
+    if (oauthToken) {
+      return { software: "claude", env: { CLAUDE_CODE_OAUTH_TOKEN: oauthToken } };
+    }
+    const anthropicKey = (process.env.ANTHROPIC_API_KEY ?? "").trim();
+    if (anthropicKey) {
+      return { software: "claude", env: { ANTHROPIC_API_KEY: anthropicKey } };
+    }
+    const zenKey =
+      (process.env.OPENCODE_API_KEY ?? process.env.OPENCODE_ZEN_API_KEY ?? "").trim();
+    if (zenKey) {
+      // OpenCode Zen speaks the Anthropic protocol at /zen/v1/messages
+      // (probed 2026-07-04: well-formed anthropic error envelope; the only
+      // barrier was workspace credits). claude CLI appends /v1/messages.
+      return {
+        software: "claude",
+        env: { ANTHROPIC_API_KEY: zenKey, ANTHROPIC_BASE_URL: "https://opencode.ai/zen" },
+      };
+    }
+    throw new SessionConfigError(
+      "claude session needs ANTHROPIC_API_KEY or OPENCODE_API_KEY in the host env",
+    );
+  }
+  if (software === "codex") {
+    // @agentos-software/codex@0.3.1 is a stub (no agent block, empty bins —
+    // verified 2026-07-04). The codex role runs a LABELED pi seat until
+    // upstream ships the real agent; requesting codex directly is an error.
+    throw new SessionConfigError(
+      "codex software is a stub at 0.3.1 — spawn the labeled pi seat instead",
+    );
+  }
+  if (software === "opencode") {
+    // Known upstream bug: bundled ACP adapter hardcodes an Anthropic catalog
+    // and ignores provider config (verified 2026-07-03). Explicit rejection
+    // beats a silently broken actor; role stays on herdr-wsl.
+    throw new SessionConfigError(
+      "opencode software adapter cannot route providers at 0.2.x — role stays on herdr-wsl",
+    );
+  }
+  throw new SessionConfigError(`unknown software '${software}'`);
+}
+
 /**
  * BOOLEAN ONLY — /health credential report. Mirrors resolveSoftwareAndEnv's
  * order (OPENCODE_API_KEY/OPENCODE_ZEN_API_KEY → OPENROUTER_API_KEY →
@@ -113,8 +173,11 @@ async function ensureVm() {
   if (vm) return vm;
   if (!vmInitPromise) {
     vmInitPromise = AgentOs.create({
-      software: [pi, opencode],
+      software: [pi, opencode, claudeCode],
       toolKits: [buildQuantflowKit()],
+      // claude-code's ACP adapter resolves its package through /root/node_modules;
+      // mount the host's own node_modules read-only (S3 compat-gate finding).
+      mounts: [nodeModulesMount(new URL("./node_modules", import.meta.url).pathname)],
     }).then((instance) => {
       vm = instance;
       return instance;
@@ -291,7 +354,16 @@ async function handleRequest(req, res) {
 
     if (req.method === "POST" && path === "/session") {
       const body = await readJsonBody(req);
-      const picked = resolveSoftwareAndEnv();
+      let picked;
+      try {
+        picked = resolveSessionConfig(body?.software);
+      } catch (err) {
+        if (err instanceof SessionConfigError) {
+          sendJson(res, 400, { error: err.message });
+          return;
+        }
+        throw err;
+      }
       const instance = await ensureVm();
       if (picked.piVmFiles) {
         for (const file of picked.piVmFiles) {

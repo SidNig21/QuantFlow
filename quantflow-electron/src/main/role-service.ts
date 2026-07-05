@@ -87,9 +87,13 @@ const BUILT_IN_ROLES: Role[] = [
     runtimeTarget: "windows-pty",
   },
   {
+    // TODO(S3): @agentos-software/codex@0.3.1 is an empty stub (no agent
+    // block, no bins — verified 2026-07-04). This seat stays LABELED pi
+    // until upstream ships the real codex agent; host rejects "codex"
+    // sessions explicitly so this can never be a silent impostor.
     id: "codex",
     name: "Codex CLI",
-    description: "Local Codex agent (AgentOS pi)",
+    description: "Codex seat · AgentOS pi (interim — codex pkg is a stub)",
     color: "#38bdf8",
     icon: "bot",
     commandTemplate: "codex",
@@ -131,13 +135,16 @@ const BUILT_IN_ROLES: Role[] = [
   {
     id: "claude-reviewer",
     name: "Claude Reviewer",
-    description: "Claude Code review and risk-check agent",
+    description: "Review and risk-check agent (AgentOS claude-code)",
     color: "#22c55e",
     icon: "search-check",
     commandTemplate: "claude",
     cwdPolicy: "workspace",
     defaultShell: "auto",
-    runtimeTarget: "herdr-wsl",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    agentosSoftware: "claude-code",
+    legacyRuntimeTarget: "herdr-wsl",
     startupPrompt: "Act as the reviewer. Focus on defects, risks, and missing tests.",
     statusParser: {
       waiting: ["do you want", "proceed?", "continue?", "yes/no"],
@@ -147,6 +154,10 @@ const BUILT_IN_ROLES: Role[] = [
     envoyWrapCommand: false,
   },
   {
+    // TODO(S3): stays on herdr-wsl — the @agentos-software/opencode ACP
+    // adapter hardcodes an Anthropic catalog and ignores provider config
+    // (verified 2026-07-03); host rejects "opencode" sessions explicitly.
+    // Re-evaluate when upstream fixes provider routing.
     id: "opencode",
     name: "OpenCode",
     description: "OpenCode agent terminal",
