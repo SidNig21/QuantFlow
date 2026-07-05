@@ -28,41 +28,31 @@ function createStorage(seed: Record<string, string> = {}) {
 }
 
 describe("Legend v2 dock recipes", () => {
-	test("keeps the real spawn roles and the forward-looking memory slot", () => {
+	test("keeps the dock actor seed in sync with dock-actors.ts", () => {
 		expect(LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
-			"shell",
 			"codex",
-			"hermes",
 			"claude",
-			"puffer",
-			"agentos",
-			"python",
-			"memory",
+			"hermes",
+			"eve",
+			"bovada-odds",
+			"canvas-scout",
 		]);
 		expect(LEGEND_RECIPES.map((recipe) => recipe.name)).toEqual([
-			"Generic CLI",
-			"Codex CLI",
-			"Hermes",
+			"Codex",
 			"Claude Code",
-			"PufferLib worker",
-			"AgentOS Worker",
-			"Python script",
-			"Envoy memory",
+			"Hermes",
+			"Eve",
+			"Bovada Odds",
+			"Canvas Scout",
 		]);
 		expect(LEGEND_RECIPES.map((recipe) => recipe.roleId)).toEqual([
-			"shell",
 			"codex",
+			"claude",
 			"hermes",
-			"claude-worker",
-			"puffer",
-			"agentos",
-			"python",
-			"memory",
+			"eve",
+			"bovada-odds",
+			"canvas-scout",
 		]);
-		expect(LEGEND_RECIPES.find((recipe) => recipe.id === "puffer")?.description)
-			.toBe("paper-trade loop");
-		expect(LEGEND_RECIPES.find((recipe) => recipe.id === "memory")?.disabled)
-			.toBe(true);
 	});
 });
 
@@ -136,7 +126,6 @@ describe("LegendState", () => {
 
 		expect([...getDisabledRecipeIds(state.getSnapshot())].sort()).toEqual([
 			"hermes",
-			"memory",
 			"puffer",
 		]);
 	});
@@ -191,9 +180,24 @@ describe("LegendState", () => {
 		expect(storage.values.get("legendV1.spawnMode")).toBe("click");
 	});
 
-	test("does not activate disabled forward-looking recipes", () => {
+	test("does not activate disabled custom recipes", () => {
 		const state = createLegendState({ storage: createStorage() });
-		expect(state.activateRecipe("memory")).toBe(false);
+		const recipes = [
+			...LEGEND_RECIPES,
+			{
+				id: "disabled-tool",
+				roleId: "disabled-tool",
+				group: "spawn",
+				type: "tool",
+				name: "Disabled",
+				description: "off",
+				runtime: "herdr-wsl",
+				color: "#6366f1",
+				icon: "shell",
+				disabled: true,
+			},
+		];
+		expect(state.activateRecipe("disabled-tool", recipes)).toBe(false);
 		expect(state.getSnapshot().pendingRecipe).toBeNull();
 	});
 });

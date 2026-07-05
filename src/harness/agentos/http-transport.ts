@@ -296,7 +296,7 @@ export function createHttpAgentOsTransport(
     async openTerminal(sessionId, cols, rows) {
       if (disposed) throw new Error('transport disposed');
       await ensureEventStream(sessionId);
-      const res = await fetchImpl(`${await rootUrl()}/session/${encodeURIComponent(sessionId)}/terminal/open`, {
+      const res = await fetchImpl(`${await rootUrl()}/session/${encodeURIComponent(sessionId)}/terminal`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ cols, rows }),

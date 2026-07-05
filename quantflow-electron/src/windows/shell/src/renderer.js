@@ -1731,6 +1731,7 @@ async function init() {
 			}, position.x, position.y, {
 				size: LEGEND_TILE_SIZE,
 				displayName: recipe?.name ?? "AgentOS Worker",
+				roleName: recipe?.name ?? "AgentOS Worker",
 				instruction,
 				software: recipe?.agentosSoftware ?? "pi",
 			});

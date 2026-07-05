@@ -25,7 +25,12 @@ export function createSimTransport(options: SimTransportOptions = {}): AgentOsTr
   readonly promptCalls: Array<{ sessionId: string; text: string }>;
   readonly permissionResponses: Array<{ sessionId: string; requestId: string; approved: boolean }>;
 } {
-  const sessionId = options.sessionId ?? 'sim-session-1';
+  const baseSessionId = options.sessionId ?? 'sim-session-1';
+  // Each createSession() call must yield a DISTINCT id so multiple tiles can
+  // coexist (a2a-cable / orchestrator / actors-demo spawn 2+ sessions). The
+  // first call keeps the base id for single-session callers/tests.
+  let sessionCounter = 0;
+  const sessionId = baseSessionId;
   const steps = [...(options.steps ?? [])];
   const promptCalls: Array<{ sessionId: string; text: string }> = [];
   const permissionResponses: Array<{ sessionId: string; requestId: string; approved: boolean }> = [];
@@ -75,7 +80,9 @@ export function createSimTransport(options: SimTransportOptions = {}): AgentOsTr
     async createSession() {
       if (options.failCreate) throw new Error('ECONNREFUSED');
       if (options.failHealth) throw new Error('agentos host unavailable');
-      return { sessionId };
+      sessionCounter += 1;
+      const id = sessionCounter === 1 ? baseSessionId : `${baseSessionId}-${sessionCounter}`;
+      return { sessionId: id };
     },
 
     async prompt(id, text) {

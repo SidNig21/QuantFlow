@@ -117,7 +117,7 @@ export async function runLegendAgentosProof(mainWindow: BrowserWindow): Promise<
 
   const useCustom = await execJs<boolean>(wc, `!!document.querySelector('.lv1-recipe[data-recipe="proof-agentos-actor"]')`);
   const clicked = await execJs<{ ok: boolean; error?: string }>(wc, `(() => {
-    const recipeId = ${useCustom ? '"proof-agentos-actor"' : '"agentos"'};
+    const recipeId = ${useCustom ? '"proof-agentos-actor"' : '"codex"'};
     const btn = document.querySelector(\`.lv1-recipe[data-recipe="\${recipeId}"]\`);
     if (!btn) return { ok: false, error: 'custom recipe button not found' };
     btn.click();
@@ -137,7 +137,7 @@ export async function runLegendAgentosProof(mainWindow: BrowserWindow): Promise<
     exitApp(1);
     return;
   }
-  logStep("spawn-click", true, `recipe=${useCustom ? "proof-agentos-actor" : "agentos"}`);
+  logStep("spawn-click", true, `recipe=${useCustom ? "proof-agentos-actor" : "codex"}`);
 
   const started = Date.now();
   let tileId: string | null = null;

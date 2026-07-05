@@ -19,8 +19,8 @@ function assertOrchestratorModule(): boolean {
     console.error('orchestrator: missing runHermesOrchestrator');
     return false;
   }
-  if (!source.includes('sendConnectionRelay')) {
-    console.error('orchestrator: must delegate via sendConnectionRelay');
+  if (!source.includes('postHostDelegateSend') && !source.includes('sendConnectionRelay')) {
+    console.error('orchestrator: must delegate via agentos-delegate toolkit bridge');
     return false;
   }
   if (!source.includes('prepareAgentOsTerminalAttach')) {

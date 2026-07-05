@@ -118,6 +118,56 @@ export function syncConnectionGraph(connections: ConnectionGraphEntry[]): void {
     if (conn.label != null) entry.label = conn.label;
     connectionGraph.set(conn.id, entry);
   }
+  void pushConnectionGraphToHost(connections);
+}
+
+async function hostSidecarBaseUrl(): Promise<string | null> {
+  try {
+    const { resolveAgentOsHostAddress } = await import('@qf-harness/agentos/host-lifecycle');
+    const port = Number.parseInt(
+      process.env.AGENTOS_HOST_PORT ?? process.env.QF_AGENTOS_PORT ?? '7430',
+      10,
+    );
+    const host = await resolveAgentOsHostAddress({ port });
+    return `http://${host}:${port}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Push Kernel-synced cables to the WSL host for agentos-cable toolkit ACL. */
+export async function pushConnectionGraphToHost(
+  connections: ConnectionGraphEntry[],
+): Promise<void> {
+  const base = await hostSidecarBaseUrl();
+  if (!base) return;
+  try {
+    await fetch(`${base}/connections/sync`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ connections }),
+    });
+  } catch {
+    // Host may be down during unit tests.
+  }
+}
+
+/** Register tile↔session on the host so toolkit sends resolve fromTileId. */
+export async function registerHostTileSession(
+  tileId: string,
+  sessionId: string,
+): Promise<void> {
+  const base = await hostSidecarBaseUrl();
+  if (!base) return;
+  try {
+    await fetch(`${base}/tile-registry`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ tileId, sessionId }),
+    });
+  } catch {
+    // Best-effort when host is unavailable.
+  }
 }
 
 export function registerTileSession(

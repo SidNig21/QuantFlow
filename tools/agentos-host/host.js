@@ -34,6 +34,33 @@ const pendingPermissions = new Map();
 /** @type {string | null} */
 let activePromptSessionId = null;
 
+/** @type {Map<string, string>} AgentOS sessionId → canvas tileId */
+const sessionToTile = new Map();
+/** @type {Map<string, string>} canvas tileId → AgentOS sessionId */
+const tileToSession = new Map();
+/** @type {Map<string, { tileAId: string, tileBId: string }>} synced from Electron Kernel cables */
+const hostConnectionGraph = new Map();
+
+function registerHostTileSession(tileId, sessionId) {
+  const tile = String(tileId ?? "").trim();
+  const session = String(sessionId ?? "").trim();
+  if (!tile || !session) return;
+  sessionToTile.set(session, tile);
+  tileToSession.set(tile, session);
+}
+
+function syncHostConnectionGraph(connections) {
+  hostConnectionGraph.clear();
+  if (!Array.isArray(connections)) return;
+  for (const conn of connections) {
+    const id = String(conn?.id ?? "").trim();
+    const tileAId = String(conn?.tileAId ?? "").trim();
+    const tileBId = String(conn?.tileBId ?? "").trim();
+    if (!id || !tileAId || !tileBId) continue;
+    hostConnectionGraph.set(id, { tileAId, tileBId });
+  }
+}
+
 function resolveSoftwareAndEnv() {
   const opencodeKey =
     (process.env.OPENCODE_API_KEY ?? process.env.OPENCODE_ZEN_API_KEY ?? "").trim();
@@ -112,11 +139,14 @@ function resolveSessionConfig(requested) {
     );
   }
   if (software === "codex") {
-    // @agentos-software/codex@0.3.1 is a stub (no agent block, empty bins —
-    // verified 2026-07-04). The codex role runs a LABELED pi seat until
-    // upstream ships the real agent; requesting codex directly is an error.
+    // A real codex agent exists upstream (repo main: examples/codex — codex is
+    // a first-class createSession agent), but the pinned @agentos-software/codex
+    // @0.3.1 is a stub (no agent block, verified 2026-07-04). Real seat is blocked
+    // on a codex-agent version compatible with core 0.2.4 (T009). NEVER fall back
+    // to pi — that impostor path is banned (roster policy 2026-07-05).
     throw new SessionConfigError(
-      "codex software is a stub at 0.3.1 — spawn the labeled pi seat instead",
+      "codex agent not yet available: pinned @agentos-software/codex@0.3.1 is a stub; " +
+        "needs a core-0.2.4-compatible codex-agent pin (T009). No pi fallback.",
     );
   }
   if (software === "opencode") {
@@ -139,7 +169,8 @@ function resolveSessionConfig(requested) {
  */
 function hostHasCredential() {
   return Boolean(
-    (process.env.OPENCODE_API_KEY ?? "").trim()
+    (process.env.CLAUDE_CODE_OAUTH_TOKEN ?? "").trim()
+    || (process.env.OPENCODE_API_KEY ?? "").trim()
     || (process.env.OPENCODE_ZEN_API_KEY ?? "").trim()
     || (process.env.OPENROUTER_API_KEY ?? "").trim()
     || (process.env.ANTHROPIC_API_KEY ?? "").trim(),
@@ -174,7 +205,7 @@ async function ensureVm() {
   if (!vmInitPromise) {
     vmInitPromise = AgentOs.create({
       software: [pi, opencode, claudeCode],
-      toolKits: [buildQuantflowKit()],
+      toolKits: [buildQuantflowKit(), buildCableKit(), buildDelegateKit()],
       // claude-code's ACP adapter resolves its package through /root/node_modules;
       // mount the host's own node_modules read-only (S3 compat-gate finding).
       mounts: [nodeModulesMount(new URL("./node_modules", import.meta.url).pathname)],
@@ -184,6 +215,144 @@ async function ensureVm() {
     });
   }
   return vmInitPromise;
+}
+
+/**
+ * S4 — agent-callable A2A: canvas cable = permission to message the peer tile.
+ * Validates against the synced Kernel connection graph; never writes cables.
+ */
+async function executeCableSend({ connectionId, fromTileId, text, fromSessionId }) {
+  const connId = String(connectionId ?? "").trim();
+  const msg = String(text ?? "").trim();
+  let from = String(fromTileId ?? "").trim();
+  if (!from && fromSessionId) {
+    from = sessionToTile.get(fromSessionId) ?? "";
+  }
+  if (!connId) throw new Error("connectionId required");
+  if (!from) throw new Error("fromTileId required (session has no tile binding)");
+  if (!msg) throw new Error("text required");
+
+  const conn = hostConnectionGraph.get(connId);
+  if (!conn) throw new Error(`no canvas cable: ${connId}`);
+  if (from !== conn.tileAId && from !== conn.tileBId) {
+    throw new Error("fromTileId is not on this connection");
+  }
+  const targetTileId = from === conn.tileAId ? conn.tileBId : conn.tileAId;
+  const targetSessionId = tileToSession.get(targetTileId);
+  if (!targetSessionId) {
+    throw new Error(`target tile has no AgentOS session: ${targetTileId}`);
+  }
+
+  const instance = await ensureVm();
+  const delegated = `[a2a ${from}→${targetTileId}] ${msg}`;
+  let targetResult;
+  try {
+    targetResult = await instance.prompt(targetSessionId, delegated);
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : String(err));
+  }
+
+  let replyPayload =
+    typeof targetResult?.text === "string" && targetResult.text.trim()
+      ? targetResult.text.trim()
+      : "";
+  if (process.env.QF_AGENTOS_SIM === "1") {
+    replyPayload = `ack: ${msg.slice(0, 120)}`;
+  } else if (!replyPayload) {
+    replyPayload = "(no reply text)";
+  }
+
+  const sourceSessionId = fromSessionId ?? tileToSession.get(from);
+  if (sourceSessionId) {
+    const back = `[a2a ${targetTileId}→${from}] ${replyPayload}`;
+    try {
+      await instance.prompt(sourceSessionId, back);
+    } catch {
+      // Reply is still returned to the toolkit caller.
+    }
+  }
+
+  return { ok: true, targetTileId, reply: replyPayload };
+}
+
+async function executeDelegateSend({ fromTileId, connectionId, goal }) {
+  const tileId = String(fromTileId ?? "").trim();
+  const fromSessionId = tileToSession.get(tileId);
+  if (!fromSessionId) {
+    throw new Error(`no AgentOS session for orchestrator tile ${tileId}`);
+  }
+  const prev = activePromptSessionId;
+  activePromptSessionId = fromSessionId;
+  try {
+    return await executeCableSend({
+      connectionId,
+      fromTileId: tileId,
+      text: goal,
+      fromSessionId,
+    });
+  } finally {
+    activePromptSessionId = prev;
+  }
+}
+
+function buildCableKit() {
+  return toolKit({
+    name: "cable",
+    description: "Send a message to an agent on the other end of a canvas cable.",
+    tools: {
+      send: hostTool({
+        description:
+          "Send text to the cabled peer. Requires an existing canvas cable (connection id).",
+        inputSchema: z.object({
+          connectionId: z.string(),
+          text: z.string(),
+        }),
+        timeout: PERMISSION_TIMEOUT_MS * 2,
+        execute: async ({ connectionId, text }) => {
+          const fromSessionId = activePromptSessionId;
+          if (!fromSessionId) {
+            throw new Error("agentos-cable send outside active session prompt");
+          }
+          return executeCableSend({
+            connectionId,
+            fromTileId: null,
+            text,
+            fromSessionId,
+          });
+        },
+      }),
+    },
+  });
+}
+
+/** S5 — Hermes orchestrator seat delegates via the same cable bridge. */
+function buildDelegateKit() {
+  return toolKit({
+    name: "delegate",
+    description: "Delegate work to a cabled legend actor tile.",
+    tools: {
+      send: hostTool({
+        description: "Delegate a goal to the worker on the other end of a canvas cable.",
+        inputSchema: z.object({
+          connectionId: z.string(),
+          goal: z.string(),
+        }),
+        timeout: PERMISSION_TIMEOUT_MS * 2,
+        execute: async ({ connectionId, goal }) => {
+          const fromSessionId = activePromptSessionId;
+          if (!fromSessionId) {
+            throw new Error("agentos-delegate send outside active session prompt");
+          }
+          return executeCableSend({
+            connectionId,
+            fromTileId: null,
+            text: goal,
+            fromSessionId,
+          });
+        },
+      }),
+    },
+  });
 }
 
 function buildQuantflowKit() {
@@ -352,6 +521,59 @@ async function handleRequest(req, res) {
       return;
     }
 
+    if (req.method === "POST" && path === "/connections/sync") {
+      const body = await readJsonBody(req);
+      syncHostConnectionGraph(body?.connections);
+      sendJson(res, 200, { ok: true, count: hostConnectionGraph.size });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/tile-registry") {
+      const body = await readJsonBody(req);
+      const tileId = typeof body?.tileId === "string" ? body.tileId : "";
+      const sessionId = typeof body?.sessionId === "string" ? body.sessionId : "";
+      if (!tileId.trim() || !sessionId.trim()) {
+        sendJson(res, 400, { error: "tileId and sessionId required" });
+        return;
+      }
+      registerHostTileSession(tileId, sessionId);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/cable/send") {
+      const body = await readJsonBody(req);
+      try {
+        const result = await executeCableSend({
+          connectionId: body?.connectionId,
+          fromTileId: body?.fromTileId,
+          text: body?.text,
+          fromSessionId: null,
+        });
+        sendJson(res, 200, result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        sendJson(res, 400, { ok: false, message });
+      }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/delegate/send") {
+      const body = await readJsonBody(req);
+      try {
+        const result = await executeDelegateSend({
+          fromTileId: body?.fromTileId,
+          connectionId: body?.connectionId,
+          goal: body?.goal ?? body?.text,
+        });
+        sendJson(res, 200, result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        sendJson(res, 400, { ok: false, message });
+      }
+      return;
+    }
+
     if (req.method === "POST" && path === "/session") {
       const body = await readJsonBody(req);
       let picked;
@@ -369,8 +591,8 @@ async function handleRequest(req, res) {
         for (const file of picked.piVmFiles) {
           try {
             await instance.writeFile(file.path, file.content);
-          } catch (err) {
-            log(`writeFile ${file.path} failed: ${err?.message ?? err}`);
+          } catch {
+            // Best-effort pi config seeding.
           }
         }
       }
@@ -379,11 +601,14 @@ async function handleRequest(req, res) {
       });
       sessions.set(sessionId, { subscribers: new Set(), software: picked.software });
       wireSessionHandlers(instance, sessionId);
+      const tileId = typeof body?.tileId === "string" ? body.tileId.trim() : "";
+      if (tileId) registerHostTileSession(tileId, sessionId);
       sendJson(res, 200, { sessionId, software: picked.software });
       return;
     }
 
     const sessionMatch = path.match(/^\/session\/([^/]+)\/(prompt|permission|events|terminal)$/);
+    const terminalOpenMatch = path.match(/^\/session\/([^/]+)\/terminal\/open$/);
     const terminalShellMatch = path.match(/^\/session\/([^/]+)\/terminal\/([^/]+)\/(write|resize|close)$/);
     if (terminalShellMatch) {
       const sessionId = decodeURIComponent(terminalShellMatch[1]);
@@ -417,6 +642,29 @@ async function handleRequest(req, res) {
         sendJson(res, 200, { ok: true });
         return;
       }
+    }
+
+    if (terminalOpenMatch && req.method === "POST") {
+      const sessionId = decodeURIComponent(terminalOpenMatch[1]);
+      if (!sessions.has(sessionId)) {
+        sendJson(res, 404, { error: "session not found" });
+        return;
+      }
+      const body = await readJsonBody(req);
+      const cols = Number.parseInt(String(body.cols ?? "80"), 10);
+      const rows = Number.parseInt(String(body.rows ?? "24"), 10);
+      const instance = await ensureVm();
+      const { shellId } = instance.openShell({ cols, rows });
+      const unsub = instance.onShellData(shellId, (chunk) => {
+        broadcastSession(sessionId, {
+          kind: "terminal-data",
+          shellId,
+          data: Buffer.from(chunk).toString("base64"),
+        });
+      });
+      terminals.set(shellId, { sessionId, unsub });
+      sendJson(res, 200, { shellId });
+      return;
     }
 
     if (sessionMatch) {

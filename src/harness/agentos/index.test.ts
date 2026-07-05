@@ -66,6 +66,25 @@ describe('agentos-harness', () => {
     ]);
   });
 
+  test('stop tears down worker state without disposing the shared transport', async () => {
+    const transport = createSimTransport({ steps: [] });
+    let disposeCalls = 0;
+    const trackingTransport = {
+      ...transport,
+      dispose: async () => {
+        disposeCalls += 1;
+        await transport.dispose();
+      },
+    };
+    const harness = createAgentOsHarness({
+      transport: trackingTransport,
+      workspace: resolve(process.cwd(), 'agentos-stop'),
+    });
+    const handle = await harness.spawn({ tileId: 'tile-stop' });
+    await harness.stop(handle);
+    expect(disposeCalls).toBe(0);
+  });
+
   test('fails fast with unavailable message when transport is unreachable', async () => {
     const transport = createSimTransport({ failPrompt: true });
     const harness = createAgentOsHarness({ transport, workspace: resolve(process.cwd(), 'agentos-down') });

@@ -69,6 +69,7 @@ import { runAgentOsTerminalProof } from "./agentos-terminal-proof";
 import { runLegendAgentosProof } from "./agentos-legend-proof";
 import { runActorsOnAgentosProof } from "./agentos-actors-proof";
 import { runA2aCableProof } from "./agentos-a2a-proof";
+import { runEveA2aProof } from "./agentos-eve-a2a-proof";
 import { runOrchestratorProof } from "./agentos-orchestrator-proof";
 import { runActorsDemoProof } from "./agentos-demo-proof";
 
@@ -1001,6 +1002,9 @@ app.whenReady().then(async () => {
   }
   if (process.env.QF_ACTORS_DEMO_PROOF === "1") {
     void runActorsDemoProof(mainWindow!);
+  }
+  if (process.env.QF_EVE_A2A_PROOF === "1") {
+    void runEveA2aProof(mainWindow!);
   }
 });
 

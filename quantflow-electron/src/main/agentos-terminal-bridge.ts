@@ -10,6 +10,13 @@ import {
   buildAgentOsDisplayTarget,
   parseAgentOsAttachTarget,
 } from './pty-spawn-params';
+import { registerHostTileSession } from './tile-session-registry';
+import {
+  bootstrapAcpTerminalText,
+  createAcpPromptLineEditor,
+  isAcpPromptSoftware,
+  type AcpPromptLineEditor,
+} from './acp-prompt-line-editor';
 
 export { buildAgentOsDisplayTarget, parseAgentOsAttachTarget };
 
@@ -18,16 +25,51 @@ interface TileAttach {
   sessionId: string;
   shellId: string;
   software: string;
+  /** Operator-facing label (Hermes, Codex, Claude Code) — never the host software id. */
+  actorName: string;
   terminalUnsub: (() => void) | null;
+  sessionEventUnsub: (() => void) | null;
+}
+
+interface PtyBridge {
+  shellId: string;
+  tileId: string;
+  unsub: () => void;
+  echo: (text: string) => void;
+  acpEditor?: AcpPromptLineEditor;
 }
 
 const tileAttaches = new Map<string, TileAttach>();
-const ptyBridges = new Map<string, { shellId: string; tileId: string; unsub: () => void }>();
+const ptyBridges = new Map<string, PtyBridge>();
 
 function resolveSoftware(input?: string): string {
   const trimmed = input?.trim();
   if (trimmed === 'pi' || trimmed === 'opencode' || trimmed === 'claude-code') return trimmed;
   return resolveAgentOsCredential()?.software ?? 'pi';
+}
+
+function encodePtyData(text: string): Buffer {
+  return Buffer.from(text, 'utf8');
+}
+
+function acpEventToTerminalText(event: unknown): string | null {
+  if (!event || typeof event !== 'object') return null;
+  const envelope = event as { params?: { update?: Record<string, unknown> } };
+  const update = envelope.params?.update;
+  if (!update) return null;
+  const kind = update.sessionUpdate;
+  if (kind === 'agent_message_chunk') {
+    const content = update.content as { text?: unknown } | undefined;
+    return typeof content?.text === 'string' ? content.text : null;
+  }
+  if (kind === 'tool_call') {
+    const title = update.title;
+    return typeof title === 'string' ? `\r\n[tool] ${title}\r\n` : '\r\n[tool call]\r\n';
+  }
+  if (kind === 'turn_complete') {
+    return '\r\n> ';
+  }
+  return null;
 }
 
 async function transportOrThrow(): Promise<AgentOsTransport> {
@@ -40,6 +82,7 @@ export async function prepareAgentOsTerminalAttach(input: {
   rows?: number;
   instruction?: string;
   software?: string;
+  actorName?: string;
 }): Promise<{ terminalTarget: string }> {
   const tileId = input.tileId.trim();
   if (!tileId) throw new Error(formatAgentOsUnavailable('tileId required'));
@@ -48,13 +91,23 @@ export async function prepareAgentOsTerminalAttach(input: {
   const cols = input.cols ?? 80;
   const rows = input.rows ?? 24;
   const software = resolveSoftware(input.software);
+  const actorName = input.actorName?.trim() || 'Agent';
 
   let attach = tileAttaches.get(tileId);
   if (!attach) {
     const { sessionId } = await transport.createSession(software, {});
     const { shellId } = await transport.openTerminal(sessionId, cols, rows);
-    attach = { tileId, sessionId, shellId, software, terminalUnsub: null };
+    attach = {
+      tileId,
+      sessionId,
+      shellId,
+      software,
+      actorName,
+      terminalUnsub: null,
+      sessionEventUnsub: null,
+    };
     tileAttaches.set(tileId, attach);
+    await registerHostTileSession(tileId, sessionId);
   }
 
   const instruction = input.instruction?.trim();
@@ -71,7 +124,7 @@ export async function bindAgentOsPtySession(input: {
   senderWebContentsId?: number;
   cols: number;
   rows: number;
-  onData: (sessionId: string, senderId: number | undefined, data: string) => void;
+  onData: (sessionId: string, senderId: number | undefined, data: Buffer) => void;
 }): Promise<void> {
   const tileId = input.tileId.trim();
   let attach = tileAttaches.get(tileId);
@@ -91,11 +144,35 @@ export async function bindAgentOsPtySession(input: {
 
   await transport.resizeTerminal(attach.shellId, input.cols, input.rows);
   if (attach.terminalUnsub) attach.terminalUnsub();
+  if (attach.sessionEventUnsub) attach.sessionEventUnsub();
   const unsub = transport.onTerminalData(attach.shellId, (chunk) => {
-    input.onData(input.ptySessionId, input.senderWebContentsId, Buffer.from(chunk).toString('utf8'));
+    input.onData(input.ptySessionId, input.senderWebContentsId, encodePtyData(
+      Buffer.from(chunk).toString('utf8'),
+    ));
   });
   attach.terminalUnsub = unsub;
-  ptyBridges.set(input.ptySessionId, { shellId: attach.shellId, tileId, unsub });
+  attach.sessionEventUnsub = transport.onSessionEvent(attach.sessionId, (event) => {
+    const text = acpEventToTerminalText(event);
+    if (text) {
+      input.onData(input.ptySessionId, input.senderWebContentsId, encodePtyData(text));
+    }
+  });
+  const echo = (text: string) => {
+    input.onData(input.ptySessionId, input.senderWebContentsId, encodePtyData(text));
+  };
+  const bridge: PtyBridge = { shellId: attach.shellId, tileId, unsub, echo };
+  if (isAcpPromptSoftware(attach.software)) {
+    bridge.acpEditor = createAcpPromptLineEditor({
+      onEcho: echo,
+      onSubmit: (line) => transport.prompt(attach.sessionId, line),
+      onSubmitError: () => echo('\r\n[error: prompt failed]\r\n> '),
+    });
+  }
+  ptyBridges.set(input.ptySessionId, bridge);
+  // Defer one tick so the terminal webview can subscribe to pty:data first.
+  setImmediate(() => {
+    echo(bootstrapAcpTerminalText(attach!.actorName));
+  });
 }
 
 export function isAgentOsPtySession(sessionId: string): boolean {
@@ -105,6 +182,10 @@ export function isAgentOsPtySession(sessionId: string): boolean {
 export async function writeAgentOsPtySession(sessionId: string, data: string): Promise<void> {
   const bridge = ptyBridges.get(sessionId);
   if (!bridge) return;
+  if (bridge.acpEditor) {
+    bridge.acpEditor.handleInput(data);
+    return;
+  }
   const transport = await transportOrThrow();
   await transport.writeTerminal(bridge.shellId, data);
 }

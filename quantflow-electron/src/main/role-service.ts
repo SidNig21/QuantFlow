@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFile, readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { QUANTFLOW_DIR } from "./paths";
+import { buildDockRoles } from "./dock-actors";
 
 let rolesDir = join(QUANTFLOW_DIR, "roles");
 
@@ -11,7 +12,7 @@ export function _setRolesDir(dir: string): void {
 
 export type RoleRuntimeTarget = "herdr-wsl" | "windows-pty" | "agentos";
 
-export type AgentOsSoftware = "pi" | "opencode" | "claude-code";
+export type AgentOsSoftware = "pi" | "opencode" | "claude-code" | "codex";
 
 export interface Role {
   id: string;
@@ -59,23 +60,7 @@ export interface RoleStatusParser {
 }
 
 const BUILT_IN_ROLES: Role[] = [
-  {
-    id: "hermes",
-    name: "Hermes",
-    description: "Sync · gossip rooms (AgentOS pi)",
-    color: "#06b6d4",
-    icon: "send",
-    commandTemplate: "hermes",
-    cwdPolicy: "workspace",
-    defaultShell: "auto",
-    runtimeTarget: "agentos",
-    harnessKind: "agentos",
-    agentosSoftware: "pi",
-    legacyRuntimeTarget: "herdr-wsl",
-    systemPrompt: "Act as Hermes, the run orchestrator for this QuantFlow canvas.",
-    envoyProfile: "hermes-agent",
-    envoyWrapCommand: false,
-  },
+  ...buildDockRoles(),
   {
     id: "shell",
     name: "Shell",
@@ -85,52 +70,6 @@ const BUILT_IN_ROLES: Role[] = [
     cwdPolicy: "workspace",
     defaultShell: "auto",
     runtimeTarget: "windows-pty",
-  },
-  {
-    // TODO(S3): @agentos-software/codex@0.3.1 is an empty stub (no agent
-    // block, no bins — verified 2026-07-04). This seat stays LABELED pi
-    // until upstream ships the real codex agent; host rejects "codex"
-    // sessions explicitly so this can never be a silent impostor.
-    id: "codex",
-    name: "Codex CLI",
-    description: "Codex seat · AgentOS pi (interim — codex pkg is a stub)",
-    color: "#38bdf8",
-    icon: "bot",
-    commandTemplate: "codex",
-    cwdPolicy: "workspace",
-    defaultShell: "auto",
-    runtimeTarget: "agentos",
-    harnessKind: "agentos",
-    agentosSoftware: "pi",
-    legacyRuntimeTarget: "herdr-wsl",
-    startupPrompt: "Review the current task context and wait for instructions.",
-    statusParser: {
-      waiting: ["approval required", "continue?", "waiting for", "confirm"],
-      blocked: ["error:", "failed:", "panic", "traceback"],
-    },
-    envoyProfile: "codex-agent",
-    envoyWrapCommand: false,
-  },
-  {
-    id: "claude-worker",
-    name: "Claude Code",
-    description: "Implementation agent (AgentOS claude-code)",
-    color: "#f97316",
-    icon: "hammer",
-    commandTemplate: "claude",
-    cwdPolicy: "workspace",
-    defaultShell: "auto",
-    runtimeTarget: "agentos",
-    harnessKind: "agentos",
-    agentosSoftware: "claude-code",
-    legacyRuntimeTarget: "herdr-wsl",
-    startupPrompt: "Act as the implementation worker for this workspace.",
-    statusParser: {
-      waiting: ["do you want", "proceed?", "continue?", "yes/no"],
-      blocked: ["error:", "failed:", "exception", "traceback"],
-    },
-    envoyProfile: "claude-worker",
-    envoyWrapCommand: false,
   },
   {
     id: "claude-reviewer",
@@ -309,6 +248,11 @@ export async function listRoles(): Promise<Role[]> {
 }
 
 export async function getRole(id: string): Promise<Role | null> {
+  const resolvedId = id === "claude-worker" ? "claude" : id;
   const roles = await listRoles();
-  return roles.find((r) => r.id === id) ?? null;
+  const role = roles.find((r) => r.id === resolvedId) ?? null;
+  if (role && id === "claude-worker" && resolvedId === "claude") {
+    return { ...role, id: "claude-worker", envoyProfile: "claude-worker" };
+  }
+  return role;
 }

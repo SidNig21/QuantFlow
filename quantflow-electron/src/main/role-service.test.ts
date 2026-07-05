@@ -29,9 +29,10 @@ describe("listRoles", () => {
     const roles = await listRoles();
     const ids = roles.map((r) => r.id);
     expect(ids).toContain("hermes");
+    expect(ids).toContain("claude");
+    expect(ids).toContain("eve");
     expect(ids).toContain("shell");
     expect(ids).toContain("codex");
-    expect(ids).toContain("claude-worker");
     expect(ids).toContain("claude-reviewer");
     expect(ids).toContain("opencode");
     expect(ids).toContain("puffer");
@@ -40,8 +41,8 @@ describe("listRoles", () => {
 
   test("agent roles use legend-canonical display names", async () => {
     const roles = await listRoles();
-    expect(roles.find((role) => role.id === "codex")?.name).toBe("Codex CLI");
-    expect(roles.find((role) => role.id === "claude-worker")?.name)
+    expect(roles.find((role) => role.id === "codex")?.name).toBe("Codex");
+    expect(roles.find((role) => role.id === "claude")?.name)
       .toBe("Claude Code");
   });
 
@@ -64,7 +65,7 @@ describe("listRoles", () => {
     )).toEqual({
       hermes: {
         name: "Hermes",
-        description: "Sync · gossip rooms (AgentOS pi)",
+        description: "Orchestrator on the AgentOS fabric (claude-backed, delegates to worker tiles)",
         color: "#06b6d4",
       },
       puffer: {
@@ -80,10 +81,10 @@ describe("listRoles", () => {
     });
   });
 
-  test("Hermes launches by running hermes, not by typing a startup prompt", async () => {
+  test("Hermes runs a real claude-backed CLI, not a typed startup prompt", async () => {
     const role = await getRole("hermes");
 
-    expect(role?.commandTemplate).toBe("hermes");
+    expect(role?.commandTemplate).toBe("claude");
     expect(role?.startupPrompt).toBeUndefined();
     expect(role?.systemPrompt).toContain("Act as Hermes");
   });
@@ -106,10 +107,12 @@ describe("listRoles", () => {
 
   test("AI-agent roles ride the agentos fabric with real identities (S3 roster)", async () => {
     const roles = await listRoles();
+    // pi is BANNED from the dock (founder directive 2026-07-05): every agent
+    // seat carries its REAL software identity, never a pi stand-in.
     const fabric: Array<[string, string]> = [
-      ["hermes", "pi"], // labeled interim seat (orchestrator; T009 gates real hermes-in-VM)
-      ["codex", "pi"], // labeled interim seat (codex pkg 0.3.1 is a stub)
-      ["claude-worker", "claude-code"],
+      ["hermes", "claude-code"],
+      ["codex", "codex"],
+      ["claude", "claude-code"],
       ["claude-reviewer", "claude-code"],
     ];
     for (const [id, software] of fabric) {
@@ -120,8 +123,19 @@ describe("listRoles", () => {
       expect(role?.legacyRuntimeTarget).toBe("herdr-wsl");
       expect(requiresHerdrSpawn(role)).toBe(false);
     }
-    // Interim seats must SAY so — silence is the sin S3 exists to kill.
-    expect(roles.find((r) => r.id === "codex")?.description).toContain("interim");
+    // No pi seats anywhere in the dock.
+    for (const role of roles) {
+      expect(role.agentosSoftware).not.toBe("pi");
+    }
+    // Not-yet-live seats must SAY so — silence is the sin the roster policy kills.
+    expect(roles.find((r) => r.id === "codex")?.description).toContain("pending");
+  });
+
+  test("claude-worker id resolves to the claude dock actor", async () => {
+    const role = await getRole("claude-worker");
+    expect(role?.id).toBe("claude-worker");
+    expect(role?.agentosSoftware).toBe("claude-code");
+    expect(role?.runtimeTarget).toBe("agentos");
   });
 
   test("script lanes and reserved roles keep their rails (roster policy)", async () => {
@@ -139,7 +153,7 @@ describe("listRoles", () => {
   test("agent roles include status parser hints", async () => {
     const roles = await listRoles();
     const agentRoles = roles.filter((role) =>
-      ["codex", "claude-worker", "claude-reviewer", "opencode"].includes(role.id),
+      ["codex", "claude", "claude-reviewer", "opencode"].includes(role.id),
     );
 
     expect(agentRoles).toHaveLength(4);

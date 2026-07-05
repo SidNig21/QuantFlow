@@ -53,51 +53,45 @@ describe("legend recipe role mapping", () => {
 
 	test("maps all visible dock recipes to role ids", () => {
 		expect(LEGEND_RECIPE_ROLE_IDS).toEqual({
-			shell: "shell",
 			codex: "codex",
+			claude: "claude",
 			hermes: "hermes",
-			claude: "claude-worker",
-			puffer: "puffer",
-			agentos: "agentos",
-			python: "python",
-			memory: "memory",
+			eve: "eve",
+			"bovada-odds": "bovada-odds",
+			"canvas-scout": "canvas-scout",
 		});
 		expect(getLegendRoleId("unknown")).toBeNull();
 	});
 
 	test("resolves a recipe against a role list", () => {
 		const roles = [
-			{ id: "shell", name: "Shell" },
-			{ id: "claude-worker", name: "Claude Worker" },
+			{ id: "claude", name: "Claude Code" },
 		];
-		expect(resolveLegendRecipeRole("claude", roles)).toEqual({
-			id: "claude-worker",
+		expect(resolveLegendRecipeRole("claude", roles)).toMatchObject({
+			id: "claude",
 			name: "Claude Code",
 		});
-		expect(resolveLegendRecipeRole("puffer", roles)).toMatchObject({ id: "puffer" });
 	});
 
-	test("Eve recipe threads commandTemplate/cwd/runtimeTarget for a Mode-1 terminal spawn", async () => {
+	test("built-in Eve actor threads commandTemplate/cwd/runtimeTarget for Mode-1 spawn", () => {
 		const recipes = [{
-			id: "quantflow-eve",
-			roleId: "quantflow-eve",
+			id: "eve",
+			roleId: "eve",
 			group: "spawn",
-			type: "agent",
-			name: "QuantFlow Eve",
-			description: "Eve · OpenCode",
+			type: "eve",
+			name: "Eve",
+			description: "eve · OpenCode Go",
 			runtime: "windows-pty",
 			color: "#6366f1",
-			icon: "hermes",
-			custom: true,
+			icon: "eve",
 			commandTemplate: "npm run dev",
 			cwd: "C:\\Users\\rybow\\quantflow-eve",
 			runtimeTarget: "windows-pty",
 		}];
 
-		// Resolved against the on-disk role.json (role-list path): role fields win.
-		const fromRoleList = resolveLegendRecipeRole("quantflow-eve", [{
-			id: "quantflow-eve",
-			name: "QuantFlow Eve",
+		const fromRoleList = resolveLegendRecipeRole("eve", [{
+			id: "eve",
+			name: "Eve",
 			commandTemplate: "npm run dev",
 			cwd: "C:\\Users\\rybow\\quantflow-eve",
 			runtimeTarget: "windows-pty",
@@ -108,14 +102,12 @@ describe("legend recipe role mapping", () => {
 			runtimeTarget: "windows-pty",
 		});
 
-		// Resolved with no matching role (synthesized path): fields come from the recipe.
-		const synthesized = resolveLegendRecipeRole("quantflow-eve", [], recipes);
+		const synthesized = resolveLegendRecipeRole("eve", [], recipes);
 		expect(synthesized).toMatchObject({
 			commandTemplate: "npm run dev",
 			cwd: "C:\\Users\\rybow\\quantflow-eve",
 			runtimeTarget: "windows-pty",
 		});
-		// No eve-harness / headless fork is introduced by the resolution.
 		expect(synthesized.harnessKind).toBeUndefined();
 	});
 

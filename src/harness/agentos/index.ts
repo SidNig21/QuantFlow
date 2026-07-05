@@ -305,11 +305,7 @@ export function createAgentOsHarness(options: AgentOsHarnessOptions): WorkerHarn
       state.status = 'stopped';
       for (const unsub of state.unsubscribers) unsub();
       state.unsubscribers = [];
-      try {
-        await transport.dispose();
-      } catch {
-        // Best-effort teardown when host is already down.
-      }
+      states.delete(handle.workerId);
     },
   };
 }

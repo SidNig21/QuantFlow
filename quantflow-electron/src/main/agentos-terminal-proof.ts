@@ -66,7 +66,7 @@ export async function runAgentOsTerminalProof(mainWindow: BrowserWindow): Promis
   logStep("renderer-ready", true, `settle=${SETTLE_MS}ms`);
 
   const clicked = await execJs<{ ok: boolean; error?: string }>(wc, `(() => {
-    const btn = document.querySelector('.lv1-recipe[data-recipe="agentos"]');
+    const btn = document.querySelector('.lv1-recipe[data-recipe="codex"]');
     if (!btn) return { ok: false, error: 'agentos recipe button not found' };
     btn.click();
     const panel = document.getElementById('panel-viewer');
@@ -85,7 +85,7 @@ export async function runAgentOsTerminalProof(mainWindow: BrowserWindow): Promis
     exitApp(1);
     return;
   }
-  logStep("spawn-click", true, 'recipe=agentos');
+  logStep("spawn-click", true, 'recipe=codex');
 
   const started = Date.now();
   let tileId: string | null = null;

@@ -277,8 +277,6 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 	}
 
 	onRoleSpawned?.(createRoleSpawnedEvent?.(tile, { id: "agentos", name: displayName }));
-	tileManager.spawnTerminalWebview(tile, true);
-	tileManager.saveCanvasImmediate();
 
 	try {
 		const prepare = await shellApi?.agentosTerminalPrepare?.({
@@ -287,6 +285,7 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 			rows: size.height ? Math.max(24, Math.floor(size.height / 17)) : undefined,
 			instruction: String(options.instruction ?? "").trim() || undefined,
 			software: options.software,
+			actorName: roleName,
 		});
 		if (!prepare?.ok || !prepare.terminalTarget) {
 			throw new Error(prepare?.error ?? "AgentOS terminal prepare failed");
@@ -295,6 +294,7 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 		tile.terminalPending = false;
 		tile.ptyStatus = "running";
 		updateRoleTileChrome?.(tile);
+		// Mount the terminal webview once — after prepare sets agentos:target.
 		tileManager.spawnTerminalWebview(tile, true);
 		tileManager.saveCanvasImmediate();
 		if (kapi) {

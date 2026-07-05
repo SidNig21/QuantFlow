@@ -162,6 +162,7 @@ describe("agentos roles never fall through to the legacy pty path", () => {
     expect(spawnCall?.payload.runtimeTarget).toBe("agentos");
     expect(spawnCall?.payload.harnessKind).toBe("agentos");
     expect(spawnCall?.payload.roleName).toBe("Hermes");
+    expect(calls.spawnTerminalWebview).toBe(1);
   });
 
   test("Kernel rejection still prevents any runtime start", async () => {

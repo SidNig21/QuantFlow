@@ -78,7 +78,7 @@ async function saveScreenshot(
 
 async function clickAgentOsRecipe(wc: WebContents): Promise<boolean> {
   const result = await execJs<{ ok: boolean; error?: string; spawnMode?: string }>(wc, `(() => {
-    const btn = document.querySelector('.lv1-recipe[data-recipe="agentos"]');
+    const btn = document.querySelector('.lv1-recipe[data-recipe="codex"]');
     if (!btn) return { ok: false, error: 'agentos recipe button not found' };
     const dock = document.querySelector('.lv1-dock');
     const spawnMode = dock?.getAttribute('data-spawn-mode') ?? 'center';
@@ -103,7 +103,7 @@ async function clickAgentOsRecipe(wc: WebContents): Promise<boolean> {
   logStep(
     "spawn-click",
     true,
-    `selector=.lv1-recipe[data-recipe="agentos"] spawnMode=${result.spawnMode ?? "center"}`,
+    `selector=.lv1-recipe[data-recipe="codex"] spawnMode=${result.spawnMode ?? "center"}`,
   );
   return true;
 }

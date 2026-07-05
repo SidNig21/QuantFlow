@@ -11,18 +11,13 @@ import {
   _setRolesDir,
 } from "./role-service";
 import { QUANTFLOW_DIR } from "./paths";
+import {
+  DOCK_ACTOR_IDS,
+  buildDockLegendRecipes,
+} from "./dock-actors";
 
-/** Built-in dock seed — not the runtime source of truth after R8. */
-export const BUILT_IN_LEGEND_RECIPE_IDS = [
-  "shell",
-  "codex",
-  "hermes",
-  "claude",
-  "puffer",
-  "agentos",
-  "python",
-  "memory",
-] as const;
+/** Built-in dock seed — four actors from dock-actors.ts. */
+export const BUILT_IN_LEGEND_RECIPE_IDS = [...DOCK_ACTOR_IDS] as const;
 
 export type LegendRecipeKind = "generic" | "codex" | "agent" | "worker" | "tool" | "memory" | "eve";
 
@@ -75,108 +70,7 @@ export interface LegendRecipeListEntry extends LegendRecipe {
   capabilityId: string;
 }
 
-export const BUILT_IN_LEGEND_RECIPES: LegendRecipe[] = [
-  {
-    id: "shell",
-    roleId: "shell",
-    group: "spawn",
-    type: "generic",
-    name: "Generic CLI",
-    description: "windows-pty",
-    runtime: "windows-pty",
-    color: "var(--rail-generic, #a3ff12)",
-    icon: "shell",
-  },
-  {
-    id: "codex",
-    roleId: "codex",
-    group: "spawn",
-    type: "codex",
-    name: "Codex CLI",
-    description: "agentos · pi",
-    runtime: "agentos",
-    runtimeTarget: "agentos",
-    harnessKind: "agentos",
-    agentosSoftware: "pi",
-    color: "var(--rail-codex, #14d9ff)",
-    icon: "codex",
-  },
-  {
-    id: "hermes",
-    roleId: "hermes",
-    group: "spawn",
-    type: "agent",
-    name: "Hermes",
-    description: "agentos · pi",
-    runtime: "agentos",
-    runtimeTarget: "agentos",
-    harnessKind: "agentos",
-    agentosSoftware: "pi",
-    color: "var(--rail-agent, #4fc3ff)",
-    icon: "hermes",
-  },
-  {
-    id: "claude",
-    roleId: "claude-worker",
-    group: "spawn",
-    type: "worker",
-    name: "Claude Code",
-    description: "agentos · claude-code",
-    runtime: "agentos",
-    runtimeTarget: "agentos",
-    harnessKind: "agentos",
-    agentosSoftware: "claude-code",
-    color: "var(--rail-worker, #ffc24a)",
-    icon: "claude",
-  },
-  {
-    id: "puffer",
-    roleId: "puffer",
-    group: "spawn",
-    type: "worker",
-    name: "PufferLib worker",
-    description: "paper-trade loop",
-    runtime: "herdr-wsl",
-    color: "var(--rail-worker, #ffc24a)",
-    icon: "puffer",
-  },
-  {
-    id: "agentos",
-    roleId: "agentos",
-    group: "spawn",
-    type: "worker",
-    name: "AgentOS Worker",
-    description: "agentos",
-    runtime: "agentos",
-    runtimeTarget: "agentos",
-    harnessKind: "agentos",
-    color: "var(--rail-agent, #4fc3ff)",
-    icon: "agentos",
-  },
-  {
-    id: "python",
-    roleId: "python",
-    group: "spawn",
-    type: "tool",
-    name: "Python script",
-    description: "one-shot script",
-    runtime: "local-script",
-    color: "var(--rail-tool, #14d9ff)",
-    icon: "python",
-  },
-  {
-    id: "memory",
-    roleId: "memory",
-    group: "spawn",
-    type: "memory",
-    name: "Envoy memory",
-    description: "disabled",
-    runtime: "Gate 3+",
-    color: "var(--rail-memory, #9b7cff)",
-    icon: "memory",
-    disabled: true,
-  },
-];
+export const BUILT_IN_LEGEND_RECIPES: LegendRecipe[] = buildDockLegendRecipes() as LegendRecipe[];
 
 let rolesDir = join(QUANTFLOW_DIR, "roles");
 

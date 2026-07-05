@@ -28,9 +28,12 @@ describe("legend-recipes registry", () => {
     if (tempDir) await rm(tempDir, { recursive: true, force: true });
   });
 
-  test("built-in seed keeps the eight dock recipes", () => {
+  test("built-in seed keeps dock actors from dock-actors.ts", () => {
     expect(BUILT_IN_LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
       ...BUILT_IN_LEGEND_RECIPE_IDS,
+    ]);
+    expect(BUILT_IN_LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
+      "codex", "claude", "hermes", "eve", "bovada-odds", "canvas-scout",
     ]);
   });
 

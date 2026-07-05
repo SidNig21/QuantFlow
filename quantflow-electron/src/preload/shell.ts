@@ -570,6 +570,7 @@ contextBridge.exposeInMainWorld("shellApi", {
     rows?: number;
     instruction?: string;
     software?: string;
+    actorName?: string;
   }): Promise<{ ok: boolean; terminalTarget?: string; error?: string }> =>
     ipcRenderer.invoke("agentos:terminal:prepare", params),
 
