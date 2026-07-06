@@ -69,4 +69,34 @@ describe('tile-relay-dispatcher', () => {
     expect(result.ok).toBe(false);
     expect(getStringLog('conn-1', 5)).toHaveLength(0);
   });
+
+  test('windows-pty live path returns captured reply via injectable deps', async () => {
+    const tileA = 'tile-live-a';
+    const tileB = 'tile-live-b';
+    const connectionId = 'conn-relay-live';
+
+    registerTileRelayBinding(tileA, { runtimeTarget: 'windows-pty', ptySessionId: 'pty-live-a' });
+    registerTileRelayBinding(tileB, { runtimeTarget: 'windows-pty', ptySessionId: 'pty-live-b' });
+    syncConnectionGraph([{ id: connectionId, tileAId: tileA, tileBId: tileB }]);
+
+    const writes: string[] = [];
+    const result = await sendTileDelegate(
+      {
+        fromTileId: tileA,
+        toTileId: tileB,
+        cableId: connectionId,
+        text: 'ping',
+      },
+      {
+        ptyWrite: (_sessionId, text) => {
+          writes.push(text);
+        },
+        waitForReply: async () => ({ ok: true, reply: 'PONG' }),
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.reply).toBe('PONG');
+    expect(writes.some((line) => line.includes('[a2a tile-live-a→tile-live-b] ping'))).toBe(true);
+  });
 });

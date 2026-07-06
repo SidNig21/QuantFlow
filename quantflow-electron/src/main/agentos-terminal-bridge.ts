@@ -3,7 +3,12 @@
  */
 import { randomBytes } from 'node:crypto';
 import type { AgentOsTransport } from '@qf-harness/agentos/transport';
-import { resolveAgentOsCredential } from '@qf-harness/agentos/credential-order';
+import {
+  hasAgentOsCredential,
+  recordHostCredentialReport,
+  requiresClaudeCredential,
+  resolveAgentOsCredential,
+} from '@qf-harness/agentos/credential-order';
 import { formatAgentOsUnavailable } from '@qf-harness/agentos/error-messages';
 import { getAgentOsTransport } from './agentos-service';
 import {
@@ -44,8 +49,34 @@ const ptyBridges = new Map<string, PtyBridge>();
 
 function resolveSoftware(input?: string): string {
   const trimmed = input?.trim();
-  if (trimmed === 'pi' || trimmed === 'opencode' || trimmed === 'claude-code') return trimmed;
+  if (
+    trimmed === 'pi'
+    || trimmed === 'opencode'
+    || trimmed === 'claude-code'
+    || trimmed === 'claude'
+    || trimmed === 'codex'
+  ) {
+    return trimmed === 'claude' ? 'claude-code' : trimmed;
+  }
   return resolveAgentOsCredential()?.software ?? 'pi';
+}
+
+async function assertClaudeCredentialReady(
+  transport: AgentOsTransport,
+  software: string,
+): Promise<void> {
+  if (!requiresClaudeCredential(software)) return;
+  try {
+    const health = await transport.health();
+    if (typeof health?.hasCredential === 'boolean') {
+      recordHostCredentialReport(health.hasCredential);
+    }
+  } catch {
+    // Host unreachable — createSession will surface host failure.
+  }
+  if (!hasAgentOsCredential()) {
+    throw new Error(formatAgentOsUnavailable('no Claude credential'));
+  }
 }
 
 function encodePtyData(text: string): Buffer {
@@ -95,6 +126,7 @@ export async function prepareAgentOsTerminalAttach(input: {
 
   let attach = tileAttaches.get(tileId);
   if (!attach) {
+    await assertClaudeCredentialReady(transport, software);
     const { sessionId } = await transport.createSession(software, {});
     const { shellId } = await transport.openTerminal(sessionId, cols, rows);
     attach = {

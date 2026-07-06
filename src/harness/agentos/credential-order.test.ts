@@ -4,12 +4,14 @@ import {
   hasAgentOsCredential,
   hasWindowsAgentOsCredential,
   recordHostCredentialReport,
+  requiresClaudeCredential,
   resolveAgentOsCredential,
 } from './credential-order';
 
 const CREDENTIAL_ENVS = [
   'OPENCODE_API_KEY',
   'OPENCODE_ZEN_API_KEY',
+  'OPENCODE_GO_API_KEY',
   'OPENROUTER_API_KEY',
   'ANTHROPIC_API_KEY',
 ] as const;
@@ -89,5 +91,12 @@ describe('agentos credential union (windows env × host report)', () => {
       software: 'pi',
       credentialName: 'OPENCODE_API_KEY',
     });
+  });
+
+  test('requiresClaudeCredential matches claude software ids', () => {
+    expect(requiresClaudeCredential('claude-code')).toBe(true);
+    expect(requiresClaudeCredential('claude')).toBe(true);
+    expect(requiresClaudeCredential('codex')).toBe(false);
+    expect(requiresClaudeCredential('pi')).toBe(false);
   });
 });

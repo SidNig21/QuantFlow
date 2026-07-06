@@ -43,12 +43,17 @@ export interface AgentOsHostHandle {
 export const DEFAULT_AGENTOS_HEALTH_TIMEOUT_MS = 90_000;
 
 const CREDENTIAL_ENV_NAMES = [
+  'CLAUDE_CODE_OAUTH_TOKEN',
   'OPENCODE_API_KEY',
   'OPENCODE_ZEN_API_KEY',
+  'OPENCODE_GO_API_KEY',
   'OPENROUTER_API_KEY',
   'ANTHROPIC_API_KEY',
   'AGENTOS_HOST_PORT',
 ] as const;
+
+/** Host runtime knobs forwarded Win→WSL (override WSL ~/.profile drift). */
+const HOST_RUNTIME_ENV_NAMES = ['AGENTOS_MODEL', 'AGENTOS_PROVIDER'] as const;
 
 function defaultRepoRoot(): string {
   return join(fileURLToPath(new URL('../../..', import.meta.url)));
@@ -90,6 +95,13 @@ function buildSpawnEnv(port: number): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, AGENTOS_HOST_PORT: String(port) };
   const shared: string[] = [];
   for (const name of CREDENTIAL_ENV_NAMES) {
+    const value = process.env[name];
+    if (value != null && value !== '') {
+      env[name] = value;
+      shared.push(name);
+    }
+  }
+  for (const name of HOST_RUNTIME_ENV_NAMES) {
     const value = process.env[name];
     if (value != null && value !== '') {
       env[name] = value;

@@ -66,8 +66,7 @@ const agentosRole = {
   name: "Hermes",
   color: "#06b6d4",
   runtimeTarget: "agentos",
-  agentosSoftware: "pi",
-  commandTemplate: "hermes",
+  agentosSoftware: "claude-code",
   startupPrompt: "Review the current task context and wait for instructions.",
 };
 
@@ -183,6 +182,24 @@ describe("agentos roles never fall through to the legacy pty path", () => {
     expect(calls.herdrSpawnRole).toBe(0);
     expect(calls.onRoleSpawnFailed).toBe(1);
     expect(tile.ptyStatus).toBe("error");
+  });
+
+  test("missing Claude credential surfaces tile error without mounting webview", async () => {
+    setKernelApi(() => ({ ok: true }));
+    const { deps, calls, tile } = makeDeps();
+    // deno-lint-ignore no-explicit-any
+    (deps.shellApi as any).agentosTerminalPrepare = async () => ({
+      ok: false,
+      error: "AgentOS unavailable: no Claude credential. Run claude setup-token in WSL and add CLAUDE_CODE_OAUTH_TOKEN to ~/.profile.",
+    });
+
+    await spawnRoleTileAt(deps, agentosRole, 0, 0, {});
+
+    expect(calls.spawnTerminalWebview).toBe(0);
+    expect(calls.onRoleSpawnFailed).toBe(1);
+    expect(tile.ptyStatus).toBe("error");
+    expect(String(tile.ptyError)).toContain("no Claude credential");
+    expect(tile.terminalTarget).toBeUndefined();
   });
 
   test("bridge failure leaves an explicit error state — never a default pty session", async () => {

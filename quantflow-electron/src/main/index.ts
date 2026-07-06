@@ -69,9 +69,11 @@ import { runAgentOsTerminalProof } from "./agentos-terminal-proof";
 import { runLegendAgentosProof } from "./agentos-legend-proof";
 import { runActorsOnAgentosProof } from "./agentos-actors-proof";
 import { runA2aCableProof } from "./agentos-a2a-proof";
+import { runAgentosStickProof } from "./agentos-stick-proof";
 import { runEveA2aProof } from "./agentos-eve-a2a-proof";
 import { runOrchestratorProof } from "./agentos-orchestrator-proof";
 import { runActorsDemoProof } from "./agentos-demo-proof";
+import { registerMastraIpc } from "./ipc-mastra";
 
 const APP_NAME = "QuantFlow";
 const launchStartedAtMs = Date.now();
@@ -574,6 +576,10 @@ ipcMain.on("get-home-path", (event) => {
   event.returnValue = app.getPath("home");
 });
 
+// Mastra meta-harness wiring — makes the qf-conductor + delegate tool reachable
+// (also forces the main bundle to actually load @mastra/core at runtime).
+registerMastraIpc();
+
 ipcMain.handle("shell:get-view-config", () => {
   const preload = pathToFileURL(
     getPreloadPath("universal"),
@@ -915,28 +921,27 @@ app.whenReady().then(async () => {
   });
   recordLaunchPhase("services.registered", servicesStartedAt);
 
-  const runtimeStartedAt = Date.now();
+  const sidecarStartedAt = Date.now();
   try {
     await pty.ensureSidecar();
   } catch (err) {
     console.error("Sidecar failed to start:", err);
   }
-  try {
-    await bootstrapHerdrRuntime();
-  } catch (err) {
-    console.error("Herdr bootstrap failed:", err);
-  }
-  recordLaunchPhase("runtime.pty-herdr", runtimeStartedAt);
-
-  if (process.env.QF_AGENTOS_PREWARM === "1") {
-    prewarmAgentOsHost();
-  }
+  recordLaunchPhase("runtime.pty-sidecar", sidecarStartedAt);
 
   const windowStartedAt = Date.now();
   buildAppMenu();
   createWindow();
   registerAgentIpc(mainWindow!, config);
   registerToggleShortcuts(mainWindow!);
+
+  // Pattern B: don't block the window on WSL herdr server startup (up to 30s).
+  // First herdr-wsl tile spawn calls ensureHerdrServer() lazily.
+  void bootstrapHerdrRuntime().catch((err) => {
+    console.error("Herdr bootstrap failed:", err);
+  });
+
+  prewarmAgentOsHost();
 
   initMainAnalytics();
   trackEvent("app_launched");
@@ -996,7 +1001,10 @@ app.whenReady().then(async () => {
   if (process.env.QF_ACTORS_ON_AGENTOS_PROOF === "1") {
     void runActorsOnAgentosProof(mainWindow!);
   }
-  if (process.env.QF_A2A_CABLE_PROOF === "1") {
+  if (process.env.QF_AGENTOS_STICK_PROOF === "1") {
+    void runAgentosStickProof(mainWindow!);
+  }
+  if (process.env.QF_A2A_CABLE_PROOF === "1" || process.env.QF_AGENTOS_A2A_PROOF === "1") {
     void runA2aCableProof(mainWindow!);
   }
   if (process.env.QF_ORCHESTRATOR_PROOF === "1") {

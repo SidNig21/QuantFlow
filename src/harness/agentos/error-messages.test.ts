@@ -23,9 +23,9 @@ describe('agentos error-messages', () => {
     const cred = formatAgentOsUnavailable('No AgentOS credential in environment', { hasCredential: false });
     const model = formatAgentOsUnavailable('session prompt failed: rate limited', { hasCredential: true });
 
-    expect(host).toContain("WSL host didn't start");
-    expect(cred).toContain('no API key set');
-    expect(cred).toContain('OPENCODE_API_KEY');
+    expect(host).toContain('start the fabric');
+    expect(cred).toContain('no Claude credential');
+    expect(cred).toContain('CLAUDE_CODE_OAUTH_TOKEN');
     expect(model).toContain('model error');
 
     expect(host).not.toBe(cred);
@@ -38,6 +38,7 @@ describe('no-API-key message defers to the host credential report (S2)', () => {
   const CREDENTIAL_ENVS = [
     'OPENCODE_API_KEY',
     'OPENCODE_ZEN_API_KEY',
+    'OPENCODE_GO_API_KEY',
     'OPENROUTER_API_KEY',
     'ANTHROPIC_API_KEY',
   ] as const;
@@ -63,22 +64,22 @@ describe('no-API-key message defers to the host credential report (S2)', () => {
   test('windows env empty + host reports true → host error stays a host error', () => {
     recordHostCredentialReport(true);
     const msg = formatAgentOsUnavailable('agentos-host did not become healthy within 90000ms');
-    expect(msg).toContain("WSL host didn't start");
-    expect(msg).not.toContain('no API key set');
+    expect(msg).toContain('start the fabric');
+    expect(msg).not.toContain('no Claude credential');
   });
 
   test('windows env empty + host reports true → model error stays a model error', () => {
     recordHostCredentialReport(true);
     const msg = formatAgentOsUnavailable('prompt failed: CreditsError');
     expect(msg).toContain('model error');
-    expect(msg).not.toContain('no API key set');
+    expect(msg).not.toContain('no Claude credential');
   });
 
   test('no API key fires only when BOTH windows env and host report say absent', () => {
     recordHostCredentialReport(false);
     const msg = formatAgentOsUnavailable('prompt failed: something opaque');
-    expect(msg).toContain('no API key set');
-    expect(msg).toContain('OPENCODE_API_KEY');
+    expect(msg).toContain('no Claude credential');
+    expect(msg).toContain('CLAUDE_CODE_OAUTH_TOKEN');
     expect(msg).toContain('WSL');
   });
 
@@ -91,13 +92,13 @@ describe('no-API-key message defers to the host credential report (S2)', () => {
 
   test('host unreachable (no report) keeps pre-S2 windows-only behavior', () => {
     const msg = formatAgentOsUnavailable('prompt failed: something opaque');
-    expect(msg).toContain('no API key set');
+    expect(msg).toContain('no Claude credential');
   });
 
   test('host-classified credential error still names the WSL fix', () => {
     recordHostCredentialReport(true);
     const msg = formatAgentOsUnavailable('No AgentOS credential in environment (OPENCODE_API_KEY)');
-    expect(msg).toContain('no API key set');
-    expect(msg).toContain('OPENCODE_API_KEY');
+    expect(msg).toContain('no Claude credential');
+    expect(msg).toContain('CLAUDE_CODE_OAUTH_TOKEN');
   });
 });

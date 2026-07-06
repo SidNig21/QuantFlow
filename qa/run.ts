@@ -283,6 +283,24 @@ const checks: Check[] = [
     },
   },
   {
+    name: "agentos-stick",
+    description:
+      "Stick: pi-stick dock actor → AgentOS session → terminal tile → sim prompt round-trip",
+    async run() {
+      const { runAgentOsStickCheck } = await import("./lib/agentos-stick");
+      return runAgentOsStickCheck();
+    },
+  },
+  {
+    name: "agentos-a2a",
+    description:
+      "A2A: two pi-stick AgentOS sessions, cable relay, sim ack + scripted canvas proof",
+    async run() {
+      const { runAgentOsA2aCheck } = await import("./lib/agentos-a2a");
+      return runAgentOsA2aCheck();
+    },
+  },
+  {
     name: "a2a-cable",
     description:
       "V4: cable-drawn A2A relay — sim relay round-trip + scripted two-actor canvas proof",
@@ -334,6 +352,15 @@ const checks: Check[] = [
     async run() {
       const { runTileRelayCheck } = await import("./lib/tile-relay");
       return runTileRelayCheck();
+    },
+  },
+  {
+    name: "mastra-delegate",
+    description:
+      "M1: Mastra delegateToTile tool wired to sim tile relay (no live LLM)",
+    async run() {
+      const { runMastraDelegateCheck } = await import("./lib/mastra-delegate");
+      return runMastraDelegateCheck();
     },
   },
   {

@@ -236,11 +236,11 @@ export function setAgentOsPrewarmDryRun(enabled: boolean): void {
 }
 
 /**
- * Optional WSL host pre-warm — off by default (Pattern B). Set QF_AGENTOS_PREWARM=1 to enable.
+ * WSL host pre-warm — on by default (Milestone D). Set QF_AGENTOS_PREWARM=0 to disable.
  * First transport use still starts the host lazily when pre-warm has not finished.
  */
 export function prewarmAgentOsHost(): void {
-  if (process.env.QF_AGENTOS_PREWARM !== "1") return;
+  if (process.env.QF_AGENTOS_PREWARM === '0') return;
   if (prewarmInvoked || shouldSkipLiveHost()) return;
   prewarmInvoked = true;
   if (prewarmDryRun) return;

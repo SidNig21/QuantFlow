@@ -8,6 +8,12 @@ export type AgentOsFailureKind = 'host' | 'credential' | 'model';
 
 const UNAVAILABLE_PREFIX = /^agentos(-harness)? unavailable:\s*/i;
 
+export const AGENTOS_NO_CLAUDE_CREDENTIAL_MESSAGE =
+  'AgentOS unavailable: no Claude credential. Run claude setup-token in WSL and add CLAUDE_CODE_OAUTH_TOKEN to ~/.profile.';
+
+export const AGENTOS_HOST_DOWN_MESSAGE =
+  'AgentOS unavailable — start the fabric.';
+
 export function stripAgentOsUnavailablePrefix(detail: string): string {
   return detail.replace(UNAVAILABLE_PREFIX, '').trim();
 }
@@ -15,7 +21,8 @@ export function stripAgentOsUnavailablePrefix(detail: string): string {
 export function classifyAgentOsFailure(detail: string): AgentOsFailureKind {
   const clean = stripAgentOsUnavailablePrefix(detail).toLowerCase();
   if (
-    /no agentos credential|no api key set|opencode_api_key|openrouter_api_key|anthropic_api_key/.test(clean)
+    /no agentos credential|no api key set|no claude credential|claude_code_oauth_token|setup-token/.test(clean)
+    || /opencode_api_key|openrouter_api_key|anthropic_api_key/.test(clean)
     || /credential in environment/.test(clean)
   ) {
     return 'credential';
@@ -41,10 +48,10 @@ export function formatAgentOsUnavailable(
   const kind = classifyAgentOsFailure(clean);
 
   if (kind === 'credential' || !hasCredential) {
-    return 'AgentOS unavailable: no API key set. Set OPENCODE_API_KEY in your WSL environment (or OPENROUTER_API_KEY / ANTHROPIC_API_KEY).';
+    return AGENTOS_NO_CLAUDE_CREDENTIAL_MESSAGE;
   }
   if (kind === 'host') {
-    return `AgentOS unavailable: WSL host didn't start (${clean}). Check WSL is running and try again.`;
+    return `${AGENTOS_HOST_DOWN_MESSAGE} (${clean})`;
   }
   return `AgentOS unavailable: model error — ${clean}`;
 }

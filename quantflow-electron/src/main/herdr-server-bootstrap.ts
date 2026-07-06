@@ -86,11 +86,17 @@ async function readHerdrStatusServer(): Promise<{
 }
 
 async function startHerdrServerProcess(): Promise<void> {
+  // The server MUST be fully detached (new session + stdin from /dev/null) or WSL
+  // reaps it the instant this one-shot `wsl.exe -e bash -lc` returns. A plain
+  // `nohup … &` does NOT survive — verified live 2026-07-05: the process is killed
+  // when wsl.exe exits, so every herdr spawn then waits 30s and fails. `setsid`
+  // escapes the launching session; `< /dev/null` detaches stdin; `disown` drops it
+  // from bash's job table so exit-time SIGHUP can't reach it.
   const script = [
     "command -v herdr >/dev/null 2>&1 || { echo 'herdr not found on PATH' >&2; exit 127; }",
     "mkdir -p ~/.quantflow",
     "if herdr status server 2>/dev/null | grep -q '^status: running'; then exit 0; fi",
-    "nohup herdr server >> ~/.quantflow/herdr-server.log 2>&1 &",
+    "setsid herdr server >> ~/.quantflow/herdr-server.log 2>&1 < /dev/null & disown 2>/dev/null || true",
   ].join("\n");
   await runShellScript(script, STATUS_TIMEOUT_MS);
 }

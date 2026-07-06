@@ -9,15 +9,15 @@ import {
 import { runKillSwitchCheck } from './kill-switch';
 
 function assertDistinctErrors(): boolean {
-  const host = formatAgentOsUnavailable('agentos-host did not become healthy within 90000ms', {
-    hasCredential: true,
-  });
   const cred = formatAgentOsUnavailable('No AgentOS credential in environment', {
     hasCredential: false,
   });
   const model = formatAgentOsUnavailable('prompt failed: CreditsError', { hasCredential: true });
+  const hostDown = formatAgentOsUnavailable('agentos-host did not become healthy within 90000ms', {
+    hasCredential: true,
+  });
 
-  const messages = [host, cred, model];
+  const messages = [hostDown, cred, model];
   const unique = new Set(messages);
   if (unique.size !== 3) {
     console.error('agentos-boot: expected three distinct failure messages');
@@ -39,7 +39,7 @@ function assertDistinctErrors(): boolean {
   }
 
   console.log('agentos-boot: three failure classes verified');
-  console.log(`  host: ${host}`);
+  console.log(`  host: ${hostDown}`);
   console.log(`  credential: ${cred}`);
   console.log(`  model: ${model}`);
   return true;
@@ -66,7 +66,7 @@ async function assertPrewarmHook(): Promise<boolean> {
     console.error(result.stderr.toString());
     return false;
   }
-  console.log('agentos-boot: pre-warm opt-in via QF_AGENTOS_PREWARM=1 (unit test PASS)');
+  console.log('agentos-boot: pre-warm on by default; opt-out via QF_AGENTOS_PREWARM=0 (unit test PASS)');
   return true;
 }
 

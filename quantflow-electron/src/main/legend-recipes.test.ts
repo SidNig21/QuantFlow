@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { HealthLevel } from "./diagnostics/types";
 import {
   BUILT_IN_LEGEND_RECIPE_IDS,
   BUILT_IN_LEGEND_RECIPES,
@@ -33,7 +34,7 @@ describe("legend-recipes registry", () => {
       ...BUILT_IN_LEGEND_RECIPE_IDS,
     ]);
     expect(BUILT_IN_LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
-      "codex", "claude", "hermes", "eve", "bovada-odds", "canvas-scout",
+      "pi-stick", "codex", "claude", "hermes", "eve", "bovada-odds", "canvas-scout",
     ]);
   });
 
@@ -142,10 +143,38 @@ describe("legend-recipes registry", () => {
     const recipe = BUILT_IN_LEGEND_RECIPES[1];
     const levels = new Map<string, "healthy" | "degraded" | "down">([
       [resolveRecipeCapabilityId(recipe), "degraded"],
+      ["harness:herdr-shell", "healthy"],
     ]);
     expect(mapHealthLevelToBadge(resolveReadinessForRecipe(recipe, levels))).toBe("amber");
     expect(mapHealthLevelToBadge("healthy")).toBe("green");
     expect(mapHealthLevelToBadge("down")).toBe("red");
+  });
+
+  test("herdr recipes require both role and harness healthy for green", async () => {
+    await createLegendRecipe({
+      id: "herdr-proof-script",
+      name: "Herdr Proof",
+      description: "herdr script",
+      color: "#6366f1",
+      icon: "python",
+      commandTemplate: "python",
+      runtimeTarget: "herdr-wsl",
+      type: "tool",
+    });
+    const listed = await listLegendRecipes();
+    const herdr = listed.find((entry) => entry.id === "herdr-proof-script");
+    expect(herdr).toBeDefined();
+    const roleOnly = new Map<string, HealthLevel>([
+      ["role:herdr-proof-script", "healthy"],
+      ["harness:herdr-shell", "degraded"],
+    ]);
+    expect(resolveReadinessForRecipe(herdr!, roleOnly)).toBe("degraded");
+    const both = new Map<string, HealthLevel>([
+      ["role:herdr-proof-script", "healthy"],
+      ["harness:herdr-shell", "healthy"],
+    ]);
+    expect(resolveReadinessForRecipe(herdr!, both)).toBe("healthy");
+    await removeLegendRecipe("herdr-proof-script");
   });
 
   test("Eve recipes use the provider capability id", () => {

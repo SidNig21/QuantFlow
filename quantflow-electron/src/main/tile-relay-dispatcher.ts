@@ -17,6 +17,13 @@ import {
   type ConnectionGraphEntry,
 } from './tile-session-registry';
 import { writeToSession } from './pty';
+import {
+  waitForHerdrPaneReply,
+  waitForPtySessionReply,
+  type HerdrReadFn,
+  type PtyCaptureFn,
+  type RelayReplyCaptureInput,
+} from './relay-reply-capture';
 import type { RoleRuntimeTarget } from './role-service';
 
 export interface TileDelegateInput {
@@ -36,6 +43,12 @@ export interface TileDelegateResult {
 export interface TileRelayDeps {
   herdrSend?: (paneId: string, text: string) => Promise<void>;
   ptyWrite?: (sessionId: string, text: string) => void;
+  ptyCapture?: PtyCaptureFn;
+  herdrRead?: HerdrReadFn;
+  waitForReply?: (
+    input: RelayReplyCaptureInput,
+    ctx: { runtime: 'herdr-wsl' | 'windows-pty'; sessionId?: string; paneId?: string },
+  ) => Promise<{ ok: boolean; reply?: string; message?: string }>;
 }
 
 function isSimRelay(): boolean {
@@ -99,6 +112,52 @@ function resolveRuntime(tileId: string): RoleRuntimeTarget | null {
   return getTileRelayBinding(tileId)?.runtimeTarget ?? null;
 }
 
+function delegateMarker(input: TileDelegateInput): string {
+  return `[a2a ${input.fromTileId}→${input.toTileId}] ${input.text}`;
+}
+
+async function captureRelayReply(
+  afterMarker: string,
+  deps: TileRelayDeps,
+  ctx: { runtime: 'herdr-wsl' | 'windows-pty'; sessionId?: string; paneId?: string },
+): Promise<TileDelegateResult> {
+  const captureInput: RelayReplyCaptureInput = { afterMarker };
+
+  if (deps.waitForReply) {
+    const captured = await deps.waitForReply(captureInput, ctx);
+    if (!captured.ok) {
+      return { ok: false, message: captured.message };
+    }
+    return { ok: true, reply: captured.reply };
+  }
+
+  if (ctx.runtime === 'windows-pty' && ctx.sessionId) {
+    const captured = await waitForPtySessionReply(
+      ctx.sessionId,
+      captureInput,
+      deps.ptyCapture,
+    );
+    if (!captured.ok) {
+      return { ok: false, message: captured.message };
+    }
+    return { ok: true, reply: captured.reply };
+  }
+
+  if (ctx.runtime === 'herdr-wsl' && ctx.paneId) {
+    const captured = await waitForHerdrPaneReply(
+      ctx.paneId,
+      captureInput,
+      deps.herdrRead,
+    );
+    if (!captured.ok) {
+      return { ok: false, message: captured.message };
+    }
+    return { ok: true, reply: captured.reply };
+  }
+
+  return { ok: true };
+}
+
 async function delegateHerdr(
   input: TileDelegateInput,
   deps: TileRelayDeps,
@@ -108,13 +167,13 @@ async function delegateHerdr(
   if (!paneId && !isSimRelay()) {
     return { ok: false, message: `herdr relay: missing pane for tile ${input.toTileId}` };
   }
-  const delegated = `[a2a ${input.fromTileId}→${input.toTileId}] ${input.text}`;
+  const marker = delegateMarker(input);
   if (isSimRelay()) {
     return { ok: true, reply: simAck(input.text) };
   }
   const send = deps.herdrSend ?? ((id, text) => sendHerdrPaneLine(callHerdrSocket, id, text));
-  await send(paneId!, delegated);
-  return { ok: true };
+  await send(paneId!, marker);
+  return captureRelayReply(marker, deps, { runtime: 'herdr-wsl', paneId: paneId! });
 }
 
 async function delegateWindowsPty(
@@ -126,13 +185,14 @@ async function delegateWindowsPty(
   if (!sessionId && !isSimRelay()) {
     return { ok: false, message: `pty relay: missing session for tile ${input.toTileId}` };
   }
-  const delegated = `[a2a ${input.fromTileId}→${input.toTileId}] ${input.text}\r`;
+  const marker = delegateMarker(input);
+  const delegated = `${marker}\r`;
   if (isSimRelay()) {
     return { ok: true, reply: simAck(input.text) };
   }
   const write = deps.ptyWrite ?? writeToSession;
   write(sessionId!, delegated);
-  return { ok: true };
+  return captureRelayReply(marker, deps, { runtime: 'windows-pty', sessionId: sessionId! });
 }
 
 async function delegateAgentOs(

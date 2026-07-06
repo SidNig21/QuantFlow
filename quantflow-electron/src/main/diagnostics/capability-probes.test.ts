@@ -76,6 +76,21 @@ describe("capability probes", () => {
     });
   });
 
+  test("hermes requires authed true for healthy not merely installed", async () => {
+    const result = await run("capability.role.hermes", [
+      { ...role("hermes", "hermes"), runtimeTarget: "agentos", harnessKind: "agentos", agentosSoftware: "claude-code" },
+    ], {
+      commandExists: () => true,
+      checkCliAuth: async () => ({
+        authed: null,
+        message: "legacy null authed",
+      }),
+    });
+
+    expect(result.level).toBe("degraded");
+    expect(result.detail).toMatchObject({ ready: false });
+  });
+
   test("absent role command maps to down and present false", async () => {
     const result = await run("capability.role.opencode", [
       role("opencode", "opencode"),

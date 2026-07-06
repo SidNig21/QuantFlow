@@ -6,91 +6,85 @@ import { buildDockRoles } from '../../quantflow-electron/src/main/dock-actors';
 
 const REPO_ROOT = join(import.meta.dir, '..', '..');
 
-const HERDR_ACTOR_RECIPES = [
-  { id: 'codex', software: 'codex', commandTemplate: 'codex' },
-  { id: 'hermes', commandTemplate: 'hermes' },
-  { id: 'claude', software: 'claude-code', commandTemplate: 'claude' },
+const AGENTOS_ACTOR_RECIPES = [
+  { id: 'codex', software: 'codex' },
+  { id: 'hermes', software: 'claude-code' },
+  { id: 'claude', software: 'claude-code' },
 ] as const;
 
 const EVE_ACTOR = { id: 'eve', runtimeTarget: 'windows-pty' } as const;
 
 function assertBuiltInLegendRecipes(): boolean {
-  for (const expected of HERDR_ACTOR_RECIPES) {
+  for (const expected of AGENTOS_ACTOR_RECIPES) {
     const recipe = BUILT_IN_LEGEND_RECIPES.find((r) => r.id === expected.id);
     if (!recipe) {
-      console.error(`actors-on-herdr: missing built-in recipe ${expected.id}`);
+      console.error(`actors-on-agentos: missing built-in recipe ${expected.id}`);
       return false;
     }
-    if (recipe.runtimeTarget !== 'herdr-wsl' || recipe.harnessKind !== 'herdr-shell') {
-      console.error(`actors-on-herdr: ${expected.id} not on herdr-wsl transport`);
+    if (recipe.runtimeTarget !== 'agentos' || recipe.harnessKind !== 'agentos') {
+      console.error(`actors-on-agentos: ${expected.id} not on agentos transport`);
       return false;
     }
-    if ('software' in expected && expected.software) {
-      if (recipe.agentosSoftware !== expected.software) {
-        console.error(`actors-on-herdr: ${expected.id} agentosSoftware=${recipe.agentosSoftware} want ${expected.software}`);
-        return false;
-      }
-    } else if (recipe.agentosSoftware) {
-      console.error(`actors-on-herdr: ${expected.id} should not carry agentosSoftware`);
-      return false;
-    }
-    if (expected.commandTemplate && recipe.commandTemplate !== expected.commandTemplate) {
-      console.error(`actors-on-herdr: ${expected.id} commandTemplate=${recipe.commandTemplate} want ${expected.commandTemplate}`);
+    if (recipe.agentosSoftware !== expected.software) {
+      console.error(`actors-on-agentos: ${expected.id} agentosSoftware=${recipe.agentosSoftware} want ${expected.software}`);
       return false;
     }
   }
 
   const eve = BUILT_IN_LEGEND_RECIPES.find((r) => r.id === EVE_ACTOR.id);
   if (!eve || eve.runtimeTarget !== 'windows-pty') {
-    console.error('actors-on-herdr: eve not on windows-pty transport');
+    console.error('actors-on-agentos: eve not on windows-pty transport');
     return false;
   }
 
-  console.log('actors-on-herdr: codex/hermes/claude legend recipes on herdr-wsl');
+  console.log('actors-on-agentos: codex/hermes/claude legend recipes on agentos');
   return true;
 }
 
 function assertBuiltInRoles(): boolean {
   const roles = buildDockRoles();
+  const softwareById = {
+    codex: 'codex',
+    claude: 'claude-code',
+    hermes: 'claude-code',
+  } as const;
   for (const roleId of ['hermes', 'codex', 'claude'] as const) {
     const role = roles.find((entry) => entry.id === roleId);
     if (!role) {
-      console.error(`actors-on-herdr: role ${roleId} not found in dock-actors`);
+      console.error(`actors-on-agentos: role ${roleId} not found in dock-actors`);
       return false;
     }
-    if (role.runtimeTarget !== 'herdr-wsl') {
-      console.error(`actors-on-herdr: role ${roleId} missing runtimeTarget herdr-wsl`);
+    if (role.runtimeTarget !== 'agentos') {
+      console.error(`actors-on-agentos: role ${roleId} missing runtimeTarget agentos`);
       return false;
     }
-    if (role.harnessKind !== 'herdr-shell') {
-      console.error(`actors-on-herdr: role ${roleId} missing harnessKind herdr-shell`);
+    if (role.harnessKind !== 'agentos') {
+      console.error(`actors-on-agentos: role ${roleId} missing harnessKind agentos`);
       return false;
     }
-    if (role.legacyRuntimeTarget !== 'agentos') {
-      console.error(`actors-on-herdr: role ${roleId} missing legacyRuntimeTarget agentos opt-in`);
+    if (role.legacyRuntimeTarget !== 'herdr-wsl') {
+      console.error(`actors-on-agentos: role ${roleId} missing legacyRuntimeTarget herdr-wsl`);
       return false;
     }
-    if (roleId === 'hermes') {
-      if (role.commandTemplate !== 'hermes' || role.agentosSoftware) {
-        console.error('actors-on-herdr: hermes must use commandTemplate hermes with no agentosSoftware');
-        return false;
-      }
+    if (role.agentosSoftware !== softwareById[roleId]) {
+      console.error(`actors-on-agentos: role ${roleId} agentosSoftware=${role.agentosSoftware}`);
+      return false;
     }
   }
-  console.log('actors-on-herdr: built-in roles on native herdr rail');
+  console.log('actors-on-agentos: built-in roles on AgentOS rail');
   return true;
 }
 
-function assertSpawnUsesHerdrPath(): boolean {
+function assertSpawnUsesAgentOsPath(): boolean {
   const roleSpawn = readFileSync(
     join(REPO_ROOT, 'quantflow-electron/src/windows/shell/src/role-tile-spawn.js'),
     'utf8',
   );
-  if (!roleSpawn.includes('requiresHerdrSpawn') || !roleSpawn.includes('herdrSpawnRole')) {
-    console.error('actors-on-herdr: role spawn missing herdr path');
+  if (!roleSpawn.includes('spawnAgentOsTileAt') || !roleSpawn.includes('agentosTerminalPrepare')) {
+    console.error('actors-on-agentos: role spawn missing agentos path');
     return false;
   }
-  console.log('actors-on-herdr: renderer uses herdr tile spawn for herdr-wsl roles');
+  console.log('actors-on-agentos: renderer uses agentos tile spawn for agentos roles');
   return true;
 }
 
@@ -98,14 +92,14 @@ export async function runActorsOnAgentosCheck(): Promise<boolean> {
   let ok = true;
   if (!assertBuiltInLegendRecipes()) ok = false;
   if (!assertBuiltInRoles()) ok = false;
-  if (!assertSpawnUsesHerdrPath()) ok = false;
+  if (!assertSpawnUsesAgentOsPath()) ok = false;
 
   const { runKillSwitchCheck } = await import('./kill-switch');
   if (!(await runKillSwitchCheck())) {
-    console.error('actors-on-herdr: kill-switch not green');
+    console.error('actors-on-agentos: kill-switch not green');
     ok = false;
   } else {
-    console.log('actors-on-herdr: kill-switch green');
+    console.log('actors-on-agentos: kill-switch green');
   }
 
   const proof = Bun.spawnSync(['bun', 'run', 'proof:actors-on-agentos'], {
@@ -115,12 +109,12 @@ export async function runActorsOnAgentosCheck(): Promise<boolean> {
     env: { ...process.env, QF_AGENTOS_SIM: '1' },
   });
   if (proof.exitCode !== 0) {
-    console.error('actors-on-herdr: electron proof failed');
+    console.error('actors-on-agentos: electron proof failed');
     ok = false;
   }
 
   if (ok) {
-    console.log('actors-on-herdr: PASS (native herdr spawn rail; AgentOS opt-in only)');
+    console.log('actors-on-agentos: PASS (AgentOS spawn rail; live typing deferred until claude setup-token)');
   }
   return ok;
 }

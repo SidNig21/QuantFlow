@@ -1,6 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { callHerdrSocket } from "./herdr-socket-bridge";
 import { buildEnvoyWrappedCommand } from "./herdr-envoy-wrap";
+import { ensureHerdrServer } from "./herdr-server-bootstrap";
 import { buildHerdrDisplayTarget } from "./pty-spawn-params";
 import { waitForWorkflowAgentPrompt } from "./workflow-agent-ready";
 
@@ -164,6 +165,14 @@ export async function spawnHerdrRoleSession(
 ): Promise<HerdrRoleSpawnResult> {
   if (isHerdrProofSim()) {
     return buildProofSimHerdrResult(request);
+  }
+
+  // Production path only — unit tests inject a mock rpc and skip WSL bootstrap.
+  if (rpc === callHerdrSocket) {
+    const bootstrap = await ensureHerdrServer();
+    if (bootstrap.state === "failed") {
+      throw new Error(bootstrap.message);
+    }
   }
 
   const herdrAgentName = buildHerdrAgentName(request);

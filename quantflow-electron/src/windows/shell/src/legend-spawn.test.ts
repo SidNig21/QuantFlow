@@ -53,6 +53,7 @@ describe("legend recipe role mapping", () => {
 
 	test("maps all visible dock recipes to role ids", () => {
 		expect(LEGEND_RECIPE_ROLE_IDS).toEqual({
+			"pi-stick": "pi-stick",
 			codex: "codex",
 			claude: "claude",
 			hermes: "hermes",

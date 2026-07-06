@@ -129,7 +129,7 @@ export function createSimTransport(options: SimTransportOptions = {}): AgentOsTr
 
     async health() {
       if (options.failHealth) return { ok: false };
-      return { ok: true };
+      return { ok: true, hasCredential: true };
     },
 
     async openTerminal(id, _cols, _rows) {

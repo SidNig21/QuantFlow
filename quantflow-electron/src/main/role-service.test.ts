@@ -46,10 +46,11 @@ describe("listRoles", () => {
       .toBe("Claude Code");
   });
 
-  test("codex is available when installed in WSL on Windows", async () => {
-    if (process.platform !== "win32") return;
+  test("codex on AgentOS rail does not require a CLI commandTemplate", async () => {
     const roles = await listRoles();
-    expect(roles.find((role) => role.id === "codex")?.commandAvailable).toBe(true);
+    const codex = roles.find((role) => role.id === "codex");
+    expect(codex?.runtimeTarget).toBe("agentos");
+    expect(codex?.commandTemplate).toBeUndefined();
   });
 
   test("includes Legend v1 recipe roles", async () => {
@@ -65,7 +66,7 @@ describe("listRoles", () => {
     )).toEqual({
       hermes: {
         name: "Hermes",
-        description: "Nous Hermes Agent CLI (hermes harness · delegates via cables)",
+        description: "Hermes orchestrator lead (AgentOS claude-code session)",
         color: "#06b6d4",
       },
       puffer: {
@@ -81,13 +82,14 @@ describe("listRoles", () => {
     });
   });
 
-  test("Hermes runs the hermes CLI harness, not claude or a startup prompt", async () => {
+  test("Hermes uses AgentOS claude-code with an orchestrator startup prompt", async () => {
     const role = await getRole("hermes");
 
-    expect(role?.commandTemplate).toBe("hermes");
-    expect(role?.startupPrompt).toBeUndefined();
+    expect(role?.agentosSoftware).toBe("claude-code");
+    expect(role?.runtimeTarget).toBe("agentos");
+    expect(role?.startupPrompt).toContain("QuantFlow");
+    expect(role?.startupPrompt?.toLowerCase()).not.toContain("coordinate via cables");
     expect(role?.systemPrompt).toBeUndefined();
-    expect(role?.agentosSoftware).toBeUndefined();
   });
 
   test("each role has identity and launch metadata", async () => {
@@ -106,7 +108,7 @@ describe("listRoles", () => {
     }
   });
 
-  test("AI-agent roles use native herdr rail with AgentOS opt-in legacy (Pattern B)", async () => {
+  test("AI-agent roles use AgentOS rail (Milestone D)", async () => {
     const roles = await listRoles();
     const fabric: Array<[string, string | undefined]> = [
       ["codex", "codex"],
@@ -115,16 +117,19 @@ describe("listRoles", () => {
     ];
     for (const [id, software] of fabric) {
       const role = roles.find((entry) => entry.id === id);
-      expect(role?.runtimeTarget).toBe("herdr-wsl");
-      expect(role?.harnessKind).toBe("herdr-shell");
+      expect(role?.runtimeTarget).toBe("agentos");
+      expect(role?.harnessKind).toBe("agentos");
       expect(role?.agentosSoftware).toBe(software);
-      expect(role?.legacyRuntimeTarget).toBe("agentos");
-      expect(requiresHerdrSpawn(role)).toBe(true);
+      expect(role?.legacyRuntimeTarget).toBe("herdr-wsl");
+      expect(requiresHerdrSpawn(role)).toBe(false);
     }
     const hermes = roles.find((entry) => entry.id === "hermes");
-    expect(hermes?.commandTemplate).toBe("hermes");
-    expect(hermes?.agentosSoftware).toBeUndefined();
+    expect(hermes?.agentosSoftware).toBe("claude-code");
+    expect(hermes?.runtimeTarget).toBe("agentos");
     for (const role of roles) {
+      // pi-stick is an HONEST pi projection-proof tile (labeled "Pi Stick"), not
+      // a pi impostor standing in for a named agent — the ban targets impostors.
+      if (role.id === "pi-stick") continue;
       expect(role.agentosSoftware).not.toBe("pi");
     }
   });
@@ -133,7 +138,7 @@ describe("listRoles", () => {
     const role = await getRole("claude-worker");
     expect(role?.id).toBe("claude-worker");
     expect(role?.agentosSoftware).toBe("claude-code");
-    expect(role?.runtimeTarget).toBe("herdr-wsl");
+    expect(role?.runtimeTarget).toBe("agentos");
   });
 
   test("script lanes and reserved roles keep their rails (roster policy)", async () => {

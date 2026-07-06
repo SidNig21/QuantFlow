@@ -62,3 +62,9 @@ export function getHostCredentialReport(): boolean | null {
 export function hasAgentOsCredential(): boolean {
   return hasWindowsAgentOsCredential() || lastHostCredentialReport === true;
 }
+
+/** True when the requested AgentOS software needs a Claude-family credential. */
+export function requiresClaudeCredential(software?: string): boolean {
+  const id = (software ?? '').trim().toLowerCase();
+  return id === 'claude' || id === 'claude-code';
+}

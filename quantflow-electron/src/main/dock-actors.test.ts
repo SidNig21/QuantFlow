@@ -13,6 +13,7 @@ import {
 describe("dock-actors", () => {
   test("defines the canonical spawn-rail actors", () => {
     expect([...DOCK_ACTOR_IDS]).toEqual([
+      "pi-stick",
       "codex",
       "claude",
       "hermes",
@@ -20,7 +21,7 @@ describe("dock-actors", () => {
       "bovada-odds",
       "canvas-scout",
     ]);
-    expect(DOCK_ACTORS).toHaveLength(6);
+    expect(DOCK_ACTORS).toHaveLength(7);
   });
 
   test("maps each actor to role + legend recipe with matching ids", () => {
@@ -34,12 +35,26 @@ describe("dock-actors", () => {
     }
   });
 
-  test("agent actors use native herdr rail; Eve personas ride Eve's local rail", () => {
+  test("pi-stick uses AgentOS pi software for projection proof", () => {
+    const role = dockActorToRole(getDockActor("pi-stick")!);
+    expect(role.runtimeTarget).toBe("agentos");
+    expect(role.harnessKind).toBe("agentos");
+    expect(role.agentosSoftware).toBe("pi");
+    expect(role.commandTemplate).toBeUndefined();
+  });
+
+  test("agent actors use AgentOS rail; Eve personas ride Eve's local rail", () => {
+    const softwareById = {
+      codex: "codex",
+      claude: "claude-code",
+      hermes: "claude-code",
+    } as const;
     for (const id of ["codex", "claude", "hermes"] as const) {
       const role = dockActorToRole(getDockActor(id)!);
-      expect(role.runtimeTarget).toBe("herdr-wsl");
-      expect(role.harnessKind).toBe("herdr-shell");
-      expect(role.legacyRuntimeTarget).toBe("agentos");
+      expect(role.runtimeTarget).toBe("agentos");
+      expect(role.harnessKind).toBe("agentos");
+      expect(role.legacyRuntimeTarget).toBe("herdr-wsl");
+      expect(role.agentosSoftware).toBe(softwareById[id]);
       expect(role.agentosSoftware).not.toBe("pi");
     }
     // Eve + Eve personas run locally via npm run dev — NOT AgentOS, NOT pi.
@@ -52,6 +67,13 @@ describe("dock-actors", () => {
     }
   });
 
+  test("dock copy bans cable-coordination language for Hermes", () => {
+    const hermes = getDockActor("hermes")!;
+    const copy = `${hermes.description} ${hermes.startupPrompt ?? ""}`.toLowerCase();
+    expect(copy).not.toContain("coordinate via cables");
+    expect(copy).not.toContain("delegates via cables");
+  });
+
   test("Eve personas resolve package cwd under eve-agents", () => {
     process.env.QUANTFLOW_DEV_WORKTREE_ROOT = "C:\\Users\\rybow\\QuantFlow";
     expect(resolveEveAgentCwd("bovada-odds")).toContain("eve-agents\\bovada-odds");
@@ -59,8 +81,8 @@ describe("dock-actors", () => {
   });
 
   test("build helpers match DOCK_ACTORS length", () => {
-    expect(buildDockRoles()).toHaveLength(6);
-    expect(buildDockLegendRecipes()).toHaveLength(6);
+    expect(buildDockRoles()).toHaveLength(7);
+    expect(buildDockLegendRecipes()).toHaveLength(7);
   });
 
   test("claude-worker alias resolves to claude", () => {

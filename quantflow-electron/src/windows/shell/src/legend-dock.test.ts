@@ -30,6 +30,7 @@ function createStorage(seed: Record<string, string> = {}) {
 describe("Legend v2 dock recipes", () => {
 	test("keeps the dock actor seed in sync with dock-actors.ts", () => {
 		expect(LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
+			"pi-stick",
 			"codex",
 			"claude",
 			"hermes",
@@ -38,6 +39,7 @@ describe("Legend v2 dock recipes", () => {
 			"canvas-scout",
 		]);
 		expect(LEGEND_RECIPES.map((recipe) => recipe.name)).toEqual([
+			"Pi Stick",
 			"Codex",
 			"Claude Code",
 			"Hermes",
@@ -46,6 +48,7 @@ describe("Legend v2 dock recipes", () => {
 			"Canvas Scout",
 		]);
 		expect(LEGEND_RECIPES.map((recipe) => recipe.roleId)).toEqual([
+			"pi-stick",
 			"codex",
 			"claude",
 			"hermes",
@@ -237,10 +240,21 @@ describe("Legend registry rendering", () => {
 	});
 
 	test("maps readiness levels to badge colors deterministically", () => {
-		const recipe = { roleId: "codex", harnessKind: undefined };
+		const recipe = {
+			roleId: "codex",
+			runtimeTarget: "herdr-wsl",
+			harnessKind: "herdr-shell",
+		};
 		expect(mapHealthLevelToBadge("healthy")).toBe("green");
 		expect(mapHealthLevelToBadge("degraded")).toBe("amber");
 		expect(mapHealthLevelToBadge("down")).toBe("red");
-		expect(resolveReadinessBadge(recipe, { "role:codex": "healthy" })).toBe("green");
+		expect(resolveReadinessBadge(recipe, {
+			"role:codex": "healthy",
+			"harness:herdr-shell": "healthy",
+		})).toBe("green");
+		expect(resolveReadinessBadge(recipe, {
+			"role:codex": "healthy",
+			"harness:herdr-shell": "down",
+		})).toBe("red");
 	});
 });

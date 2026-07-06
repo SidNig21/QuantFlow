@@ -1,5 +1,5 @@
 /**
- * V3 scripted proof — codex, hermes, claude spawn as native herdr terminal actors.
+ * V3 scripted proof — codex, hermes, claude spawn as AgentOS terminal actors.
  */
 import { app, type BrowserWindow, type WebContents } from "electron";
 import { mkdirSync, readFileSync } from "node:fs";
@@ -38,7 +38,7 @@ async function execJs<T>(wc: WebContents, expression: string): Promise<T> {
   return wc.executeJavaScript(expression, true) as Promise<T>;
 }
 
-async function assertHerdrRailTile(wc: WebContents, tileId: string): Promise<boolean> {
+async function assertAgentOsRailTile(wc: WebContents, tileId: string): Promise<boolean> {
   const check = await execJs<{
     ok: boolean;
     runtimeTarget: string | null;
@@ -55,13 +55,14 @@ async function assertHerdrRailTile(wc: WebContents, tileId: string): Promise<boo
     const webview = tileEl?.querySelector('webview');
     const src = webview?.getAttribute('src') ?? '';
     const decoded = decodeURIComponent(src);
-    const isAgentOs = decoded.includes('target=agentos')
+    const isAgentOs = runtimeTarget === 'agentos'
+      || decoded.includes('target=agentos')
       || decoded.includes('agentos%3A');
     const isHerdr = runtimeTarget === 'herdr-wsl'
       || decoded.includes('herdr-wsl')
       || decoded.includes('herdr%3A');
     return {
-      ok: !!webview && !isAgentOs && isHerdr,
+      ok: !!webview && isAgentOs && !isHerdr,
       runtimeTarget,
       isAgentOs,
       isHerdr,
@@ -69,13 +70,13 @@ async function assertHerdrRailTile(wc: WebContents, tileId: string): Promise<boo
   })()`);
   if (!check.ok) {
     logStep(
-      `herdr-rail-${tileId}`,
+      `agentos-rail-${tileId}`,
       false,
       `runtime=${check.runtimeTarget ?? "null"} agentos=${check.isAgentOs} herdr=${check.isHerdr}`,
     );
     return false;
   }
-  logStep(`herdr-rail-${tileId}`, true, `runtime=${check.runtimeTarget ?? "herdr-wsl"}`);
+  logStep(`agentos-rail-${tileId}`, true, `runtime=${check.runtimeTarget ?? "agentos"}`);
   return true;
 }
 
@@ -96,7 +97,7 @@ export async function runActorsOnAgentosProof(mainWindow: BrowserWindow): Promis
       exitApp(1);
       return;
     }
-    if (!(await assertHerdrRailTile(wc, tileId))) {
+    if (!(await assertAgentOsRailTile(wc, tileId))) {
       exitApp(1);
       return;
     }

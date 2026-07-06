@@ -92,12 +92,31 @@ export function resolveRecipeCapabilityId(recipe: Pick<LegendRecipe, "roleId" | 
   return `role:${recipe.roleId}`;
 }
 
+function worstHealthLevel(...levels: HealthLevel[]): HealthLevel {
+  if (levels.some((level) => level === "down")) return "down";
+  if (levels.some((level) => level === "degraded")) return "degraded";
+  return "healthy";
+}
+
+function harnessCapabilityId(
+  recipe: Pick<LegendRecipe, "runtimeTarget" | "harnessKind">,
+): string | null {
+  if (recipe.runtimeTarget === "herdr-wsl" || recipe.harnessKind === "herdr-shell") {
+    return "harness:herdr-shell";
+  }
+  if (recipe.runtimeTarget === "windows-pty") return "harness:local-shell";
+  return null;
+}
+
 export function resolveReadinessForRecipe(
   recipe: LegendRecipe,
   levelsByCapabilityId: ReadonlyMap<string, HealthLevel>,
 ): HealthLevel {
-  const capabilityId = resolveRecipeCapabilityId(recipe);
-  return levelsByCapabilityId.get(capabilityId) ?? "down";
+  const roleLevel = levelsByCapabilityId.get(resolveRecipeCapabilityId(recipe)) ?? "down";
+  const harnessId = harnessCapabilityId(recipe);
+  if (!harnessId) return roleLevel;
+  const harnessLevel = levelsByCapabilityId.get(harnessId) ?? "down";
+  return worstHealthLevel(roleLevel, harnessLevel);
 }
 
 function runtimeLabelForRole(role: Role): string {

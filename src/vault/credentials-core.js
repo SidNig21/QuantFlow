@@ -4,7 +4,22 @@ const ENV_ALIASES = {
   OPENCODE_ZEN_API_KEY: 'OPENCODE_API_KEY',
 };
 
+const OPENCODE_ENV_NAMES = ['OPENCODE_API_KEY', 'OPENCODE_ZEN_API_KEY', 'OPENCODE_GO_API_KEY'];
+
+function getOpencodeCredential() {
+  for (const envKey of OPENCODE_ENV_NAMES) {
+    const raw = process.env[envKey];
+    if (raw == null || raw === '') continue;
+    const trimmed = raw.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return undefined;
+}
+
 export function getCredential(name) {
+  if (name === 'OPENCODE_API_KEY' || name === 'OPENCODE_ZEN_API_KEY' || name === 'OPENCODE_GO_API_KEY') {
+    return getOpencodeCredential();
+  }
   const envKey = ENV_ALIASES[name] ?? name;
   const raw = process.env[envKey];
   if (raw == null || raw === '') return undefined;

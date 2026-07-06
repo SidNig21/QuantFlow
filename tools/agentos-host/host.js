@@ -61,21 +61,29 @@ function syncHostConnectionGraph(connections) {
   }
 }
 
+function resolveOpencodeKey() {
+  return (
+    (process.env.OPENCODE_API_KEY
+      ?? process.env.OPENCODE_GO_API_KEY
+      ?? process.env.OPENCODE_ZEN_API_KEY
+      ?? "")
+      .trim()
+  );
+}
+
 function resolveSoftwareAndEnv() {
-  const opencodeKey =
-    (process.env.OPENCODE_API_KEY ?? process.env.OPENCODE_ZEN_API_KEY ?? "").trim();
+  const opencodeKey = resolveOpencodeKey();
   if (opencodeKey) {
-    // OpenCode Zen via pi's custom-provider mechanism. The `opencode` AgentOS
-    // software cannot be used: its bundled ACP adapter hardcodes an Anthropic
-    // catalog and ignores OPENCODE_CONFIG_CONTENT for provider selection
-    // (verified 2026-07-03). Instead we register a `zen` provider in pi's
-    // ~/.pi/agent/models.json inside the VM (written by piVmFiles below) and
-    // pass only OPENCODE_API_KEY as session env.
-    const model = (process.env.AGENTOS_MODEL ?? "big-pickle").trim();
+    // OpenCode via pi's custom-provider mechanism. The `opencode` AgentOS software
+    // cannot be used: its bundled ACP adapter hardcodes an Anthropic catalog and
+    // ignores OPENCODE_CONFIG_CONTENT for provider selection (verified 2026-07-03).
+    // Default: OpenCode Go (zen/go/v1, glm-5.2). Override via AGENTOS_PROVIDER=zen
+    // for legacy Zen free tier (big-pickle) or AGENTOS_MODEL for other Go models.
+    const route = resolveOpencodePiRoute();
     return {
       software: "pi",
       env: { OPENCODE_API_KEY: opencodeKey },
-      piVmFiles: buildZenPiFiles(model),
+      piVmFiles: buildOpencodePiFiles(route),
     };
   }
   const openrouterKey = (process.env.OPENROUTER_API_KEY ?? "").trim();
@@ -123,8 +131,7 @@ function resolveSessionConfig(requested) {
     if (anthropicKey) {
       return { software: "claude", env: { ANTHROPIC_API_KEY: anthropicKey } };
     }
-    const zenKey =
-      (process.env.OPENCODE_API_KEY ?? process.env.OPENCODE_ZEN_API_KEY ?? "").trim();
+    const zenKey = resolveOpencodeKey();
     if (zenKey) {
       // OpenCode Zen speaks the Anthropic protocol at /zen/v1/messages
       // (probed 2026-07-04: well-formed anthropic error envelope; the only
@@ -135,7 +142,8 @@ function resolveSessionConfig(requested) {
       };
     }
     throw new SessionConfigError(
-      "claude session needs ANTHROPIC_API_KEY or OPENCODE_API_KEY in the host env",
+      "no Claude credential: run `claude setup-token` in WSL and add CLAUDE_CODE_OAUTH_TOKEN to ~/.profile " +
+        "(or set ANTHROPIC_API_KEY / OPENCODE_API_KEY in the host env)",
     );
   }
   if (software === "codex") {
@@ -162,7 +170,7 @@ function resolveSessionConfig(requested) {
 
 /**
  * BOOLEAN ONLY — /health credential report. Mirrors resolveSoftwareAndEnv's
- * order (OPENCODE_API_KEY/OPENCODE_ZEN_API_KEY → OPENROUTER_API_KEY →
+ * order (OPENCODE_API_KEY/OPENCODE_GO_API_KEY/OPENCODE_ZEN_API_KEY → OPENROUTER_API_KEY →
  * ANTHROPIC_API_KEY) but never exposes which name matched, any value, or any
  * length. The Windows side is blind to WSL ~/.profile keys; this is its only
  * window, and it must stay a single boolean.
@@ -171,27 +179,50 @@ function hostHasCredential() {
   return Boolean(
     (process.env.CLAUDE_CODE_OAUTH_TOKEN ?? "").trim()
     || (process.env.OPENCODE_API_KEY ?? "").trim()
+    || (process.env.OPENCODE_GO_API_KEY ?? "").trim()
     || (process.env.OPENCODE_ZEN_API_KEY ?? "").trim()
     || (process.env.OPENROUTER_API_KEY ?? "").trim()
     || (process.env.ANTHROPIC_API_KEY ?? "").trim(),
   );
 }
 
-/** pi config files written into the VM for the OpenCode Zen provider. */
-function buildZenPiFiles(model) {
+/** OpenCode Go/Zen pi route — AGENTOS_PROVIDER=zen keeps legacy Zen free tier. */
+function resolveOpencodePiRoute() {
+  const provider = (process.env.AGENTOS_PROVIDER ?? "go").trim().toLowerCase();
+  if (provider === "zen") {
+    const model = (process.env.AGENTOS_MODEL ?? "big-pickle").trim();
+    return {
+      providerId: "zen",
+      baseUrl: "https://opencode.ai/zen/v1",
+      model,
+      label: "OpenCode Zen",
+    };
+  }
+  const model = (process.env.AGENTOS_MODEL ?? "glm-5.2").trim();
+  return {
+    providerId: "go",
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    model,
+    label: "OpenCode Go",
+  };
+}
+
+/** pi config files written into the VM for OpenCode Go/Zen providers. */
+function buildOpencodePiFiles(route) {
+  const { providerId, baseUrl, model, label } = route;
   const modelsJson = JSON.stringify({
     providers: {
-      zen: {
-        baseUrl: "https://opencode.ai/zen/v1",
+      [providerId]: {
+        baseUrl,
         apiKey: "OPENCODE_API_KEY",
         api: "openai-completions",
         models: [
-          { id: model, name: `OpenCode Zen ${model}`, contextWindow: 128000, maxTokens: 8192 },
+          { id: model, name: `${label} ${model}`, contextWindow: 128000, maxTokens: 8192 },
         ],
       },
     },
   });
-  const settingsJson = JSON.stringify({ defaultProvider: "zen", defaultModel: model });
+  const settingsJson = JSON.stringify({ defaultProvider: providerId, defaultModel: model });
   const files = [];
   for (const home of ["/root", "/home/agentos"]) {
     files.push({ path: `${home}/.pi/agent/models.json`, content: modelsJson });

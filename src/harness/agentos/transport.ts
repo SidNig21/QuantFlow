@@ -26,7 +26,7 @@ export interface AgentOsTransport {
   respondPermission(sessionId: string, requestId: string, approved: boolean): Promise<void>;
   readFile(path: string): Promise<Uint8Array>;
   dispose(): Promise<void>;
-  health(): Promise<{ ok: boolean }>;
+  health(): Promise<{ ok: boolean; hasCredential?: boolean }>;
   /** V1: interactive terminal attach for actor tiles. */
   openTerminal(sessionId: string, cols: number, rows: number): Promise<{ shellId: string }>;
   writeTerminal(shellId: string, data: string): Promise<void>;

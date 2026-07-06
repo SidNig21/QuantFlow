@@ -1,5 +1,5 @@
 /**
- * V4 scripted proof — two AgentOS actors, cable, relay, sim ack.
+ * V4 scripted proof — two pi-stick AgentOS sessions, cable relay, sim ack.
  */
 import { type BrowserWindow } from "electron";
 import { mkdirSync } from "node:fs";
@@ -10,9 +10,10 @@ import { proofSleep, saveProofScreenshot, spawnDockRecipeTile } from "./proof-ti
 import { exitProofApp } from "./proof-app-lifecycle";
 
 const SETTLE_MS = 2500;
+const RECIPE_ID = "pi-stick";
 
 function logStep(name: string, ok: boolean, detail: string): void {
-  console.log(`A2A-CABLE-PROOF: step=${name} ok=${ok} detail=${detail}`);
+  console.log(`AGENTOS-A2A-PROOF: step=${name} ok=${ok} detail=${detail}`);
 }
 
 export async function runA2aCableProof(mainWindow: BrowserWindow): Promise<void> {
@@ -23,9 +24,9 @@ export async function runA2aCableProof(mainWindow: BrowserWindow): Promise<void>
   const wc = mainWindow.webContents;
   await proofSleep(SETTLE_MS);
 
-  const tileA = await spawnDockRecipeTile(wc, "codex", -80, []);
+  const tileA = await spawnDockRecipeTile(wc, RECIPE_ID, -80, []);
   await proofSleep(1500);
-  const tileB = await spawnDockRecipeTile(wc, "claude", 80, tileA ? [tileA] : []);
+  const tileB = await spawnDockRecipeTile(wc, RECIPE_ID, 80, tileA ? [tileA] : []);
   if (!tileA || !tileB || tileA === tileB) {
     logStep("spawn-pair", false, `tileA=${tileA} tileB=${tileB}`);
     exitProofApp(1);
@@ -39,7 +40,7 @@ export async function runA2aCableProof(mainWindow: BrowserWindow): Promise<void>
   const relay = await sendConnectionRelay({
     connectionId,
     fromTileId: tileA,
-    text: "Please acknowledge this delegation",
+    text: "Reply with exactly PONG",
   });
   if (!relay.ok) {
     logStep("cable-relay", false, relay.message ?? "relay failed");
@@ -56,7 +57,10 @@ export async function runA2aCableProof(mainWindow: BrowserWindow): Promise<void>
   }
   logStep("cable-relay", true, `connectionId=${connectionId} target=${relay.targetTileId}`);
 
-  await saveProofScreenshot(wc, evidenceDir, "V4-00-a2a-cable.png", logStep);
+  const screenshot = process.env.QF_AGENTOS_A2A_PROOF === "1"
+    ? "V6-00-agentos-a2a-live.png"
+    : "V4-00-a2a-cable.png";
+  await saveProofScreenshot(wc, evidenceDir, screenshot, logStep);
   logStep("done", true, evidenceDir);
   exitProofApp(0);
 }

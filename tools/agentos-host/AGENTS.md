@@ -43,10 +43,11 @@ SSE `data:` JSON shapes:
 
 ## Credential order (session create only)
 
-1. `OPENCODE_API_KEY` / `OPENCODE_ZEN_API_KEY` → software `pi` with a custom `zen`
-   provider (OpenCode Zen OpenAI-compat endpoint `https://opencode.ai/zen/v1`,
-   default model `big-pickle`, override via `AGENTOS_MODEL`). The host writes
-   `~/.pi/agent/{models.json,settings.json}` into the VM before `createSession`.
+1. `OPENCODE_API_KEY` / `OPENCODE_ZEN_API_KEY` / `OPENCODE_GO_API_KEY` → software `pi`
+   with a custom OpenCode provider written to `~/.pi/agent/{models.json,settings.json}`
+   before `createSession`. **Default:** OpenCode Go (`https://opencode.ai/zen/go/v1`,
+   model `glm-5.2`). Override model via `AGENTOS_MODEL`; set `AGENTOS_PROVIDER=zen`
+   for legacy Zen free tier (`big-pickle` on `https://opencode.ai/zen/v1`).
    The `opencode` software is deliberately NOT used: its bundled ACP adapter
    hardcodes an Anthropic catalog and ignores `OPENCODE_CONFIG_CONTENT` for
    provider selection (verified 2026-07-03).

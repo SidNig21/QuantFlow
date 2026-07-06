@@ -4,8 +4,8 @@
 
  *
 
- * Core spawn-rail actors on native host paths (herdr-wsl / windows-pty).
- * AgentOS is opt-in coordination — not the default dock runtime.
+ * Agent actors (Claude/Codex/Hermes) run as AgentOS sessions on the canvas.
+ * Scripts use herdr-wsl; Eve personas use windows-pty.
 
  */
 
@@ -18,6 +18,8 @@ import type { AgentOsSoftware, Role, RoleRuntimeTarget } from "./role-service";
 
 
 export const DOCK_ACTOR_IDS = [
+
+  "pi-stick",
 
   "codex",
 
@@ -152,6 +154,10 @@ const EVE_LOCAL_ACTOR = {
 
   modelHint: "deepseek-v4-pro",
 
+  startupPrompt:
+
+    "You are a QuantFlow Eve tile. Chat here; follow canvas cables and operator goals when wired.",
+
 };
 
 
@@ -160,13 +166,45 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
   {
 
+    id: "pi-stick",
+
+    name: "Pi Stick",
+
+    description: "AgentOS projection proof — pi session, terminal tile, type to talk",
+
+    dockSubtitle: "agentos · pi stick",
+
+    color: "var(--rail-worker, #a3e635)",
+
+    roleColor: "#a3e635",
+
+    icon: "shell",
+
+    kind: "worker",
+
+    runtimeTarget: "agentos",
+
+    harnessKind: "agentos",
+
+    agentosSoftware: "pi",
+
+    cwdPolicy: "workspace",
+
+    defaultShell: "auto",
+
+    startupPrompt: "You are Pi Stick — a minimal AgentOS projection witness. Reply briefly.",
+
+  },
+
+  {
+
     id: "codex",
 
     name: "Codex",
 
-    description: "Codex CLI in WSL (native auth · herdr spawn rail)",
+    description: "Codex agent (AgentOS session · codex software)",
 
-    dockSubtitle: "herdr · codex",
+    dockSubtitle: "agentos · codex",
 
     color: "var(--rail-codex, #14d9ff)",
 
@@ -176,21 +214,19 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     kind: "codex",
 
-    runtimeTarget: "herdr-wsl",
+    runtimeTarget: "agentos",
 
-    harnessKind: "herdr-shell",
+    harnessKind: "agentos",
 
     agentosSoftware: "codex",
 
-    legacyRuntimeTarget: "agentos",
-
-    commandTemplate: "codex",
+    legacyRuntimeTarget: "herdr-wsl",
 
     cwdPolicy: "workspace",
 
     defaultShell: "auto",
 
-    startupPrompt: "Review the current task context and wait for instructions.",
+    startupPrompt: "Review the current task context and wait for QuantFlow operator instructions.",
 
     statusParser: {
 
@@ -210,9 +246,9 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     name: "Claude Code",
 
-    description: "Claude Code CLI in WSL (native auth · herdr spawn rail)",
+    description: "Claude Code agent (AgentOS session · claude-code)",
 
-    dockSubtitle: "herdr · claude-code",
+    dockSubtitle: "agentos · claude-code",
 
     color: "var(--rail-worker, #ffc24a)",
 
@@ -222,21 +258,19 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     kind: "worker",
 
-    runtimeTarget: "herdr-wsl",
+    runtimeTarget: "agentos",
 
-    harnessKind: "herdr-shell",
+    harnessKind: "agentos",
 
     agentosSoftware: "claude-code",
 
-    legacyRuntimeTarget: "agentos",
-
-    commandTemplate: "claude",
+    legacyRuntimeTarget: "herdr-wsl",
 
     cwdPolicy: "workspace",
 
     defaultShell: "auto",
 
-    startupPrompt: "Act as the implementation worker for this workspace.",
+    startupPrompt: "Act as the implementation worker for this QuantFlow workspace.",
 
     statusParser: {
 
@@ -256,9 +290,9 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     name: "Hermes",
 
-    description: "Nous Hermes Agent CLI (hermes harness · delegates via cables)",
+    description: "Hermes orchestrator lead (AgentOS claude-code session)",
 
-    dockSubtitle: "herdr · hermes",
+    dockSubtitle: "agentos · hermes",
 
     color: "var(--rail-agent, #4fc3ff)",
 
@@ -268,17 +302,21 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     kind: "agent",
 
-    runtimeTarget: "herdr-wsl",
+    runtimeTarget: "agentos",
 
-    harnessKind: "herdr-shell",
+    harnessKind: "agentos",
 
-    legacyRuntimeTarget: "agentos",
+    agentosSoftware: "claude-code",
 
-    commandTemplate: "hermes",
+    legacyRuntimeTarget: "herdr-wsl",
 
     cwdPolicy: "workspace",
 
     defaultShell: "auto",
+
+    startupPrompt:
+
+      "You are Hermes, the orchestrator lead on the QuantFlow canvas. Delegate work to worker sessions via AgentOS; wait for operator goals.",
 
     envoyProfile: "hermes-agent",
 
@@ -314,6 +352,10 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     modelHint: "deepseek-v4-pro",
 
+    startupPrompt:
+
+      "You are Eve on the QuantFlow canvas (OpenCode Go). Respond in chat; wait for operator goals.",
+
     envoyProfile: "eve-agent",
 
   },
@@ -337,6 +379,10 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
     ...EVE_LOCAL_ACTOR,
 
     resolveCwd: () => resolveEveAgentCwd("bovada-odds"),
+
+    startupPrompt:
+
+      "You are Bovada Odds on the QuantFlow canvas. Research betting markets; report via chat and cables.",
 
     envoyProfile: "eve-bovada-odds",
 
@@ -363,6 +409,10 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
     resolveCwd: () => resolveEveAgentCwd("canvas-scout"),
 
     modelHint: "deepseek-v4-flash",
+
+    startupPrompt:
+
+      "You are Canvas Scout on the QuantFlow canvas. Report canvas and workflow state to other actors.",
 
     envoyProfile: "eve-canvas-scout",
 

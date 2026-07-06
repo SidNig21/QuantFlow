@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import {
   commandExists,
@@ -7,6 +9,7 @@ import {
   type Role,
 } from "../role-service";
 import { getCredential, type CredentialStorage } from "../credentials/credential-accessor";
+import { pingHerdrSocket } from "../herdr-socket-bridge";
 import { isAgentPromptReady } from "../workflow-agent-ready";
 import type {
   CapabilityDetail,
@@ -70,6 +73,10 @@ const AUTH_COMMANDS: Record<string, {
     args: ["doctor"],
     unauthenticated: [/not\s+(logged|signed)\s+in/i, /unauth/i, /login required/i],
   },
+  hermes: {
+    args: ["--version"],
+    unauthenticated: [/not found/i, /command not found/i],
+  },
   opencode: {
     args: ["auth", "status"],
     unauthenticated: [/not\s+(logged|signed)\s+in/i, /unauth/i, /login required/i],
@@ -119,11 +126,115 @@ function capabilityId(kind: CapabilityKind, id: string): string {
   return `${kind}:${id}`;
 }
 
-async function defaultCliAuth(role: Role, command: string): Promise<CliAuthResult> {
-  if (command === "hermes") {
+function usesHerdrWsl(role: Role): boolean {
+  return role.runtimeTarget === "herdr-wsl" || role.harnessKind === "herdr-shell";
+}
+
+function usesEveLocalPackage(role: Role, command: string): boolean {
+  return role.runtimeTarget === "windows-pty"
+    && command === "npm"
+    && Boolean(role.cwd?.trim());
+}
+
+async function execWslBash(
+  script: string,
+  timeoutMs = 7000,
+): Promise<{ stdout: string; stderr: string }> {
+  return execFileAsync(
+    "wsl.exe",
+    ["-e", "bash", "-lc", script],
+    { encoding: "utf-8", timeout: timeoutMs, windowsHide: true },
+  );
+}
+
+async function wslCommandExists(command: string): Promise<boolean> {
+  try {
+    await execWslBash(`command -v ${JSON.stringify(command)} >/dev/null 2>&1`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function checkEveLocalPackage(role: Role): Promise<CliAuthResult> {
+  const cwd = role.cwd?.trim();
+  if (!cwd) {
     return {
-      authed: null,
-      message: `${role.name} is available; no credential check is required.`,
+      authed: false,
+      message: `${role.name} has no package folder configured.`,
+      remediation: "Set the Eve package cwd on this role.",
+    };
+  }
+  if (!existsSync(cwd)) {
+    return {
+      authed: false,
+      message: `${role.name} package folder is missing.`,
+      remediation: `Create or fix cwd: ${cwd}`,
+      detail: { cwd },
+    };
+  }
+  if (!commandExists("node") || !commandExists("npm")) {
+    return {
+      authed: false,
+      message: `${role.name} requires Node.js and npm on Windows PATH.`,
+      remediation: "Install Node.js 24+ and ensure npm is on PATH.",
+    };
+  }
+  const envPath = join(cwd, ".env.local");
+  if (!existsSync(envPath)) {
+    return {
+      authed: false,
+      message: `${role.name} is missing .env.local in its package folder.`,
+      remediation: `Add OPENCODE_GO_API_KEY to ${envPath} and restart the tile.`,
+      detail: { cwd, envPath },
+    };
+  }
+  try {
+    const envText = readFileSync(envPath, "utf-8");
+    const hasKey = /^\s*OPENCODE_GO_API_KEY\s*=\s*\S+/m.test(envText);
+    if (!hasKey) {
+      return {
+        authed: false,
+        message: `${role.name} .env.local has no OPENCODE_GO_API_KEY.`,
+        remediation: "Add OPENCODE_GO_API_KEY=sk-... to .env.local (see docs/v4/EVE_SETUP.md).",
+        detail: { cwd, envPath },
+      };
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      authed: false,
+      message: `${role.name} .env.local could not be read.`,
+      remediation: "Fix permissions or recreate .env.local with OPENCODE_GO_API_KEY.",
+      detail: { cwd, envPath, error: message },
+    };
+  }
+  return {
+    authed: true,
+    message: `${role.name} package, Node/npm, and OPENCODE_GO_API_KEY are ready.`,
+    detail: { cwd, envPath },
+  };
+}
+
+async function defaultCliAuth(role: Role, command: string): Promise<CliAuthResult> {
+  if (usesEveLocalPackage(role, command)) {
+    return checkEveLocalPackage(role);
+  }
+
+  const viaWsl = usesHerdrWsl(role);
+  const exists = viaWsl
+    ? await wslCommandExists(command)
+    : commandExists(command);
+  if (!exists) {
+    return {
+      authed: false,
+      message: viaWsl
+        ? `${role.name} command is not installed in WSL PATH.`
+        : `${role.name} command is not installed or not on PATH.`,
+      remediation: viaWsl
+        ? `Install ${command} in WSL and ensure it is on PATH.`
+        : `Install ${command} and ensure it is on PATH.`,
+      detail: { command, viaWsl },
     };
   }
 
@@ -133,37 +244,45 @@ async function defaultCliAuth(role: Role, command: string): Promise<CliAuthResul
       authed: false,
       message: `${role.name} is installed, but no bounded auth-status command is configured.`,
       remediation: `Authenticate ${command} or add a bounded status command for this CLI.`,
-      detail: { authCheck: "not-configured" },
+      detail: { authCheck: "not-configured", viaWsl },
     };
   }
 
+  const argList = check.args.map((arg) => JSON.stringify(arg)).join(" ");
+  const script = `${JSON.stringify(command)} ${argList}`;
   try {
-    const result = await execFileAsync(command, check.args, {
-      encoding: "utf-8",
-      timeout: 7000,
-      windowsHide: true,
-    });
+    const result = viaWsl
+      ? await execWslBash(script)
+      : await execFileAsync(command, check.args, {
+        encoding: "utf-8",
+        timeout: 7000,
+        windowsHide: true,
+      });
     const output = `${result.stdout}\n${result.stderr}`;
     if (check.unauthenticated.some((pattern) => pattern.test(output))) {
       return {
         authed: false,
-        message: `${role.name} is installed but not authenticated.`,
-        remediation: `Run ${command} login, then rerun capability preflight.`,
-        detail: { authCheck: check.args.join(" "), exitCode: 0 },
+        message: `${role.name} is installed but not authenticated${viaWsl ? " in WSL" : ""}.`,
+        remediation: viaWsl
+          ? `Run ${command} login inside WSL, then refresh readiness.`
+          : `Run ${command} login, then rerun capability preflight.`,
+        detail: { authCheck: check.args.join(" "), exitCode: 0, viaWsl },
       };
     }
     return {
       authed: true,
-      message: `${role.name} auth-status command completed successfully.`,
-      detail: { authCheck: check.args.join(" "), exitCode: 0 },
+      message: `${role.name} CLI is installed, reachable, and authenticated${viaWsl ? " in WSL" : ""}.`,
+      detail: { authCheck: check.args.join(" "), exitCode: 0, viaWsl },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
       authed: false,
-      message: `${role.name} is installed, but readiness could not be proven.`,
-      remediation: `Authenticate ${command} and confirm its status command can run non-interactively.`,
-      detail: { authCheck: check.args.join(" "), error: message },
+      message: `${role.name} is installed, but readiness could not be proven${viaWsl ? " in WSL" : ""}.`,
+      remediation: viaWsl
+        ? `Authenticate ${command} in WSL and confirm its status command runs non-interactively.`
+        : `Authenticate ${command} and confirm its status command can run non-interactively.`,
+      detail: { authCheck: check.args.join(" "), error: message, viaWsl },
     };
   }
 }
@@ -273,7 +392,10 @@ function makeRoleProbe(role: Role, deps: CapabilityProbeDeps): HealthProbe | nul
     intervalMs: 60_000,
     timeoutMs: 15_000,
     check: async (ctx) => {
-      const exists = await (deps.commandExists ?? commandExists)(command);
+      const existsFn = deps.commandExists ?? commandExists;
+      const exists = usesHerdrWsl(role)
+        ? await wslCommandExists(command)
+        : await Promise.resolve(existsFn(command));
       if (!exists) {
         return capabilityResult(
           makeDetail(ctx, {
@@ -283,9 +405,9 @@ function makeRoleProbe(role: Role, deps: CapabilityProbeDeps): HealthProbe | nul
             reachable: false,
             authed: false,
             ready: false,
-          }, { command }),
-          `${role.name} command is not installed or not on PATH.`,
-          `Install ${command} and ensure it is on PATH/WSL PATH.`,
+          }, { command, viaWsl: usesHerdrWsl(role) }),
+          `${role.name} command is not installed${usesHerdrWsl(role) ? " in WSL" : ""}.`,
+          `Install ${command}${usesHerdrWsl(role) ? " in WSL" : ""} and ensure it is on PATH.`,
         );
       }
 
@@ -299,13 +421,13 @@ function makeRoleProbe(role: Role, deps: CapabilityProbeDeps): HealthProbe | nul
             reachable: true,
             authed: true,
             ready: true,
-          }, { command, promptReady: true }),
+          }, { command, promptReady: true, viaWsl: usesHerdrWsl(role) }),
           `${role.name} has an existing ready prompt.`,
         );
       }
 
       const auth = await (deps.checkCliAuth ?? defaultCliAuth)(role, command);
-      const ready = auth.authed !== false;
+      const ready = auth.authed === true;
       return capabilityResult(
         makeDetail(ctx, {
           capabilityId: capabilityId("role", role.id),
@@ -331,17 +453,29 @@ function makeHerdrProbe(deps: CapabilityProbeDeps): HealthProbe {
     timeoutMs: 12_000,
     check: async (ctx) => {
       const result = await (deps.checkHerdrReachability ?? defaultHerdrReachability)(ctx);
+      let socketReady = false;
+      if (result.reachable) {
+        try {
+          await pingHerdrSocket({ timeoutMs: 2_000 });
+          socketReady = true;
+        } catch {
+          socketReady = false;
+        }
+      }
+      const ready = result.present && result.reachable && socketReady;
       return capabilityResult(
         makeDetail(ctx, {
           capabilityId: capabilityId("harness", "herdr-shell"),
           kind: "harness",
           present: result.present,
-          reachable: result.reachable,
+          reachable: result.reachable && socketReady,
           authed: null,
-          ready: result.present && result.reachable,
-        }, result.detail),
-        result.message,
-        result.remediation,
+          ready,
+        }, { ...result.detail, socketReady }),
+        socketReady
+          ? "WSL and herdr socket are reachable for herdr-shell workers."
+          : result.message,
+        socketReady ? undefined : (result.remediation ?? "Start herdr in WSL or wait for bootstrap."),
       );
     },
   };

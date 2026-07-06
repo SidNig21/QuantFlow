@@ -4,6 +4,7 @@ import { getCredential, hasCredential } from './credentials';
 const KEYS = [
   'OPENROUTER_API_KEY',
   'OPENCODE_ZEN_API_KEY',
+  'OPENCODE_GO_API_KEY',
   'OPENCODE_API_KEY',
 ] as const;
 
@@ -38,6 +39,12 @@ describe('vault credentials accessor', () => {
   test('OPENCODE_ZEN_API_KEY resolves via OPENCODE_API_KEY alias', () => {
     process.env.OPENCODE_API_KEY = 'zen-key';
     expect(getCredential('OPENCODE_ZEN_API_KEY')).toBe('zen-key');
+  });
+
+  test('OPENCODE_GO_API_KEY resolves when OPENCODE_API_KEY is unset', () => {
+    process.env.OPENCODE_GO_API_KEY = 'go-key';
+    expect(getCredential('OPENCODE_API_KEY')).toBe('go-key');
+    expect(getCredential('OPENCODE_GO_API_KEY')).toBe('go-key');
   });
 
   test('hasCredential mirrors getCredential', () => {
