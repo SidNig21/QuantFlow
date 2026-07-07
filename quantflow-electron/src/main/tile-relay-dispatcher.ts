@@ -16,7 +16,12 @@ import {
   registerHostTileSession,
   type ConnectionGraphEntry,
 } from './tile-session-registry';
-import { writeToSession } from './pty';
+import { writeToSession, awaitTileReady } from './pty';
+import {
+  isNativeTuiAdapter,
+  isServerClassifiedAdapter,
+} from './agent-adapter';
+import { getAgentAdapterForRole } from './dock-actors';
 import {
   waitForHerdrPaneReply,
   waitForPtySessionReply,
@@ -45,6 +50,7 @@ export interface TileRelayDeps {
   ptyWrite?: (sessionId: string, text: string) => void;
   ptyCapture?: PtyCaptureFn;
   herdrRead?: HerdrReadFn;
+  awaitTileReady?: (sessionId: string, roleId?: string) => Promise<void>;
   waitForReply?: (
     input: RelayReplyCaptureInput,
     ctx: { runtime: 'herdr-wsl' | 'windows-pty'; sessionId?: string; paneId?: string },
@@ -182,6 +188,14 @@ async function delegateWindowsPty(
 ): Promise<TileDelegateResult> {
   const binding = getTileRelayBinding(input.toTileId);
   const sessionId = binding?.ptySessionId?.trim();
+  const roleId = binding?.roleId?.trim();
+  const adapter = getAgentAdapterForRole(roleId);
+  if (isServerClassifiedAdapter(adapter)) {
+    return {
+      ok: false,
+      message: `pty relay: tile ${input.toTileId} is a server tile, not a chat agent target`,
+    };
+  }
   if (!sessionId && !isSimRelay()) {
     return { ok: false, message: `pty relay: missing session for tile ${input.toTileId}` };
   }
@@ -190,6 +204,13 @@ async function delegateWindowsPty(
   if (isSimRelay()) {
     return { ok: true, reply: simAck(input.text) };
   }
+  const waitReady = deps.awaitTileReady ?? (async (sid, rid) => {
+    const readyAdapter = getAgentAdapterForRole(rid);
+    if (isNativeTuiAdapter(readyAdapter)) {
+      await awaitTileReady(sid, readyAdapter);
+    }
+  });
+  await waitReady(sessionId!, roleId);
   const write = deps.ptyWrite ?? writeToSession;
   write(sessionId!, delegated);
   return captureRelayReply(marker, deps, { runtime: 'windows-pty', sessionId: sessionId! });

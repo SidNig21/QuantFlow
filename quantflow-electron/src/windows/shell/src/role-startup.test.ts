@@ -1,12 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
-	ROLE_STARTUP_PROMPT_DELAY_MS,
 	formatRoleStartupEvent,
 	getRoleStartupWrites,
 } from "./role-startup.js";
 
 describe("getRoleStartupWrites", () => {
-	test("sends command first and delays startup prompt for a fresh role session", () => {
+	test("sends command first; prompt awaits readiness (no blind timer)", () => {
 		expect(getRoleStartupWrites({
 			type: "term",
 			ptySessionId: "session-1",
@@ -16,12 +15,26 @@ describe("getRoleStartupWrites", () => {
 			{
 				kind: "command",
 				data: "codex\r",
-				delayMs: 0,
 			},
 			{
 				kind: "prompt",
 				data: "Review context and wait.\r",
-				delayMs: ROLE_STARTUP_PROMPT_DELAY_MS,
+				awaitReady: true,
+			},
+		]);
+	});
+
+	test("server tiles never receive a startup prompt paste", () => {
+		expect(getRoleStartupWrites({
+			type: "term",
+			ptySessionId: "session-1",
+			roleIntegrationMode: "server",
+			roleCommandTemplate: "npm run dev",
+			roleStartupPrompt: "You are Eve on the canvas.",
+		})).toEqual([
+			{
+				kind: "command",
+				data: "npm run dev\r",
 			},
 		]);
 	});
@@ -46,7 +59,6 @@ describe("getRoleStartupWrites", () => {
 			{
 				kind: "prompt",
 				data: "Use this terminal for review.\r",
-				delayMs: 0,
 			},
 		]);
 	});

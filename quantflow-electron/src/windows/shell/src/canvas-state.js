@@ -42,6 +42,7 @@
  * @property {string} [roleShellKind] - Shell/CLI kind for role-spawned tiles
  * @property {string} [roleCommandTemplate] - Startup command for role-spawned tiles
  * @property {string} [roleStartupPrompt] - Initial role instruction text
+ * @property {"native-tui"|"server"} [roleIntegrationMode] - Agent adapter mode
  * @property {{waiting?: string[], blocked?: string[]}} [roleStatusParser] - Role-specific terminal status hints
  * @property {string} [roleStartupSessionId] - Session that already received startup command
  * @property {string} [roleStartupPromptSessionId] - Session that already received startup prompt

@@ -400,6 +400,7 @@ export function buildRoleTileOptions(role, params = {}) {
 			getRpcRoleCommandName(role) || role.defaultShell || "shell",
 		roleCommandTemplate: role.commandTemplate,
 		roleStartupPrompt: role.startupPrompt,
+		roleIntegrationMode: role.agentAdapter?.integrationMode,
 		roleStatusParser: role.statusParser,
 	};
 	if (role.runtimeTarget) {

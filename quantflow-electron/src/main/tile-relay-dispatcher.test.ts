@@ -75,11 +75,12 @@ describe('tile-relay-dispatcher', () => {
     const tileB = 'tile-live-b';
     const connectionId = 'conn-relay-live';
 
-    registerTileRelayBinding(tileA, { runtimeTarget: 'windows-pty', ptySessionId: 'pty-live-a' });
-    registerTileRelayBinding(tileB, { runtimeTarget: 'windows-pty', ptySessionId: 'pty-live-b' });
+    registerTileRelayBinding(tileA, { runtimeTarget: 'windows-pty', ptySessionId: 'pty-live-a', roleId: 'claude' });
+    registerTileRelayBinding(tileB, { runtimeTarget: 'windows-pty', ptySessionId: 'pty-live-b', roleId: 'claude' });
     syncConnectionGraph([{ id: connectionId, tileAId: tileA, tileBId: tileB }]);
 
     const writes: string[] = [];
+    let readyBeforeWrite = false;
     const result = await sendTileDelegate(
       {
         fromTileId: tileA,
@@ -91,12 +92,32 @@ describe('tile-relay-dispatcher', () => {
         ptyWrite: (_sessionId, text) => {
           writes.push(text);
         },
+        awaitTileReady: async () => {
+          readyBeforeWrite = true;
+        },
         waitForReply: async () => ({ ok: true, reply: 'PONG' }),
       },
     );
 
     expect(result.ok).toBe(true);
     expect(result.reply).toBe('PONG');
+    expect(readyBeforeWrite).toBe(true);
     expect(writes.some((line) => line.includes('[a2a tile-live-a→tile-live-b] ping'))).toBe(true);
+  });
+
+  test('windows-pty rejects server-classified targets', async () => {
+    registerTileRelayBinding('tile-eve-a', { runtimeTarget: 'windows-pty', ptySessionId: 'pty-a', roleId: 'claude' });
+    registerTileRelayBinding('tile-eve-b', { runtimeTarget: 'windows-pty', ptySessionId: 'pty-b', roleId: 'eve' });
+    syncConnectionGraph([{ id: 'conn-eve', tileAId: 'tile-eve-a', tileBId: 'tile-eve-b' }]);
+
+    const result = await sendTileDelegate({
+      fromTileId: 'tile-eve-a',
+      toTileId: 'tile-eve-b',
+      cableId: 'conn-eve',
+      text: 'hello eve',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('server tile');
   });
 });

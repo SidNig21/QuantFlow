@@ -40,6 +40,8 @@ import * as watcher from "./watcher";
 import * as gitReplay from "./git-replay";
 import { DISABLE_GIT_REPLAY } from "@collab/shared/replay-types";
 import * as pty from "./pty";
+import { isNativeTuiAdapter, isServerClassifiedAdapter } from "./agent-adapter";
+import { getAgentAdapterForRole } from "./dock-actors";
 import { updateManager, setupUpdateIPC } from "./updater";
 import { DEV_WORKTREE_ID, QUANTFLOW_DIR } from "./paths";
 import {
@@ -745,6 +747,35 @@ ipcMain.handle(
     _event,
     { sessionId, lines }: { sessionId: string; lines?: number },
   ) => pty.captureSession(sessionId, lines),
+);
+
+ipcMain.handle(
+  "pty:awaitReady",
+  (
+    _event,
+    {
+      sessionId,
+      roleId,
+    }: { sessionId: string; roleId?: string },
+  ) => {
+    const adapter = getAgentAdapterForRole(roleId);
+    // Server tiles (Eve dev servers) legitimately never wait for an agent.
+    if (isServerClassifiedAdapter(adapter)) {
+      return Promise.resolve();
+    }
+    // A readiness wait was explicitly requested, so a native-tui agent is
+    // expected here. A missing/unknown adapter means the tile spawned without
+    // its role wiring — fail LOUD (surfaces as a role.failed event on the tile)
+    // instead of silently pretending the agent is ready.
+    if (!isNativeTuiAdapter(adapter)) {
+      return Promise.reject(
+        new Error(
+          `readiness gate: no native-tui adapter for role "${roleId ?? "(none)"}" — tile spawned without role wiring`,
+        ),
+      );
+    }
+    return pty.awaitTileReady(sessionId, adapter);
+  },
 );
 
 let settingsOpen = false;

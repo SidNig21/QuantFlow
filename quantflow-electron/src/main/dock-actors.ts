@@ -14,6 +14,13 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 import type { AgentOsSoftware, Role, RoleRuntimeTarget } from "./role-service";
+import type { AgentAdapter } from "./agent-adapter";
+import {
+  CLAUDE_NATIVE_TUI_ADAPTER,
+  CODEX_NATIVE_TUI_ADAPTER,
+  SERVER_AGENT_ADAPTER,
+  resolveRoleLaunchFields,
+} from "./agent-adapter";
 
 
 
@@ -99,6 +106,9 @@ export interface DockActorDefinition {
 
   statusParser?: Role["statusParser"];
 
+  /** How to run and message this agent over the tile PTY. */
+  agentAdapter?: AgentAdapter;
+
 }
 
 
@@ -146,6 +156,8 @@ const EVE_LOCAL_ACTOR = {
 
   commandTemplate: "npm run dev",
 
+  agentAdapter: SERVER_AGENT_ADAPTER,
+
   cwdPolicy: "inherit" as const,
 
   defaultShell: "powershell" as const,
@@ -153,10 +165,6 @@ const EVE_LOCAL_ACTOR = {
   kind: "eve" as const,
 
   modelHint: "deepseek-v4-pro",
-
-  startupPrompt:
-
-    "You are a QuantFlow Eve tile. Chat here; follow canvas cables and operator goals when wired.",
 
 };
 
@@ -202,9 +210,9 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     name: "Codex",
 
-    description: "Codex agent (AgentOS session · codex software)",
+    description: "Codex agent (native CLI in tile PTY)",
 
-    dockSubtitle: "agentos · codex",
+    dockSubtitle: "windows-pty · codex",
 
     color: "var(--rail-codex, #14d9ff)",
 
@@ -214,13 +222,11 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     kind: "codex",
 
-    runtimeTarget: "agentos",
+    runtimeTarget: "windows-pty",
 
-    harnessKind: "agentos",
+    agentAdapter: CODEX_NATIVE_TUI_ADAPTER,
 
-    agentosSoftware: "codex",
-
-    legacyRuntimeTarget: "herdr-wsl",
+    legacyRuntimeTarget: "agentos",
 
     cwdPolicy: "workspace",
 
@@ -246,9 +252,9 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     name: "Claude Code",
 
-    description: "Claude Code agent (AgentOS session · claude-code)",
+    description: "Claude Code agent (native CLI in tile PTY)",
 
-    dockSubtitle: "agentos · claude-code",
+    dockSubtitle: "windows-pty · claude",
 
     color: "var(--rail-worker, #ffc24a)",
 
@@ -258,13 +264,11 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     kind: "worker",
 
-    runtimeTarget: "agentos",
+    runtimeTarget: "windows-pty",
 
-    harnessKind: "agentos",
+    agentAdapter: CLAUDE_NATIVE_TUI_ADAPTER,
 
-    agentosSoftware: "claude-code",
-
-    legacyRuntimeTarget: "herdr-wsl",
+    legacyRuntimeTarget: "agentos",
 
     cwdPolicy: "workspace",
 
@@ -346,15 +350,13 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
 
     resolveCwd: resolveDefaultEveCwd,
 
+    agentAdapter: SERVER_AGENT_ADAPTER,
+
     cwdPolicy: "inherit",
 
     defaultShell: "powershell",
 
     modelHint: "deepseek-v4-pro",
-
-    startupPrompt:
-
-      "You are Eve on the QuantFlow canvas (OpenCode Go). Respond in chat; wait for operator goals.",
 
     envoyProfile: "eve-agent",
 
@@ -379,10 +381,6 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
     ...EVE_LOCAL_ACTOR,
 
     resolveCwd: () => resolveEveAgentCwd("bovada-odds"),
-
-    startupPrompt:
-
-      "You are Bovada Odds on the QuantFlow canvas. Research betting markets; report via chat and cables.",
 
     envoyProfile: "eve-bovada-odds",
 
@@ -409,10 +407,6 @@ export const DOCK_ACTORS: readonly DockActorDefinition[] = [
     resolveCwd: () => resolveEveAgentCwd("canvas-scout"),
 
     modelHint: "deepseek-v4-flash",
-
-    startupPrompt:
-
-      "You are Canvas Scout on the QuantFlow canvas. Report canvas and workflow state to other actors.",
 
     envoyProfile: "eve-canvas-scout",
 
@@ -450,7 +444,20 @@ function runtimeLabel(actor: DockActorDefinition): string {
 
 
 
+export function getAgentAdapterForRole(
+  roleId: string | undefined | null,
+): AgentAdapter | null {
+  if (!roleId?.trim()) return null;
+  return getDockActor(roleId.trim())?.agentAdapter ?? null;
+}
+
 export function dockActorToRole(actor: DockActorDefinition): Role {
+
+  const launchFields = resolveRoleLaunchFields(
+    actor.agentAdapter,
+    actor.startupPrompt,
+    actor.commandTemplate ?? actor.agentAdapter?.launch,
+  );
 
   return {
 
@@ -464,7 +471,7 @@ export function dockActorToRole(actor: DockActorDefinition): Role {
 
     icon: actor.icon,
 
-    commandTemplate: actor.commandTemplate,
+    commandTemplate: launchFields.commandTemplate,
 
     cwd: actor.resolveCwd?.(),
 
@@ -482,7 +489,7 @@ export function dockActorToRole(actor: DockActorDefinition): Role {
 
     legacyRuntimeTarget: actor.legacyRuntimeTarget,
 
-    startupPrompt: actor.startupPrompt,
+    startupPrompt: launchFields.startupPrompt,
 
     systemPrompt: actor.systemPrompt,
 
@@ -497,6 +504,8 @@ export function dockActorToRole(actor: DockActorDefinition): Role {
     legendType: actor.kind,
 
     modelHint: actor.modelHint,
+
+    agentAdapter: actor.agentAdapter,
 
   };
 
@@ -515,6 +524,15 @@ export function dockActorToLegendRecipe(actor: DockActorDefinition) {
         : actor.kind === "agent" ? "agent"
 
           : "worker";
+
+  // Carry the SAME resolved launch fields the role gets (folded prompt for
+  // promptArg agents like Claude), so a legend/recipe spawn is self-sufficient
+  // even on the synthesize fallback path.
+  const launchFields = resolveRoleLaunchFields(
+    actor.agentAdapter,
+    actor.startupPrompt,
+    actor.commandTemplate ?? actor.agentAdapter?.launch,
+  );
 
   return {
 
@@ -536,7 +554,11 @@ export function dockActorToLegendRecipe(actor: DockActorDefinition) {
 
     icon: actor.icon,
 
-    commandTemplate: actor.commandTemplate,
+    commandTemplate: launchFields.commandTemplate,
+
+    startupPrompt: launchFields.startupPrompt,
+
+    agentAdapter: actor.agentAdapter,
 
     cwd: actor.resolveCwd?.(),
 

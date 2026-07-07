@@ -34,6 +34,11 @@ import {
 import { QUANTFLOW_DIR } from "./paths";
 import { resolveTerminalTarget } from "./terminal-target";
 import { traceHarnessSpawn, ingestPtyStreamBytes } from "../../../src/kernel/perf";
+import type { AgentAdapter } from "./agent-adapter";
+import {
+  adapterToReadinessOptions,
+  waitForPtyReadiness,
+} from "./pty-readiness";
 import {
   createPtySession,
   endPtySession,
@@ -81,6 +86,35 @@ const pendingPtyDataTimers = new Map<
   ReturnType<typeof setTimeout>
 >();
 const WINDOWS_POWERSHELL_PTY_BATCH_MS = 16;
+const ptyOutputListeners = new Map<string, Set<(data: string) => void>>();
+
+function notifyPtyOutputListeners(sessionId: string, data: Buffer | string): void {
+  const listeners = ptyOutputListeners.get(sessionId);
+  if (!listeners || listeners.size === 0) return;
+  const text = typeof data === "string" ? data : data.toString("utf8");
+  for (const listener of listeners) {
+    listener(text);
+  }
+}
+
+/** Subscribe to raw PTY output in main (readiness gate, tests). */
+export function subscribePtyOutput(
+  sessionId: string,
+  listener: (data: string) => void,
+): () => void {
+  let set = ptyOutputListeners.get(sessionId);
+  if (!set) {
+    set = new Set();
+    ptyOutputListeners.set(sessionId, set);
+  }
+  set.add(listener);
+  return () => {
+    const current = ptyOutputListeners.get(sessionId);
+    if (!current) return;
+    current.delete(listener);
+    if (current.size === 0) ptyOutputListeners.delete(sessionId);
+  };
+}
 
 function getSidecarClient(): SidecarClient {
   if (!sidecarClient) throw new Error("Sidecar client not initialized");
@@ -190,6 +224,7 @@ function flushPendingPtyData(
   const data = chunks.length === 1
     ? chunks[0]
     : Buffer.concat(chunks);
+  notifyPtyOutputListeners(sessionId, data);
   sendToSender(senderWebContentsId, "pty:data", {
     sessionId,
     data,
@@ -205,6 +240,7 @@ function forwardPtyData(
   // E2/PF2 fence: stream bytes → terminal webview IPC only (+ PF0 byte counter).
   // No pty:status-changed, canvas save, or Kernel work per chunk.
   ingestPtyStreamBytes(sessionId, data);
+  notifyPtyOutputListeners(sessionId, data);
   if (!shouldBatchWindowsPowerShellOutput(sessionId)) {
     sendToSender(senderWebContentsId, "pty:data", {
       sessionId,
@@ -1424,4 +1460,16 @@ export function verifyTmuxAvailable(): { ok: true } | { ok: false; message: stri
 /** Smoke/test hook — exercises the PTY byte-counter path without Electron IPC. */
 export function ingestPtyDataForTrace(sessionId: string, data: Buffer | string): void {
   ingestPtyStreamBytes(sessionId, data);
+  notifyPtyOutputListeners(sessionId, data);
+}
+
+/** Authoritative readiness gate — watch PTY output, do not time blindly. */
+export async function awaitTileReady(
+  sessionId: string,
+  adapter: AgentAdapter,
+): Promise<void> {
+  await waitForPtyReadiness(
+    (listener) => subscribePtyOutput(sessionId, listener),
+    adapterToReadinessOptions(adapter),
+  );
 }

@@ -46,11 +46,12 @@ describe("listRoles", () => {
       .toBe("Claude Code");
   });
 
-  test("codex on AgentOS rail does not require a CLI commandTemplate", async () => {
+  test("codex on windows-pty rail launches native CLI via adapter", async () => {
     const roles = await listRoles();
     const codex = roles.find((role) => role.id === "codex");
-    expect(codex?.runtimeTarget).toBe("agentos");
-    expect(codex?.commandTemplate).toBeUndefined();
+    expect(codex?.runtimeTarget).toBe("windows-pty");
+    expect(codex?.agentAdapter?.launch).toBe("codex");
+    expect(codex?.commandTemplate).toContain("codex");
   });
 
   test("includes Legend v1 recipe roles", async () => {
@@ -108,27 +109,23 @@ describe("listRoles", () => {
     }
   });
 
-  test("AI-agent roles use AgentOS rail (Milestone D)", async () => {
+  test("native-tui chat agents use windows-pty rail with adapters", async () => {
     const roles = await listRoles();
-    const fabric: Array<[string, string | undefined]> = [
-      ["codex", "codex"],
-      ["claude", "claude-code"],
-      ["claude-reviewer", "claude-code"],
-    ];
-    for (const [id, software] of fabric) {
+    for (const id of ["codex", "claude"] as const) {
       const role = roles.find((entry) => entry.id === id);
-      expect(role?.runtimeTarget).toBe("agentos");
-      expect(role?.harnessKind).toBe("agentos");
-      expect(role?.agentosSoftware).toBe(software);
-      expect(role?.legacyRuntimeTarget).toBe("herdr-wsl");
+      expect(role?.runtimeTarget).toBe("windows-pty");
+      expect(role?.agentAdapter?.integrationMode).toBe("native-tui");
+      expect(role?.agentAdapter?.launch).toBe(id);
       expect(requiresHerdrSpawn(role)).toBe(false);
     }
+    const claudeReviewer = roles.find((entry) => entry.id === "claude-reviewer");
+    expect(claudeReviewer?.runtimeTarget).toBe("agentos");
+    expect(claudeReviewer?.harnessKind).toBe("agentos");
+    expect(claudeReviewer?.agentosSoftware).toBe("claude-code");
     const hermes = roles.find((entry) => entry.id === "hermes");
     expect(hermes?.agentosSoftware).toBe("claude-code");
     expect(hermes?.runtimeTarget).toBe("agentos");
     for (const role of roles) {
-      // pi-stick is an HONEST pi projection-proof tile (labeled "Pi Stick"), not
-      // a pi impostor standing in for a named agent — the ban targets impostors.
       if (role.id === "pi-stick") continue;
       expect(role.agentosSoftware).not.toBe("pi");
     }
@@ -137,8 +134,8 @@ describe("listRoles", () => {
   test("claude-worker id resolves to the claude dock actor", async () => {
     const role = await getRole("claude-worker");
     expect(role?.id).toBe("claude-worker");
-    expect(role?.agentosSoftware).toBe("claude-code");
-    expect(role?.runtimeTarget).toBe("agentos");
+    expect(role?.agentAdapter?.launch).toBe("claude");
+    expect(role?.runtimeTarget).toBe("windows-pty");
   });
 
   test("script lanes and reserved roles keep their rails (roster policy)", async () => {

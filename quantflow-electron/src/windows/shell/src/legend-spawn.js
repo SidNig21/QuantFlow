@@ -33,6 +33,8 @@ function synthesizeRoleFromRecipe(recipe) {
 		runtimeTarget: recipe.runtimeTarget,
 		harnessKind: recipe.harnessKind,
 		endpoint: recipe.endpoint,
+		agentAdapter: recipe.agentAdapter,
+		startupPrompt: recipe.startupPrompt,
 	};
 }
 
@@ -52,6 +54,8 @@ export function resolveLegendRecipeRole(recipeId, roles, recipes = LEGEND_RECIPE
 		runtimeTarget: role.runtimeTarget ?? recipe.runtimeTarget,
 		harnessKind: recipe.harnessKind ?? role.harnessKind,
 		endpoint: recipe.endpoint ?? role.endpoint,
+		agentAdapter: role.agentAdapter ?? recipe.agentAdapter,
+		startupPrompt: role.startupPrompt ?? recipe.startupPrompt,
 	};
 }
 

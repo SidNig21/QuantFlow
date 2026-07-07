@@ -5,6 +5,7 @@ export interface TileRelayBinding {
   runtimeTarget: RoleRuntimeTarget;
   herdrPaneId?: string;
   ptySessionId?: string;
+  roleId?: string;
 }
 
 export interface ConnectionGraphEntry {

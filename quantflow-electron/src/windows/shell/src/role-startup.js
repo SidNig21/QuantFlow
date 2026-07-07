@@ -1,15 +1,25 @@
-export const ROLE_STARTUP_PROMPT_DELAY_MS = 1800;
-
 function normalizeStartupText(value) {
 	return String(value ?? "").trim();
 }
 
 /**
  * @param {import("./canvas-state.js").Tile} tile
- * @returns {Array<{kind: "command" | "prompt", data: string, delayMs: number}>}
+ * @returns {Array<{kind: "command" | "prompt", data: string, awaitReady?: boolean}>}
  */
 export function getRoleStartupWrites(tile) {
 	if (!tile?.ptySessionId) return [];
+
+	const integrationMode = tile.roleIntegrationMode;
+	if (integrationMode === "server") {
+		const command = normalizeStartupText(tile.roleCommandTemplate);
+		if (!command || tile.roleStartupSessionId === tile.ptySessionId) {
+			return [];
+		}
+		return [{
+			kind: "command",
+			data: `${command}\r`,
+		}];
+	}
 
 	const command = normalizeStartupText(tile.roleCommandTemplate);
 	const prompt = normalizeStartupText(tile.roleStartupPrompt);
@@ -23,7 +33,6 @@ export function getRoleStartupWrites(tile) {
 		writes.push({
 			kind: "command",
 			data: `${command}\r`,
-			delayMs: 0,
 		});
 	}
 
@@ -31,7 +40,7 @@ export function getRoleStartupWrites(tile) {
 		writes.push({
 			kind: "prompt",
 			data: `${prompt}\r`,
-			delayMs: shouldSendCommand ? ROLE_STARTUP_PROMPT_DELAY_MS : 0,
+			...(shouldSendCommand ? { awaitReady: true } : {}),
 		});
 	}
 

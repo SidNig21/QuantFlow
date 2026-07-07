@@ -140,10 +140,10 @@ describe("legend-recipes registry", () => {
   });
 
   test("maps readiness from injected capability levels", () => {
-    const recipe = BUILT_IN_LEGEND_RECIPES[1];
+    const recipe = BUILT_IN_LEGEND_RECIPES.find((entry) => entry.id === "codex")!;
     const levels = new Map<string, "healthy" | "degraded" | "down">([
       [resolveRecipeCapabilityId(recipe), "degraded"],
-      ["harness:herdr-shell", "healthy"],
+      ["harness:local-shell", "healthy"],
     ]);
     expect(mapHealthLevelToBadge(resolveReadinessForRecipe(recipe, levels))).toBe("amber");
     expect(mapHealthLevelToBadge("healthy")).toBe("green");

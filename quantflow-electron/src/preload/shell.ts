@@ -271,6 +271,12 @@ contextBridge.exposeInMainWorld("shellApi", {
     ipcRenderer.send("pty:write", { sessionId, data });
   },
 
+  ptyAwaitReady: (
+    sessionId: string,
+    roleId?: string,
+  ): Promise<void> =>
+    ipcRenderer.invoke("pty:awaitReady", { sessionId, roleId }),
+
   ptyCapture: (
     sessionId: string, lines?: number,
   ): Promise<string> =>
@@ -433,6 +439,7 @@ contextBridge.exposeInMainWorld("shellApi", {
       runtimeTarget?: string;
       herdrPaneId?: string;
       ptySessionId?: string;
+      roleId?: string;
     },
   ) => ipcRenderer.invoke(
     "string:register-tile-session",

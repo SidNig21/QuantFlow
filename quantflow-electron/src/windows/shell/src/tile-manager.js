@@ -104,6 +104,7 @@ export function createTileManager({
 				runtimeTarget: tile.runtimeTarget,
 				herdrPaneId: tile.herdrPaneId,
 				ptySessionId: tile.ptySessionId,
+				roleId: tile.roleId,
 			}
 			: undefined;
 		window.shellApi.stringRegisterTileSession?.(
@@ -477,8 +478,23 @@ export function createTileManager({
 		if (!writes.length) return;
 		const sessionId = tile.ptySessionId;
 
-		for (const write of writes) {
-			const send = () => {
+		void (async () => {
+			for (const write of writes) {
+				const currentBefore = getTile(tile.id);
+				if (!currentBefore || currentBefore.ptySessionId !== sessionId) return;
+
+				if (write.awaitReady) {
+					try {
+						await window.shellApi.ptyAwaitReady?.(
+							sessionId,
+							tile.roleId,
+						);
+					} catch (err) {
+						onRoleStartupWrite?.(currentBefore, write, err);
+						return;
+					}
+				}
+
 				const current = getTile(tile.id);
 				if (!current || current.ptySessionId !== sessionId) return;
 				if (write.kind === "command") {
@@ -494,14 +510,8 @@ export function createTileManager({
 				} catch (err) {
 					onRoleStartupWrite?.(current, write, err);
 				}
-			};
-
-			if (write.delayMs > 0) {
-				setTimeout(send, write.delayMs);
-			} else {
-				send();
 			}
-		}
+		})();
 	}
 
 	function spawnGraphWebview(tile) {

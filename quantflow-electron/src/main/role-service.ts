@@ -3,6 +3,7 @@ import { readFile, readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { QUANTFLOW_DIR } from "./paths";
 import { buildDockRoles } from "./dock-actors";
+import type { AgentAdapter } from "./agent-adapter";
 
 let rolesDir = join(QUANTFLOW_DIR, "roles");
 
@@ -46,6 +47,8 @@ export interface Role {
   harnessKind?: "eve-harness" | "local-shell" | "herdr-shell" | "agentos";
   endpoint?: string;
   modelHint?: string;
+  /** Native-TUI / server adapter for windows-pty chat agents. */
+  agentAdapter?: AgentAdapter;
 }
 
 export function requiresHerdrSpawn(

@@ -23,6 +23,7 @@ export function registerTileRegistryHandlers(): void {
         runtimeTarget?: string;
         herdrPaneId?: string;
         ptySessionId?: string;
+        roleId?: string;
       },
     ) => {
       const binding = relay?.runtimeTarget
@@ -30,6 +31,7 @@ export function registerTileRegistryHandlers(): void {
             runtimeTarget: relay.runtimeTarget as "herdr-wsl" | "windows-pty" | "agentos",
             herdrPaneId: relay.herdrPaneId,
             ptySessionId: relay.ptySessionId,
+            roleId: relay.roleId,
           }
         : undefined;
       registerTileSession(tileId, sessionId, label, routeHandle, statusParser, binding);
