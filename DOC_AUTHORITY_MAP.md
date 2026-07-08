@@ -1,7 +1,7 @@
 # DOC_AUTHORITY_MAP.md
 
 > **The "is this doc current?" answer key.** If you are ever unsure whether a file is live, dated, or dead — this map decides. It is a companion to `START_HERE.md` (the front door). If this map and another doc disagree about a doc's status, this map wins.
-> Last updated: 2026-06-24 · Branch: `quantflow-v4`
+> Last updated: 2026-07-07 · Branch: `quantflow-v6-actors`
 
 ---
 
@@ -35,7 +35,8 @@ Every doc is exactly one of:
 |---|---|---|
 | `START_HERE.md` | Front door; overrides any conflict | tracked |
 | `DOC_AUTHORITY_MAP.md` | This file; doc-status answer key | tracked |
-| `REBUILD_QUEUE.md` | **The active ordered execution queue (Stage A→H)** — the marching order | tracked |
+| `docs/v6/STACK_REDUCTION_LADDER.md` | **The active v6-actors restructure ladder (2026-07-07)** — wins over `REBUILD_QUEUE.md` and all older plans for restructure work | tracked |
+| `REBUILD_QUEUE.md` | Ordered execution queue (Stage A→H) from the v4 structure-freeze era — consult for unfinished stages, but the v6 ladder above is the active marching order | tracked |
 | `KERNEL_CONSTITUTION.md` | The one rule (Kernel owns truth) | tracked |
 | `docs/v3/AUTHORITY_RULES.md` | Mutation rules, invariants, violation signals | tracked |
 | `docs/v3/KERNEL_SCHEMA_V1.md` | Canonical Kernel table definitions | tracked |
