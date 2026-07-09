@@ -443,6 +443,16 @@ AgentOS actor
   readiness: session health + send/reply probe
 ```
 
+## Cleanup & Deletion Targets
+
+Folded in from the retired `docs/v6/STACK_REDUCTION_LADDER.md` (2026-07-09). These are the "re-wall the existing code" obligations that ride alongside the runtime proofs. Each is **proof-gated**: do not delete a path until a pinned Runtime Binding makes it unreachable (routing discipline from `docs/plans/2026-07-07-001-architecture-layer-routing-plan.md`).
+
+- **Rebuild RuntimeHandle as the single delivery door.** It does not currently exist in code — the cable dispatcher (`tile-relay-dispatcher.ts`) still uses inline per-lane logic (`delegateHerdr`/`delegateWindowsPty`/`delegateAgentOs`). Rebuild it fresh against this spec so it also fronts the AgentOS session API and the Eve server adapter, not just the three legacy lanes. (An earlier draft `runtime-handle.ts` was dropped at `c85394f`; do not resurrect it — the spec's contract is richer.)
+- **Remove `legacyRuntimeTarget` fields and silent spawn fallbacks** once a runtime is pinned by proof. A chat Agent tile must never quietly fall back to AgentOS via a fallback field (routing plan KD5). One actor, one primary binding (D7).
+- **Demote `runtime-state/` to derived-only.** No feature may read it as the first source for canonical tiles/tasks/connections/artifacts/events. Keep `pty-sessions-repo` and diagnostics as operational stores only. Kernel + receipts own truth (D5).
+- **`tile-session-registry` is a projection cache of Kernel truth**, never a second authoritative graph.
+- **Legibility sweep:** archive stale docs per `DOC_AUTHORITY_MAP.md`, quarantine dead files to `reference/`, keep `REPO_MAP.md` current — the non-developer founder must be able to navigate the tree from the map alone.
+
 ## Non-Goals For This Phase
 
 - Saved recipes

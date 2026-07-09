@@ -1,11 +1,18 @@
-# STACK_REDUCTION_LADDER.md — the v6 restructure, one rung at a time
+# STACK_REDUCTION_LADDER.md — ⛔ RETIRED (2026-07-09)
 
-> **This is the ONLY execution authority for the v6-actors restructure.** If any other doc
-> (including `REBUILD_QUEUE.md`, `docs/v7/V7_MISSION.md`, or anything in Obsidian) conflicts with
-> this file about restructure work, this file wins. Source plan: founder's deep-research report
-> (`Obsidian\Cursor Collab\deep-research-quantflow.md`), verified against this repo 2026-07-07 —
-> every file/symbol it cites exists. Its three corrections (part 1) are baked in below.
-> Created: 2026-07-07 · Branch: `quantflow-v6-actors` · Owner: founder · Orchestrator: Fable · Builder: Codex CLI
+> **This ladder is NO LONGER the plan.** The single execution authority for the Dock/runtime
+> restructure is now **`docs/v7/DOCK_RUNTIME_REWORK_SPEC.md`** (founder decision 2026-07-09:
+> "rework spec = sole authority; do not let both docs claim to be the plan"). `CONTEXT.md` is the
+> supporting glossary. This file is kept only as a historical record.
+>
+> **What carried forward:** R0 + R1 landed and are committed/pushed (`6abe527`, `09c3cc9` — the
+> dock split into catalog + launch profiles is durable and still correct). The still-valid cleanup
+> targets from R2–R5 (rebuild RuntimeHandle, remove `legacyRuntimeTarget` fallbacks, demote
+> `runtime-state/`, registry-as-cache, legibility sweep) were **folded into the rework spec's
+> "Cleanup & Deletion Targets" section**. The R2 live proof was superseded by the rework spec's
+> AgentOS proof ladder (P0–P3). Everything below is history — do not execute from it.
+>
+> Original creation: 2026-07-07 · Branch: `quantflow-v6-actors`
 
 ---
 

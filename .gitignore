@@ -11,6 +11,12 @@ docs/*
 !docs/v5/**
 !docs/v6/
 !docs/v6/**
+!docs/v7/
+!docs/v7/**
+!docs/adr/
+!docs/adr/**
+!docs/plans/
+!docs/plans/**
 !docs/solutions/
 !docs/solutions/**
 .compound-engineering/*.local.yaml

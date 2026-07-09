@@ -35,8 +35,12 @@ Every doc is exactly one of:
 |---|---|---|
 | `START_HERE.md` | Front door; overrides any conflict | tracked |
 | `DOC_AUTHORITY_MAP.md` | This file; doc-status answer key | tracked |
-| `docs/v6/STACK_REDUCTION_LADDER.md` | **The active v6-actors restructure ladder (2026-07-07)** — wins over `REBUILD_QUEUE.md` and all older plans for restructure work | tracked |
-| `REBUILD_QUEUE.md` | Ordered execution queue (Stage A→H) from the v4 structure-freeze era — consult for unfinished stages, but the v6 ladder above is the active marching order | tracked |
+| `docs/v7/DOCK_RUNTIME_REWORK_SPEC.md` | **THE active Dock/runtime rework authority (2026-07-09)** — Agent/Worker doctrine, AgentOS-preferred runtime adapter, proof ladder P0–P3, cleanup/deletion targets. Sole plan for restructure + runtime work. | tracked |
+| `CONTEXT.md` | Supporting glossary/reference for the rework spec (not itself the plan) | tracked |
+| `docs/adr/0003-agentos-preferred-agent-runtime.md` | Decision record: AgentOS = preferred agent runtime adapter (not the core) | tracked |
+| `docs/plans/2026-07-07-001-architecture-layer-routing-plan.md` | Routing discipline (proof-pinned spawn, no silent fallbacks) — informs the rework spec | tracked |
+| `docs/v6/STACK_REDUCTION_LADDER.md` | ⛔ **RETIRED 2026-07-09** — superseded by the rework spec above; kept as history only (R0/R1 landed; cleanup targets folded into rework spec) | tracked |
+| `REBUILD_QUEUE.md` | Ordered execution queue (Stage A→H) from the v4 structure-freeze era — historical reference; the rework spec above is the active marching order | tracked |
 | `KERNEL_CONSTITUTION.md` | The one rule (Kernel owns truth) | tracked |
 | `docs/v3/AUTHORITY_RULES.md` | Mutation rules, invariants, violation signals | tracked |
 | `docs/v3/KERNEL_SCHEMA_V1.md` | Canonical Kernel table definitions | tracked |
