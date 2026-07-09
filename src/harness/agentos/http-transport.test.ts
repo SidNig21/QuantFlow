@@ -32,7 +32,7 @@ describe('http-agentos-transport', () => {
           return Response.json({ sessionId: 'live-1', software: 'pi' });
         }
         if (url.pathname === '/session/live-1/prompt' && req.method === 'POST') {
-          return Response.json({ ok: true });
+          return Response.json({ ok: true, text: 'agentos-p1-ok', response: { id: 1 } });
         }
         if (url.pathname === '/session/live-1/events' && req.method === 'GET') {
           const stream = new ReadableStream({
@@ -91,7 +91,9 @@ describe('http-agentos-transport', () => {
       void transport.respondPermission('live-1', request.requestId, true);
     });
 
-    await transport.prompt('live-1', 'run task');
+    const promptResult = await transport.prompt('live-1', 'run task');
+    expect(promptResult.text).toBe('agentos-p1-ok');
+    expect(promptResult.response).toEqual({ id: 1 });
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(events.length).toBeGreaterThan(0);

@@ -17,7 +17,7 @@ export interface AgentOsTransport {
     software: string,
     options?: { env?: Record<string, string> },
   ): Promise<{ sessionId: string }>;
-  prompt(sessionId: string, text: string): Promise<void>;
+  prompt(sessionId: string, text: string): Promise<{ text: string; response?: unknown }>;
   onSessionEvent(sessionId: string, handler: (event: unknown) => void): () => void;
   onPermissionRequest(
     sessionId: string,

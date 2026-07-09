@@ -55,7 +55,11 @@ describe('agentos-harness', () => {
     expect(milestones).toContain('approval.requested');
     expect(milestones).toContain('approval.granted');
     expect(milestones).toContain('artifact.created');
+    expect(milestones).toContain('agent.reply');
     expect(milestones[milestones.length - 1]).toBe('turn.complete');
+
+    const replyDraft = drafts.find((d) => d.metadata?.['milestone'] === 'agent.reply');
+    expect(replyDraft?.metadata?.['replySnippet']).toBe('sim prompt completed');
 
     const artifactDraft = drafts.find((d) => d.type === 'task_submitted');
     expect(artifactDraft?.contentHash).toBe(

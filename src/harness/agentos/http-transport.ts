@@ -220,7 +220,11 @@ export function createHttpAgentOsTransport(
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text }),
       });
-      await parseJsonResponse(res);
+      const body = await parseJsonResponse(res) as { text?: unknown; response?: unknown };
+      return {
+        text: typeof body.text === 'string' ? body.text : '',
+        response: body.response,
+      };
     },
 
     onSessionEvent(sessionId, handler) {

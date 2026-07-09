@@ -90,6 +90,7 @@ export function createSimTransport(options: SimTransportOptions = {}): AgentOsTr
       promptCalls.push({ sessionId: id, text });
       replayPromise = replay(id);
       await replayPromise;
+      return { text: 'sim prompt completed' };
     },
 
     onSessionEvent(id, handler) {

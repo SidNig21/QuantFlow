@@ -11,6 +11,7 @@ export type AcpMilestone =
   | 'session.start'
   | 'turn.start'
   | 'turn.complete'
+  | 'agent.reply'
   | 'tool.started'
   | 'tool.completed'
   | 'tool.failed'
@@ -218,6 +219,25 @@ export function translateTurnComplete(
 
   drafts.push(buildDraft('turn.complete', 'AgentOS turn completed', ctx));
   return drafts;
+}
+
+export function translateAgentReply(
+  text: string,
+  ctx: AcpTranslatorContext = {},
+  response?: unknown,
+): ReceiptDraft[] {
+  const reply = text.trim();
+  if (!reply) return [];
+  return [buildDraft(
+    'agent.reply',
+    `AgentOS reply returned (${reply.length} chars)`,
+    ctx,
+    {
+      replyChars: reply.length,
+      replySnippet: reply.slice(0, 240),
+      ...(response === undefined ? {} : { response }),
+    },
+  )];
 }
 
 export function translateApprovalRequested(

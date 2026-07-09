@@ -23,6 +23,7 @@ import type { AgentOsPermissionRequest, AgentOsTransport } from './transport';
 import { formatAgentOsUnavailable } from './error-messages';
 import {
   createAcpTranslatorState,
+  translateAgentReply,
   translateApprovalGranted,
   translateApprovalRequested,
   translateSessionUpdate,
@@ -259,9 +260,10 @@ export function createAgentOsHarness(options: AgentOsHarnessOptions): WorkerHarn
         }
 
         const promptText = message.appendNewline === false ? message.text : `${message.text}\n`;
-        await transport.prompt(state.agentosSessionId, promptText);
+        const reply = await transport.prompt(state.agentosSessionId, promptText);
 
         await tryQueueArtifactReceipt(state);
+        queueDrafts(state, translateAgentReply(reply.text, translatorContext(state), reply.response));
         queueDrafts(state, translateTurnComplete(state.translator, translatorContext(state)));
         state.turnComplete = true;
         state.status = state.artifactPath ? 'done' : 'working';

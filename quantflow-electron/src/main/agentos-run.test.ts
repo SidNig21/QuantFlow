@@ -51,6 +51,7 @@ describe("agentos run driver", () => {
       getHarness: () => makeHarness([
         { type: "task_started", summary: "AgentOS session started", metadata: { milestone: "session.start" } },
         { type: "progress", summary: "tool started", metadata: { milestone: "tool.started" } },
+        { type: "progress", summary: "AgentOS reply returned (22 chars)", metadata: { milestone: "agent.reply", replySnippet: "agentos-p1-receipt-ok" } },
         { type: "task_completed", summary: "turn complete", metadata: { milestone: "turn.complete" } },
       ]),
       dispatchKernel: async (type, payload, requestedBy) => {
@@ -75,7 +76,7 @@ describe("agentos run driver", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.receiptsPosted).toBe(3);
+    expect(result.receiptsPosted).toBe(4);
 
     const statusCalls = dispatchCalls.filter((c) => c.type === "kernel.worker.status_update");
     expect(statusCalls.map((c) => c.payload.status)).toEqual(["active", "idle"]);
@@ -84,7 +85,14 @@ describe("agentos run driver", () => {
     expect(receiptCalls.map((c) => c.payload.summary)).toEqual([
       "AgentOS session started",
       "tool started",
+      "AgentOS reply returned (22 chars)",
       "turn complete",
+    ]);
+    expect(receiptCalls.map((c) => c.payload.metadata?.milestone)).toEqual([
+      "session.start",
+      "tool.started",
+      "agent.reply",
+      "turn.complete",
     ]);
     expect(receiptCalls.every((c) => c.payload.tileId === "tile-agentos-1")).toBe(true);
   });

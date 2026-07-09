@@ -32,6 +32,7 @@ live in the WSL **host process** (`tools/agentos-host/`), not in this repo root.
 
 - **Tool calls:** one `progress` receipt at first `in_progress` (`metadata.milestone = tool.started`), one at terminal `completed`/`failed` (`tool.completed` / `tool.failed`), keyed by stable `toolCallId`.
 - **Chunks:** never one receipt per `agent_message_chunk`; coalesce to at most one `transcript.summary` progress receipt per turn.
+- **Agent reply:** one `progress` receipt after `prompt()` returns meaningful text (`metadata.milestone = agent.reply`). This proves the Agent send-to-reply readiness bar.
 - **Turn boundaries:** `task_started` (session/turn start), `task_completed` (turn complete).
 - **Approval:** `approval.requested` (progress) then `human_decision` with `blockedMs` on grant.
 - **Artifact:** `task_submitted` with content hash (same convention as Eve/mock).
