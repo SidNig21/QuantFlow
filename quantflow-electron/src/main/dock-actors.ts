@@ -7,7 +7,7 @@
 
 import type { AgentOsSoftware, Role, RoleRuntimeTarget } from "./role-service";
 import type { AgentAdapter } from "./agent-adapter";
-import { resolveRoleLaunchFields } from "./agent-adapter";
+import { resolveRoleLaunchFields, toIpcSafeAgentAdapter } from "./agent-adapter";
 import { DOCK_ACTOR_CATALOG, DOCK_ACTOR_IDS } from "./dock-catalog";
 import type { DockActorId, DockActorKind } from "./dock-catalog";
 import {
@@ -117,7 +117,7 @@ export function dockActorToRole(actor: DockActorDefinition): Role {
     showInLegend: true,
     legendType: actor.kind,
     modelHint: actor.modelHint,
-    agentAdapter: actor.agentAdapter,
+    agentAdapter: toIpcSafeAgentAdapter(actor.agentAdapter),
   };
 }
 
@@ -148,7 +148,7 @@ export function dockActorToLegendRecipe(actor: DockActorDefinition) {
     icon: actor.icon,
     commandTemplate: launchFields.commandTemplate,
     startupPrompt: launchFields.startupPrompt,
-    agentAdapter: actor.agentAdapter,
+    agentAdapter: toIpcSafeAgentAdapter(actor.agentAdapter),
     cwd: actor.resolveCwd?.(),
     runtimeTarget: actor.runtimeTarget,
     harnessKind: actor.harnessKind,

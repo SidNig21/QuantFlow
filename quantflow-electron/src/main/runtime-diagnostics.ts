@@ -92,7 +92,7 @@ export function buildRuntimeDiagnostics({
 
 export async function getRuntimeDiagnostics(): Promise<RuntimeDiagnostic[]> {
   const resolved = resolveTerminalTarget(getTerminalTarget());
-  const roles = await listRoles();
+  const roles = await listRoles({ includeDiagnostics: true });
   return buildRuntimeDiagnostics({
     bunAvailable: commandExists("bun"),
     shellCommand: resolved.command,

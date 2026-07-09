@@ -966,11 +966,12 @@ app.whenReady().then(async () => {
   registerAgentIpc(mainWindow!, config);
   registerToggleShortcuts(mainWindow!);
 
-  // Pattern B: don't block the window on WSL herdr server startup (up to 30s).
-  // First herdr-wsl tile spawn calls ensureHerdrServer() lazily.
-  void bootstrapHerdrRuntime().catch((err) => {
-    console.error("Herdr bootstrap failed:", err);
-  });
+  // WSL Herdr prewarm is opt-in; herdr-wsl tile spawn calls ensureHerdrServer() lazily.
+  if (process.env.QF_HERDR_PREWARM === "1") {
+    void bootstrapHerdrRuntime().catch((err) => {
+      console.error("Herdr bootstrap failed:", err);
+    });
+  }
 
   prewarmAgentOsHost();
 

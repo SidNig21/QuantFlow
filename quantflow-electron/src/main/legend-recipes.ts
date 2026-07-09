@@ -1,6 +1,7 @@
 import { readFile, readdir, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { HealthLevel } from "./diagnostics/types";
+import type { ControllerHealth } from "./diagnostics/types";
 import { runPreflight } from "./diagnostics/preflight";
 import {
   listRoles,
@@ -193,18 +194,20 @@ export async function listLegendRecipes(): Promise<LegendRecipe[]> {
   ];
 }
 
-export async function listLegendRecipesWithReadiness(): Promise<LegendRecipeListEntry[]> {
-  const recipes = await listLegendRecipes();
-  const preflight = await runPreflight();
-  const levels = new Map<string, HealthLevel>();
-  for (const probe of preflight.probes) {
-    const capabilityId = typeof probe.detail?.capabilityId === "string"
-      ? probe.detail.capabilityId
-      : null;
-    if (capabilityId) levels.set(capabilityId, probe.level);
-  }
+export interface LegendReadinessOptions {
+  /** Full capability preflight can touch WSL/network; keep dock startup cheap. */
+  runPreflight?: boolean;
+  preflight?: ControllerHealth;
+}
+
+function readinessEntries(
+  recipes: LegendRecipe[],
+  levels: ReadonlyMap<string, HealthLevel> | null,
+): LegendRecipeListEntry[] {
   return recipes.map((recipe) => {
-    const readiness = resolveReadinessForRecipe(recipe, levels);
+    const readiness = levels
+      ? resolveReadinessForRecipe(recipe, levels)
+      : "degraded";
     return {
       ...recipe,
       readiness,
@@ -212,6 +215,24 @@ export async function listLegendRecipesWithReadiness(): Promise<LegendRecipeList
       capabilityId: resolveRecipeCapabilityId(recipe),
     };
   });
+}
+
+export async function listLegendRecipesWithReadiness(
+  options: LegendReadinessOptions = {},
+): Promise<LegendRecipeListEntry[]> {
+  const recipes = await listLegendRecipes();
+  if (options.runPreflight === false) {
+    return readinessEntries(recipes, null);
+  }
+  const preflight = options.preflight ?? await runPreflight();
+  const levels = new Map<string, HealthLevel>();
+  for (const probe of preflight.probes) {
+    const capabilityId = typeof probe.detail?.capabilityId === "string"
+      ? probe.detail.capabilityId
+      : null;
+    if (capabilityId) levels.set(capabilityId, probe.level);
+  }
+  return readinessEntries(recipes, levels);
 }
 
 function assertCustomId(id: string): void {

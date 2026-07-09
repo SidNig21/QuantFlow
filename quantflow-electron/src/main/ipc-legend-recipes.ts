@@ -59,7 +59,8 @@ function notifyLegendRegistryChanged(): void {
 }
 
 export function registerLegendRecipeHandlers(): void {
-  ipcMain.handle("legend:list", async () => listLegendRecipesWithReadiness());
+  ipcMain.handle("legend:list", async () =>
+    listLegendRecipesWithReadiness({ runPreflight: false }));
   ipcMain.handle("legend:create", async (_event, raw: unknown) => {
     const recipe = await createLegendRecipe(parseCreateInput(raw));
     notifyLegendRegistryChanged();
@@ -79,9 +80,9 @@ export function registerLegendRecipeHandlers(): void {
 
   registerMethod(
     "legend.list",
-    () => listLegendRecipesWithReadiness(),
+    () => listLegendRecipesWithReadiness({ runPreflight: false }),
     {
-      description: "List legend dock recipes with R0 readiness badges",
+      description: "List legend dock recipes with cached/lightweight readiness badges",
       params: {},
     },
   );

@@ -48,6 +48,21 @@ export const SERVER_AGENT_ADAPTER: AgentAdapter = {
 // truth. The previous hardcoded ADAPTER_BY_ROLE_ID map here was a second copy
 // that could silently drift from the roster, so it was deleted.
 
+/**
+ * IPC-safe projection. Electron structured clone rejects functions, so
+ * `promptArg` must never cross into renderer payloads. The prompt is already
+ * folded into commandTemplate by resolveRoleLaunchFields.
+ */
+export type IpcSafeAgentAdapter = Omit<AgentAdapter, "promptArg">;
+
+export function toIpcSafeAgentAdapter(
+  adapter: AgentAdapter | undefined,
+): IpcSafeAgentAdapter | undefined {
+  if (!adapter) return undefined;
+  const { promptArg: _promptArg, ...safe } = adapter;
+  return safe;
+}
+
 export function isNativeTuiAdapter(
   adapter: AgentAdapter | null | undefined,
 ): adapter is AgentAdapter & { integrationMode: "native-tui"; launch: string } {

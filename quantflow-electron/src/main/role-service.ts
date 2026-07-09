@@ -62,6 +62,10 @@ export interface RoleStatusParser {
   blocked?: string[];
 }
 
+export interface ListRolesOptions {
+  includeDiagnostics?: boolean;
+}
+
 const BUILT_IN_ROLES: Role[] = [
   ...buildDockRoles(),
   {
@@ -200,7 +204,10 @@ function commandExistsInWsl(command: string): boolean {
   }
 }
 
-export function commandExists(command: string): boolean {
+export function commandExists(
+  command: string,
+  options: { allowWslFallback?: boolean } = {},
+): boolean {
   try {
     execFileSync(
       process.platform === "win32" ? "where.exe" : "which",
@@ -214,7 +221,7 @@ export function commandExists(command: string): boolean {
     );
     return true;
   } catch {
-    return commandExistsInWsl(command);
+    return options.allowWslFallback === true && commandExistsInWsl(command);
   }
 }
 
@@ -223,11 +230,24 @@ export function withRoleDiagnostics(role: Role): Role {
   if (!command) return role;
   return {
     ...role,
-    commandAvailable: commandExists(command),
+    commandAvailable: commandExists(command, {
+      allowWslFallback: role.runtimeTarget === "herdr-wsl",
+    }),
   };
 }
 
-export async function listRoles(): Promise<Role[]> {
+function maybeWithDiagnostics(
+  roles: Role[],
+  options: ListRolesOptions,
+): Role[] {
+  return options.includeDiagnostics
+    ? roles.map(withRoleDiagnostics)
+    : roles;
+}
+
+export async function listRoles(
+  options: ListRolesOptions = {},
+): Promise<Role[]> {
   try {
     await mkdir(rolesDir, { recursive: true });
     const files = await readdir(rolesDir);
@@ -244,15 +264,18 @@ export async function listRoles(): Promise<Role[]> {
         }
       } catch { /* skip invalid */ }
     }
-    return [...roleMap.values()].map(withRoleDiagnostics);
+    return maybeWithDiagnostics([...roleMap.values()], options);
   } catch {
-    return [...BUILT_IN_ROLES].map(withRoleDiagnostics);
+    return maybeWithDiagnostics([...BUILT_IN_ROLES], options);
   }
 }
 
-export async function getRole(id: string): Promise<Role | null> {
+export async function getRole(
+  id: string,
+  options: ListRolesOptions = {},
+): Promise<Role | null> {
   const resolvedId = id === "claude-worker" ? "claude" : id;
-  const roles = await listRoles();
+  const roles = await listRoles(options);
   const role = roles.find((r) => r.id === resolvedId) ?? null;
   if (role && id === "claude-worker" && resolvedId === "claude") {
     return { ...role, id: "claude-worker", envoyProfile: "claude-worker" };

@@ -1027,8 +1027,25 @@ async function init() {
 		void syncHerdrWorkspaceView();
 	}
 
+	function hasHerdrBackedTiles() {
+		return tiles.some((tile) =>
+			tile?.herdrPaneId ||
+			String(tile?.terminalTarget ?? "").startsWith("herdr-wsl:") ||
+			tile?.runtimeTarget === "herdr-wsl"
+		);
+	}
+
 	async function syncHerdrWorkspaceView() {
 		if (!tileListWebview?.send) return;
+		if (!hasHerdrBackedTiles()) {
+			tileListWebview.send("tile-list:herdr", {
+				available: false,
+				panes: [],
+				workspaceId: null,
+				updatedAt: Date.now(),
+			});
+			return;
+		}
 		try {
 			const available = await window.shellApi.herdrAvailable?.();
 			if (!available) {

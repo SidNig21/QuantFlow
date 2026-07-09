@@ -8,6 +8,7 @@ import {
   BUILT_IN_LEGEND_RECIPES,
   createLegendRecipe,
   listLegendRecipes,
+  listLegendRecipesWithReadiness,
   mapHealthLevelToBadge,
   removeLegendRecipe,
   resolveReadinessForRecipe,
@@ -148,6 +149,13 @@ describe("legend-recipes registry", () => {
     expect(mapHealthLevelToBadge(resolveReadinessForRecipe(recipe, levels))).toBe("amber");
     expect(mapHealthLevelToBadge("healthy")).toBe("green");
     expect(mapHealthLevelToBadge("down")).toBe("red");
+  });
+
+  test("dock recipe listing can skip heavyweight capability preflight", async () => {
+    const entries = await listLegendRecipesWithReadiness({ runPreflight: false });
+    expect(entries).toHaveLength(BUILT_IN_LEGEND_RECIPE_IDS.length);
+    expect(entries.every((entry) => entry.readinessBadge === "amber")).toBe(true);
+    expect(entries.every((entry) => typeof entry.capabilityId === "string")).toBe(true);
   });
 
   test("herdr recipes require both role and harness healthy for green", async () => {

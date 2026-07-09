@@ -13,6 +13,18 @@ export function stripAnsi(text: string): string {
   );
 }
 
+export const READINESS_TAIL_BYTES = 8 * 1024;
+
+export function appendReadinessTail(
+  current: string,
+  chunk: string,
+  maxBytes = READINESS_TAIL_BYTES,
+): string {
+  const next = current + chunk;
+  if (next.length <= maxBytes) return next;
+  return next.slice(-maxBytes);
+}
+
 export interface PtyReadinessOptions {
   readySignal?: RegExp;
   settleMs?: number;
@@ -36,7 +48,7 @@ export async function waitForPtyReadiness(
   const readySignal = options.readySignal;
   const deadline = Date.now() + maxWaitMs;
 
-  let accumulated = "";
+  let readinessTail = "";
   let sawOutput = false;
   let quiescenceTimer: ReturnType<typeof setTimeout> | null = null;
   let settled = false;
@@ -73,8 +85,8 @@ export async function waitForPtyReadiness(
     const onChunk = (chunk: string) => {
       if (settled) return;
       sawOutput = true;
-      accumulated += chunk;
-      const plain = stripAnsi(accumulated);
+      readinessTail = appendReadinessTail(readinessTail, chunk);
+      const plain = stripAnsi(readinessTail);
       if (readySignal?.test(plain)) {
         succeed();
         return;

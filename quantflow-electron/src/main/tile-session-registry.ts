@@ -127,6 +127,7 @@ export function syncConnectionGraph(connections: ConnectionGraphEntry[]): void {
     if (conn.label != null) entry.label = conn.label;
     connectionGraph.set(conn.id, entry);
   }
+  if (connectionGraph.size === 0) return;
   void pushConnectionGraphToHost(connections);
 }
 
@@ -148,6 +149,7 @@ async function hostSidecarBaseUrl(): Promise<string | null> {
 export async function pushConnectionGraphToHost(
   connections: ConnectionGraphEntry[],
 ): Promise<void> {
+  if (connections.length === 0) return;
   const base = await hostSidecarBaseUrl();
   if (!base) return;
   try {

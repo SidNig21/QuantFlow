@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   DOCK_ACTOR_IDS,
   DOCK_ACTORS,
@@ -83,9 +86,35 @@ describe("dock-actors", () => {
   });
 
   test("Eve personas resolve package cwd under eve-agents", () => {
-    process.env.QUANTFLOW_DEV_WORKTREE_ROOT = "C:\\Users\\rybow\\QuantFlow";
-    expect(resolveEveAgentCwd("bovada-odds")).toContain("eve-agents\\bovada-odds");
-    delete process.env.QUANTFLOW_DEV_WORKTREE_ROOT;
+    const previous = process.env.QUANTFLOW_DEV_WORKTREE_ROOT;
+    try {
+      process.env.QUANTFLOW_DEV_WORKTREE_ROOT = "C:\\Users\\rybow\\QuantFlow";
+      expect(resolveEveAgentCwd("bovada-odds")).toContain("eve-agents\\bovada-odds");
+    } finally {
+      if (previous == null) delete process.env.QUANTFLOW_DEV_WORKTREE_ROOT;
+      else process.env.QUANTFLOW_DEV_WORKTREE_ROOT = previous;
+    }
+  });
+
+  test("Eve persona cwd recovers when dev worktree env points at electron package", () => {
+    const previousDev = process.env.QUANTFLOW_DEV_WORKTREE_ROOT;
+    const previousCollab = process.env.COLLAB_DEV_WORKTREE_ROOT;
+    const root = join(tmpdir(), `quantflow-eve-cwd-${Date.now()}`);
+    const electronDir = join(root, "quantflow-electron");
+    const agentDir = join(root, "eve-agents", "bovada-odds");
+    mkdirSync(electronDir, { recursive: true });
+    mkdirSync(agentDir, { recursive: true });
+    try {
+      delete process.env.QUANTFLOW_DEV_WORKTREE_ROOT;
+      process.env.COLLAB_DEV_WORKTREE_ROOT = electronDir;
+      expect(resolveEveAgentCwd("bovada-odds")).toBe(agentDir);
+    } finally {
+      if (previousDev == null) delete process.env.QUANTFLOW_DEV_WORKTREE_ROOT;
+      else process.env.QUANTFLOW_DEV_WORKTREE_ROOT = previousDev;
+      if (previousCollab == null) delete process.env.COLLAB_DEV_WORKTREE_ROOT;
+      else process.env.COLLAB_DEV_WORKTREE_ROOT = previousCollab;
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("build helpers match DOCK_ACTORS length", () => {
@@ -102,6 +131,7 @@ describe("dock-actors", () => {
     // even on the synthesize fallback path where rolesList() is unavailable.
     const claudeRecipe = dockActorToLegendRecipe(getDockActor("claude")!);
     expect(claudeRecipe.agentAdapter?.integrationMode).toBe("native-tui");
+    expect(claudeRecipe.agentAdapter).not.toHaveProperty("promptArg");
     expect(claudeRecipe.commandTemplate?.startsWith("claude")).toBe(true);
     expect(claudeRecipe.startupPrompt).toBeUndefined(); // folded into launch
 
@@ -115,6 +145,11 @@ describe("dock-actors", () => {
     expect(eveRecipe.commandTemplate).toBe("npm run dev");
   });
 
+  test("role and legend recipe projections are structured-clone safe for IPC", () => {
+    const claude = getDockActor("claude")!;
+    expect(() => structuredClone(dockActorToRole(claude))).not.toThrow();
+    expect(() => structuredClone(dockActorToLegendRecipe(claude))).not.toThrow();
+  });
   test("getAgentAdapterForRole resolves from the roster — single source of truth", () => {
     // #1: a2a/readiness resolves adapters from the SAME actor field used to
     // spawn. No separate hardcoded map to drift out of sync.

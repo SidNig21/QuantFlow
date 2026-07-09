@@ -25,6 +25,13 @@ describe("listRoles", () => {
     expect(roles.length).toBeGreaterThanOrEqual(5);
   });
 
+  test("lists roles as passive catalog data by default", async () => {
+    const roles = await listRoles();
+    const codex = roles.find((role) => role.id === "codex");
+    expect(codex?.commandTemplate).toContain("codex");
+    expect(codex?.commandAvailable).toBeUndefined();
+  });
+
   test("includes practical orchestration roles", async () => {
     const roles = await listRoles();
     const ids = roles.map((r) => r.id);

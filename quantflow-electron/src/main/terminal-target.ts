@@ -33,6 +33,11 @@ interface WslDistro {
   isDefault: boolean;
 }
 
+function shouldDiscoverWslDistributions(): boolean {
+  const flag = process.env.QF_DISCOVER_WSL_DISTROS?.trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
+}
+
 function commandExists(command: string): boolean {
   try {
     execFileSync(
@@ -53,6 +58,7 @@ function commandExists(command: string): boolean {
 
 function listWslDistributions(): WslDistro[] {
   if (process.platform !== "win32") return [];
+  if (!shouldDiscoverWslDistributions()) return [];
   try {
     const output = execFileSync("wsl.exe", ["-l", "-v"], {
       encoding: "utf8",

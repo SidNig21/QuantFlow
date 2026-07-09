@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -41,11 +42,26 @@ export function resolveDefaultEveCwd(): string {
 /** Resolve an Eve agent package folder (eve-agents/<id> under the repo by default). */
 export function resolveEveAgentCwd(agentId: string): string {
   const fromEnv = process.env.QUANTFLOW_EVE_AGENTS_DIR?.trim();
-  if (fromEnv) return join(fromEnv, agentId);
-  const repoRoot = process.env.QUANTFLOW_DEV_WORKTREE_ROOT?.trim()
-    || process.env.COLLAB_DEV_WORKTREE_ROOT?.trim();
-  if (repoRoot) return join(resolve(repoRoot), "eve-agents", agentId);
-  return join(homedir(), "QuantFlow", "eve-agents", agentId);
+  if (fromEnv) return join(resolve(fromEnv), agentId);
+
+  const candidates: string[] = [];
+  const addRoot = (root: string | undefined) => {
+    const trimmed = root?.trim();
+    if (!trimmed) return;
+    const resolved = resolve(trimmed);
+    candidates.push(join(resolved, "eve-agents", agentId));
+    candidates.push(join(resolve(resolved, ".."), "eve-agents", agentId));
+  };
+
+  addRoot(process.env.QUANTFLOW_DEV_WORKTREE_ROOT);
+  addRoot(process.env.COLLAB_DEV_WORKTREE_ROOT);
+  addRoot(process.cwd());
+  candidates.push(join(homedir(), "QuantFlow", "eve-agents", agentId));
+
+  const uniqueCandidates = [...new Set(candidates)];
+  return uniqueCandidates.find((candidate) => existsSync(candidate))
+    ?? uniqueCandidates[0]
+    ?? join(homedir(), "QuantFlow", "eve-agents", agentId);
 }
 
 // Eve personas run on Eve's OWN rail — local `npm run dev` in their package

@@ -199,6 +199,17 @@ function normalizeConnection(value: unknown): ConnectionState | null {
   return normalized;
 }
 
+function filterConnectionsToExistingTiles(
+  connections: ConnectionState[],
+  tiles: TileState[],
+): ConnectionState[] {
+  const tileIds = new Set(tiles.map((tile) => tile.id).filter(Boolean));
+  if (tileIds.size === 0) return [];
+  return connections.filter((conn) =>
+    tileIds.has(conn.tileAId) && tileIds.has(conn.tileBId)
+  );
+}
+
 function connectionRowToState(row: ConnectionRow): ConnectionState {
   const conn: ConnectionState = {
     id: row.id,
@@ -274,7 +285,10 @@ async function loadStateFromKernel(): Promise<CanvasState | null> {
     return {
       version: 2,
       tiles: kernelState.tiles,
-      connections: loadConnectionsFromDb(),
+      connections: filterConnectionsToExistingTiles(
+        loadConnectionsFromDb(),
+        kernelState.tiles,
+      ),
       viewport: kernelState.viewport,
     };
   } catch {
@@ -299,7 +313,10 @@ async function loadStateFromJson(): Promise<CanvasState | null> {
         .filter((conn): conn is ConnectionState => Boolean(conn))
       : [];
 
-    state.connections = mergeJsonAndDbConnections(jsonConnections);
+    state.connections = filterConnectionsToExistingTiles(
+      mergeJsonAndDbConnections(jsonConnections),
+      state.tiles,
+    );
     state.version = 2;
     return state;
   } catch {
@@ -380,7 +397,10 @@ async function writeFullAuthorityJson(state: CanvasState, connections: Connectio
 }
 
 export async function saveState(state: CanvasState): Promise<void> {
-  const normalizedConnections = normalizeConnectionsFromState(state);
+  const normalizedConnections = filterConnectionsToExistingTiles(
+    normalizeConnectionsFromState(state),
+    state.tiles,
+  );
 
   await syncConnectionsToDb(normalizedConnections);
 
@@ -416,7 +436,10 @@ export async function saveState(state: CanvasState): Promise<void> {
 export async function exportState(targetPath?: string): Promise<string> {
   const ephemeralByTileId = await loadEphemeralOverlay();
   const kernelState = assembleCanvasStateFromKernel(ephemeralByTileId);
-  const connections = loadConnectionsFromDb();
+  const connections = filterConnectionsToExistingTiles(
+    loadConnectionsFromDb(),
+    kernelState.tiles,
+  );
   const fullState: CanvasState = {
     version: 2,
     tiles: kernelState.tiles,

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { waitForPtyReadiness } from "./pty-readiness";
+import {
+  appendReadinessTail,
+  READINESS_TAIL_BYTES,
+  waitForPtyReadiness,
+} from "./pty-readiness";
 
 function fakeSubscribe(chunks: string[], intervalMs = 10) {
   return (listener: (chunk: string) => void) => {
@@ -30,6 +34,13 @@ describe("waitForPtyReadiness", () => {
         maxWaitMs: 2000,
       },
     );
+  });
+
+  test("keeps only a bounded output tail for readiness scans", () => {
+    const oversized = "x".repeat(READINESS_TAIL_BYTES * 2);
+    const tail = appendReadinessTail("", oversized + "ready>");
+    expect(tail.length).toBe(READINESS_TAIL_BYTES);
+    expect(tail.endsWith("ready>")).toBe(true);
   });
 
   test("rejects on timeout when no output arrives", async () => {

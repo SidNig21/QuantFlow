@@ -31,6 +31,18 @@ type ConnectionState = {
   updatedAt: number;
 };
 
+function tile(id: string) {
+  return {
+    id,
+    type: "term" as const,
+    x: 0,
+    y: 0,
+    width: 520,
+    height: 420,
+    zIndex: 1,
+  };
+}
+
 beforeEach(() => {
   installTestRuntimeDb();
   resetConnections();
@@ -113,7 +125,7 @@ describe("canvas-persistence connections", () => {
     expect(state?.connections).toEqual([]);
   });
 
-  test("loadState accepts v1 connections without metadata", async () => {
+  test("loadState accepts v1 connections without metadata when endpoints exist", async () => {
     const connections: ConnectionState[] = [
       {
         id: "conn-1",
@@ -129,7 +141,7 @@ describe("canvas-persistence connections", () => {
       STATE_FILE,
       JSON.stringify({
         version: 1,
-        tiles: [],
+        tiles: [tile("tile-a"), tile("tile-b")],
         connections,
         viewport: { centerX: 0, centerY: 0, zoom: 1 },
       }, null, 2),
@@ -140,7 +152,7 @@ describe("canvas-persistence connections", () => {
     expect(state?.connections).toEqual(connections);
   });
 
-  test("loadState accepts v2 connections with side and kind metadata", async () => {
+  test("loadState accepts v2 connections with side and kind metadata when endpoints exist", async () => {
     const connections: ConnectionState[] = [
       {
         id: "conn-1",
@@ -159,7 +171,7 @@ describe("canvas-persistence connections", () => {
       STATE_FILE,
       JSON.stringify({
         version: 2,
-        tiles: [],
+        tiles: [tile("tile-a"), tile("tile-b")],
         connections,
         viewport: { centerX: 0, centerY: 0, zoom: 1 },
       }, null, 2),
@@ -175,7 +187,7 @@ describe("canvas-persistence connections", () => {
       STATE_FILE,
       JSON.stringify({
         version: 2,
-        tiles: [],
+        tiles: [tile("tile-a"), tile("tile-b")],
         connections: [
           {
             id: "conn-1",
@@ -219,7 +231,7 @@ describe("canvas-persistence connections", () => {
 
     await saveState({
       version: 1,
-      tiles: [],
+      tiles: [tile("tile-a"), tile("tile-b")],
       connections: [connection],
       viewport: { centerX: 100, centerY: 200, zoom: 1.5 },
     });
@@ -245,7 +257,7 @@ describe("canvas-persistence DB sync (connections survive restart)", () => {
 
     await saveState({
       version: 1,
-      tiles: [],
+      tiles: [tile("tile-a"), tile("tile-b")],
       connections: [connection],
       viewport: { centerX: 0, centerY: 0, zoom: 1 },
     });
@@ -257,7 +269,7 @@ describe("canvas-persistence DB sync (connections survive restart)", () => {
     expect(dbConns[0].label).toBe("db-backed");
   });
 
-  test("loadState returns DB-only connections not in JSON", async () => {
+  test("loadState drops DB-only connections when endpoint tiles are absent", async () => {
     // Write a minimal JSON file with no connections
     await Bun.write(
       STATE_FILE,
@@ -274,8 +286,6 @@ describe("canvas-persistence DB sync (connections survive restart)", () => {
     dbCreate({ id: "orphan-db-conn", tileAId: "x", tileBId: "y" });
 
     const state = await loadState();
-    expect(state?.connections.length).toBe(1);
-    expect(state?.connections[0].id).toBe("orphan-db-conn");
-    expect(state?.connections[0].tileAId).toBe("x");
+    expect(state?.connections).toEqual([]);
   });
 });
