@@ -85,6 +85,7 @@ Every doc is exactly one of:
 | `reference/v2-shipped-context/**` (incl. `BUILD_PLAN_V2.md`, `CONCEPT.md`) | Shipped v2 context. Read-only history. |
 | `reference/v3-superseded/**` (incl. `BUILD_PLAN_V3.md`, `ARCHITECTURE.md`, `V3_MIGRATION_NOTES.md`, `ENVOY.md`, `SCOPE.md`, `VAULT.md`, `RETIREMENT.md`) | Superseded v3 root docs. The old `ARCHITECTURE.md` lives here now — it is **not** at repo root anymore. |
 | `reference/archive/**` (v2 layer charters, superpowers plans/specs, `phase-7.5-orchestration-spine.md`) | Deep archive. |
+| `reference/v7-superseded/V7_MISSION.md` | Old v7 "actor-native" mission order. **Superseded 2026-07-09** by `docs/v7/DOCK_RUNTIME_REWORK_SPEC.md`. History only. |
 
 **Never execute from `reference/**`.** It is the morgue, not the workshop.
 
