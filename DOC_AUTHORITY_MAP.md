@@ -35,7 +35,9 @@ Every doc is exactly one of:
 |---|---|---|
 | `START_HERE.md` | Front door; overrides any conflict | tracked |
 | `DOC_AUTHORITY_MAP.md` | This file; doc-status answer key | tracked |
-| `docs/v7/DOCK_RUNTIME_REWORK_SPEC.md` | **THE active Dock/runtime rework authority (2026-07-09)** — Agent/Worker doctrine, AgentOS-preferred runtime adapter, proof ladder P0–P3, cleanup/deletion targets. Sole plan for restructure + runtime work. | tracked |
+| `docs/v7/DOCK_RUNTIME_REWORK_SPEC.md` | **THE active Dock/runtime rework authority (2026-07-09)** — Agent/Worker doctrine, AgentOS ANCHOR runtime (per its 2026-07-09 amendment), proof ladder, cleanup/deletion targets. Sole plan for restructure + runtime work. | tracked |
+| `docs/v7/AGENTOS_RIVET_RUNTIME_FINDINGS.md` + `V7_FIRST_PROOF.md` + `RUNTIME_BINDING_CONTRACT.md` + `P1D_PROOF_CHECKLIST.md` | Doctrine annexes ADOPTED by the rework spec's Anchor amendment — Anchor Principle, first-proof gate, RuntimeHandle contract, P1d checklist w/ Step-0 audit verdict (RAW BRIDGE → migrate host to `agentOS()`) | tracked |
+| `docs/v7/EXTENSIBLE_TOOLING_SKETCH.md` | **Deferred** future machinery (capability registry etc.) — reference, do NOT implement before first proof + two real adapters | tracked |
 | `CONTEXT.md` | Supporting glossary/reference for the rework spec (not itself the plan) | tracked |
 | `docs/adr/0003-agentos-preferred-agent-runtime.md` | Decision record: AgentOS = preferred agent runtime adapter (not the core) | tracked |
 | `docs/plans/2026-07-07-001-architecture-layer-routing-plan.md` | Routing discipline (proof-pinned spawn, no silent fallbacks) — informs the rework spec | tracked |

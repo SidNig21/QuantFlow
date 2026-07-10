@@ -2,6 +2,33 @@
 
 This is the working architecture spec for making the QuantFlow Dock launch real collaborative runtime actors. It deliberately ignores saved recipes until singular Dock actors work end to end.
 
+## 2026-07-09 Amendment — AgentOS Anchor Principle ADOPTED
+
+The doctrine package in this directory is adopted and governs the v7 actor path. Read
+`AGENTOS_RIVET_RUNTIME_FINDINGS.md` (Anchor Principle at top) before any v7 implementation.
+This amendment updates the spec as follows — where older sections below disagree, this wins:
+
+- **D8 sharpened → G6 resolved ("yes-anchor"):** AgentOS is the ANCHOR of the v7 actor
+  path. Nothing replaces it there; other systems work inside AgentOS, alongside it, behind
+  the RuntimeHandle, or as deferred sidecars. The Kernel still owns product truth.
+- **G7 timing updated:** the RivetKit-wrapped `agentOS()` actor is now a **precondition of
+  the v7 first proof**, not a later phase — durability is a property of the package actually
+  used. It is ONE runtime component (`agentOS()` *is* the RivetKit actor), never a separate
+  "actor runtime" plus "wrapper". Raw `@rivet-dev/agentos-core` does not satisfy it.
+- **Step 0 import audit VERDICT (2026-07-09): RAW BRIDGE.** `tools/agentos-host/host.js:237`
+  calls `AgentOs.create()` from `@rivet-dev/agentos-core@0.2.4`; the durable wrapper is not
+  installed. Full receipts in the findings doc. Therefore **P1e = migrate the host to
+  `agentOS()` from `@rivet-dev/agentos` (npm-verified v0.2.7)** — not session-id persistence.
+  P1D §4 re-addressability is expected to FAIL until the migration lands.
+- **First proof = `dock-actor-agentos-echo`** per `V7_FIRST_PROOF.md` (8-point gate incl.
+  stop/sleep/reopen re-addressing). Actor key = `[workspaceId, tileId]`; the
+  `RUNTIME_BINDING_CONTRACT.md` `actorId` is that compound key serialized — one identity,
+  two notations.
+- **Governed annexes in this directory:** `AGENTOS_RIVET_RUNTIME_FINDINGS.md` (doctrine +
+  findings + audit), `V7_FIRST_PROOF.md`, `RUNTIME_BINDING_CONTRACT.md` (RuntimeHandle
+  rebuild shape), `P1D_PROOF_CHECKLIST.md`, `EXTENSIBLE_TOOLING_SKETCH.md` (deferred — do
+  not implement). Mastra/Restate/Omnigent remain parked as unproven future sidecars.
+
 ## Goal
 
 Make one Dock Card launch one real actor that QuantFlow can prove is alive, address through one RuntimeHandle, and project onto the canvas from Kernel truth.
