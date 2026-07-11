@@ -805,8 +805,9 @@ function ReadinessDot({ badge }: { badge: "green" | "amber" | "red" }) {
 
 const SHELL_OPTIONS = ["auto", "powershell", "wsl", "shell"] as const;
 
-// Mirror of the dock "+ Add" Eve defaults — a persona is a Mode-1 role (terminal
-// summon), never a harnessKind:eve-harness row. See docs/v4/SPAWN_MODEL.md.
+// "Eve agent" defaults to the AgentOS rail (Path A): runtimeTarget agentos +
+// agentosSoftware eve. Selecting windows-pty keeps the legacy Mode-1 local-dev
+// spawn (`npm run dev` in the package cwd). See docs/v4/SPAWN_MODEL.md.
 function AddAgentInline({
   busy,
   onCreate,
@@ -818,25 +819,35 @@ function AddAgentInline({
 }) {
   const [kind, setKind] = useState<"cli" | "eve">("eve");
   const isEve = kind === "eve";
+  const [runtime, setRuntime] = useState<string>("agentos");
+  const eveAgentOs = isEve && runtime === "agentos";
+
+  function selectKind(next: "cli" | "eve") {
+    setKind(next);
+    setRuntime(next === "eve" ? "agentos" : "herdr-wsl");
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const cwd = String(data.get("cwd") ?? "").trim();
-    if (isEve && !cwd) return;
+    if (isEve && !eveAgentOs && !cwd) return;
+    const runtimeTarget = String(data.get("runtimeTarget") ?? (isEve ? "agentos" : "herdr-wsl"));
+    const onAgentOsRail = isEve && runtimeTarget === "agentos";
     const payload: Record<string, unknown> = {
       id: String(data.get("id") ?? "").trim(),
       name: String(data.get("name") ?? "").trim(),
       description: String(data.get("description") ?? "").trim() || undefined,
-      icon: "hermes",
+      icon: onAgentOsRail ? "agentos" : "hermes",
       color: String(data.get("color") ?? "#6366f1"),
       cwd: cwd || undefined,
       commandTemplate: String(data.get("commandTemplate") ?? "").trim()
-        || (isEve ? "npm run dev" : undefined),
-      runtimeTarget: String(data.get("runtimeTarget") ?? (isEve ? "windows-pty" : "herdr-wsl")),
-      defaultShell: String(data.get("defaultShell") ?? (isEve ? "powershell" : "auto")),
+        || (isEve && !onAgentOsRail ? "npm run dev" : undefined),
+      runtimeTarget,
+      defaultShell: String(data.get("defaultShell") ?? (isEve && !onAgentOsRail ? "powershell" : "auto")),
       type: isEve ? "agent" : "tool",
       modelHint: String(data.get("modelHint") ?? "").trim() || undefined,
+      ...(onAgentOsRail ? { harnessKind: "agentos", agentosSoftware: "eve" } : {}),
     };
     onCreate(payload);
   }
@@ -854,7 +865,7 @@ function AddAgentInline({
           <button
             key={k}
             type="button"
-            onClick={() => setKind(k)}
+            onClick={() => selectKind(k)}
             className="rounded-md px-2.5 py-1 text-xs font-medium"
             style={{
               backgroundColor: kind === k ? "var(--accent)" : "color-mix(in srgb, var(--foreground) 8%, transparent)",
@@ -873,16 +884,27 @@ function AddAgentInline({
       <input
         className={`${inputCls} w-full`}
         name="cwd"
-        placeholder={isEve ? "Folder (C:\\Users\\you\\quantflow-eve)" : "Folder (optional)"}
-        required={isEve}
+        placeholder={isEve && !eveAgentOs ? "Folder (C:\\Users\\you\\quantflow-eve)" : "Folder (optional)"}
+        required={isEve && !eveAgentOs}
       />
       <div className="grid grid-cols-2 gap-2">
-        <input className={inputCls} name="commandTemplate" placeholder={isEve ? "npm run dev" : "python"} />
-        <select className={inputCls} name="runtimeTarget" defaultValue={isEve ? "windows-pty" : "herdr-wsl"}>
+        <input
+          className={inputCls}
+          name="commandTemplate"
+          placeholder={eveAgentOs ? "(managed by AgentOS)" : isEve ? "npm run dev" : "python"}
+          disabled={eveAgentOs}
+        />
+        <select
+          className={inputCls}
+          name="runtimeTarget"
+          value={runtime}
+          onChange={(e) => setRuntime(e.currentTarget.value)}
+        >
+          {isEve ? <option value="agentos">agentos (Eve rail)</option> : null}
           <option value="herdr-wsl">herdr-wsl</option>
           <option value="windows-pty">windows-pty</option>
         </select>
-        <select className={inputCls} name="defaultShell" defaultValue={isEve ? "powershell" : "auto"}>
+        <select className={inputCls} name="defaultShell" defaultValue={isEve && !eveAgentOs ? "powershell" : "auto"}>
           {SHELL_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <input className={inputCls} name="modelHint" placeholder="model label (optional)" />

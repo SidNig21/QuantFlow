@@ -7,6 +7,17 @@ const DEFAULT_HEALTH_TIMEOUT_MS = 90_000;
 
 const running = new Map();
 
+// Warm pool (size 1): one Eve instance boots ahead of demand so a new tile
+// adopts it instantly instead of paying the ~30s cold boot. Each warm
+// generation gets a nonce key so its port hash never collides with the
+// still-listening instance a previous generation was adopted into.
+let warmRecord = null; // { keyId, ready, entry, startedAt }
+let warmGeneration = 0;
+
+function warmPoolEnabled() {
+  return (process.env.EVE_WARM_POOL ?? "1") !== "0";
+}
+
 function stableHash(value) {
   let hash = 2166136261;
   for (const ch of String(value)) {
@@ -56,9 +67,13 @@ function isPortCollision(error) {
 }
 
 function spawnEve({ eveRoot, port, env, spawnImpl = defaultSpawn } = {}) {
+  // `eve start` (production server, requires a prior `eve build`): unlike
+  // `eve dev` it has no single-instance dev lock, so the warm pool and
+  // multi-spawn can run concurrent Eves from one workspace. Each instance
+  // gets its own workflow-world data dir to avoid journal races.
   const child = spawnImpl(
     process.platform === "win32" ? "npm.cmd" : "npm",
-    ["run", "dev"],
+    ["run", "start"],
     {
       cwd: eveRoot,
       env: {
@@ -66,6 +81,7 @@ function spawnEve({ eveRoot, port, env, spawnImpl = defaultSpawn } = {}) {
         ...env,
         PORT: String(port),
         EVE_PORT: String(port),
+        WORKFLOW_LOCAL_DATA_DIR: `/tmp/eve-workflow-data-${port}`,
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -101,51 +117,101 @@ async function waitForHealth(baseUrl, {
   throw new Error(`Eve did not become healthy at ${baseUrl} within ${timeoutMs}ms: ${lastError}`);
 }
 
+async function bootEve(keyId, options = {}) {
+  const maxAttempts = options.maxAttempts ?? 10;
+  const eveRoot = options.eveRoot ?? resolveQuantflowEveRoot();
+  const env = credentialEnv(options.opencodeKey);
+  let lastError;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const port = portForKey(keyId, attempt, options);
+    const baseUrl = makeBaseUrl(port);
+    const child = spawnEve({
+      eveRoot,
+      port,
+      env,
+      spawnImpl: options.spawnImpl,
+    });
+    let stderrTail = "";
+    child.stderr?.on?.("data", (chunk) => {
+      stderrTail = `${stderrTail}${chunk.toString("utf8")}`.slice(-2000);
+    });
+    try {
+      const { coldBootMs } = await waitForHealth(baseUrl, {
+        fetchImpl: options.fetchImpl,
+        timeoutMs: options.timeoutMs,
+        intervalMs: options.intervalMs,
+        child,
+      });
+      return { keyId, baseUrl, port, child, coldBootMs, eveRoot };
+    } catch (error) {
+      lastError = error;
+      if (child.exitCode === null || child.exitCode === undefined) {
+        child.kill?.();
+      }
+      if (!isPortCollision(error) && !isPortCollision({ message: stderrTail })) {
+        throw new Error(`Eve failed for actor ${keyId} on ${baseUrl}: ${error.message}; stderr=${stderrTail}`);
+      }
+    }
+  }
+  throw new Error(`Eve could not allocate a port for actor ${keyId}: ${lastError?.message ?? "unknown error"}`);
+}
+
+function prewarmEve(options = {}) {
+  if (!warmPoolEnabled()) return null;
+  if (warmRecord) return warmRecord.ready;
+  warmGeneration += 1;
+  const keyId = `__warm__:${warmGeneration}`;
+  const startedAt = Date.now();
+  const record = { keyId, entry: null, startedAt, options };
+  record.ready = (async () => {
+    const entry = await bootEve(keyId, options);
+    record.entry = entry;
+    console.error(`[eve-supervisor] warm instance ready key=${keyId} baseUrl=${entry.baseUrl} cold_boot_ms=${entry.coldBootMs}`);
+    return entry;
+  })();
+  record.ready.catch(() => {
+    if (warmRecord === record) warmRecord = null;
+  });
+  warmRecord = record;
+  return record.ready;
+}
+
+async function adoptWarmEve(keyId) {
+  const record = warmRecord;
+  if (!record) return null;
+  warmRecord = null;
+  const adoptStartedAt = Date.now();
+  try {
+    const warmEntry = await record.ready;
+    const warmWaitMs = Date.now() - adoptStartedAt;
+    const entry = { ...warmEntry, keyId, adopted: true };
+    console.error(`[eve-supervisor] key=${keyId} adopted warm instance warm_wait_ms=${warmWaitMs}`);
+    // Replace the pool for the next spawn, mirroring the adopted boot config.
+    prewarmEve(record.options);
+    return entry;
+  } catch {
+    // Warm boot failed — caller falls back to the cold path.
+    return null;
+  }
+}
+
 async function ensureEveForActorKey(address, options = {}) {
   const keyId = actorKeyId(address);
   const existing = running.get(keyId);
   if (existing) return existing.ready;
 
   const ready = (async () => {
-    const maxAttempts = options.maxAttempts ?? 10;
-    const eveRoot = options.eveRoot ?? resolveQuantflowEveRoot();
-    const env = credentialEnv(options.opencodeKey);
-    let lastError;
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const port = portForKey(keyId, attempt, options);
-      const baseUrl = makeBaseUrl(port);
-      const child = spawnEve({
-        eveRoot,
-        port,
-        env,
-        spawnImpl: options.spawnImpl,
-      });
-      let stderrTail = "";
-      child.stderr?.on?.("data", (chunk) => {
-        stderrTail = `${stderrTail}${chunk.toString("utf8")}`.slice(-2000);
-      });
-      try {
-        const { coldBootMs } = await waitForHealth(baseUrl, {
-          fetchImpl: options.fetchImpl,
-          timeoutMs: options.timeoutMs,
-          intervalMs: options.intervalMs,
-          child,
-        });
-        const entry = { keyId, baseUrl, port, child, coldBootMs, eveRoot };
-        running.set(keyId, { ready: Promise.resolve(entry), entry });
-        console.error(`[eve-supervisor] key=${keyId} baseUrl=${baseUrl} cold_boot_ms=${coldBootMs}`);
-        return entry;
-      } catch (error) {
-        lastError = error;
-        if (child.exitCode === null || child.exitCode === undefined) {
-          child.kill?.();
-        }
-        if (!isPortCollision(error) && !isPortCollision({ message: stderrTail })) {
-          throw new Error(`Eve failed for actor ${keyId} on ${baseUrl}: ${error.message}; stderr=${stderrTail}`);
-        }
+    if (warmPoolEnabled()) {
+      const adopted = await adoptWarmEve(keyId);
+      if (adopted) {
+        running.set(keyId, { ready: Promise.resolve(adopted), entry: adopted });
+        return adopted;
       }
     }
-    throw new Error(`Eve could not allocate a port for actor ${keyId}: ${lastError?.message ?? "unknown error"}`);
+    const entry = await bootEve(keyId, options);
+    running.set(keyId, { ready: Promise.resolve(entry), entry });
+    console.error(`[eve-supervisor] key=${keyId} baseUrl=${entry.baseUrl} cold_boot_ms=${entry.coldBootMs}`);
+    return entry;
   })();
   running.set(keyId, { ready, entry: null });
   try {
@@ -171,12 +237,31 @@ async function stopEveForActorKey(address) {
   }
 }
 
+async function stopWarmEve() {
+  const record = warmRecord;
+  warmRecord = null;
+  if (!record) return;
+  try {
+    const entry = record.entry ?? await record.ready;
+    if (entry?.child?.exitCode === null || entry?.child?.exitCode === undefined) {
+      entry.child.kill?.();
+    }
+  } catch {
+    // Best effort cleanup.
+  }
+}
+
 async function stopAllEve() {
-  await Promise.all([...running.keys()].map((keyId) => stopEveForActorKey({ actorKey: JSON.parse(keyId) })));
+  await Promise.all([
+    stopWarmEve(),
+    ...[...running.keys()].map((keyId) => stopEveForActorKey({ actorKey: JSON.parse(keyId) })),
+  ]);
 }
 
 function _resetEveSupervisorForTests() {
   running.clear();
+  warmRecord = null;
+  warmGeneration = 0;
 }
 
 export {
@@ -184,8 +269,10 @@ export {
   actorKeyId,
   ensureEveForActorKey,
   portForKey,
+  prewarmEve,
   resolveQuantflowEveRoot,
   stableHash,
   stopAllEve,
   stopEveForActorKey,
+  stopWarmEve,
 };

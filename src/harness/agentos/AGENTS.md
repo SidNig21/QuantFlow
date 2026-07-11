@@ -92,6 +92,25 @@ proofs depend on the same WSL credential and Node setup used by manual probes.
 - Scripted proof: `bun qa/run.ts loop-proof` (see
   `quantflow-electron/src/main/agentos-loop-proof.ts`).
 
+## Operator Eve spawn (until U7 dock promotion)
+
+The verified dock rail (`DOCK_SPAWN_ACTOR_IDS`) stays empty until U7 operator
+sign-off. Until then the manual path is the seeded custom card:
+
+1. The app seeds an `eve-agentos` legend recipe on boot (`seedOperatorLegendRecipes`
+   in `quantflow-electron/src/main/legend-recipes.ts`) — the "Eve" card on the
+   dock's custom rail with `runtimeTarget: agentos`, `agentosSoftware: eve`.
+2. Click it. The host adopts a pre-booted warm Eve (`prewarmEve` /
+   `ensureEveForActorKey` in `tools/agentos-host/eve-supervisor.js`), so attach
+   skips the cold boot (~8s session create vs ~32s cold; `EVE_WARM_POOL=0`
+   disables the pool).
+3. Tiles run `eve start` (production server, per-instance
+   `WORKFLOW_LOCAL_DATA_DIR`), never `eve dev` — the dev server enforces a
+   single-instance lock per workspace and cannot multi-spawn. A stale
+   `eve dev` (e.g. `.eve/dev-process.pid`) blocks new instances; kill it first.
+4. Settings → Add agent → "Eve agent" now defaults to the AgentOS rail;
+   pick `windows-pty` there only for a local-dev (`npm run dev`) Eve.
+
 ## Child DOX Index
 
 None.

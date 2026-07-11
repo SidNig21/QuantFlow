@@ -13,6 +13,9 @@ import {
   removeLegendRecipe,
   resolveReadinessForRecipe,
   resolveRecipeCapabilityId,
+  seedOperatorLegendRecipes,
+  updateLegendRecipe,
+  EVE_AGENTOS_RECIPE_ID,
   _setLegendRegistryDirs,
 } from "./legend-recipes";
 
@@ -35,6 +38,26 @@ describe("legend-recipes registry", () => {
       ...BUILT_IN_LEGEND_RECIPE_IDS,
     ]);
     expect(BUILT_IN_LEGEND_RECIPE_IDS).toEqual([]);
+  });
+
+  test("seedOperatorLegendRecipes creates the eve-agentos card when missing", async () => {
+    const created = await seedOperatorLegendRecipes();
+    expect(created).toBe(true);
+    const listed = await listLegendRecipes();
+    const eve = listed.find((recipe) => recipe.id === EVE_AGENTOS_RECIPE_ID);
+    expect(eve).toBeDefined();
+    expect(eve?.runtimeTarget).toBe("agentos");
+    expect(eve?.harnessKind).toBe("agentos");
+    expect(eve?.agentosSoftware).toBe("eve");
+  });
+
+  test("seedOperatorLegendRecipes never overwrites an existing card", async () => {
+    await seedOperatorLegendRecipes();
+    await updateLegendRecipe(EVE_AGENTOS_RECIPE_ID, { name: "Eve Custom" });
+    const createdAgain = await seedOperatorLegendRecipes();
+    expect(createdAgain).toBe(false);
+    const listed = await listLegendRecipes();
+    expect(listed.find((recipe) => recipe.id === EVE_AGENTOS_RECIPE_ID)?.name).toBe("Eve Custom");
   });
 
   test("create/remove round-trips a custom CLI recipe through roles/*.json", async () => {

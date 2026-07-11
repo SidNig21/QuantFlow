@@ -5,6 +5,7 @@ import {
   listLegendRecipes,
   listLegendRecipesWithReadiness,
   removeLegendRecipe,
+  seedOperatorLegendRecipes,
   updateLegendRecipe,
   type LegendRecipeCreateInput,
 } from "./legend-recipes";
@@ -59,6 +60,15 @@ function notifyLegendRegistryChanged(): void {
 }
 
 export function registerLegendRecipeHandlers(): void {
+  // Seed the operator Path A Eve card (no-op when it already exists); the
+  // verified dock rail stays gated on U7.
+  void seedOperatorLegendRecipes()
+    .then((created) => {
+      if (created) notifyLegendRegistryChanged();
+    })
+    .catch((error) => {
+      console.error(`legend seed failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
   ipcMain.handle("legend:list", async () =>
     listLegendRecipesWithReadiness({ runPreflight: false }));
   ipcMain.handle("legend:create", async (_event, raw: unknown) => {

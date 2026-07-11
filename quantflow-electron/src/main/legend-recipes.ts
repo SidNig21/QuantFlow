@@ -284,6 +284,30 @@ export async function createLegendRecipe(input: LegendRecipeCreateInput): Promis
   return roleToLegendRecipe(withRoleDiagnostics(role));
 }
 
+// Operator-facing Path A card. The verified dock rail (DOCK_SPAWN_ACTOR_IDS)
+// stays empty until U7 sign-off; until then this seeded custom recipe is the
+// documented manual spawn path for AgentOS Eve. Mirrors the proven U4 proof
+// recipe (agentos-eve-proof.ts) — the proof persists only into an isolated
+// temp profile, so the operator's userData needs its own copy.
+export const EVE_AGENTOS_RECIPE_ID = "eve-agentos";
+
+export async function seedOperatorLegendRecipes(): Promise<boolean> {
+  const existing = await listLegendRecipes();
+  if (existing.some((recipe) => recipe.id === EVE_AGENTOS_RECIPE_ID)) return false;
+  await createLegendRecipe({
+    id: EVE_AGENTOS_RECIPE_ID,
+    name: "Eve",
+    description: "Eve on the AgentOS rail",
+    color: "#8b5cf6",
+    icon: "agentos",
+    type: "agent",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    agentosSoftware: "eve",
+  });
+  return true;
+}
+
 export async function removeLegendRecipe(id: string): Promise<boolean> {
   assertCustomId(id);
   const rolePath = join(rolesDir, `${id}.json`);

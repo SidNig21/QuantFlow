@@ -13,7 +13,7 @@ import pi from "@agentos-software/pi";
 import opencode from "@agentos-software/opencode";
 import claudeCode from "@agentos-software/claude-code";
 import { z } from "zod";
-import { ensureEveForActorKey, stopAllEve, stopEveForActorKey } from "./eve-supervisor.js";
+import { ensureEveForActorKey, prewarmEve, stopAllEve, stopEveForActorKey } from "./eve-supervisor.js";
 
 const HOST = process.env.AGENTOS_HOST_BIND ?? "0.0.0.0";
 const PORT = Number.parseInt(process.env.AGENTOS_HOST_PORT ?? "7430", 10);
@@ -1218,6 +1218,15 @@ const server = http.createServer((req, res) => {
 if (process.env.AGENTOS_HOST_NO_LISTEN !== "1") {
   server.listen(PORT, HOST, () => {
     console.log(`agentos-host listening on http://${HOST}:${PORT}`);
+    // Warm one Eve instance ahead of demand so the first tile spawn adopts
+    // it instead of paying the ~30s cold boot. EVE_WARM_POOL=0 disables.
+    const warmKey = resolveOpencodeKey();
+    if (warmKey) {
+      const warm = prewarmEve({ opencodeKey: warmKey });
+      warm?.catch?.((error) => {
+        console.error(`[host] eve warm boot failed (cold path remains): ${error?.message ?? error}`);
+      });
+    }
   });
 }
 
