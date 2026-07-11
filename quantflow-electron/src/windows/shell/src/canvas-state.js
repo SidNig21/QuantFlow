@@ -109,8 +109,14 @@ export function defaultSize(type) {
  */
 export function isEphemeralAgentOsTile(tile) {
 	if (tile?.type !== "term") return false;
-	const target = String(tile.terminalTarget ?? tile.runtimeTarget ?? "");
-	return target.startsWith("agentos:");
+	// Check BOTH fields: a tile persisted mid-spawn (or after a failed spawn)
+	// has runtimeTarget "agentos" (bare, no colon) and no terminalTarget yet —
+	// those half-born tiles are exactly the ones that must not be restored.
+	const targets = [tile.terminalTarget, tile.runtimeTarget];
+	return targets.some((raw) => {
+		const target = String(raw ?? "");
+		return target === "agentos" || target.startsWith("agentos:");
+	});
 }
 
 let idCounter = 0;

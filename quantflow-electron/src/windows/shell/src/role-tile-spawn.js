@@ -309,14 +309,35 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 				tileId: tile.id,
 				status: "active",
 			});
+			// Provable tile: every dock spawn leaves Kernel evidence, not just a
+			// DOM tile. The full agent.reply readiness bar comes from the first
+			// prompt round trip; this receipt proves the session was prepared.
+			await kapi.sendCommand("kernel.receipt.post", {
+				type: "progress",
+				tileId: tile.id,
+				summary: `Dock spawn prepared: ${displayName} (${prepare.terminalTarget})`,
+				metadata: {
+					milestone: "dock.spawn.prepared",
+					workspaceId: workspaceId ?? null,
+					terminalTarget: prepare.terminalTarget,
+					roleName,
+				},
+			});
 		}
 		const instruction = String(options.instruction ?? "").trim();
 		if (instruction) {
-			void shellApi?.agentosRun?.({
+			shellApi?.agentosRun?.({
 				workspaceId,
 				tileId: tile.id,
 				instruction,
 				workflowId: options.workflowId ?? undefined,
+			})?.catch?.((err) => {
+				const message = err instanceof Error ? err.message : String(err);
+				console.warn(`agentosRun failed for tile ${tile.id}: ${message}`);
+				toasts?.show?.({
+					message: `${displayName}: startup instruction failed — ${message}`,
+					tone: "error",
+				});
 			});
 		}
 	} catch (err) {

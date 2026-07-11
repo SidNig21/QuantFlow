@@ -3616,6 +3616,10 @@ async function init() {
 				.map((tile) => tile.id),
 		);
 		if (expiredAgentOsIds.size > 0) {
+			const expiredConnections = (savedState.connections ?? []).filter(
+				(conn) => expiredAgentOsIds.has(conn.tileAId)
+					|| expiredAgentOsIds.has(conn.tileBId),
+			);
 			savedState.tiles = (savedState.tiles ?? []).filter(
 				(tile) => !expiredAgentOsIds.has(tile.id),
 			);
@@ -3624,6 +3628,36 @@ async function init() {
 					&& !expiredAgentOsIds.has(conn.tileBId),
 			);
 			await window.shellApi.canvasSaveState(savedState);
+			// Expiry must reach the truth store, not just the JSON export:
+			// otherwise the Kernel keeps ghost tile rows and "active" workers for
+			// tiles the canvas deleted. All three commands are idempotent.
+			if (window.kernelApi) {
+				for (const conn of expiredConnections) {
+					try {
+						await window.kernelApi.sendCommand(
+							"kernel.connection.delete", { id: conn.id },
+						);
+					} catch (err) {
+						console.warn("fresh-run expiry: connection.delete failed", conn.id, err);
+					}
+				}
+				for (const tileId of expiredAgentOsIds) {
+					try {
+						await window.kernelApi.sendCommand(
+							"kernel.worker.stop", { tileId },
+						);
+					} catch (err) {
+						console.warn("fresh-run expiry: worker.stop failed", tileId, err);
+					}
+					try {
+						await window.kernelApi.sendCommand(
+							"kernel.tile.remove", { id: tileId },
+						);
+					} catch (err) {
+						console.warn("fresh-run expiry: tile.remove failed", tileId, err);
+					}
+				}
+			}
 		}
 		const { centerX, centerY, zoom } = savedState.viewport;
 		const w = canvasEl.clientWidth;

@@ -80,9 +80,22 @@ async function syncAgentOsHostRegistry(
   targetTileId: string,
   conn: ConnectionGraphEntry,
 ): Promise<void> {
-  await prepareAgentOsTerminalAttach({ tileId: targetTileId });
-  await pushConnectionGraphToHost([conn]);
+  // A cable send must never create an unkeyed session: the host hard-rejects
+  // sessions without [workspaceId, tileId]. If the target attach is missing
+  // (main restart, spawn raced), re-attach with the sender's workspaceId —
+  // both tiles live on the same canvas, and the durable actor key means this
+  // re-addresses the SAME actor. With no workspaceId available, fail loudly.
   const fromAttach = getAgentOsTileAttach(fromTileId);
+  if (!getAgentOsTileAttach(targetTileId)) {
+    const workspaceId = fromAttach?.workspaceId;
+    if (!workspaceId) {
+      throw new Error(
+        `agentos relay: no live attach for tile ${targetTileId} and no workspaceId to re-address it — spawn both tiles from the Dock first`,
+      );
+    }
+    await prepareAgentOsTerminalAttach({ workspaceId, tileId: targetTileId });
+  }
+  await pushConnectionGraphToHost([conn]);
   const targetAttach = getAgentOsTileAttach(targetTileId);
   if (fromAttach?.sessionId) {
     await registerHostTileSession(fromTileId, fromAttach.sessionId);
@@ -240,12 +253,18 @@ async function delegateAgentOs(
     }
     return { ok: true, reply };
   }
-  await syncAgentOsHostRegistry(input.fromTileId, input.toTileId, conn);
-  return postHostCableSend({
-    connectionId: input.cableId,
-    fromTileId: input.fromTileId,
-    text: input.text,
-  });
+  try {
+    await syncAgentOsHostRegistry(input.fromTileId, input.toTileId, conn);
+    return await postHostCableSend({
+      connectionId: input.cableId,
+      fromTileId: input.fromTileId,
+      text: input.text,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[tile-relay] agentos delegate failed (${input.fromTileId}→${input.toTileId}): ${message}`);
+    return { ok: false, message };
+  }
 }
 
 async function notifySender(
@@ -273,11 +292,13 @@ async function notifySender(
     return;
   }
   if (runtime === 'agentos') {
+    // Echo only through the sender's EXISTING attach — never create a new
+    // (possibly unkeyed) session just to display a reply.
     try {
-      await prepareAgentOsTerminalAttach({ tileId: input.fromTileId });
       await writeAgentOsTileTerminal(input.fromTileId, line);
-    } catch {
-      // Best-effort echo for orchestrator proofs.
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[tile-relay] reply echo to sender ${input.fromTileId} failed: ${message}`);
     }
   }
 }

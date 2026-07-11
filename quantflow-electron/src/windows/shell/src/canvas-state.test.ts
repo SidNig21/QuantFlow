@@ -57,8 +57,16 @@ describe("defaultSize", () => {
 describe("isEphemeralAgentOsTile", () => {
 	test("expires only persisted AgentOS terminal runs", () => {
 		expect(isEphemeralAgentOsTile({ type: "term", terminalTarget: "agentos:v2:workspace:tile" })).toBe(true);
-		expect(isEphemeralAgentOsTile({ type: "term", runtimeTarget: "agentos:tile" })).toBe(true);
+		// Production dock spawns write bare runtimeTarget "agentos" (no colon);
+		// terminalTarget is only set after prepare succeeds.
+		expect(isEphemeralAgentOsTile({ type: "term", runtimeTarget: "agentos" })).toBe(true);
+		// Half-spawned tile: runtimeTarget set, prepare failed, no terminalTarget.
+		expect(isEphemeralAgentOsTile({ type: "term", runtimeTarget: "agentos", ptyStatus: "error" })).toBe(true);
+		// Fully-prepared tile has both fields; herdr terminalTarget must not mask
+		// an agentos runtimeTarget (and vice versa a real herdr tile stays).
+		expect(isEphemeralAgentOsTile({ type: "term", terminalTarget: "agentos:v2:ws:tile", runtimeTarget: "agentos" })).toBe(true);
 		expect(isEphemeralAgentOsTile({ type: "term", terminalTarget: "herdr-wsl:terminal" })).toBe(false);
+		expect(isEphemeralAgentOsTile({ type: "term", runtimeTarget: "herdr-wsl" })).toBe(false);
 		expect(isEphemeralAgentOsTile({ type: "browser", terminalTarget: "agentos:tile" })).toBe(false);
 	});
 });
