@@ -10,21 +10,20 @@ describe('agentos pre-warm hook', () => {
     await mod.disposeAgentOsService();
   });
 
-  test('prewarmAgentOsHost is opt-in with QF_AGENTOS_PREWARM=1', async () => {
+  test('prewarmAgentOsHost runs by default; opt out with QF_AGENTOS_PREWARM=0', async () => {
     const mod = await import('./agentos-service');
     mod.setAgentOsPrewarmDryRun(true);
     expect(mod.wasAgentOsPrewarmInvoked()).toBe(false);
 
     mod.prewarmAgentOsHost();
-    expect(mod.wasAgentOsPrewarmInvoked()).toBe(false);
+    expect(mod.wasAgentOsPrewarmInvoked()).toBe(true);
 
     await mod.disposeAgentOsService();
-    expect(mod.wasAgentOsPrewarmInvoked()).toBe(false);
 
     mod.setAgentOsPrewarmDryRun(true);
-    process.env.QF_AGENTOS_PREWARM = '1';
+    process.env.QF_AGENTOS_PREWARM = '0';
     mod.prewarmAgentOsHost();
-    expect(mod.wasAgentOsPrewarmInvoked()).toBe(true);
+    expect(mod.wasAgentOsPrewarmInvoked()).toBe(false);
 
     await mod.disposeAgentOsService();
   });

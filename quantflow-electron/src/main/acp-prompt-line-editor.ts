@@ -1,5 +1,5 @@
 /**
- * Local echo + line editing for AgentOS ACP prompt-mode actors (pi, claude-code, opencode).
+ * Local echo + line editing for AgentOS ACP prompt-mode actors (pi, claude-code, opencode, eve).
  */
 export interface AcpPromptLineEditor {
   handleInput(data: string): void;
@@ -52,7 +52,8 @@ export function isAcpPromptSoftware(software: string): boolean {
   return software === "claude-code"
     || software === "claude"
     || software === "pi"
-    || software === "opencode";
+    || software === "opencode"
+    || software === "eve";
 }
 
 export function bootstrapAcpTerminalText(actorName: string): string {

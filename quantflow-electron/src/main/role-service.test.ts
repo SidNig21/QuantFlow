@@ -100,6 +100,16 @@ describe("listRoles", () => {
     expect(role?.systemPrompt).toBeUndefined();
   });
 
+  test("Eve uses AgentOS eve software without a Windows dev server", async () => {
+    const role = await getRole("eve");
+
+    expect(role?.runtimeTarget).toBe("agentos");
+    expect(role?.harnessKind).toBe("agentos");
+    expect(role?.agentosSoftware).toBe("eve");
+    expect(role?.commandTemplate).toBeUndefined();
+    expect(role?.agentAdapter).toBeUndefined();
+  });
+
   test("each role has identity and launch metadata", async () => {
     const roles = await listRoles();
     for (const role of roles) {

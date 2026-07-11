@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildDockLegendRecipes, DOCK_ACTOR_IDS } from "./dock-actors";
+import { buildDockLegendRecipes, DOCK_SPAWN_ACTOR_IDS } from "./dock-actors";
 import { LEGEND_RECIPES } from "../windows/shell/src/legend-dock.js";
 
 function seedFields(recipe: {
@@ -25,10 +25,10 @@ function seedFields(recipe: {
 }
 
 describe("dock legend seed sync", () => {
-  test("legend-dock.js seed matches dock-actors canonical recipes", () => {
+  test("legend-dock.js seed matches verified dock spawn rail", () => {
     const canonical = buildDockLegendRecipes();
-    expect(LEGEND_RECIPES.map((r) => r.id)).toEqual([...DOCK_ACTOR_IDS]);
-    expect(canonical.map((r) => r.id)).toEqual([...DOCK_ACTOR_IDS]);
+    expect(LEGEND_RECIPES.map((r) => r.id)).toEqual([...DOCK_SPAWN_ACTOR_IDS]);
+    expect(canonical.map((r) => r.id)).toEqual([...DOCK_SPAWN_ACTOR_IDS]);
     expect(LEGEND_RECIPES.map(seedFields)).toEqual(canonical.map(seedFields));
   });
 });

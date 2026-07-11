@@ -1,14 +1,14 @@
 /**
  * QF Dock — canonical actor roster (single source of truth).
  *
- * Agent actors (Claude/Codex/Hermes) run as AgentOS sessions on the canvas.
- * Scripts use herdr-wsl; Eve personas use windows-pty.
+ * Verified actor registry. Individual launch profiles decide the rail:
+ * Eve/Hermes/Pi can ride AgentOS, Codex/Claude stay native PTY until proven.
  */
 
 import type { AgentOsSoftware, Role, RoleRuntimeTarget } from "./role-service";
 import type { AgentAdapter } from "./agent-adapter";
 import { resolveRoleLaunchFields, toIpcSafeAgentAdapter } from "./agent-adapter";
-import { DOCK_ACTOR_CATALOG, DOCK_ACTOR_IDS } from "./dock-catalog";
+import { DOCK_ACTOR_CATALOG, DOCK_ACTOR_IDS, DOCK_SPAWN_ACTOR_IDS } from "./dock-catalog";
 import type { DockActorId, DockActorKind } from "./dock-catalog";
 import {
   DOCK_ACTOR_LAUNCH_PROFILES,
@@ -16,7 +16,7 @@ import {
   resolveEveAgentCwd,
 } from "./launch-profiles";
 
-export { DOCK_ACTOR_IDS };
+export { DOCK_ACTOR_IDS, DOCK_SPAWN_ACTOR_IDS };
 export type { DockActorId, DockActorKind };
 
 
@@ -159,7 +159,10 @@ export function dockActorToLegendRecipe(actor: DockActorDefinition) {
 }
 
 export function buildDockLegendRecipes() {
-  return DOCK_ACTORS.map(dockActorToLegendRecipe);
+  const spawnIds = new Set<string>(DOCK_SPAWN_ACTOR_IDS);
+  return DOCK_ACTORS
+    .filter((actor) => spawnIds.has(actor.id))
+    .map(dockActorToLegendRecipe);
 }
 
 export function buildDockRoles(): Role[] {

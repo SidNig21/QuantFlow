@@ -892,6 +892,10 @@
 .lv1-dock__section-sub { padding: 0 9px 8px; color: color-mix(in srgb, var(--muted-foreground) 85%, transparent); font-family: var(--font-mono); font-size: 8px; }
 .lv1-dock__scroll { display: grid; gap: 4px; min-height: 0; padding: 0 5px 6px; overflow: auto; scrollbar-width: none; }
 .lv1-dock__scroll::-webkit-scrollbar { display: none; }
+.lv1-dock__empty { display: grid; gap: 6px; padding: 10px 8px 12px; border: 1px dashed color-mix(in srgb, var(--muted-foreground) 28%, transparent); border-radius: 7px; color: var(--muted-foreground); }
+.lv1-dock__empty--muted { border-style: none; padding: 8px; }
+.lv1-dock__empty-title { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground)); }
+.lv1-dock__empty-copy { font-family: var(--font-mono); font-size: 8px; line-height: 1.45; letter-spacing: 0.02em; }
 
 .lv1-recipe, .lv1-dock[data-density="comfortable"] .lv1-recipe { display: grid; grid-template-columns: 30px minmax(0, 1fr) 7px; gap: 8px; align-items: center; min-height: 45px; padding: 6px 7px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--foreground); text-align: left; transition: background 120ms ease, border-color 120ms ease, transform 120ms ease; }
 .lv1-recipe:hover:not(:disabled), .lv1-recipe[data-state="active"] { border-color: color-mix(in srgb, var(--role-color) 55%, transparent); background: color-mix(in srgb, var(--role-color) 9%, transparent); transform: translateX(1px); }

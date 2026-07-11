@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   DOCK_ACTOR_IDS,
   DOCK_ACTORS,
+  DOCK_SPAWN_ACTOR_IDS,
   buildDockLegendRecipes,
   buildDockRoles,
   dockActorToLegendRecipe,
@@ -28,6 +29,11 @@ describe("dock-actors", () => {
     expect(DOCK_ACTORS).toHaveLength(7);
   });
 
+  test("dock spawn rail starts empty until canvas proof promotes actors", () => {
+    expect([...DOCK_SPAWN_ACTOR_IDS]).toEqual([]);
+    expect(buildDockLegendRecipes()).toHaveLength(0);
+  });
+
   test("maps each actor to role + legend recipe with matching ids", () => {
     for (const actor of DOCK_ACTORS) {
       const role = dockActorToRole(actor);
@@ -47,18 +53,20 @@ describe("dock-actors", () => {
     expect(role.commandTemplate).toBeUndefined();
   });
 
-  test("agent actors use AgentOS rail; Eve personas ride Eve's local rail", () => {
+  test("agent actors use AgentOS rail; secondary Eve personas ride Eve's local rail", () => {
     const softwareById = {
       hermes: "claude-code",
+      eve: "eve",
     } as const;
-    for (const id of ["hermes"] as const) {
+    for (const id of ["hermes", "eve"] as const) {
       const role = dockActorToRole(getDockActor(id)!);
       expect(role.runtimeTarget).toBe("agentos");
       expect(role.harnessKind).toBe("agentos");
-      expect(role.legacyRuntimeTarget).toBe("herdr-wsl");
       expect(role.agentosSoftware).toBe(softwareById[id]);
       expect(role.agentosSoftware).not.toBe("pi");
+      expect(role.commandTemplate).toBeUndefined();
     }
+    expect(dockActorToRole(getDockActor("hermes")!).legacyRuntimeTarget).toBe("herdr-wsl");
     for (const id of ["claude", "codex"] as const) {
       const role = dockActorToRole(getDockActor(id)!);
       expect(role.runtimeTarget).toBe("windows-pty");
@@ -66,8 +74,8 @@ describe("dock-actors", () => {
       expect(role.agentAdapter?.launch).toBe(id);
       expect(role.commandTemplate).toContain(id);
     }
-    // Eve + Eve personas run locally via npm run dev — NOT AgentOS, NOT pi.
-    for (const id of ["eve", "bovada-odds", "canvas-scout"] as const) {
+    // Secondary Eve personas run locally via npm run dev until their own proofs land.
+    for (const id of ["bovada-odds", "canvas-scout"] as const) {
       const role = dockActorToRole(getDockActor(id)!);
       expect(role.runtimeTarget).toBe("windows-pty");
       expect(role.harnessKind).not.toBe("agentos");
@@ -117,9 +125,9 @@ describe("dock-actors", () => {
     }
   });
 
-  test("build helpers match DOCK_ACTORS length", () => {
+  test("build helpers match registry vs verified dock spawn rail", () => {
     expect(buildDockRoles()).toHaveLength(7);
-    expect(buildDockLegendRecipes()).toHaveLength(7);
+    expect(buildDockLegendRecipes()).toHaveLength(0);
   });
 
   test("claude-worker alias resolves to claude", () => {
@@ -141,8 +149,11 @@ describe("dock-actors", () => {
     expect(codexRecipe.startupPrompt).toBeTruthy(); // codex has no promptArg → sent after ready
 
     const eveRecipe = dockActorToLegendRecipe(getDockActor("eve")!);
-    expect(eveRecipe.agentAdapter?.integrationMode).toBe("server");
-    expect(eveRecipe.commandTemplate).toBe("npm run dev");
+    expect(eveRecipe.agentAdapter).toBeUndefined();
+    expect(eveRecipe.commandTemplate).toBeUndefined();
+    expect(eveRecipe.runtimeTarget).toBe("agentos");
+    expect(eveRecipe.harnessKind).toBe("agentos");
+    expect(eveRecipe.agentosSoftware).toBe("eve");
   });
 
   test("role and legend recipe projections are structured-clone safe for IPC", () => {
@@ -155,7 +166,7 @@ describe("dock-actors", () => {
     // spawn. No separate hardcoded map to drift out of sync.
     expect(getAgentAdapterForRole("claude")?.launch).toBe("claude");
     expect(getAgentAdapterForRole("codex")?.launch).toBe("codex");
-    expect(getAgentAdapterForRole("eve")?.integrationMode).toBe("server");
+    expect(getAgentAdapterForRole("eve")).toBeNull();
     expect(getAgentAdapterForRole("nonexistent")).toBeNull();
     expect(getAgentAdapterForRole(undefined)).toBeNull();
   });

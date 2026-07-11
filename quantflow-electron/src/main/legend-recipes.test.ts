@@ -30,13 +30,11 @@ describe("legend-recipes registry", () => {
     if (tempDir) await rm(tempDir, { recursive: true, force: true });
   });
 
-  test("built-in seed keeps dock actors from dock-actors.ts", () => {
+  test("built-in seed follows the verified dock spawn rail", () => {
     expect(BUILT_IN_LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
       ...BUILT_IN_LEGEND_RECIPE_IDS,
     ]);
-    expect(BUILT_IN_LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
-      "pi-stick", "codex", "claude", "hermes", "eve", "bovada-odds", "canvas-scout",
-    ]);
+    expect(BUILT_IN_LEGEND_RECIPE_IDS).toEqual([]);
   });
 
   test("create/remove round-trips a custom CLI recipe through roles/*.json", async () => {
@@ -141,7 +139,18 @@ describe("legend-recipes registry", () => {
   });
 
   test("maps readiness from injected capability levels", () => {
-    const recipe = BUILT_IN_LEGEND_RECIPES.find((entry) => entry.id === "codex")!;
+    const recipe = {
+      id: "codex",
+      roleId: "codex",
+      group: "spawn" as const,
+      type: "codex" as const,
+      name: "Codex",
+      description: "windows-pty",
+      runtime: "windows-pty",
+      color: "#14d9ff",
+      icon: "codex",
+      runtimeTarget: "windows-pty" as const,
+    };
     const levels = new Map<string, "healthy" | "degraded" | "down">([
       [resolveRecipeCapabilityId(recipe), "degraded"],
       ["harness:local-shell", "healthy"],

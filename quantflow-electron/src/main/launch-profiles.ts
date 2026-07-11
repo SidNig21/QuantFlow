@@ -64,9 +64,9 @@ export function resolveEveAgentCwd(agentId: string): string {
     ?? join(homedir(), "QuantFlow", "eve-agents", agentId);
 }
 
-// Eve personas run on Eve's OWN rail — local `npm run dev` in their package
-// folder, authed by each package's .env.local. NOT AgentOS sessions, NEVER pi.
-// (Founder directive 2026-07-05: "Bovada Odds / Canvas Scout → same rail as Eve".)
+// Secondary Eve personas stay on Eve's local rail until their own proofs land:
+// local `npm run dev` in their package folder, authed by each package's
+// .env.local. Main `eve` is the first AgentOS custom software proof.
 const EVE_LOCAL_PROFILE = {
   runtimeTarget: "windows-pty" as const,
   commandTemplate: "npm run dev",
@@ -128,12 +128,11 @@ export const DOCK_ACTOR_LAUNCH_PROFILES: readonly DockActorLaunchProfile[] = [
   },
   {
     id: "eve",
-    runtimeTarget: "windows-pty",
-    commandTemplate: "npm run dev",
-    resolveCwd: resolveDefaultEveCwd,
-    agentAdapter: SERVER_AGENT_ADAPTER,
-    cwdPolicy: "inherit",
-    defaultShell: "powershell",
+    runtimeTarget: "agentos",
+    harnessKind: "agentos",
+    agentosSoftware: "eve",
+    cwdPolicy: "workspace",
+    defaultShell: "auto",
     modelHint: "deepseek-v4-pro",
     envoyProfile: "eve-agent",
   },

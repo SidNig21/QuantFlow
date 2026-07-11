@@ -8,7 +8,7 @@ import { saveProofScreenshot, spawnDockRecipeTile } from "./proof-tile-spawn";
 import { SIDECAR_PID_PATH } from "./sidecar/protocol";
 
 const SETTLE_MS = 2500;
-const RECIPES = ["codex", "hermes", "claude"] as const;
+const RECIPES = ["eve"] as const;
 
 function logStep(name: string, ok: boolean, detail: string): void {
   console.log(`ACTORS-ON-AGENTOS-PROOF: step=${name} ok=${ok} detail=${detail}`);

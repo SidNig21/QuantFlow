@@ -13,7 +13,7 @@ export function _setRolesDir(dir: string): void {
 
 export type RoleRuntimeTarget = "herdr-wsl" | "windows-pty" | "agentos";
 
-export type AgentOsSoftware = "pi" | "opencode" | "claude-code" | "codex";
+export type AgentOsSoftware = "pi" | "opencode" | "claude-code" | "codex" | "eve";
 
 export interface Role {
   id: string;

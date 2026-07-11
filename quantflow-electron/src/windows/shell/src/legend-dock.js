@@ -3,102 +3,8 @@ export const LEGEND_PREF_KEYS = {
 	spawnMode: "legendV1.spawnMode",
 };
 
-/** Built-in seed — runtime list comes from main via getRecipes(); keep in sync with dock-actors.ts. */
-export const LEGEND_RECIPES = [
-	{
-		id: "pi-stick",
-		roleId: "pi-stick",
-		group: "spawn",
-		type: "worker",
-		name: "Pi Stick",
-		description: "agentos · pi stick",
-		runtime: "agentos",
-		runtimeTarget: "agentos",
-		harnessKind: "agentos",
-		agentosSoftware: "pi",
-		color: "var(--rail-worker, #a3e635)",
-		icon: "shell",
-	},
-	{
-		id: "codex",
-		roleId: "codex",
-		group: "spawn",
-		type: "codex",
-		name: "Codex",
-		description: "windows-pty · codex",
-		runtime: "windows-pty",
-		runtimeTarget: "windows-pty",
-		commandTemplate: "codex",
-		color: "var(--rail-codex, #14d9ff)",
-		icon: "codex",
-	},
-	{
-		id: "claude",
-		roleId: "claude",
-		group: "spawn",
-		type: "worker",
-		name: "Claude Code",
-		description: "windows-pty · claude",
-		runtime: "windows-pty",
-		runtimeTarget: "windows-pty",
-		commandTemplate: "claude",
-		color: "var(--rail-worker, #ffc24a)",
-		icon: "claude",
-	},
-	{
-		id: "hermes",
-		roleId: "hermes",
-		group: "spawn",
-		type: "agent",
-		name: "Hermes",
-		description: "agentos · hermes",
-		runtime: "agentos",
-		runtimeTarget: "agentos",
-		harnessKind: "agentos",
-		agentosSoftware: "claude-code",
-		color: "var(--rail-agent, #4fc3ff)",
-		icon: "hermes",
-	},
-	{
-		id: "eve",
-		roleId: "eve",
-		group: "spawn",
-		type: "eve",
-		name: "Eve",
-		description: "eve · OpenCode Go",
-		runtime: "windows-pty",
-		runtimeTarget: "windows-pty",
-		commandTemplate: "npm run dev",
-		color: "var(--rail-agent, #6366f1)",
-		icon: "eve",
-	},
-	{
-		id: "bovada-odds",
-		roleId: "bovada-odds",
-		group: "spawn",
-		type: "eve",
-		name: "Bovada Odds",
-		description: "eve · bovada odds",
-		runtime: "windows-pty",
-		runtimeTarget: "windows-pty",
-		commandTemplate: "npm run dev",
-		color: "var(--rail-agent, #22c55e)",
-		icon: "eve",
-	},
-	{
-		id: "canvas-scout",
-		roleId: "canvas-scout",
-		group: "spawn",
-		type: "eve",
-		name: "Canvas Scout",
-		description: "eve · canvas scout",
-		runtime: "windows-pty",
-		runtimeTarget: "windows-pty",
-		commandTemplate: "npm run dev",
-		color: "var(--rail-agent, #a855f7)",
-		icon: "eve",
-	},
-];
+/** Built-in seed — runtime list comes from main via getRecipes(); keep spawn ids in sync with DOCK_SPAWN_ACTOR_IDS. */
+export const LEGEND_RECIPES = [];
 
 export { mapHealthLevelToBadge, resolveRecipeCapabilityId, resolveReadinessBadge } from "./legend-readiness.js";
 
@@ -354,15 +260,14 @@ function recipeButton(recipe, state, readinessBadge = "red", recipes = LEGEND_RE
 }
 
 export function renderDockHtml(state, recipes = LEGEND_RECIPES, readinessByRecipeId = {}) {
-	const armed = state.armedTemplate === TEMPLATE_ID;
 	const spawnRecipes = recipes.filter((recipe) => recipe.group === "spawn");
+	const agentsEmpty = spawnRecipes.length === 0;
 
 	return `
 		<header class="lv1-dock__header">
 			<span class="lv1-dock__brand">QF</span>
-			<span class="lv1-dock__heading"><span>Dock</span><small>fresh actor runs</small></span>
+			<span class="lv1-dock__heading"><span>Dock</span><small>verified actors only</small></span>
 			<button class="lv1-dock__tidy" type="button" data-action="tidy-grid" title="Tidy tiles to grid">Tidy</button>
-			<button class="lv1-dock__add" type="button" data-action="add-agent" title="Add a deployable agent or tool">Add</button>
 		</header>
 		<div class="lv1-dock__body">
 			<section class="lv1-dock__section lv1-dock__section--agents" data-group="agents">
@@ -370,46 +275,38 @@ export function renderDockHtml(state, recipes = LEGEND_RECIPES, readinessByRecip
 					<span>Agents</span>
 					<span>${spawnRecipes.length}</span>
 				</div>
-				<div class="lv1-dock__section-sub">Click an agent to start a new tile</div>
+				<div class="lv1-dock__section-sub">${agentsEmpty
+		? "No verified agents yet — promote after canvas proof"
+		: "Click an agent to start a new tile"}</div>
 				<div class="lv1-dock__scroll" data-scroll-region="agents">
-					${spawnRecipes.map((recipe) => recipeButton(
-						recipe,
-						state,
-						readinessByRecipeId[recipe.id] ?? "red",
-						recipes,
-					)).join("")}
+					${agentsEmpty
+		? `<div class="lv1-dock__empty" role="status">
+						<span class="lv1-dock__empty-title">Runtime foundation ready</span>
+						<span class="lv1-dock__empty-copy">Actors appear here one at a time after they pass live canvas proof in the AgentOS stack.</span>
+					</div>`
+		: spawnRecipes.map((recipe) => recipeButton(
+			recipe,
+			state,
+			readinessByRecipeId[recipe.id] ?? "red",
+			recipes,
+		)).join("")}
 				</div>
 			</section>
 			<section class="lv1-dock__section lv1-dock__section--templates" data-group="templates">
 				<div class="lv1-dock__section-head">
 					<span>Templates</span>
-					<span>1</span>
+					<span>0</span>
 				</div>
 				<div class="lv1-dock__scroll" data-scroll-region="templates">
-				<button
-					class="lv1-template"
-					data-template="${TEMPLATE_ID}"
-					${armed ? "data-armed" : ""}
-					type="button"
-					aria-pressed="${armed ? "true" : "false"}"
-				>
-					<span class="lv1-template__glyph" aria-hidden="true">
-						<span class="lv1-template__glyph-box lv1-template__glyph-box--hermes"></span>
-						<span class="lv1-template__glyph-box lv1-template__glyph-box--puffer"></span>
-					</span>
-					<span class="lv1-template__copy">
-						<span class="lv1-template__name">RL Training</span>
-						<span class="lv1-template__summary">Hermes to PufferLib / paper trade loop</span>
-						<span class="lv1-template__meta">2 actors / 1 cable</span>
-					</span>
-					<span class="lv1-template__armed-badge">${armed ? "Armed" : "Arm"}</span>
-				</button>
+					<div class="lv1-dock__empty lv1-dock__empty--muted" role="status">
+						<span class="lv1-dock__empty-copy">Workflow templates return after agent proofs land.</span>
+					</div>
 				</div>
 			</section>
 		</div>
 		<footer class="lv1-dock__footer">
-			<span>Each tile is a fresh run.</span>
-			<span>Close tile = end run.</span>
+			<span>Fresh run per tile.</span>
+			<span>Close = end run.</span>
 		</footer>
 	`;
 }

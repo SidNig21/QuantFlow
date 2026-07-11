@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
   CLAUDE_NATIVE_TUI_ADAPTER,
   isNativeTuiAdapter,
-  isServerClassifiedAdapter,
   resolveRoleLaunchFields,
 } from "./agent-adapter";
 // getAgentAdapterForRole now resolves from the actor roster (single source of truth).
@@ -15,12 +14,9 @@ describe("agent-adapter", () => {
     expect(adapter?.launch).toBe("claude");
   });
 
-  test("eve resolves as server — no terminal prompt injection", () => {
+  test("eve uses the AgentOS rail with no terminal adapter", () => {
     const adapter = getAgentAdapterForRole("eve");
-    expect(isServerClassifiedAdapter(adapter)).toBe(true);
-    const fields = resolveRoleLaunchFields(adapter, "You are Eve...", "npm run dev");
-    expect(fields.commandTemplate).toBe("npm run dev");
-    expect(fields.startupPrompt).toBeUndefined();
+    expect(adapter).toBeNull();
   });
 
   test("promptArg folds startup prompt into launch command", () => {

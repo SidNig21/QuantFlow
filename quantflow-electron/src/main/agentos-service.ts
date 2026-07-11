@@ -1,7 +1,7 @@
 /**
  * AgentOS harness service — lazy singleton for Electron main (P6 chunk A).
  *
- * V0.1: optional fire-and-forget pre-warm on app boot (`prewarmAgentOsHost`).
+ * V0.1: fire-and-forget pre-warm on app boot (`prewarmAgentOsHost`).
  * First transport use still starts the host if pre-warm has not finished.
  * Connection failures surface as `agentos unavailable: …` without blocking
  * app startup (kill-switch invariant).
@@ -236,11 +236,11 @@ export function setAgentOsPrewarmDryRun(enabled: boolean): void {
 }
 
 /**
- * WSL host pre-warm — opt in with QF_AGENTOS_PREWARM=1.
- * First transport use still starts the host lazily when pre-warm has not finished.
+ * WSL host pre-warm — on by default so the first Dock click does not pay cold
+ * WSL boot. Opt out with QF_AGENTOS_PREWARM=0 (tests/CI).
  */
 export function prewarmAgentOsHost(): void {
-  if (process.env.QF_AGENTOS_PREWARM !== '1') return;
+  if (process.env.QF_AGENTOS_PREWARM === '0') return;
   if (prewarmInvoked || shouldSkipLiveHost()) return;
   prewarmInvoked = true;
   if (prewarmDryRun) return;

@@ -1,3 +1,4 @@
+/** Full actor registry — launch profiles, roles, relay adapters. Not the Dock UI list. */
 export const DOCK_ACTOR_IDS = [
   "pi-stick",
   "codex",
@@ -9,6 +10,13 @@ export const DOCK_ACTOR_IDS = [
 ] as const;
 
 export type DockActorId = (typeof DOCK_ACTOR_IDS)[number];
+
+/**
+ * Verified-only Dock spawn rail. Empty until an actor passes live canvas proof
+ * (dock click → tile → AgentOS session → Kernel receipt). Promote one id at a
+ * time after `docs/v7/V7_FIRST_PROOF.md` / P1d evidence — never pre-ship hope.
+ */
+export const DOCK_SPAWN_ACTOR_IDS = [] as const satisfies readonly DockActorId[];
 
 export type DockActorKind = "codex" | "worker" | "agent" | "eve";
 
@@ -67,8 +75,8 @@ export const DOCK_ACTOR_CATALOG: readonly DockActorCatalogEntry[] = [
   {
     id: "eve",
     name: "Eve",
-    description: "QuantFlow Eve agent (OpenCode Go · npm run dev)",
-    dockSubtitle: "eve · OpenCode Go",
+    description: "QuantFlow Eve agent (AgentOS eve software)",
+    dockSubtitle: "agentos · eve",
     color: "var(--rail-agent, #6366f1)",
     roleColor: "#6366f1",
     icon: "eve",

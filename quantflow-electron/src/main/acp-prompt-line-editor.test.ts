@@ -17,6 +17,7 @@ describe("acp-prompt-line-editor", () => {
   test("recognizes ACP prompt software ids", () => {
     expect(isAcpPromptSoftware("pi")).toBe(true);
     expect(isAcpPromptSoftware("claude-code")).toBe(true);
+    expect(isAcpPromptSoftware("eve")).toBe(true);
     expect(isAcpPromptSoftware("bash")).toBe(false);
   });
 });

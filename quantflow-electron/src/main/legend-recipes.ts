@@ -13,12 +13,12 @@ import {
 } from "./role-service";
 import { QUANTFLOW_DIR } from "./paths";
 import {
-  DOCK_ACTOR_IDS,
+  DOCK_SPAWN_ACTOR_IDS,
   buildDockLegendRecipes,
 } from "./dock-actors";
 
-/** Built-in dock seed — four actors from dock-actors.ts. */
-export const BUILT_IN_LEGEND_RECIPE_IDS = [...DOCK_ACTOR_IDS] as const;
+/** Verified built-in dock seed from DOCK_SPAWN_ACTOR_IDS. */
+export const BUILT_IN_LEGEND_RECIPE_IDS = [...DOCK_SPAWN_ACTOR_IDS] as const;
 
 export type LegendRecipeKind = "generic" | "codex" | "agent" | "worker" | "tool" | "memory" | "eve";
 

@@ -28,34 +28,8 @@ function createStorage(seed: Record<string, string> = {}) {
 }
 
 describe("Legend v2 dock recipes", () => {
-	test("keeps the dock actor seed in sync with dock-actors.ts", () => {
-		expect(LEGEND_RECIPES.map((recipe) => recipe.id)).toEqual([
-			"pi-stick",
-			"codex",
-			"claude",
-			"hermes",
-			"eve",
-			"bovada-odds",
-			"canvas-scout",
-		]);
-		expect(LEGEND_RECIPES.map((recipe) => recipe.name)).toEqual([
-			"Pi Stick",
-			"Codex",
-			"Claude Code",
-			"Hermes",
-			"Eve",
-			"Bovada Odds",
-			"Canvas Scout",
-		]);
-		expect(LEGEND_RECIPES.map((recipe) => recipe.roleId)).toEqual([
-			"pi-stick",
-			"codex",
-			"claude",
-			"hermes",
-			"eve",
-			"bovada-odds",
-			"canvas-scout",
-		]);
+	test("keeps the dock actor seed in sync with verified spawn rail", () => {
+		expect(LEGEND_RECIPES).toEqual([]);
 	});
 });
 
@@ -211,18 +185,17 @@ describe("Legend registry rendering", () => {
 		expect(html).toContain('data-group="agents"');
 		expect(html).toContain('data-scroll-region="agents"');
 		expect(html).toContain('data-scroll-region="templates"');
-		expect(html).toContain("Close tile = end run.");
+		expect(html).toContain("Close = end run.");
+		expect(html).toContain("lv1-dock__empty");
 		expect(html).not.toContain("Route</span>");
 		expect(html).not.toContain("Run Workflow");
 	});
 
-	test("renders a visible tidy-grid dock action beside add", () => {
+	test("renders tidy-grid dock action", () => {
 		const html = renderDockHtml(createLegendState({ storage: createStorage() }).getSnapshot());
 		expect(html).toContain('data-action="tidy-grid"');
 		expect(html).toContain('class="lv1-dock__tidy"');
-		expect(html.indexOf('data-action="tidy-grid"')).toBeLessThan(
-			html.indexOf('data-action="add-agent"'),
-		);
+		expect(html).not.toContain('data-action="add-agent"');
 	});
 
 	test("renders injected custom recipes without rebuild", () => {

@@ -64,6 +64,7 @@ function resolveSoftware(input?: string): string {
     || trimmed === 'claude-code'
     || trimmed === 'claude'
     || trimmed === 'codex'
+    || trimmed === 'eve'
   ) {
     return trimmed === 'claude' ? 'claude-code' : trimmed;
   }
