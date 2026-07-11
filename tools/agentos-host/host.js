@@ -31,6 +31,12 @@ const RIVET_START_TIMEOUT_MS = Number.parseInt(
   10,
 );
 const RIVET_ENVOY_KEY = process.env.AGENTOS_RIVET_ENVOY_KEY?.trim() || randomUUID();
+const EVE_PORT_BASE = Number.parseInt(process.env.EVE_PORT_BASE ?? "3010", 10);
+const EVE_PORT_RANGE = Number.parseInt(process.env.EVE_PORT_RANGE ?? "900", 10);
+const AGENTOS_JS_CPU_TIME_LIMIT_MS = Number.parseInt(
+  process.env.AGENTOS_JS_CPU_TIME_LIMIT_MS ?? "600000",
+  10,
+);
 const PERMISSION_TIMEOUT_MS = 120_000;
 
 function resolveQuantflowEvePackagePath() {
@@ -41,12 +47,33 @@ function resolveQuantflowEvePackagePath() {
 
 const quantflowEve = defineSoftware({ packagePath: resolveQuantflowEvePackagePath() });
 
+function eveLoopbackExemptPorts() {
+  const base = Number.isFinite(EVE_PORT_BASE) ? EVE_PORT_BASE : 3010;
+  const range = Number.isFinite(EVE_PORT_RANGE) ? EVE_PORT_RANGE : 900;
+  const safeStart = Math.max(0, Math.min(65535, base));
+  const safeCount = Math.max(0, Math.min(range, 65536 - safeStart));
+  return Array.from({ length: safeCount }, (_, index) => safeStart + index);
+}
+
 // @rivet-dev/agentos@0.2.7 accepts serializable software + native mounts here.
 // Its native actor schema rejects JS toolKits, so the preserved toolkit/cable
 // definitions below stay deliberately deferred instead of being silently
 // presented as active. ACP permission events still cross the actor connection.
 const agentOsActor = agentOS({
   software: [pi, opencode, claudeCode, quantflowEve],
+  // Eve itself runs in WSL on deterministic per-actor ports. The guest ACP
+  // adapter reaches it through EVE_BASE_URL, so mark that known range as an
+  // intentional loopback bridge.
+  loopbackExemptPorts: eveLoopbackExemptPorts(),
+  // Thin ACP adapters may wait on slow live model streams. Keep the VM-side
+  // relay bounded, but above normal Eve turn latency; the adapter itself
+  // coalesces updates so this is a safety margin, not a license to spam.
+  limits: {
+    jsRuntime: {
+      cpuTimeLimitMs: AGENTOS_JS_CPU_TIME_LIMIT_MS,
+      wallClockLimitMs: AGENTOS_JS_CPU_TIME_LIMIT_MS,
+    },
+  },
   // claude-code's ACP adapter resolves its package through /root/node_modules;
   // mount the host's own node_modules read-only (S3 compat-gate finding).
   mounts: [nodeModulesMount(new URL("./node_modules", import.meta.url).pathname)],
@@ -88,6 +115,7 @@ const actorClient = createClient({
 
 let actorRuntimeStarted = false;
 let actorRuntimeDisposed = false;
+let actorRuntimeStartPromise = null;
 
 /**
  * @typedef {{ workspaceId: string, tileId: string, actorKey: [string, string], keyId: string }} ActorAddress
@@ -371,17 +399,49 @@ function addressFromSession(session) {
   };
 }
 
-function startActorRuntime() {
+async function waitForEnvoy() {
+  const startedAt = Date.now();
+  let lastError = "";
+  while (Date.now() - startedAt < RIVET_START_TIMEOUT_MS) {
+    try {
+      const response = await fetch(`${RIVET_ENDPOINT}/envoys?namespace=default`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      if (response.ok) {
+        const body = await response.json();
+        if (Array.isArray(body.envoys) && body.envoys.length > 0) return;
+        lastError = "no envoys registered";
+      } else {
+        lastError = `status ${response.status}`;
+      }
+    } catch (error) {
+      lastError = error?.cause?.message ?? error?.message ?? String(error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`AgentOS envoy not ready within ${RIVET_START_TIMEOUT_MS}ms: ${lastError}`);
+}
+
+async function startActorRuntime() {
   if (actorRuntimeDisposed) {
     throw new Error("AgentOS actor runtime disposed");
   }
   if (actorRuntimeStarted) return;
-  actorRegistry.start();
-  actorRuntimeStarted = true;
+  if (!actorRuntimeStartPromise) {
+    actorRuntimeStartPromise = (async () => {
+      actorRegistry.start();
+      await waitForEnvoy();
+      actorRuntimeStarted = true;
+    })().catch((error) => {
+      actorRuntimeStartPromise = null;
+      throw error;
+    });
+  }
+  await actorRuntimeStartPromise;
 }
 
-function actorHandleFor(address) {
-  startActorRuntime();
+async function actorHandleFor(address) {
+  await startActorRuntime();
   // This getOrCreate call is the durable delivery door. Sessions only retain
   // the compound key; no raw actor/session object is used as the address.
   return actorClient.agentos.getOrCreate(address.actorKey);
@@ -475,7 +535,7 @@ function wireActorEvents(connection, lifecycle) {
 }
 
 async function ensureActor(address) {
-  const handle = actorHandleFor(address);
+  const handle = await actorHandleFor(address);
   const actorId = await retryActorReady(() => handle.resolve());
 
   let connectionPromise = actorConnections.get(address.keyId);
@@ -552,7 +612,7 @@ async function disposeActorRuntime() {
     const session = sessions.get(terminal.sessionId);
     if (!session) continue;
     try {
-      await actorHandleFor(addressFromSession(session)).closeShell(shellId);
+      await (await actorHandleFor(addressFromSession(session))).closeShell(shellId);
     } catch {
       // Best effort.
     }
@@ -561,7 +621,7 @@ async function disposeActorRuntime() {
 
   for (const [sessionId, session] of sessions) {
     try {
-      await actorHandleFor(addressFromSession(session)).closeSession(sessionId);
+      await (await actorHandleFor(addressFromSession(session))).closeSession(sessionId);
     } catch {
       // Best effort; persisted transcript rows remain actor-owned.
     }
@@ -583,6 +643,7 @@ async function disposeActorRuntime() {
   hostConnectionGraph.clear();
   lastAddressedSessionId = null;
   actorRuntimeDisposed = true;
+  actorRuntimeStartPromise = null;
   await actorClient.dispose().catch(() => {});
   // @rivet-dev/agentos@0.2.7 cannot gracefully drain a prompted actor: the
   // persisted session stays `running`, registry.shutdown() removes its envoy,
