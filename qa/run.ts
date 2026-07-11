@@ -301,6 +301,15 @@ const checks: Check[] = [
     },
   },
   {
+    name: "agentos-eve-multispawn",
+    description:
+      "U5: two proof Eve dock tiles on AgentOS with distinct sessions and live replies",
+    async run() {
+      const { runAgentOsEveMultispawnCheck } = await import("./lib/agentos-eve-multispawn");
+      return runAgentOsEveMultispawnCheck();
+    },
+  },
+  {
     name: "agentos-a2a",
     description:
       "A2A: two pi-stick AgentOS sessions, cable relay, sim ack + scripted canvas proof",
