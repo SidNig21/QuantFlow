@@ -5,7 +5,8 @@
  */
 import http from "node:http";
 import { randomUUID } from "node:crypto";
-import { agentOS, nodeModulesMount, setup } from "@rivet-dev/agentos";
+import { fileURLToPath } from "node:url";
+import { agentOS, defineSoftware, nodeModulesMount, setup } from "@rivet-dev/agentos";
 import { createClient } from "@rivet-dev/agentos/client";
 import { toolKit, hostTool } from "@rivet-dev/agentos-core";
 import pi from "@agentos-software/pi";
@@ -31,12 +32,20 @@ const RIVET_START_TIMEOUT_MS = Number.parseInt(
 const RIVET_ENVOY_KEY = process.env.AGENTOS_RIVET_ENVOY_KEY?.trim() || randomUUID();
 const PERMISSION_TIMEOUT_MS = 120_000;
 
+function resolveQuantflowEvePackagePath() {
+  const override = (process.env.QUANTFLOW_EVE_AGENTOS_PKG ?? "").trim();
+  if (override) return override;
+  return fileURLToPath(new URL("../../../quantflow-eve/agentos/dist/package.aospkg", import.meta.url));
+}
+
+const quantflowEve = defineSoftware({ packagePath: resolveQuantflowEvePackagePath() });
+
 // @rivet-dev/agentos@0.2.7 accepts serializable software + native mounts here.
 // Its native actor schema rejects JS toolKits, so the preserved toolkit/cable
 // definitions below stay deliberately deferred instead of being silently
 // presented as active. ACP permission events still cross the actor connection.
 const agentOsActor = agentOS({
-  software: [pi, opencode, claudeCode],
+  software: [pi, opencode, claudeCode, quantflowEve],
   // claude-code's ACP adapter resolves its package through /root/node_modules;
   // mount the host's own node_modules read-only (S3 compat-gate finding).
   mounts: [nodeModulesMount(new URL("./node_modules", import.meta.url).pathname)],
@@ -207,6 +216,15 @@ function resolveSessionConfig(requested) {
   const software = (requested ?? "").trim();
   if (!software || software === "pi") {
     return resolveSoftwareAndEnv();
+  }
+  if (software === "eve") {
+    const opencodeGoKey = (process.env.OPENCODE_GO_API_KEY ?? "").trim();
+    if (opencodeGoKey) {
+      return { software: "eve", env: { OPENCODE_GO_API_KEY: opencodeGoKey } };
+    }
+    throw new SessionConfigError(
+      "no Eve credential: set OPENCODE_GO_API_KEY in the AgentOS host environment",
+    );
   }
   if (software === "claude" || software === "claude-code") {
     // First choice: the founder's own Claude subscription. `claude setup-token`
@@ -1100,6 +1118,15 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`agentos-host listening on http://${HOST}:${PORT}`);
-});
+if (process.env.AGENTOS_HOST_NO_LISTEN !== "1") {
+  server.listen(PORT, HOST, () => {
+    console.log(`agentos-host listening on http://${HOST}:${PORT}`);
+  });
+}
+
+export {
+  SessionConfigError,
+  hostHasCredential,
+  resolveQuantflowEvePackagePath,
+  resolveSessionConfig,
+};

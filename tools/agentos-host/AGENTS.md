@@ -19,6 +19,7 @@ actor registry and preserves the localhost wire protocol consumed by
 | --- | --- |
 | `host.js` | RivetKit registry/client; HTTP/SSE compatibility server; actor/session routing; credential-order session env |
 | `package.json` | Exact AgentOS/software version pins |
+| `host-config.test.mjs` | Fast session-config tests; must not start Rivet or the HTTP listener |
 
 ## Wire protocol
 
@@ -99,13 +100,18 @@ ACP permission requests block until `POST .../permission` arrives.
 
 ## Credential order
 
-1. `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` / `OPENCODE_ZEN_API_KEY` → Pi
+1. `OPENCODE_GO_API_KEY` → Eve custom ACP software (`software: "eve"`).
+   The value is forwarded in the AgentOS session env only; it is never written
+   to VM files or returned over HTTP. Use `QUANTFLOW_EVE_AGENTOS_PKG` to
+   override the package path; default is the sibling
+   `../../../quantflow-eve/agentos/dist/package.aospkg`.
+2. `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` / `OPENCODE_ZEN_API_KEY` → Pi
    with custom provider files under both supported VM homes. Default is
    OpenCode Go (`https://opencode.ai/zen/go/v1`, model `glm-5.2`); use
    `AGENTOS_PROVIDER=zen` for the legacy Zen route or `AGENTOS_MODEL` to change
    the model.
-2. `OPENROUTER_API_KEY` → Pi with the Anthropic-compatible OpenRouter base.
-3. `ANTHROPIC_API_KEY` → Pi directly.
+3. `OPENROUTER_API_KEY` → Pi with the Anthropic-compatible OpenRouter base.
+4. `ANTHROPIC_API_KEY` → Pi directly.
 
 Named Claude sessions retain their OAuth/API-key precedence. Codex and bundled
 OpenCode rejection rules stay explicit; never silently fall back to Pi.
@@ -129,6 +135,7 @@ Version bumps require a deliberate churn review; the SDK stays behind
 wsl -e bash -lc "cd /mnt/c/Users/rybow/QuantFlow/tools/agentos-host && npm install"
 node --check tools/agentos-host/host.js
 bun test src/harness/agentos
+npm --prefix tools/agentos-host test
 bun qa/run.ts agentos-live
 ```
 

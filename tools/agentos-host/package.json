@@ -6,7 +6,8 @@
   "description": "WSL-side AgentOS host for QuantFlow — localhost HTTP bridge",
   "main": "host.js",
   "scripts": {
-    "start": "node host.js"
+    "start": "node host.js",
+    "test": "node --test *.test.mjs"
   },
   "dependencies": {
     "@agentos-software/claude-code": "0.2.7",
