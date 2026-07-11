@@ -412,8 +412,8 @@ html.platform-win #panel-viewer::before {
 	outline: none;
 }
 
-#panel-viewer:has(.lv1-dock[data-density="comfortable"]) {
-	--canvas-chrome-left: 268px;
+#panel-viewer:has(.lv1-dock) {
+	--canvas-chrome-left: 304px;
 }
 
 #panel-viewer::after {

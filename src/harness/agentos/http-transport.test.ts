@@ -150,6 +150,40 @@ describe('http-agentos-transport', () => {
     expect((await transport.health()).ok).toBe(false);
   });
 
+  test('a completed background event stream does not poison the next prompt', async () => {
+    let streamOpens = 0;
+    const server = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/session/live-1/events') {
+          streamOpens += 1;
+          return new Response(sseBody([]), {
+            headers: { 'content-type': 'text/event-stream' },
+          });
+        }
+        if (url.pathname === '/session/live-1/prompt' && req.method === 'POST') {
+          return Response.json({ ok: true, text: 'ready' });
+        }
+        return new Response('not found', { status: 404 });
+      },
+    }) as Server;
+
+    const transport = createHttpAgentOsTransport({
+      host: '127.0.0.1',
+      port: server.port!,
+    });
+
+    transport.onSessionEvent('live-1', () => {});
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await expect(transport.prompt('live-1', 'hello')).resolves.toMatchObject({ text: 'ready' });
+    expect(streamOpens).toBe(2);
+
+    await transport.dispose();
+    server.stop(true);
+  });
+
   test('health caches the host hasCredential report (boolean only)', async () => {
     let payload: Record<string, unknown> = { ok: true, hasCredential: true };
     const server = Bun.serve({

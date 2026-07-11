@@ -48,6 +48,14 @@ interface PtyBridge {
 const tileAttaches = new Map<string, TileAttach>();
 const ptyBridges = new Map<string, PtyBridge>();
 
+function releaseTileAttach(tileId: string): void {
+  const attach = tileAttaches.get(tileId);
+  if (!attach) return;
+  attach.terminalUnsub?.();
+  attach.sessionEventUnsub?.();
+  tileAttaches.delete(tileId);
+}
+
 function resolveSoftware(input?: string): string {
   const trimmed = input?.trim();
   if (
@@ -249,8 +257,14 @@ export async function killAgentOsPtySession(sessionId: string): Promise<void> {
   if (!bridge) return;
   bridge.unsub();
   ptyBridges.delete(sessionId);
-  const transport = await transportOrThrow();
-  await transport.closeTerminal(bridge.shellId);
+  releaseTileAttach(bridge.tileId);
+  try {
+    const transport = await transportOrThrow();
+    await transport.closeTerminal(bridge.shellId);
+  } catch {
+    // A tile close must release local actor resources even if the host has
+    // already exited. The next fresh tile will create a new attachment.
+  }
 }
 
 export function newAgentOsPtySessionId(): string {
@@ -276,7 +290,7 @@ export async function writeAgentOsTileTerminal(tileId: string, text: string): Pr
 }
 
 export function detachAgentOsTile(tileId: string): void {
-  tileAttaches.delete(tileId.trim());
+  releaseTileAttach(tileId.trim());
 }
 
 export async function disposeAgentOsTerminalBridge(): Promise<void> {

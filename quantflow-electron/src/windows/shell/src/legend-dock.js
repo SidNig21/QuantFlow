@@ -102,11 +102,6 @@ export const LEGEND_RECIPES = [
 
 export { mapHealthLevelToBadge, resolveRecipeCapabilityId, resolveReadinessBadge } from "./legend-readiness.js";
 
-const GROUPS = [
-	{ id: "flow", label: "Flow" },
-	{ id: "spawn", label: "Spawn" },
-];
-
 const TEMPLATE_ID = "rl-training";
 
 const ICONS = {
@@ -326,7 +321,9 @@ function escapeHtml(value) {
 function recipeButton(recipe, state, readinessBadge = "red", recipes = LEGEND_RECIPES) {
 	const disabled = getDisabledRecipeIds(state, recipes).has(recipe.id);
 	const recipeState = disabled ? "disabled" : "idle";
-	const runtime = recipe.runtime ?? recipe.description;
+	const runtime = recipe.runtimeTarget === "agentos"
+		? `AgentOS / ${recipe.agentosSoftware ?? "agent"}`
+		: "Local / terminal";
 	return `
 		<button
 			class="lv1-recipe"
@@ -343,11 +340,11 @@ function recipeButton(recipe, state, readinessBadge = "red", recipes = LEGEND_RE
 			title="${escapeHtml(recipe.name)} - ${escapeHtml(runtime)}"
 		>
 			<span class="lv1-recipe__disc">${ICONS[recipe.icon] ?? ICONS.shell}</span>
-			<span class="lv1-recipe__badge lv1-recipe__badge--${readinessBadge}" aria-hidden="true"></span>
 			<span class="lv1-recipe__copy">
 				<span class="lv1-recipe__name">${escapeHtml(recipe.name)}</span>
-				<span class="lv1-recipe__desc">${escapeHtml(recipe.description)}</span>
+				<span class="lv1-recipe__desc">${escapeHtml(runtime)}</span>
 			</span>
+			<span class="lv1-recipe__badge lv1-recipe__badge--${readinessBadge}" aria-hidden="true"></span>
 			<span class="lv1-recipe__tip" role="tooltip">
 				<span class="lv1-recipe__tip-name">${escapeHtml(recipe.name)}</span>
 				<span class="lv1-recipe__tip-desc">${escapeHtml(runtime)}</span>
@@ -356,71 +353,39 @@ function recipeButton(recipe, state, readinessBadge = "red", recipes = LEGEND_RE
 	`;
 }
 
-function flowActivityButton() {
-	return `
-		<button
-			class="lv1-recipe lv1-recipe--activity"
-			data-role-type="activity"
-			data-state="disabled"
-			data-runtime="route activity"
-			style="--role-color: var(--flow)"
-			type="button"
-			aria-label="Route activity"
-			disabled
-		>
-			<span class="lv1-recipe__disc">${ICONS.activity}</span>
-			<span class="lv1-recipe__copy">
-				<span class="lv1-recipe__name">Activity</span>
-				<span class="lv1-recipe__desc">route activity</span>
-			</span>
-			<span class="lv1-recipe__tip" role="tooltip">
-				<span class="lv1-recipe__tip-name">Activity</span>
-				<span class="lv1-recipe__tip-desc">route activity</span>
-			</span>
-		</button>
-	`;
-}
-
 export function renderDockHtml(state, recipes = LEGEND_RECIPES, readinessByRecipeId = {}) {
-	const commence = getCommenceCopy(state);
-	const toggles = getToggleContent(state);
 	const armed = state.armedTemplate === TEMPLATE_ID;
 	const spawnRecipes = recipes.filter((recipe) => recipe.group === "spawn");
-	const groups = GROUPS.map((group) => `
-		<section class="lv1-group" data-group="${group.id}">
-			<div class="lv1-group__label">${group.label}</div>
-			${group.id === "flow"
-				? flowActivityButton()
-				: spawnRecipes
-					.map((recipe) => recipeButton(
+
+	return `
+		<header class="lv1-dock__header">
+			<span class="lv1-dock__brand">QF</span>
+			<span class="lv1-dock__heading"><span>Dock</span><small>fresh actor runs</small></span>
+			<button class="lv1-dock__tidy" type="button" data-action="tidy-grid" title="Tidy tiles to grid">Tidy</button>
+			<button class="lv1-dock__add" type="button" data-action="add-agent" title="Add a deployable agent or tool">Add</button>
+		</header>
+		<div class="lv1-dock__body">
+			<section class="lv1-dock__section lv1-dock__section--agents" data-group="agents">
+				<div class="lv1-dock__section-head">
+					<span>Agents</span>
+					<span>${spawnRecipes.length}</span>
+				</div>
+				<div class="lv1-dock__section-sub">Click an agent to start a new tile</div>
+				<div class="lv1-dock__scroll" data-scroll-region="agents">
+					${spawnRecipes.map((recipe) => recipeButton(
 						recipe,
 						state,
 						readinessByRecipeId[recipe.id] ?? "red",
 						recipes,
 					)).join("")}
-		</section>
-	`).join("");
-
-	return `
-		<header class="lv1-dock__header">
-			<span class="lv1-dock__title">QF Dock</span>
-			<span class="lv1-dock__eyebrow">spawn rail</span>
-			<button class="lv1-dock__tidy" type="button" data-action="tidy-grid" title="Tidy tiles to grid">Tidy</button>
-			<button class="lv1-dock__add" type="button" data-action="add-agent" title="Add agent or tool">+ Add</button>
-			${ICONS.legend}
-		</header>
-		<div class="lv1-mode-toggle" role="group" aria-label="Dock mode">
-			<button class="lv1-mode-toggle__btn" data-mode="spawn" data-active="true" type="button" title="Spawn nodes">${ICONS.spawn}<span>Spawn</span></button>
-			<button class="lv1-mode-toggle__btn" data-mode="connect" data-active="false" type="button" title="Connect via ports" disabled>${ICONS.connect}<span>Route</span></button>
-		</div>
-		<div class="lv1-dock__body">
-			${groups}
-			<section class="lv1-group lv1-group--templates" data-group="templates">
-				<div class="lv1-group__label lv1-group__label--templates">
-					<span>Templates</span>
-					<span class="lv1-group__count">1</span>
-					<span class="lv1-group__compact-label">TMPL</span>
 				</div>
+			</section>
+			<section class="lv1-dock__section lv1-dock__section--templates" data-group="templates">
+				<div class="lv1-dock__section-head">
+					<span>Templates</span>
+					<span>1</span>
+				</div>
+				<div class="lv1-dock__scroll" data-scroll-region="templates">
 				<button
 					class="lv1-template"
 					data-template="${TEMPLATE_ID}"
@@ -434,50 +399,17 @@ export function renderDockHtml(state, recipes = LEGEND_RECIPES, readinessByRecip
 					</span>
 					<span class="lv1-template__copy">
 						<span class="lv1-template__name">RL Training</span>
-						<span class="lv1-template__summary">Hermes to PufferLib - paper trade loop</span>
-						<span class="lv1-template__meta">2 tiles - 1 string</span>
+						<span class="lv1-template__summary">Hermes to PufferLib / paper trade loop</span>
+						<span class="lv1-template__meta">2 actors / 1 cable</span>
 					</span>
-					<span class="lv1-template__compact-label">RL</span>
-					<span class="lv1-template__armed-badge">ARMED</span>
+					<span class="lv1-template__armed-badge">${armed ? "Armed" : "Arm"}</span>
 				</button>
+				</div>
 			</section>
 		</div>
 		<footer class="lv1-dock__footer">
-			<button
-				class="lv1-commence"
-				data-state="${commence.state}"
-				type="button"
-				aria-disabled="${commence.ariaDisabled}"
-			>
-				<span class="lv1-commence__icon">${ICONS[commence.icon]}</span>
-				<span class="lv1-commence__copy">
-					<span class="lv1-commence__label">${commence.label}</span>
-					<span class="lv1-commence__sub">${commence.subLabel}</span>
-				</span>
-				<span class="lv1-commence__compact-label">${commence.compactLabel}</span>
-			</button>
-			<div class="lv1-dock__toggles">
-				<button
-					class="lv1-toggle lv1-toggle--density"
-					data-density-value="${toggles.density.value}"
-					type="button"
-					title="${toggles.density.title}"
-					aria-label="${toggles.density.title}"
-				>
-					${ICONS[toggles.density.icon]}
-					<span class="lv1-toggle__label">${toggles.density.label}</span>
-				</button>
-				<button
-					class="lv1-toggle lv1-toggle--spawn"
-					data-spawn-value="${toggles.spawnMode.value}"
-					type="button"
-					title="${toggles.spawnMode.title}"
-					aria-label="${toggles.spawnMode.title}"
-				>
-					${ICONS[toggles.spawnMode.icon]}
-					<span class="lv1-toggle__label">${toggles.spawnMode.label}</span>
-				</button>
-			</div>
+			<span>Each tile is a fresh run.</span>
+			<span>Close tile = end run.</span>
 		</footer>
 	`;
 }

@@ -21,7 +21,8 @@ import {
   removeConnection as removeConnectionState,
   getConnectionsForTile,
   getOtherTileId,
-  clearConnections,
+	clearConnections,
+	isEphemeralAgentOsTile,
 } from "./canvas-state.js";
 
 // Reset tiles array between tests by splicing out all entries.
@@ -51,6 +52,15 @@ describe("defaultSize", () => {
     a.width = 999;
     expect(defaultSize("term").width).toBe(400);
   });
+});
+
+describe("isEphemeralAgentOsTile", () => {
+	test("expires only persisted AgentOS terminal runs", () => {
+		expect(isEphemeralAgentOsTile({ type: "term", terminalTarget: "agentos:v2:workspace:tile" })).toBe(true);
+		expect(isEphemeralAgentOsTile({ type: "term", runtimeTarget: "agentos:tile" })).toBe(true);
+		expect(isEphemeralAgentOsTile({ type: "term", terminalTarget: "herdr-wsl:terminal" })).toBe(false);
+		expect(isEphemeralAgentOsTile({ type: "browser", terminalTarget: "agentos:tile" })).toBe(false);
+	});
 });
 
 // -- generateId --
@@ -152,7 +162,7 @@ describe("connection CRUD", () => {
     expect(connections).toHaveLength(1);
   });
 
-  test("addConnection strips invalid optional visual metadata", () => {
+	test("addConnection strips invalid optional visual metadata", () => {
     const conn = addConnection({
       id: "conn-1",
       tileAId: "tile-a",
@@ -162,7 +172,7 @@ describe("connection CRUD", () => {
       kind: "",
       createdAt: 1,
       updatedAt: 1,
-    });
+	});
 
     expect(conn).toEqual({
       id: "conn-1",
@@ -172,6 +182,26 @@ describe("connection CRUD", () => {
       updatedAt: 1,
     });
   });
+
+	test("addConnection ignores a duplicate connection id", () => {
+		const first = addConnection({
+			id: "conn-1",
+			tileAId: "tile-a",
+			tileBId: "tile-b",
+			createdAt: 1,
+			updatedAt: 1,
+		});
+		const duplicate = addConnection({
+			id: "conn-1",
+			tileAId: "tile-a",
+			tileBId: "tile-b",
+			createdAt: 2,
+			updatedAt: 2,
+		});
+
+		expect(connections).toHaveLength(1);
+		expect(duplicate).toBe(first);
+	});
 
   test("removeConnection removes by id", () => {
     addConnection({

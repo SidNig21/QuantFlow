@@ -946,6 +946,9 @@ export function createTileManager({
 
 		const dom = tileDOMs.get(id);
 		if (dom) {
+			// Tear down the guest explicitly before losing the container. This
+			// prevents an orphaned terminal renderer from surviving a closed tile.
+			dom.webview?.remove();
 			dom.container.remove();
 			tileDOMs.delete(id);
 		}
@@ -970,7 +973,11 @@ export function createTileManager({
 					window.shellApi.herdrUnlinkPane?.(tile.id);
 					await new Promise((resolve) => setTimeout(resolve, 200));
 				}
-				window.shellApi.ptyKillSession(tile.ptySessionId);
+				void window.shellApi.ptyKillSession(tile.ptySessionId).catch((err) => {
+					// The local tile is already closed; a dead host must not create an
+					// unhandled renderer rejection or resurrect this fresh run.
+					console.warn("[tile] terminal cleanup failed:", err);
+				});
 				window.shellApi.stringUnregisterTileSession?.(tile.id);
 				if (onTerminalTileClosed) {
 					onTerminalTileClosed(tile.ptySessionId);

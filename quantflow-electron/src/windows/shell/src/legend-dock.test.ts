@@ -206,6 +206,16 @@ describe("LegendState", () => {
 });
 
 describe("Legend registry rendering", () => {
+	test("renders Agents and Templates as independent dock regions", () => {
+		const html = renderDockHtml(createLegendState({ storage: createStorage() }).getSnapshot());
+		expect(html).toContain('data-group="agents"');
+		expect(html).toContain('data-scroll-region="agents"');
+		expect(html).toContain('data-scroll-region="templates"');
+		expect(html).toContain("Close tile = end run.");
+		expect(html).not.toContain("Route</span>");
+		expect(html).not.toContain("Run Workflow");
+	});
+
 	test("renders a visible tidy-grid dock action beside add", () => {
 		const html = renderDockHtml(createLegendState({ storage: createStorage() }).getSnapshot());
 		expect(html).toContain('data-action="tidy-grid"');

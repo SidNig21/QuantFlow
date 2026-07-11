@@ -102,8 +102,11 @@ export function createHttpAgentOsTransport(
     if (disposed) return;
 
     let resolveReady!: () => void;
-    state.streamReady = new Promise<void>((resolve) => {
+    let rejectReady!: (reason: Error) => void;
+    let streamConnected = false;
+    state.streamReady = new Promise<void>((resolve, reject) => {
       resolveReady = resolve;
+      rejectReady = reject;
     });
 
     const abort = new AbortController();
@@ -116,6 +119,7 @@ export function createHttpAgentOsTransport(
         if (!res.ok || !res.body) {
           throw new Error(`SSE connect failed: HTTP ${res.status}`);
         }
+        streamConnected = true;
         resolveReady();
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -146,7 +150,13 @@ export function createHttpAgentOsTransport(
       } catch (error) {
         if (!abort.signal.aborted && !disposed) {
           const detail = error instanceof Error ? error.message : String(error);
-          throw new Error(`agentos event stream: ${detail}`);
+          // A subscription is best-effort. In particular, a host shutdown must
+          // not surface as an unhandled rejection in Electron after a tile has
+          // already been opened. A later prompt/attach will establish a fresh
+          // stream because the finally block clears streamReady.
+          if (!streamConnected) {
+            rejectReady(new Error(`agentos event stream: ${detail}`));
+          }
         }
       } finally {
         state.streamAbort = null;
@@ -235,7 +245,10 @@ export function createHttpAgentOsTransport(
     onSessionEvent(sessionId, handler) {
       const state = sessionState(sessionId);
       state.eventHandlers.push(handler);
-      void ensureEventStream(sessionId);
+      void ensureEventStream(sessionId).catch(() => {
+        // The first foreground operation reports a failed connection. A
+        // background subscription must never crash the desktop process.
+      });
       return () => {
         state.eventHandlers = state.eventHandlers.filter((h) => h !== handler);
       };
@@ -244,7 +257,10 @@ export function createHttpAgentOsTransport(
     onPermissionRequest(sessionId, handler) {
       const state = sessionState(sessionId);
       state.permissionHandlers.push(handler);
-      void ensureEventStream(sessionId);
+      void ensureEventStream(sessionId).catch(() => {
+        // See onSessionEvent: background subscription failures are retried by
+        // the next foreground operation.
+      });
       return () => {
         state.permissionHandlers = state.permissionHandlers.filter((h) => h !== handler);
       };

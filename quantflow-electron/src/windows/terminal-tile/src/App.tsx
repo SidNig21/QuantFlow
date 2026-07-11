@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { TerminalTab } from "@collab/components/Terminal";
-import { parseTerminalTileLaunchParams } from "./session-start";
+import {
+  parseTerminalTileLaunchParams,
+  shouldEndRestoredAgentOsRun,
+} from "./session-start";
 
 /** Approximate terminal dimensions from the viewport before xterm mounts. */
 function estimateTermSize(): { cols: number; rows: number } {
@@ -37,6 +40,26 @@ function App() {
     } = parseTerminalTileLaunchParams(window.location.search);
 
     let sessionRestoreAttempted = false;
+
+    if (shouldEndRestoredAgentOsRun({
+      existingSessionId,
+      isRestored,
+      isPending,
+      cwd,
+      target,
+      tileId,
+    })) {
+      const message = "This AgentOS run ended when QuantFlow stopped. Close this tile, then start a fresh run from the Dock.";
+      setStartError(message);
+      window.api.notifyPtyStartFailed?.({
+        message,
+        tileId,
+        cwd,
+        target,
+      });
+      setExited(true);
+      return;
+    }
 
     const createFreshSession = (
       target?: string,

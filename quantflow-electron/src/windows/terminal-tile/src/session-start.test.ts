@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { parseTerminalTileLaunchParams } from "./session-start";
+import {
+  parseTerminalTileLaunchParams,
+  shouldEndRestoredAgentOsRun,
+} from "./session-start";
 
 describe("parseTerminalTileLaunchParams", () => {
   test("preserves herdr attach targets for ptyCreate", () => {
@@ -39,5 +42,14 @@ describe("parseTerminalTileLaunchParams", () => {
       target: undefined,
       tileId: "tile-hermes",
     });
+  });
+
+  test("ends restored AgentOS runs instead of silently replacing them", () => {
+    expect(shouldEndRestoredAgentOsRun(parseTerminalTileLaunchParams(
+      "?sessionId=agentos-pty-1&restored=1&target=agentos%3Av2%3Aworkspace%3Atile-1&tileId=tile-1",
+    ))).toBe(true);
+    expect(shouldEndRestoredAgentOsRun(parseTerminalTileLaunchParams(
+      "?sessionId=pty-1&restored=1&target=herdr-wsl%3Aterminal-1&tileId=tile-1",
+    ))).toBe(false);
   });
 });

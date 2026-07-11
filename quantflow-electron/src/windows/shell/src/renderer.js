@@ -5,7 +5,7 @@ import {
 	tiles, connections, getTile, defaultSize, inferTileType, tileAtPoint,
 	selectTile, clearSelection, getSelectedTiles, getNearestTileInDirection,
 	addConnection, removeConnection, updateConnectionLabel, clearConnections,
-	generateId, formatRepackTilesToast, repackTilesToGrid,
+	generateId, formatRepackTilesToast, repackTilesToGrid, isEphemeralAgentOsTile,
 } from "./canvas-state.js";
 import { attachMarquee } from "./tile-interactions.js";
 import { initDarkMode, applyCanvasOpacity } from "./dark-mode.js";
@@ -93,7 +93,6 @@ import { createLegendDock, LEGEND_RECIPES } from "./legend-dock.js";
 import { createAddAgentForm } from "./add-agent-form.js";
 import { createWorkflowModal } from "./workflow-modal.js";
 import { spawnRoleTileAt as spawnRoleTileAtShared, spawnAgentOsTileAt } from "./role-tile-spawn.js";
-import { AGENTOS_DEFAULT_INSTRUCTION } from "../../../shared/agentos-instruction.js";
 import {
 	createFlowCubeLoadingMark,
 	createFlowCubeWatermark,
@@ -1731,9 +1730,10 @@ async function init() {
 		const recipe = legendRegistry.recipes.find((entry) => entry.id === recipeId)
 			?? LEGEND_RECIPES.find((entry) => entry.id === recipeId);
 		if (recipeId === "agentos" || recipe?.runtimeTarget === "agentos") {
-			const instruction = String(
-				recipe?.agentosInstruction ?? AGENTOS_DEFAULT_INSTRUCTION,
-			).trim();
+			// A Dock card starts a fresh, ready actor. Only an explicit recipe
+			// boot instruction should prompt it; spawning must not spend time on
+			// an unsolicited workspace-summary turn before the tile is usable.
+			const instruction = String(recipe?.agentosInstruction ?? "").trim();
 			const tile = await spawnAgentOsTileAt({
 				tileManager,
 				generateId,
@@ -3607,6 +3607,24 @@ async function init() {
 
 	const savedState = await window.shellApi.canvasLoadState();
 	if (savedState) {
+		// A Dock click creates one fresh AgentOS actor run.  It is deliberately
+		// not a resume-on-relaunch terminal: discard stale actor tiles and their
+		// cables before hydration, so a restart cannot resurrect background work.
+		const expiredAgentOsIds = new Set(
+			(savedState.tiles ?? [])
+				.filter(isEphemeralAgentOsTile)
+				.map((tile) => tile.id),
+		);
+		if (expiredAgentOsIds.size > 0) {
+			savedState.tiles = (savedState.tiles ?? []).filter(
+				(tile) => !expiredAgentOsIds.has(tile.id),
+			);
+			savedState.connections = (savedState.connections ?? []).filter(
+				(conn) => !expiredAgentOsIds.has(conn.tileAId)
+					&& !expiredAgentOsIds.has(conn.tileBId),
+			);
+			await window.shellApi.canvasSaveState(savedState);
+		}
 		const { centerX, centerY, zoom } = savedState.viewport;
 		const w = canvasEl.clientWidth;
 		const h = canvasEl.clientHeight;

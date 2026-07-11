@@ -100,6 +100,19 @@ export function defaultSize(type) {
 	return { ...DEFAULT_TILE_SIZES[type] };
 }
 
+/**
+ * AgentOS tiles are intentionally ephemeral: their actor identity belongs to
+ * the current live tile, not to persisted canvas layout.  A later app launch
+ * must start a new run from the Dock instead of silently reviving this one.
+ *
+ * @param {Partial<Tile> | null | undefined} tile
+ */
+export function isEphemeralAgentOsTile(tile) {
+	if (tile?.type !== "term") return false;
+	const target = String(tile.terminalTarget ?? tile.runtimeTarget ?? "");
+	return target.startsWith("agentos:");
+}
+
 let idCounter = 0;
 
 export function generateId() {
@@ -133,6 +146,11 @@ export function getTile(id) {
 export function addConnection(conn) {
 	const normalized = normalizeConnection(conn);
 	if (!normalized) return null;
+	// Restore and event replay are intentionally idempotent. A duplicate cable
+	// ID would otherwise make tile close delete the same Kernel record twice.
+	if (connections.some((existing) => existing.id === normalized.id)) {
+		return getConnection(normalized.id);
+	}
 	connections.push(normalized);
 	return normalized;
 }
