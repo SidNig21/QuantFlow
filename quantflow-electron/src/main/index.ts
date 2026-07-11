@@ -71,6 +71,7 @@ import { runAgentOsTerminalProof } from "./agentos-terminal-proof";
 import { runLegendAgentosProof } from "./agentos-legend-proof";
 import { runActorsOnAgentosProof } from "./agentos-actors-proof";
 import { runA2aCableProof } from "./agentos-a2a-proof";
+import { runAgentosEveA2aLiveProof } from "./agentos-eve-a2a-live-proof";
 import { runAgentosEveMultispawnProof } from "./agentos-eve-multispawn-proof";
 import { runAgentosEveProof } from "./agentos-eve-proof";
 import { runAgentosStickProof } from "./agentos-stick-proof";
@@ -1043,6 +1044,9 @@ app.whenReady().then(async () => {
   }
   if (process.env.QF_AGENTOS_EVE_MULTISPAWN_PROOF === "1") {
     void runAgentosEveMultispawnProof(mainWindow!);
+  }
+  if (process.env.QF_AGENTOS_EVE_A2A_PROOF === "1") {
+    void runAgentosEveA2aLiveProof(mainWindow!);
   }
   if (process.env.QF_A2A_CABLE_PROOF === "1" || process.env.QF_AGENTOS_A2A_PROOF === "1") {
     void runA2aCableProof(mainWindow!);

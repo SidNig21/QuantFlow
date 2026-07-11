@@ -310,6 +310,15 @@ const checks: Check[] = [
     },
   },
   {
+    name: "agentos-eve-a2a",
+    description:
+      "U6: live A2A cable relay between two real Eve AgentOS tiles, real reply",
+    async run() {
+      const { runAgentOsEveA2aCheck } = await import("./lib/agentos-eve-a2a");
+      return runAgentOsEveA2aCheck();
+    },
+  },
+  {
     name: "agentos-a2a",
     description:
       "A2A: two pi-stick AgentOS sessions, cable relay, sim ack + scripted canvas proof",

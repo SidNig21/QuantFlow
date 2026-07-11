@@ -1,10 +1,10 @@
 /**
- * U5 scripted proof — two proof-only Eve dock tiles alive at once.
+ * U6 scripted proof — live A2A cable relay between two real Eve AgentOS tiles.
  */
 import type { BrowserWindow } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { promptAgentOsTile } from "./agentos-terminal-bridge";
+import { sendConnectionRelay } from "./agentos-a2a-relay";
 import {
   assertAgentOsWorkers,
   ensureProofRecipe,
@@ -14,26 +14,21 @@ import {
 } from "./agentos-eve-proof-shared";
 import { exitProofApp } from "./proof-app-lifecycle";
 import { proofSleep, saveProofScreenshot } from "./proof-tile-spawn";
+import { getStringLog, syncConnectionGraph } from "./tile-session-registry";
 
 const SETTLE_MS = 2500;
+const RELAY_TEXT = "Reply with exactly: eve-a2a-u6-ok";
+const RELAY_EXPECT = "eve-a2a-u6-ok";
 
-const logStep = makeLogStep("AGENTOS-EVE-MULTISPAWN-PROOF");
+const logStep = makeLogStep("AGENTOS-EVE-A2A-PROOF");
 
-async function promptAndAssert(tileId: string, expected: string): Promise<boolean> {
-  try {
-    const result = await promptAgentOsTile(tileId, `Reply with exactly: ${expected}`);
-    const text = result.text.trim();
-    const ok = text.includes(expected);
-    logStep("prompt-round-trip", ok, `${tileId} -> ${text || "empty reply"}`);
-    return ok;
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    logStep("prompt-round-trip", false, `${tileId} -> ${detail}`);
-    return false;
+export async function runAgentosEveA2aLiveProof(mainWindow: BrowserWindow): Promise<void> {
+  if (process.env.QF_AGENTOS_SIM === "1") {
+    logStep("sim-mode-guard", false, "sim-mode forbidden for U6 live proof");
+    exitProofApp(1);
+    return;
   }
-}
 
-export async function runAgentosEveMultispawnProof(mainWindow: BrowserWindow): Promise<void> {
   const evidenceDir = process.env.QF_TERMINAL_PROOF_EVIDENCE_DIR
     ?? join(process.cwd(), "..", "docs", "v7", "reports", "evidence");
   mkdirSync(evidenceDir, { recursive: true });
@@ -82,14 +77,35 @@ export async function runAgentosEveMultispawnProof(mainWindow: BrowserWindow): P
     return;
   }
 
-  const okA = await promptAndAssert(tileA, "eve-multi-a-ok");
-  const okB = await promptAndAssert(tileB, "eve-multi-b-ok");
-  if (!okA || !okB) {
+  const connectionId = `conn-eve-a2a-${Date.now()}`;
+  syncConnectionGraph([{ id: connectionId, tileAId: tileA, tileBId: tileB, label: "eve-a2a-u6" }]);
+
+  const relay = await sendConnectionRelay({
+    connectionId,
+    fromTileId: tileA,
+    text: RELAY_TEXT,
+  });
+  const relayOk = relay.ok
+    && relay.targetTileId === tileB
+    && typeof relay.reply === "string"
+    && relay.reply.includes(RELAY_EXPECT);
+  logStep("cable-relay", relayOk, `ok=${relay.ok} target=${relay.targetTileId ?? "null"} reply=${relay.reply ?? "null"} message=${relay.message ?? "null"}`);
+  if (!relayOk) {
     exitProofApp(1);
     return;
   }
 
-  await saveProofScreenshot(wc, evidenceDir, "V7-01-agentos-eve-multispawn-live.png", logStep);
+  const log = getStringLog(connectionId, 10);
+  const forward = log.some((entry) => entry.fromTileId === tileA && entry.toTileId === tileB && entry.text === RELAY_TEXT);
+  const backward = log.some((entry) => entry.fromTileId === tileB && entry.toTileId === tileA && entry.text.includes(RELAY_EXPECT));
+  const logOk = forward && backward;
+  logStep("relay-log", logOk, `forward=${forward} backward=${backward} entries=${log.length}`);
+  if (!logOk) {
+    exitProofApp(1);
+    return;
+  }
+
+  await saveProofScreenshot(wc, evidenceDir, "V7-02-agentos-eve-a2a-live.png", logStep);
   logStep("done", true, evidenceDir);
   exitProofApp(0);
 }
