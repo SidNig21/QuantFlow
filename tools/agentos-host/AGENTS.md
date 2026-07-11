@@ -18,8 +18,10 @@ actor registry and preserves the localhost wire protocol consumed by
 | File | Role |
 | --- | --- |
 | `host.js` | RivetKit registry/client; HTTP/SSE compatibility server; actor/session routing; credential-order session env |
+| `eve-supervisor.js` | Path A Eve process supervisor: one WSL Eve server per `[workspaceId, tileId]`, deterministic port, `EVE_BASE_URL` injection |
 | `package.json` | Exact AgentOS/software version pins |
 | `host-config.test.mjs` | Fast session-config tests; must not start Rivet or the HTTP listener |
+| `eve-supervisor.test.mjs` | Fast supervisor tests with injected spawn/fetch; must not start real Eve |
 
 ## Wire protocol
 
@@ -101,11 +103,15 @@ ACP permission requests block until `POST .../permission` arrives.
 ## Credential order
 
 1. `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` / `OPENCODE_ZEN_API_KEY` → Eve
-   custom ACP software (`software: "eve"`); whichever alias is present is
-   forwarded into the VM session env as `OPENCODE_GO_API_KEY` (the name
-   `quantflow-eve/agent/agent.ts` reads). Value is never written to VM files
-   or returned over HTTP. Use `QUANTFLOW_EVE_AGENTOS_PKG` to override the
-   package path; default is the sibling
+   custom ACP software (`software: "eve"`). Path A keeps Eve itself on WSL
+   Node: `eve-supervisor.js` starts one host-side Eve server per
+   `[workspaceId, tileId]`, assigns a deterministic port from
+   `EVE_PORT_BASE`/`EVE_PORT_RANGE`, waits for `/eve/v1/health`, then injects
+   `EVE_BASE_URL` into the AgentOS guest adapter. The key alias family is
+   forwarded to both the host-side Eve process and VM session env; values are
+   never written to VM files or returned over HTTP. Use `QUANTFLOW_EVE_ROOT`
+   to override the sibling checkout and `QUANTFLOW_EVE_AGENTOS_PKG` to
+   override the adapter package path; default package is the sibling
    `../../../quantflow-eve/agentos/dist/package.aospkg`.
 2. `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` / `OPENCODE_ZEN_API_KEY` → Pi
    with custom provider files under both supported VM homes. Default is
@@ -138,6 +144,7 @@ wsl -e bash -lc "cd /mnt/c/Users/rybow/QuantFlow/tools/agentos-host && npm insta
 node --check tools/agentos-host/host.js
 bun test src/harness/agentos
 npm --prefix tools/agentos-host test
+node --test tools/agentos-host/eve-supervisor.test.mjs
 bun qa/run.ts agentos-live
 ```
 

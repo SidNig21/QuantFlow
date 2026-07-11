@@ -13,6 +13,7 @@ import pi from "@agentos-software/pi";
 import opencode from "@agentos-software/opencode";
 import claudeCode from "@agentos-software/claude-code";
 import { z } from "zod";
+import { ensureEveForActorKey, stopAllEve, stopEveForActorKey } from "./eve-supervisor.js";
 
 const HOST = process.env.AGENTOS_HOST_BIND ?? "0.0.0.0";
 const PORT = Number.parseInt(process.env.AGENTOS_HOST_PORT ?? "7430", 10);
@@ -223,7 +224,15 @@ function resolveSessionConfig(requested) {
     // agent.ts reads inside the VM. U3.5 finding 2026-07-11.
     const opencodeKey = resolveOpencodeKey();
     if (opencodeKey) {
-      return { software: "eve", env: { OPENCODE_GO_API_KEY: opencodeKey } };
+      return {
+        software: "eve",
+        env: {
+          OPENCODE_API_KEY: opencodeKey,
+          OPENCODE_GO_API_KEY: opencodeKey,
+          OPENCODE_ZEN_API_KEY: opencodeKey,
+        },
+        opencodeKey,
+      };
     }
     throw new SessionConfigError(
       "no Eve credential: set OPENCODE_API_KEY / OPENCODE_GO_API_KEY / OPENCODE_ZEN_API_KEY " +
@@ -509,6 +518,11 @@ async function actorForSession(sessionId) {
 async function disposeActorConnection(keyId) {
   const pending = actorConnections.get(keyId);
   actorConnections.delete(keyId);
+  try {
+    await stopEveForActorKey({ actorKey: JSON.parse(keyId) });
+  } catch {
+    // Best effort Path A Eve cleanup.
+  }
   if (!pending) return;
   try {
     const entry = await pending;
@@ -532,6 +546,8 @@ async function promptSession(sessionId, text) {
 }
 
 async function disposeActorRuntime() {
+  await stopAllEve();
+
   for (const [shellId, terminal] of terminals) {
     const session = sessions.get(terminal.sessionId);
     if (!session) continue;
@@ -937,6 +953,22 @@ async function handleRequest(req, res) {
         throw err;
       }
       const { handle, actorId } = await ensureActor(address);
+      if (picked.software === "eve") {
+        try {
+          const eve = await ensureEveForActorKey(address, {
+            opencodeKey: picked.opencodeKey,
+          });
+          picked.env = {
+            ...picked.env,
+            EVE_BASE_URL: eve.baseUrl,
+          };
+        } catch (error) {
+          sendJson(res, 500, {
+            error: `eve supervisor failed: ${error?.message ?? error}`,
+          });
+          return;
+        }
+      }
       if (picked.piVmFiles) {
         for (const file of picked.piVmFiles) {
           try {

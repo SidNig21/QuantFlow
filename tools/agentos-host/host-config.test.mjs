@@ -45,7 +45,12 @@ test("resolves Eve software with OPENCODE_GO_API_KEY in session env", () => {
   withEnv({ OPENCODE_GO_API_KEY: "test-eve-key" }, () => {
     assert.deepEqual(resolveSessionConfig("eve"), {
       software: "eve",
-      env: { OPENCODE_GO_API_KEY: "test-eve-key" },
+      env: {
+        OPENCODE_API_KEY: "test-eve-key",
+        OPENCODE_GO_API_KEY: "test-eve-key",
+        OPENCODE_ZEN_API_KEY: "test-eve-key",
+      },
+      opencodeKey: "test-eve-key",
     });
   });
 });
@@ -60,7 +65,12 @@ test("resolves Eve software when only OPENCODE_API_KEY is set (WSL profile alias
     () => {
       assert.deepEqual(resolveSessionConfig("eve"), {
         software: "eve",
-        env: { OPENCODE_GO_API_KEY: "profile-alias-key" },
+        env: {
+          OPENCODE_API_KEY: "profile-alias-key",
+          OPENCODE_GO_API_KEY: "profile-alias-key",
+          OPENCODE_ZEN_API_KEY: "profile-alias-key",
+        },
+        opencodeKey: "profile-alias-key",
       });
     },
   );
