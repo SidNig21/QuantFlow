@@ -26,6 +26,7 @@ import {
 export { buildAgentOsDisplayTarget, parseAgentOsAttachTarget };
 
 interface TileAttach {
+  workspaceId?: string;
   tileId: string;
   sessionId: string;
   shellId: string;
@@ -108,6 +109,7 @@ async function transportOrThrow(): Promise<AgentOsTransport> {
 }
 
 export async function prepareAgentOsTerminalAttach(input: {
+  workspaceId?: string;
   tileId: string;
   cols?: number;
   rows?: number;
@@ -115,6 +117,7 @@ export async function prepareAgentOsTerminalAttach(input: {
   software?: string;
   actorName?: string;
 }): Promise<{ terminalTarget: string }> {
+  const workspaceId = input.workspaceId?.trim() || undefined;
   const tileId = input.tileId.trim();
   if (!tileId) throw new Error(formatAgentOsUnavailable('tileId required'));
 
@@ -127,9 +130,13 @@ export async function prepareAgentOsTerminalAttach(input: {
   let attach = tileAttaches.get(tileId);
   if (!attach) {
     await assertClaudeCredentialReady(transport, software);
-    const { sessionId } = await transport.createSession(software, {});
+    const { sessionId } = await transport.createSession(software, {
+      workspaceId,
+      tileId,
+    });
     const { shellId } = await transport.openTerminal(sessionId, cols, rows);
     attach = {
+      workspaceId,
       tileId,
       sessionId,
       shellId,
@@ -147,11 +154,14 @@ export async function prepareAgentOsTerminalAttach(input: {
     await transport.prompt(attach.sessionId, instruction);
   }
 
-  return { terminalTarget: buildAgentOsDisplayTarget(tileId) };
+  return {
+    terminalTarget: buildAgentOsDisplayTarget(tileId, attach.workspaceId),
+  };
 }
 
 export async function bindAgentOsPtySession(input: {
   ptySessionId: string;
+  workspaceId?: string;
   tileId: string;
   senderWebContentsId?: number;
   cols: number;
@@ -164,6 +174,7 @@ export async function bindAgentOsPtySession(input: {
 
   if (!attach) {
     const prepared = await prepareAgentOsTerminalAttach({
+      workspaceId: input.workspaceId,
       tileId,
       cols: input.cols,
       rows: input.rows,

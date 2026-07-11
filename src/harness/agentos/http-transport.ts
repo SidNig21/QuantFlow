@@ -205,7 +205,12 @@ export function createHttpAgentOsTransport(
       const res = await fetchImpl(`${await rootUrl()}/session`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ software, env: sessionOptions?.env ?? {} }),
+        body: JSON.stringify({
+          software,
+          env: sessionOptions?.env ?? {},
+          workspaceId: sessionOptions?.workspaceId,
+          tileId: sessionOptions?.tileId,
+        }),
       });
       const body = await parseJsonResponse(res) as { sessionId?: string };
       if (!body.sessionId) throw new Error('createSession missing sessionId');
@@ -255,9 +260,14 @@ export function createHttpAgentOsTransport(
       await parseJsonResponse(res);
     },
 
-    async readFile(path) {
+    async readFile(path, sessionId) {
       if (disposed) throw new Error('transport disposed');
-      const res = await fetchImpl(`${await rootUrl()}/file?path=${encodeURIComponent(path)}`);
+      const sessionQuery = sessionId === undefined
+        ? ''
+        : `&sessionId=${encodeURIComponent(sessionId)}`;
+      const res = await fetchImpl(
+        `${await rootUrl()}/file?path=${encodeURIComponent(path)}${sessionQuery}`,
+      );
       if (!res.ok) {
         const detail = await res.text().catch(() => `HTTP ${res.status}`);
         throw new Error(detail || `HTTP ${res.status}`);

@@ -96,8 +96,8 @@ function wrapTransportWithLazyHost(base: AgentOsTransport): AgentOsTransport {
     respondPermission(sessionId, requestId, approved) {
       return withHost(() => base.respondPermission(sessionId, requestId, approved), false);
     },
-    readFile(path) {
-      return withHost(() => base.readFile(path), false);
+    readFile(path, sessionId) {
+      return withHost(() => base.readFile(path, sessionId), false);
     },
     dispose() {
       return withHost(() => base.dispose(), false);

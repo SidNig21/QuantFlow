@@ -625,6 +625,7 @@ async function createSessionInner(
     try {
       await agentOsPtyBinder({
         ptySessionId: sessionId,
+        workspaceId: agentosAttach.workspaceId,
         tileId: agentosAttach.tileId,
         senderWebContentsId,
         cols: c,
@@ -942,6 +943,7 @@ export async function reconnectSession(
     try {
       await agentOsPtyBinder({
         ptySessionId: sessionId,
+        workspaceId: attachTarget.workspaceId,
         tileId: attachTarget.tileId,
         senderWebContentsId,
         cols,

@@ -16,16 +16,44 @@ export interface SidecarSessionCreateParams {
 
 const HERDR_DISPLAY_TARGET_PREFIX = "herdr-wsl:";
 const AGENTOS_DISPLAY_TARGET_PREFIX = "agentos:";
+const AGENTOS_DISPLAY_TARGET_V2_PREFIX = "agentos:v2:";
 
-export function buildAgentOsDisplayTarget(tileId: string): string {
+export interface AgentOsAttachTarget {
+  tileId: string;
+  workspaceId?: string;
+}
+
+export function buildAgentOsDisplayTarget(
+  tileId: string,
+  workspaceId?: string,
+): string {
+  const normalizedWorkspaceId = workspaceId?.trim();
+  if (normalizedWorkspaceId) {
+    return `${AGENTOS_DISPLAY_TARGET_V2_PREFIX}${encodeURIComponent(normalizedWorkspaceId)}:${encodeURIComponent(tileId)}`;
+  }
   return `${AGENTOS_DISPLAY_TARGET_PREFIX}${encodeURIComponent(tileId)}`;
 }
 
 export function parseAgentOsAttachTarget(
   target: unknown,
-): { tileId: string } | null {
+): AgentOsAttachTarget | null {
   if (typeof target !== "string") return null;
   if (!target.startsWith(AGENTOS_DISPLAY_TARGET_PREFIX)) return null;
+
+  if (target.startsWith(AGENTOS_DISPLAY_TARGET_V2_PREFIX)) {
+    const encoded = target.slice(AGENTOS_DISPLAY_TARGET_V2_PREFIX.length);
+    const separator = encoded.indexOf(":");
+    if (separator <= 0 || separator === encoded.length - 1) return null;
+    if (encoded.indexOf(":", separator + 1) !== -1) return null;
+    try {
+      const workspaceId = decodeURIComponent(encoded.slice(0, separator)).trim();
+      const tileId = decodeURIComponent(encoded.slice(separator + 1)).trim();
+      return workspaceId && tileId ? { workspaceId, tileId } : null;
+    } catch {
+      return null;
+    }
+  }
+
   const encoded = target.slice(AGENTOS_DISPLAY_TARGET_PREFIX.length);
   if (!encoded) return null;
   try {

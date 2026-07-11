@@ -1,5 +1,11 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import type { PartialStateCard, ReceiptDraft, WorkerHandle, WorkerHarness } from "@qf-harness/types";
+import type {
+  PartialStateCard,
+  ReceiptDraft,
+  SpawnWorkerInput,
+  WorkerHandle,
+  WorkerHarness,
+} from "@qf-harness/types";
 import {
   configureAgentOsRun,
   resetAgentOsRunModule,
@@ -12,7 +18,10 @@ interface DispatchCall {
   requestedBy?: string;
 }
 
-function makeHarness(drafts: ReceiptDraft[]): WorkerHarness {
+function makeHarness(
+  drafts: ReceiptDraft[],
+  onSpawn?: (input: SpawnWorkerInput) => void,
+): WorkerHarness {
   let spawned = false;
   const handle: WorkerHandle = {
     workerId: "worker-agentos-1",
@@ -23,7 +32,8 @@ function makeHarness(drafts: ReceiptDraft[]): WorkerHarness {
 
   return {
     kind: "agentos",
-    async spawn() {
+    async spawn(input) {
+      onSpawn?.(input);
       spawned = true;
       return handle;
     },
@@ -44,16 +54,18 @@ function makeHarness(drafts: ReceiptDraft[]): WorkerHarness {
 
 describe("agentos run driver", () => {
   let dispatchCalls: DispatchCall[];
+  let spawnInputs: SpawnWorkerInput[];
 
   beforeEach(() => {
     dispatchCalls = [];
+    spawnInputs = [];
     configureAgentOsRun({
       getHarness: () => makeHarness([
         { type: "task_started", summary: "AgentOS session started", metadata: { milestone: "session.start" } },
         { type: "progress", summary: "tool started", metadata: { milestone: "tool.started" } },
         { type: "progress", summary: "AgentOS reply returned (22 chars)", metadata: { milestone: "agent.reply", replySnippet: "agentos-p1-receipt-ok" } },
         { type: "task_completed", summary: "turn complete", metadata: { milestone: "turn.complete" } },
-      ]),
+      ], (input) => spawnInputs.push(input)),
       dispatchKernel: async (type, payload, requestedBy) => {
         dispatchCalls.push({ type, payload, requestedBy });
         return { ok: true, id: `cmd-${dispatchCalls.length}` };
@@ -70,6 +82,7 @@ describe("agentos run driver", () => {
 
   test("posts receipt drafts in order and transitions worker status", async () => {
     const result = await runAgentOsTask({
+      workspaceId: "workspace-main",
       tileId: "tile-agentos-1",
       instruction: "List files",
       workflowId: "wf-1",
@@ -77,6 +90,11 @@ describe("agentos run driver", () => {
 
     expect(result.ok).toBe(true);
     expect(result.receiptsPosted).toBe(4);
+    expect(spawnInputs).toHaveLength(1);
+    expect(spawnInputs[0]).toMatchObject({
+      workspaceId: "workspace-main",
+      tileId: "tile-agentos-1",
+    });
 
     const statusCalls = dispatchCalls.filter((c) => c.type === "kernel.worker.status_update");
     expect(statusCalls.map((c) => c.payload.status)).toEqual(["active", "idle"]);

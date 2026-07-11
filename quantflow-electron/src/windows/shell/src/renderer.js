@@ -1739,6 +1739,8 @@ async function init() {
 				generateId,
 				getTerminalSize,
 				shellApi: window.shellApi,
+				workspaceId: workspaceData.workspaces?.[0],
+				canvasId: workspaceData.workspaces?.[0],
 				updateRoleTileChrome,
 				onRoleSpawned: (event) => operationalEvents.record(event),
 				onRoleSpawnFailed: (event) => operationalEvents.record(event),

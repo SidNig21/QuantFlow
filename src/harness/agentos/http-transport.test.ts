@@ -15,6 +15,8 @@ function sseBody(messages: unknown[]): Uint8Array {
 describe('http-agentos-transport', () => {
   test('createSession, prompt, events, permission, readFile, dispose, health', async () => {
     let disposed = false;
+    const sessionRequests: Record<string, unknown>[] = [];
+    const fileQueries: Array<{ path: string | null; sessionId: string | null }> = [];
     let permissionResolve: ((approved: boolean) => void) | null = null;
     const permissionWait = new Promise<boolean>((resolve) => {
       permissionResolve = resolve;
@@ -29,6 +31,7 @@ describe('http-agentos-transport', () => {
           return Response.json({ ok: !disposed });
         }
         if (url.pathname === '/session' && req.method === 'POST') {
+          sessionRequests.push(await req.json() as Record<string, unknown>);
           return Response.json({ sessionId: 'live-1', software: 'pi' });
         }
         if (url.pathname === '/session/live-1/prompt' && req.method === 'POST') {
@@ -61,6 +64,10 @@ describe('http-agentos-transport', () => {
           return Response.json({ ok: true });
         }
         if (url.pathname === '/file') {
+          fileQueries.push({
+            path: url.searchParams.get('path'),
+            sessionId: url.searchParams.get('sessionId'),
+          });
           return new Response('hello-artifact', {
             headers: { 'content-type': 'application/octet-stream' },
           });
@@ -80,8 +87,18 @@ describe('http-agentos-transport', () => {
 
     expect((await transport.health()).ok).toBe(true);
 
-    const created = await transport.createSession('pi');
+    const created = await transport.createSession('pi', {
+      env: { AGENTOS_TEST: '1' },
+      workspaceId: 'workspace-live-1',
+      tileId: 'tile-live-1',
+    });
     expect(created.sessionId).toBe('live-1');
+    expect(sessionRequests[0]).toEqual({
+      software: 'pi',
+      env: { AGENTOS_TEST: '1' },
+      workspaceId: 'workspace-live-1',
+      tileId: 'tile-live-1',
+    });
 
     const events: unknown[] = [];
     const permissions: AgentOsPermissionRequest[] = [];
@@ -100,8 +117,21 @@ describe('http-agentos-transport', () => {
     expect(permissions).toHaveLength(1);
     expect(permissions[0]?.requestId).toBe('perm-1');
 
-    const file = await transport.readFile('/workspace/out.txt');
+    const file = await transport.readFile('/workspace/out.txt', 'live-1');
     expect(new TextDecoder().decode(file)).toBe('hello-artifact');
+    expect(fileQueries[0]).toEqual({
+      path: '/workspace/out.txt',
+      sessionId: 'live-1',
+    });
+
+    // Legacy callers may still omit actor address and file-routing fields.
+    await transport.createSession('pi');
+    await transport.readFile('/workspace/legacy.txt');
+    expect(sessionRequests[1]).toEqual({ software: 'pi', env: {} });
+    expect(fileQueries[1]).toEqual({
+      path: '/workspace/legacy.txt',
+      sessionId: null,
+    });
 
     await transport.dispose();
     expect((await transport.health()).ok).toBe(false);

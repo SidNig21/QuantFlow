@@ -42,6 +42,7 @@ function makeDeps() {
     generateId: () => "tile-x",
     getTerminalCwd: () => "/tmp",
     getTerminalSize: () => ({ width: 300, height: 200 }),
+    workspaceId: "workspace-x",
     shellApi: {
       herdrSpawnRole: async () => {
         calls.herdrSpawnRole += 1;
@@ -138,12 +139,20 @@ describe("agentos roles never fall through to the legacy pty path", () => {
     });
     const { deps, calls, tile } = makeDeps();
     const prepared: Record<string, unknown>[] = [];
+    const runs: Record<string, unknown>[] = [];
     // deno-lint-ignore no-explicit-any
     (deps.shellApi as any).agentosTerminalPrepare = async (
       input: Record<string, unknown>,
     ) => {
       prepared.push(input);
       return { ok: true, terminalTarget: `agentos:${input.tileId}` };
+    };
+    // deno-lint-ignore no-explicit-any
+    (deps.shellApi as any).agentosRun = (
+      input: Record<string, unknown>,
+    ) => {
+      runs.push(input);
+      return Promise.resolve({ ok: true, started: true });
     };
 
     await spawnRoleTileAt(deps, agentosRole, 0, 0, {});
@@ -156,6 +165,9 @@ describe("agentos roles never fall through to the legacy pty path", () => {
     expect(tile.ptyStatus).toBe("running");
     // Startup prompt threads through as the AgentOS instruction.
     expect(prepared[0]?.instruction).toBe(agentosRole.startupPrompt);
+    expect(prepared[0]?.workspaceId).toBe("workspace-x");
+    expect(runs[0]?.workspaceId).toBe("workspace-x");
+    expect(runs[0]?.tileId).toBe("tile-x");
     // Kernel worker row carries the agentos runtime, not local-shell.
     const spawnCall = sent.find((c) => c.method === "kernel.worker.spawn");
     expect(spawnCall?.payload.runtimeTarget).toBe("agentos");

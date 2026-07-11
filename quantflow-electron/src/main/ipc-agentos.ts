@@ -24,6 +24,7 @@ export function registerAgentOsHandlers(): void {
   ipcMain.handle(
     "agentos:terminal:prepare",
     async (_event, payload: {
+      workspaceId?: string;
       tileId?: string;
       cols?: number;
       rows?: number;
@@ -31,10 +32,14 @@ export function registerAgentOsHandlers(): void {
       software?: string;
       actorName?: string;
     } = {}) => {
+      const workspaceId = typeof payload.workspaceId === "string"
+        ? payload.workspaceId.trim()
+        : "";
       const tileId = typeof payload.tileId === "string" ? payload.tileId.trim() : "";
       if (!tileId) return { ok: false, error: "tileId required" };
       try {
         const result = await prepareAgentOsTerminalAttach({
+          workspaceId: workspaceId || undefined,
           tileId,
           cols: typeof payload.cols === "number" ? payload.cols : undefined,
           rows: typeof payload.rows === "number" ? payload.rows : undefined,
@@ -52,13 +57,26 @@ export function registerAgentOsHandlers(): void {
 
   ipcMain.handle(
     "agentos:run",
-    (_event, payload: { tileId?: string; instruction?: string; workflowId?: string } = {}) => {
+    (_event, payload: {
+      workspaceId?: string;
+      tileId?: string;
+      instruction?: string;
+      workflowId?: string;
+    } = {}) => {
+      const workspaceId = typeof payload.workspaceId === "string"
+        ? payload.workspaceId.trim()
+        : "";
       const tileId = typeof payload.tileId === "string" ? payload.tileId.trim() : "";
       const instruction = typeof payload.instruction === "string" ? payload.instruction.trim() : "";
       if (!tileId) return { ok: false, error: "tileId required" };
       if (!instruction) return { ok: false, error: "instruction required" };
       const workflowId = typeof payload.workflowId === "string" ? payload.workflowId : undefined;
-      return startAgentOsTask({ tileId, instruction, workflowId });
+      return startAgentOsTask({
+        workspaceId: workspaceId || undefined,
+        tileId,
+        instruction,
+        workflowId,
+      });
     },
   );
 }

@@ -358,7 +358,7 @@ describe("agentos sessions never fall back to a default pty", () => {
     shell: "agentos",
     cwd: "/tmp",
     createdAt: new Date().toISOString(),
-    target: "agentos:tile-agent-1",
+    target: "agentos:v2:workspace-main:tile-agent-1",
     displayName: "AgentOS",
     command: "agentos",
     backend: "agentos",
@@ -381,20 +381,29 @@ describe("agentos sessions never fall back to a default pty", () => {
     // session, which is what produced the impostor shells).
     const meta = readSessionMeta(agentosId);
     expect(meta).not.toBeNull();
-    expect(meta!.target).toBe("agentos:tile-agent-1");
+    expect(meta!.target).toBe("agentos:v2:workspace-main:tile-agent-1");
   });
 
   test("reconnectSession re-attaches through the agentos bridge when the host is available", async () => {
     writeSessionMeta(agentosId, agentosMeta);
-    const bound: { ptySessionId: string; tileId: string }[] = [];
+    const bound: {
+      ptySessionId: string;
+      workspaceId?: string;
+      tileId: string;
+    }[] = [];
     _setAgentOsPtyBinderForTest(async (input) => {
-      bound.push({ ptySessionId: input.ptySessionId, tileId: input.tileId });
+      bound.push({
+        ptySessionId: input.ptySessionId,
+        workspaceId: input.workspaceId,
+        tileId: input.tileId,
+      });
     });
 
     const result = await reconnectSession(agentosId, 80, 24, -1);
 
     expect(bound.length).toBe(1);
     expect(bound[0]!.ptySessionId).toBe(agentosId);
+    expect(bound[0]!.workspaceId).toBe("workspace-main");
     expect(bound[0]!.tileId).toBe("tile-agent-1");
     expect(result.shell).toBe("agentos");
     expect(result.displayName).toBe("AgentOS");
@@ -402,7 +411,9 @@ describe("agentos sessions never fall back to a default pty", () => {
 
   test("reconnectSession with host unreachable throws the explicit disconnected error and preserves metadata", async () => {
     writeSessionMeta(agentosId, agentosMeta);
-    _setAgentOsPtyBinderForTest(async () => {
+    let boundWorkspaceId: string | undefined;
+    _setAgentOsPtyBinderForTest(async (input) => {
+      boundWorkspaceId = input.workspaceId;
       throw new Error("agentos unavailable: host not reachable");
     });
 
@@ -420,6 +431,7 @@ describe("agentos sessions never fall back to a default pty", () => {
     // Metadata survives, so the renderer's fallback create still targets
     // agentos (never a default pty cwd/shell).
     expect(readSessionMeta(agentosId)).not.toBeNull();
+    expect(boundWorkspaceId).toBe("workspace-main");
   });
 
   test("reconnectSession without an agentos attach target still refuses default pty fallback", async () => {
@@ -441,14 +453,18 @@ describe("agentos sessions never fall back to a default pty", () => {
   });
 
   test("createSession with an agentos target fails explicitly when the bridge fails — never a default pty", async () => {
-    _setAgentOsPtyBinderForTest(async () => {
+    let boundWorkspaceId: string | undefined;
+    _setAgentOsPtyBinderForTest(async (input) => {
+      boundWorkspaceId = input.workspaceId;
       throw new Error("agentos unavailable: host not reachable");
     });
 
     let error: Error | null = null;
     try {
       await createSession(
-        "/tmp", -1, 80, 24, "agentos:tile-agent-1", "tile-agent-1",
+        "/tmp", -1, 80, 24,
+        "agentos:v2:workspace-main:tile-agent-1",
+        "tile-agent-1",
       );
     } catch (e) {
       error = e as Error;
@@ -456,6 +472,7 @@ describe("agentos sessions never fall back to a default pty", () => {
 
     expect(error).not.toBeNull();
     expect(error!.message).toContain(AGENTOS_DISCONNECTED_MESSAGE);
+    expect(boundWorkspaceId).toBe("workspace-main");
   });
 });
 

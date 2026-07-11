@@ -28,6 +28,16 @@ live in the WSL **host process** (`tools/agentos-host/`), not in this repo root.
 | `index.ts` | `createAgentOsHarness({ transport, approvalGate?, ... })` |
 | `fixtures/tier2-events-trimmed.jsonl` | Anonymized subset of spike `tier2-events.jsonl` |
 
+## Actor address threading
+
+- `createSession` accepts `workspaceId` + `tileId`; together they are the
+  durable actor address. The TypeScript seam keeps them optional for sim/legacy
+  adapters, but the production durable host rejects an unkeyed session loudly.
+- The harness carries spawn `workspaceId` separately from cwd/artifact workspace
+  paths and forwards the exact spawn identity to session creation.
+- VM artifact reads may include `sessionId` so a multi-actor host can select the
+  actor that owns the file without changing artifact paths.
+
 ## Translator rules
 
 - **Tool calls:** one `progress` receipt at first `in_progress` (`metadata.milestone = tool.started`), one at terminal `completed`/`failed` (`tool.completed` / `tool.failed`), keyed by stable `toolCallId`.

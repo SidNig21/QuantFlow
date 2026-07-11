@@ -5,7 +5,9 @@
  */
 import http from "node:http";
 import { randomUUID } from "node:crypto";
-import { AgentOs, toolKit, hostTool, nodeModulesMount } from "@rivet-dev/agentos-core";
+import { agentOS, nodeModulesMount, setup } from "@rivet-dev/agentos";
+import { createClient } from "@rivet-dev/agentos/client";
+import { toolKit, hostTool } from "@rivet-dev/agentos-core";
 import pi from "@agentos-software/pi";
 import opencode from "@agentos-software/opencode";
 import claudeCode from "@agentos-software/claude-code";
@@ -13,18 +15,102 @@ import { z } from "zod";
 
 const HOST = process.env.AGENTOS_HOST_BIND ?? "0.0.0.0";
 const PORT = Number.parseInt(process.env.AGENTOS_HOST_PORT ?? "7430", 10);
+const RIVET_ACTOR_PORT = Number.parseInt(
+  process.env.AGENTOS_RIVET_ACTOR_PORT ?? String(PORT + 1),
+  10,
+);
+const RIVET_ENGINE_PORT = Number.parseInt(
+  process.env.AGENTOS_RIVET_ENGINE_PORT ?? String(PORT + 2),
+  10,
+);
+const RIVET_ENDPOINT = `http://127.0.0.1:${RIVET_ENGINE_PORT}`;
+const RIVET_START_TIMEOUT_MS = Number.parseInt(
+  process.env.AGENTOS_RIVET_START_TIMEOUT_MS ?? "90000",
+  10,
+);
+const RIVET_ENVOY_KEY = process.env.AGENTOS_RIVET_ENVOY_KEY?.trim() || randomUUID();
 const PERMISSION_TIMEOUT_MS = 120_000;
 
-/** @type {import('@rivet-dev/agentos-core').AgentOs | null} */
-let vm = null;
-/** @type {Promise<import('@rivet-dev/agentos-core').AgentOs> | null} */
-let vmInitPromise = null;
+// @rivet-dev/agentos@0.2.7 accepts serializable software + native mounts here.
+// Its native actor schema rejects JS toolKits, so the preserved toolkit/cable
+// definitions below stay deliberately deferred instead of being silently
+// presented as active. ACP permission events still cross the actor connection.
+const agentOsActor = agentOS({
+  software: [pi, opencode, claudeCode],
+  // claude-code's ACP adapter resolves its package through /root/node_modules;
+  // mount the host's own node_modules read-only (S3 compat-gate finding).
+  mounts: [nodeModulesMount(new URL("./node_modules", import.meta.url).pathname)],
+  // AgentOs.create() supplied this effective allow-all VM policy by default.
+  // The native actor is deny-by-default, so carry that behavior forward
+  // explicitly or packaged agents cannot read session env/reach providers.
+  permissions: {
+    fs: "allow",
+    network: "allow",
+    childProcess: "allow",
+    process: "allow",
+    env: "allow",
+    binding: "allow",
+  },
+});
 
-/** @type {Map<string, { subscribers: Set<import('node:http').ServerResponse>, software: string }>} */
+const actorRegistry = setup({
+  use: { agentos: agentOsActor },
+  runtime: "native",
+  startEngine: true,
+  engineHost: "127.0.0.1",
+  enginePort: RIVET_ENGINE_PORT,
+  httpHost: "127.0.0.1",
+  httpPort: RIVET_ACTOR_PORT,
+  noWelcome: true,
+  logging: { level: "warn" },
+  // Keep process identity separate from the durable compound actor key.
+  envoy: { poolName: "default", version: 1, envoyKey: RIVET_ENVOY_KEY },
+  shutdown: { disableSignalHandlers: true },
+});
+
+const actorClient = createClient({
+  endpoint: RIVET_ENDPOINT,
+  namespace: "default",
+  poolName: "default",
+  encoding: "bare",
+  disableMetadataLookup: true,
+});
+
+let actorRuntimeStarted = false;
+let actorRuntimeDisposed = false;
+
+/**
+ * @typedef {{ workspaceId: string, tileId: string, actorKey: [string, string], keyId: string }} ActorAddress
+ */
+
+/**
+ * @typedef {{
+ *   subscribers: Set<import('node:http').ServerResponse>,
+ *   software: string,
+ *   workspaceId: string,
+ *   tileId: string,
+ *   actorKey: [string, string],
+ *   keyId: string,
+ *   actorId: string,
+ * }} HostSession
+ */
+
+/** @type {Map<string, HostSession>} */
 const sessions = new Map();
 
-/** @type {Map<string, { sessionId: string, unsub: () => void }>} */
+/** @type {Map<string, { sessionId: string, keyId: string }>} */
 const terminals = new Map();
+
+/**
+ * @type {Map<string, Promise<{
+ *   address: ActorAddress,
+ *   actorId: string,
+ *   connection: any,
+ *   unsubs: Array<() => void>,
+ *   lifecycle: { state: string, reason?: string },
+ * }>>}
+ */
+const actorConnections = new Map();
 
 /**
  * @type {Map<string, { sessionId: string, kind: 'toolkit' | 'acp', resolve: (approved: boolean) => void, timer: NodeJS.Timeout }>}
@@ -33,6 +119,9 @@ const pendingPermissions = new Map();
 
 /** @type {string | null} */
 let activePromptSessionId = null;
+
+/** @type {string | null} */
+let lastAddressedSessionId = null;
 
 /** @type {Map<string, string>} AgentOS sessionId → canvas tileId */
 const sessionToTile = new Map();
@@ -231,21 +320,237 @@ function buildOpencodePiFiles(route) {
   return files;
 }
 
-async function ensureVm() {
-  if (vm) return vm;
-  if (!vmInitPromise) {
-    vmInitPromise = AgentOs.create({
-      software: [pi, opencode, claudeCode],
-      toolKits: [buildQuantflowKit(), buildCableKit(), buildDelegateKit()],
-      // claude-code's ACP adapter resolves its package through /root/node_modules;
-      // mount the host's own node_modules read-only (S3 compat-gate finding).
-      mounts: [nodeModulesMount(new URL("./node_modules", import.meta.url).pathname)],
-    }).then((instance) => {
-      vm = instance;
-      return instance;
+function resolveActorAddress(body) {
+  const workspaceId = typeof body?.workspaceId === "string" ? body.workspaceId.trim() : "";
+  const tileId = typeof body?.tileId === "string" ? body.tileId.trim() : "";
+  if (!workspaceId || !tileId) {
+    throw new SessionConfigError("workspaceId and tileId required for AgentOS actor key");
+  }
+  /** @type {[string, string]} */
+  const actorKey = [workspaceId, tileId];
+  return { workspaceId, tileId, actorKey, keyId: JSON.stringify(actorKey) };
+}
+
+function addressFromSession(session) {
+  return {
+    workspaceId: session.workspaceId,
+    tileId: session.tileId,
+    actorKey: session.actorKey,
+    keyId: session.keyId,
+  };
+}
+
+function startActorRuntime() {
+  if (actorRuntimeDisposed) {
+    throw new Error("AgentOS actor runtime disposed");
+  }
+  if (actorRuntimeStarted) return;
+  actorRegistry.start();
+  actorRuntimeStarted = true;
+}
+
+function actorHandleFor(address) {
+  startActorRuntime();
+  // This getOrCreate call is the durable delivery door. Sessions only retain
+  // the compound key; no raw actor/session object is used as the address.
+  return actorClient.agentos.getOrCreate(address.actorKey);
+}
+
+async function retryActorReady(operation) {
+  const timeoutMs = Number.isFinite(RIVET_START_TIMEOUT_MS) && RIVET_START_TIMEOUT_MS > 0
+    ? RIVET_START_TIMEOUT_MS
+    : 90_000;
+  const deadline = Date.now() + timeoutMs;
+  let lastError = new Error("AgentOS actor runtime did not become ready");
+  while (Date.now() < deadline) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+  throw new Error(`AgentOS actor runtime not ready within ${timeoutMs}ms: ${lastError.message}`);
+}
+
+function sessionEventPayload(args) {
+  const first = args[0];
+  if (first && typeof first === "object" && "sessionId" in first) return first;
+  return { sessionId: args[0], event: args[1] };
+}
+
+function permissionEventPayload(args) {
+  const first = args[0];
+  if (first && typeof first === "object" && "sessionId" in first) return first;
+  return { sessionId: args[0], request: args[1] };
+}
+
+function shellEventPayload(args) {
+  const first = args[0];
+  if (first && typeof first === "object" && "shellId" in first) return first;
+  return { shellId: args[0], data: args[1] };
+}
+
+function wireActorEvents(connection, lifecycle) {
+  const unsubs = [];
+  unsubs.push(connection.on("sessionEvent", (...args) => {
+    const payload = sessionEventPayload(args);
+    const sessionId = String(payload?.sessionId ?? "");
+    if (sessionId) {
+      broadcastSession(sessionId, { kind: "session-event", event: payload?.event });
+    }
+  }));
+  unsubs.push(connection.on("permissionRequest", (...args) => {
+    const payload = permissionEventPayload(args);
+    const sessionId = String(payload?.sessionId ?? "");
+    const request = payload?.request;
+    const requestId = String(request?.permissionId ?? "");
+    if (!sessionId || !requestId) return;
+    emitPermissionRequest(sessionId, {
+      requestId,
+      action: request?.description ?? "acp permission",
+      source: "acp",
+      raw: request,
+    });
+    waitForPermission(sessionId, requestId, "acp").catch(async () => {
+      try {
+        const { handle } = await actorForSession(sessionId);
+        await handle.respondPermission(sessionId, requestId, "reject");
+      } catch {
+        // Session may already be closed during actor teardown.
+      }
+    });
+  }));
+  unsubs.push(connection.on("shellData", (...args) => {
+    const payload = shellEventPayload(args);
+    const shellId = String(payload?.shellId ?? "");
+    const terminal = terminals.get(shellId);
+    if (!terminal || payload?.data == null) return;
+    broadcastSession(terminal.sessionId, {
+      kind: "terminal-data",
+      shellId,
+      data: Buffer.from(payload.data).toString("base64"),
+    });
+  }));
+  unsubs.push(connection.on("vmBooted", () => {
+    lifecycle.state = "booted";
+    delete lifecycle.reason;
+  }));
+  unsubs.push(connection.on("vmShutdown", (payload) => {
+    lifecycle.state = "shutdown";
+    lifecycle.reason = String(payload?.reason ?? "unknown");
+  }));
+  return unsubs;
+}
+
+async function ensureActor(address) {
+  const handle = actorHandleFor(address);
+  const actorId = await retryActorReady(() => handle.resolve());
+
+  let connectionPromise = actorConnections.get(address.keyId);
+  if (!connectionPromise) {
+    connectionPromise = (async () => {
+      // resolve() can succeed before a restarted envoy is registered. A harmless
+      // action proves the actor is actually ready before any non-idempotent call.
+      await retryActorReady(() => handle.listSoftware());
+      const connection = handle.connect();
+      const lifecycle = { state: "connecting" };
+      const unsubs = wireActorEvents(connection, lifecycle);
+      try {
+        await connection.ready;
+        lifecycle.state = "connected";
+        return { address, actorId, connection, unsubs, lifecycle };
+      } catch (error) {
+        for (const unsub of unsubs) unsub();
+        await connection.dispose().catch(() => {});
+        throw error;
+      }
+    })();
+    actorConnections.set(address.keyId, connectionPromise);
+    connectionPromise.catch(() => {
+      if (actorConnections.get(address.keyId) === connectionPromise) {
+        actorConnections.delete(address.keyId);
+      }
     });
   }
-  return vmInitPromise;
+
+  const connection = await connectionPromise;
+  return { handle, actorId, connection };
+}
+
+async function actorForSession(sessionId) {
+  const session = sessions.get(sessionId);
+  if (!session) throw new Error(`session not found: ${sessionId}`);
+  return ensureActor(addressFromSession(session));
+}
+
+async function disposeActorConnection(keyId) {
+  const pending = actorConnections.get(keyId);
+  actorConnections.delete(keyId);
+  if (!pending) return;
+  try {
+    const entry = await pending;
+    for (const unsub of entry.unsubs) unsub();
+    await entry.connection.dispose();
+  } catch {
+    // Best effort during reload/dispose.
+  }
+}
+
+async function promptSession(sessionId, text) {
+  const { handle } = await actorForSession(sessionId);
+  const previous = activePromptSessionId;
+  activePromptSessionId = sessionId;
+  lastAddressedSessionId = sessionId;
+  try {
+    return await handle.sendPrompt(sessionId, text);
+  } finally {
+    activePromptSessionId = previous;
+  }
+}
+
+async function disposeActorRuntime() {
+  for (const [shellId, terminal] of terminals) {
+    const session = sessions.get(terminal.sessionId);
+    if (!session) continue;
+    try {
+      await actorHandleFor(addressFromSession(session)).closeShell(shellId);
+    } catch {
+      // Best effort.
+    }
+  }
+  terminals.clear();
+
+  for (const [sessionId, session] of sessions) {
+    try {
+      await actorHandleFor(addressFromSession(session)).closeSession(sessionId);
+    } catch {
+      // Best effort; persisted transcript rows remain actor-owned.
+    }
+  }
+
+  for (const keyId of [...actorConnections.keys()]) {
+    await disposeActorConnection(keyId);
+  }
+
+  for (const [requestId, entry] of pendingPermissions) {
+    clearTimeout(entry.timer);
+    pendingPermissions.delete(requestId);
+    entry.resolve(false);
+  }
+
+  sessions.clear();
+  sessionToTile.clear();
+  tileToSession.clear();
+  hostConnectionGraph.clear();
+  lastAddressedSessionId = null;
+  actorRuntimeDisposed = true;
+  await actorClient.dispose().catch(() => {});
+  // @rivet-dev/agentos@0.2.7 cannot gracefully drain a prompted actor: the
+  // persisted session stays `running`, registry.shutdown() removes its envoy,
+  // and the next incarnation is stranded in `no_envoys`. The lifecycle caller
+  // terminates this host immediately after /dispose; letting process exit drop
+  // the envoy lets Rivet Engine release the slot and re-address the same actor.
 }
 
 /**
@@ -274,11 +579,10 @@ async function executeCableSend({ connectionId, fromTileId, text, fromSessionId 
     throw new Error(`target tile has no AgentOS session: ${targetTileId}`);
   }
 
-  const instance = await ensureVm();
   const delegated = `[a2a ${from}→${targetTileId}] ${msg}`;
   let targetResult;
   try {
-    targetResult = await instance.prompt(targetSessionId, delegated);
+    targetResult = await promptSession(targetSessionId, delegated);
   } catch (err) {
     throw new Error(err instanceof Error ? err.message : String(err));
   }
@@ -297,7 +601,7 @@ async function executeCableSend({ connectionId, fromTileId, text, fromSessionId 
   if (sourceSessionId) {
     const back = `[a2a ${targetTileId}→${from}] ${replyPayload}`;
     try {
-      await instance.prompt(sourceSessionId, back);
+      await promptSession(sourceSessionId, back);
     } catch {
       // Reply is still returned to the toolkit caller.
     }
@@ -441,8 +745,9 @@ async function fulfillPermission(sessionId, requestId, approved) {
   }
   clearTimeout(entry.timer);
   pendingPermissions.delete(requestId);
-  if (entry.kind === "acp" && vm) {
-    await vm.respondPermission(sessionId, requestId, approved ? "once" : "reject");
+  if (entry.kind === "acp") {
+    const { handle } = await actorForSession(sessionId);
+    await handle.respondPermission(sessionId, requestId, approved ? "once" : "reject");
   }
   entry.resolve(approved);
   return true;
@@ -475,27 +780,6 @@ function emitPermissionRequest(sessionId, request) {
   });
 }
 
-function wireSessionHandlers(instance, sessionId) {
-  instance.onSessionEvent(sessionId, (event) => {
-    broadcastSession(sessionId, { kind: "session-event", event });
-  });
-
-  instance.onPermissionRequest(sessionId, (request) => {
-    const requestId = request.permissionId;
-    emitPermissionRequest(sessionId, {
-      requestId,
-      action: request.description ?? "acp permission",
-      source: "acp",
-      raw: request,
-    });
-    waitForPermission(sessionId, requestId, "acp").catch(() => {
-      if (vm) {
-        vm.respondPermission(sessionId, requestId, "reject").catch(() => {});
-      }
-    });
-  });
-}
-
 async function readJsonBody(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -525,12 +809,11 @@ async function handleRequest(req, res) {
     }
 
     if (req.method === "POST" && path === "/dispose") {
-      if (vm) {
-        await vm.dispose();
-        vm = null;
-        vmInitPromise = null;
-      }
-      sessions.clear();
+      await disposeActorRuntime();
+      res.once("finish", () => {
+        server.close();
+        setImmediate(() => process.exit(0));
+      });
       sendJson(res, 200, { ok: true });
       return;
     }
@@ -541,8 +824,20 @@ async function handleRequest(req, res) {
         sendJson(res, 400, { error: "path query required" });
         return;
       }
-      const instance = await ensureVm();
-      const raw = await instance.readFile(filePath);
+      let sessionId = url.searchParams.get("sessionId")?.trim() ?? "";
+      if (!sessionId && sessions.size === 1) {
+        sessionId = sessions.keys().next().value ?? "";
+      }
+      if (!sessionId) {
+        sendJson(res, 400, { error: "sessionId query required when actor is ambiguous" });
+        return;
+      }
+      if (!sessions.has(sessionId)) {
+        sendJson(res, 404, { error: "session not found" });
+        return;
+      }
+      const { handle } = await actorForSession(sessionId);
+      const raw = await handle.readFile(filePath);
       const buf = Buffer.from(raw);
       res.writeHead(200, {
         "content-type": "application/octet-stream",
@@ -608,8 +903,10 @@ async function handleRequest(req, res) {
     if (req.method === "POST" && path === "/session") {
       const body = await readJsonBody(req);
       let picked;
+      let address;
       try {
         picked = resolveSessionConfig(body?.software);
+        address = resolveActorAddress(body);
       } catch (err) {
         if (err instanceof SessionConfigError) {
           sendJson(res, 400, { error: err.message });
@@ -617,28 +914,46 @@ async function handleRequest(req, res) {
         }
         throw err;
       }
-      const instance = await ensureVm();
+      const { handle, actorId } = await ensureActor(address);
       if (picked.piVmFiles) {
         for (const file of picked.piVmFiles) {
           try {
-            await instance.writeFile(file.path, file.content);
+            const parent = file.path.slice(0, file.path.lastIndexOf("/"));
+            if (!(await handle.exists(parent))) await handle.mkdir(parent);
+            await handle.writeFile(file.path, file.content);
           } catch {
             // Best-effort pi config seeding.
           }
         }
       }
-      const { sessionId } = await instance.createSession(picked.software, {
+      const sessionId = await handle.createSession(picked.software, {
         env: picked.env,
       });
-      sessions.set(sessionId, { subscribers: new Set(), software: picked.software });
-      wireSessionHandlers(instance, sessionId);
-      const tileId = typeof body?.tileId === "string" ? body.tileId.trim() : "";
-      if (tileId) registerHostTileSession(tileId, sessionId);
-      sendJson(res, 200, { sessionId, software: picked.software });
+      sessions.set(sessionId, {
+        subscribers: new Set(),
+        software: picked.software,
+        workspaceId: address.workspaceId,
+        tileId: address.tileId,
+        actorKey: address.actorKey,
+        keyId: address.keyId,
+        actorId,
+      });
+      lastAddressedSessionId = sessionId;
+      registerHostTileSession(address.tileId, sessionId);
+      sendJson(res, 200, {
+        sessionId,
+        software: picked.software,
+        workspaceId: address.workspaceId,
+        tileId: address.tileId,
+        actorKey: address.actorKey,
+        actorId,
+      });
       return;
     }
 
-    const sessionMatch = path.match(/^\/session\/([^/]+)\/(prompt|permission|events|terminal)$/);
+    const sessionMatch = path.match(
+      /^\/session\/([^/]+)\/(prompt|permission|events|terminal|runtime)$/,
+    );
     const terminalOpenMatch = path.match(/^\/session\/([^/]+)\/terminal\/open$/);
     const terminalShellMatch = path.match(/^\/session\/([^/]+)\/terminal\/([^/]+)\/(write|resize|close)$/);
     if (terminalShellMatch) {
@@ -649,11 +964,11 @@ async function handleRequest(req, res) {
         sendJson(res, 404, { error: "session not found" });
         return;
       }
-      const instance = await ensureVm();
+      const { handle } = await actorForSession(sessionId);
       if (action === "write" && req.method === "POST") {
         const body = await readJsonBody(req);
         const data = typeof body.data === "string" ? body.data : "";
-        instance.writeShell(shellId, data);
+        await handle.writeShell(shellId, data);
         sendJson(res, 200, { ok: true });
         return;
       }
@@ -661,15 +976,13 @@ async function handleRequest(req, res) {
         const body = await readJsonBody(req);
         const cols = Number.parseInt(String(body.cols ?? "80"), 10);
         const rows = Number.parseInt(String(body.rows ?? "24"), 10);
-        instance.resizeShell(shellId, cols, rows);
+        await handle.resizeShell(shellId, cols, rows);
         sendJson(res, 200, { ok: true });
         return;
       }
       if (action === "close" && req.method === "POST") {
-        const entry = terminals.get(shellId);
-        entry?.unsub?.();
         terminals.delete(shellId);
-        instance.closeShell(shellId);
+        await handle.closeShell(shellId);
         sendJson(res, 200, { ok: true });
         return;
       }
@@ -684,16 +997,10 @@ async function handleRequest(req, res) {
       const body = await readJsonBody(req);
       const cols = Number.parseInt(String(body.cols ?? "80"), 10);
       const rows = Number.parseInt(String(body.rows ?? "24"), 10);
-      const instance = await ensureVm();
-      const { shellId } = instance.openShell({ cols, rows });
-      const unsub = instance.onShellData(shellId, (chunk) => {
-        broadcastSession(sessionId, {
-          kind: "terminal-data",
-          shellId,
-          data: Buffer.from(chunk).toString("base64"),
-        });
-      });
-      terminals.set(shellId, { sessionId, unsub });
+      const session = sessions.get(sessionId);
+      const { handle } = await actorForSession(sessionId);
+      const { shellId } = await handle.openShell({ cols, rows });
+      terminals.set(shellId, { sessionId, keyId: session.keyId });
       sendJson(res, 200, { shellId });
       return;
     }
@@ -702,35 +1009,39 @@ async function handleRequest(req, res) {
       const sessionId = decodeURIComponent(sessionMatch[1]);
       const action = sessionMatch[2];
 
-      if (!sessions.has(sessionId) && action !== "terminal") {
+      if (!sessions.has(sessionId)) {
         sendJson(res, 404, { error: "session not found" });
         return;
       }
 
       if (action === "terminal" && req.method === "POST") {
-        if (!sessions.has(sessionId)) {
-          sendJson(res, 404, { error: "session not found" });
-          return;
-        }
         const body = await readJsonBody(req);
         const cols = Number.parseInt(String(body.cols ?? "80"), 10);
         const rows = Number.parseInt(String(body.rows ?? "24"), 10);
-        const instance = await ensureVm();
-        const { shellId } = instance.openShell({ cols, rows });
-        const unsub = instance.onShellData(shellId, (chunk) => {
-          broadcastSession(sessionId, {
-            kind: "terminal-data",
-            shellId,
-            data: Buffer.from(chunk).toString("base64"),
-          });
-        });
-        terminals.set(shellId, { sessionId, unsub });
+        const session = sessions.get(sessionId);
+        const { handle } = await actorForSession(sessionId);
+        const { shellId } = await handle.openShell({ cols, rows });
+        terminals.set(shellId, { sessionId, keyId: session.keyId });
         sendJson(res, 200, { shellId });
         return;
       }
 
-      if (!sessions.has(sessionId)) {
-        sendJson(res, 404, { error: "session not found" });
+      if (action === "runtime" && req.method === "GET") {
+        const session = sessions.get(sessionId);
+        const { handle, actorId } = await actorForSession(sessionId);
+        const persistedSessions = await handle.listPersistedSessions();
+        const persistedEvents = await handle.getSessionEvents(sessionId);
+        const connection = await actorConnections.get(session.keyId);
+        sendJson(res, 200, {
+          sessionId,
+          workspaceId: session.workspaceId,
+          tileId: session.tileId,
+          actorKey: session.actorKey,
+          actorId,
+          lifecycle: connection?.lifecycle ?? { state: "unknown" },
+          persistedSessions,
+          persistedEvents,
+        });
         return;
       }
 
@@ -752,18 +1063,12 @@ async function handleRequest(req, res) {
       if (action === "prompt" && req.method === "POST") {
         const body = await readJsonBody(req);
         const text = typeof body.text === "string" ? body.text : "";
-        const instance = await ensureVm();
-        activePromptSessionId = sessionId;
-        try {
-          const result = await instance.prompt(sessionId, text);
-          sendJson(res, 200, {
-            ok: true,
-            text: result?.text ?? "",
-            response: result?.response ?? null,
-          });
-        } finally {
-          activePromptSessionId = null;
-        }
+        const result = await promptSession(sessionId, text);
+        sendJson(res, 200, {
+          ok: true,
+          text: result?.text ?? "",
+          response: result?.response ?? null,
+        });
         return;
       }
 

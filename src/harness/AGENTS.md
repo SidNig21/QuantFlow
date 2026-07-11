@@ -44,6 +44,10 @@ available-but-uncalled (do not assume the live delegation flow uses it).
 `readState` reads the Kernel State Card (never log scraping); `collectReceipts`
 returns drafts the caller posts via `kernel.receipt.post`.
 
+`SpawnWorkerInput.workspaceId` is the optional durable runtime workspace
+identity. It stays separate from `cwd` and artifact paths; adapters must not
+derive one from the other.
+
 **Pi is deferred.** A stable, approved Pi programmatic spawn/send/read contract
 is not available in this increment, so `pi` is NOT registered (no `src/harness/pi`).
 Adding it later must not make Pi mandatory for the core app. Codex/Claude-code

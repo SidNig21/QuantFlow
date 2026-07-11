@@ -43,6 +43,8 @@ export interface SpawnWorkerInput {
   modelName?: string | null;
   workflowId?: string | null;
   tileId?: string | null;
+  /** Durable runtime workspace identity; distinct from cwd/artifact paths. */
+  workspaceId?: string | null;
   permissions?: Record<string, unknown>;
   skills?: string[];
   env?: Record<string, string>;
@@ -55,6 +57,8 @@ export interface SpawnWorkerInput {
 export interface WorkerHandle {
   workerId: string; // kernel worker_instances id
   tileId: string;
+  /** Durable runtime workspace identity carried from spawn when available. */
+  workspaceId?: string | null;
   kind: HarnessKind;
   herdrPaneId?: string | null;
   envoySpaceId?: string | null;

@@ -1,39 +1,39 @@
 # AgentOS host (WSL sidecar)
 
-Thin Node process that runs AgentOS in WSL and exposes localhost HTTP + SSE for the
-QuantFlow harness adapter on Windows.
+Node sidecar that serves one durable AgentOS-backed RivetKit actor per
+`[workspaceId, tileId]` and exposes QuantFlow's existing localhost HTTP/SSE
+transport on Windows.
 
-## One-time setup (WSL)
+## Setup
 
 ```bash
 wsl -e bash -lc "cd /mnt/c/Users/rybow/QuantFlow/tools/agentos-host && npm install"
 ```
 
-Uses the WSL login-shell `node` (e.g. `/home/rybowen21/.local/bin/node` v22+).
+The WSL login-shell Node must be v22 or newer.
 
-## Manual boot (health check)
+## Manual boot
 
 ```bash
 wsl -e bash -lc "cd /mnt/c/Users/rybow/QuantFlow/tools/agentos-host && node host.js"
-```
-
-In another shell:
-
-```bash
 curl http://127.0.0.1:7430/health
 ```
 
-Boot does **not** require API keys. Keys are read only on `POST /session`.
+Boot and `/health` do not require a credential. `POST /session` requires both
+`workspaceId` and `tileId`; the host resolves credentials only at that point.
 
 ## Environment
 
 | Variable | Purpose |
 | --- | --- |
-| `AGENTOS_HOST_PORT` | Listen port (default `7430`) |
-| `OPENCODE_API_KEY` / `OPENCODE_ZEN_API_KEY` | Preferred — `opencode` software |
-| `OPENROUTER_API_KEY` | `pi` + OpenRouter base URL quirk |
-| `ANTHROPIC_API_KEY` | Direct `pi` |
+| `AGENTOS_HOST_PORT` | Compatibility HTTP port (default `7430`) |
+| `AGENTOS_RIVET_ACTOR_PORT` | Internal Rivet actor port (default host port + 1) |
+| `AGENTOS_RIVET_ENGINE_PORT` | Internal Rivet Engine port (default host port + 2) |
+| `AGENTOS_RIVET_START_TIMEOUT_MS` | Actor/envoy readiness budget (default `90000`) |
+| `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` / `OPENCODE_ZEN_API_KEY` | Preferred Pi provider credential |
+| `OPENROUTER_API_KEY` | Pi via OpenRouter |
+| `ANTHROPIC_API_KEY` | Direct Pi/Claude API credential |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Preferred Claude Code subscription credential |
 
-Passed through from Windows when started via `host-lifecycle.ts`.
-
-See `AGENTS.md` for the full wire protocol.
+See `AGENTS.md` for the full wire contract, the process-exit lifecycle
+workaround, and the current `0.2.7` package-boundary findings.

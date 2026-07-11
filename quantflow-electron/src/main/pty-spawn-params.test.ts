@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  buildAgentOsDisplayTarget,
   buildHerdrAttachSessionCreateParams,
   buildHerdrDisplayTarget,
   buildSidecarSessionCreateParams,
+  parseAgentOsAttachTarget,
   parseHerdrAttachTarget,
 } from "./pty-spawn-params";
 
@@ -55,6 +57,39 @@ describe("buildSidecarSessionCreateParams", () => {
       rows: 28,
       env: { LANG: "en_US.UTF-8" },
     });
+  });
+});
+
+describe("agentos attach target helpers", () => {
+  test("round-trips the versioned workspace and tile actor address", () => {
+    const target = buildAgentOsDisplayTarget(
+      "tile/with spaces",
+      "workspace:main",
+    );
+
+    expect(target).toBe(
+      "agentos:v2:workspace%3Amain:tile%2Fwith%20spaces",
+    );
+    expect(parseAgentOsAttachTarget(target)).toEqual({
+      workspaceId: "workspace:main",
+      tileId: "tile/with spaces",
+    });
+  });
+
+  test("keeps legacy tile-only targets parseable", () => {
+    const target = buildAgentOsDisplayTarget("tile/legacy actor");
+
+    expect(target).toBe("agentos:tile%2Flegacy%20actor");
+    expect(parseAgentOsAttachTarget(target)).toEqual({
+      tileId: "tile/legacy actor",
+    });
+  });
+
+  test("rejects malformed versioned actor targets", () => {
+    expect(parseAgentOsAttachTarget("agentos:v2:workspace-only")).toBeNull();
+    expect(parseAgentOsAttachTarget("agentos:v2::tile-1")).toBeNull();
+    expect(parseAgentOsAttachTarget("agentos:v2:workspace-1:")).toBeNull();
+    expect(parseAgentOsAttachTarget("agentos:v2:%ZZ:tile-1")).toBeNull();
   });
 });
 

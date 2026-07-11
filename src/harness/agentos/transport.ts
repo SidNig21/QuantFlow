@@ -1,7 +1,7 @@
 /**
  * AgentOS transport seam — localhost HTTP/JSON-RPC shape the WSL host process
- * will expose. The adapter depends on this interface only; @rivet-dev/agentos-core
- * stays in the host process (next chunk).
+ * exposes. The adapter depends on this interface only; the durable
+ * @rivet-dev/agentos actor wrapper stays in the host process.
  */
 
 export interface AgentOsPermissionRequest {
@@ -12,10 +12,17 @@ export interface AgentOsPermissionRequest {
   raw?: unknown;
 }
 
+export interface AgentOsSessionOptions {
+  env?: Record<string, string>;
+  /** Durable actor address, used together with tileId when both are present. */
+  workspaceId?: string;
+  tileId?: string;
+}
+
 export interface AgentOsTransport {
   createSession(
     software: string,
-    options?: { env?: Record<string, string> },
+    options?: AgentOsSessionOptions,
   ): Promise<{ sessionId: string }>;
   prompt(sessionId: string, text: string): Promise<{ text: string; response?: unknown }>;
   onSessionEvent(sessionId: string, handler: (event: unknown) => void): () => void;
@@ -24,7 +31,7 @@ export interface AgentOsTransport {
     handler: (request: AgentOsPermissionRequest) => void | Promise<void>,
   ): () => void;
   respondPermission(sessionId: string, requestId: string, approved: boolean): Promise<void>;
-  readFile(path: string): Promise<Uint8Array>;
+  readFile(path: string, sessionId?: string): Promise<Uint8Array>;
   dispose(): Promise<void>;
   health(): Promise<{ ok: boolean; hasCredential?: boolean }>;
   /** V1: interactive terminal attach for actor tiles. */

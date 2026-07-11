@@ -57,6 +57,7 @@ export async function spawnRoleTileAt(deps, role, x, y, options = {}) {
 			id: options.id,
 			size: options.size,
 			workflowId: options.workflowId,
+			workspaceId: options.workspaceId ?? workspaceId ?? canvasId,
 			displayName,
 			roleName: role.name,
 			instruction: String(options.instruction ?? role.startupPrompt ?? "").trim()
@@ -216,6 +217,8 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 		generateId,
 		getTerminalSize = () => ({}),
 		shellApi,
+		workspaceId: rendererWorkspaceId,
+		canvasId,
 		updateRoleTileChrome,
 		onRoleSpawned,
 		onRoleSpawnFailed,
@@ -228,6 +231,9 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 	const roleName = String(options.roleName ?? "").trim() || "AgentOS";
 	const size = options.size ?? getTerminalSize();
 	const tileId = options.id || generateId();
+	const workspaceId = String(
+		options.workspaceId ?? rendererWorkspaceId ?? canvasId ?? "",
+	).trim() || undefined;
 	const kapi = kernelApiRef();
 
 	const tile = await tileManager.createCanvasTile("term", x, y, {
@@ -280,6 +286,7 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 
 	try {
 		const prepare = await shellApi?.agentosTerminalPrepare?.({
+			workspaceId,
 			tileId: tile.id,
 			cols: size.width ? Math.max(80, Math.floor(size.width / 8)) : undefined,
 			rows: size.height ? Math.max(24, Math.floor(size.height / 17)) : undefined,
@@ -306,6 +313,7 @@ export async function spawnAgentOsTileAt(deps, x, y, options = {}) {
 		const instruction = String(options.instruction ?? "").trim();
 		if (instruction) {
 			void shellApi?.agentosRun?.({
+				workspaceId,
 				tileId: tile.id,
 				instruction,
 				workflowId: options.workflowId ?? undefined,

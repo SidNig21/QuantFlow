@@ -19,7 +19,11 @@ import type {
 } from '../types';
 import type { ApprovalGate } from './approval-gate';
 import { createSimApprovalGate } from './approval-gate';
-import type { AgentOsPermissionRequest, AgentOsTransport } from './transport';
+import type {
+  AgentOsPermissionRequest,
+  AgentOsSessionOptions,
+  AgentOsTransport,
+} from './transport';
 import { formatAgentOsUnavailable } from './error-messages';
 import {
   createAcpTranslatorState,
@@ -54,6 +58,8 @@ export interface AgentOsHarnessOptions {
 interface AgentOsState {
   agentosSessionId: string | null;
   status: 'idle' | 'working' | 'done' | 'stopped';
+  /** Durable actor address input; never derived from the artifact workspace. */
+  workspaceId: string | null;
   workspace: string;
   taskId: string | null;
   workflowId: string | null;
@@ -94,6 +100,7 @@ export function createAgentOsHarness(options: AgentOsHarnessOptions): WorkerHarn
       state = {
         agentosSessionId: handle.agentosSessionId ?? null,
         status: handle.agentosSessionId ? 'working' : 'idle',
+        workspaceId: handle.workspaceId ?? null,
         workspace: resolve(handle.workspacePath ?? fallbackWorkspace),
         taskId: null,
         workflowId: null,
@@ -188,7 +195,10 @@ export function createAgentOsHarness(options: AgentOsHarnessOptions): WorkerHarn
     try {
       const raw = io?.readFile && state.artifactPath
         ? io.readFile(state.artifactPath)
-        : await transport.readFile(state.artifactVmPath);
+        : await transport.readFile(
+            state.artifactVmPath,
+            state.agentosSessionId ?? undefined,
+          );
       const bytes = typeof raw === 'string' ? Buffer.from(raw) : Buffer.from(raw);
       state.artifactLoaded = true;
       queueDrafts(state, [{
@@ -221,6 +231,7 @@ export function createAgentOsHarness(options: AgentOsHarnessOptions): WorkerHarn
       const handle: WorkerHandle = {
         workerId: input.roleId ?? `agentos-worker-${tileId}`,
         tileId,
+        workspaceId: input.workspaceId ?? null,
         kind: 'agentos',
         agentosSessionId: null,
         workspacePath: resolve(input.cwd ?? workspace),
@@ -228,6 +239,7 @@ export function createAgentOsHarness(options: AgentOsHarnessOptions): WorkerHarn
       states.set(handle.workerId, {
         agentosSessionId: null,
         status: 'idle',
+        workspaceId: input.workspaceId ?? null,
         workspace: handle.workspacePath,
         taskId: null,
         workflowId: null,
@@ -253,7 +265,11 @@ export function createAgentOsHarness(options: AgentOsHarnessOptions): WorkerHarn
       try {
         await ensureHealthy();
         if (!state.agentosSessionId) {
-          const created = await transport.createSession(software, {});
+          const sessionOptions: AgentOsSessionOptions = { tileId: handle.tileId };
+          if (state.workspaceId !== null) {
+            sessionOptions.workspaceId = state.workspaceId;
+          }
+          const created = await transport.createSession(software, sessionOptions);
           state.agentosSessionId = created.sessionId;
           handle.agentosSessionId = created.sessionId;
           wireSession(created.sessionId, state);

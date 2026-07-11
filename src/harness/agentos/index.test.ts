@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { createSimApprovalGate } from './approval-gate';
 import { createAgentOsHarness } from './index';
 import { createSimTransport, simStepsFromFixtureEvents } from './sim-transport';
+import type { AgentOsSessionOptions } from './transport';
 
 const FIXTURE = join(import.meta.dir, 'fixtures', 'tier2-events-trimmed.jsonl');
 
@@ -22,7 +23,7 @@ describe('agentos-harness', () => {
     const artifactVmPath = '/workspace/tier2-result.txt';
     const artifactBody = 'bindings-approved-hello';
     const gate = createSimApprovalGate(60);
-    const transport = createSimTransport({
+    const baseTransport = createSimTransport({
       steps: simStepsFromFixtureEvents(events, {
         permissionAtIndex: 5,
         permission: {
@@ -34,9 +35,29 @@ describe('agentos-harness', () => {
         artifactBody,
       }),
     });
+    const createCalls: Array<{
+      software: string;
+      options: AgentOsSessionOptions | undefined;
+    }> = [];
+    const readCalls: Array<{ path: string; sessionId: string | undefined }> = [];
+    const transport = {
+      ...baseTransport,
+      async createSession(software: string, options?: AgentOsSessionOptions) {
+        createCalls.push({ software, options });
+        return baseTransport.createSession();
+      },
+      async readFile(path: string, sessionId?: string) {
+        readCalls.push({ path, sessionId });
+        return baseTransport.readFile(path);
+      },
+    };
     const harness = createAgentOsHarness({ transport, workspace, approvalGate: gate });
 
-    const handle = await harness.spawn({ tileId: 'tile1', workflowId: 'wf1' });
+    const handle = await harness.spawn({
+      tileId: 'tile1',
+      workspaceId: 'workspace-actor-key',
+      workflowId: 'wf1',
+    });
     await harness.send(handle, {
       text: 'Run governed task',
       taskId: 'task1',
@@ -48,6 +69,18 @@ describe('agentos-harness', () => {
     const milestones = drafts.map((d) => d.metadata?.['milestone'] ?? d.type);
 
     expect(handle.agentosSessionId).toBe('sim-session-1');
+    expect(handle.workspaceId).toBe('workspace-actor-key');
+    expect(createCalls).toEqual([{
+      software: 'pi',
+      options: {
+        workspaceId: 'workspace-actor-key',
+        tileId: 'tile1',
+      },
+    }]);
+    expect(readCalls).toEqual([{
+      path: artifactVmPath,
+      sessionId: 'sim-session-1',
+    }]);
     expect(gate.records).toHaveLength(1);
     expect(gate.records[0]?.blockedMs).toBeGreaterThan(0);
     expect(milestones[0]).toBe('session.start');

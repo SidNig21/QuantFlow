@@ -16,6 +16,7 @@ import { getAgentOsWorkerHarness } from "./agentos-service";
 export { AGENTOS_DEFAULT_INSTRUCTION };
 
 export interface AgentOsRunInput {
+  workspaceId?: string | null;
   tileId: string;
   instruction: string;
   workflowId?: string | null;
@@ -144,6 +145,7 @@ async function statusUpdate(
 export async function runAgentOsTask(input: AgentOsRunInput): Promise<AgentOsRunResult> {
   const deps = resolveDeps();
   const { running } = moduleState;
+  const workspaceId = input.workspaceId?.trim() || undefined;
   const tileId = input.tileId?.trim();
   const instruction = input.instruction?.trim();
   if (!tileId) return { ok: false, error: "tileId required" };
@@ -168,6 +170,7 @@ export async function runAgentOsTask(input: AgentOsRunInput): Promise<AgentOsRun
 
     const harness = deps.getHarness();
     handle = await harness.spawn({
+      workspaceId,
       tileId,
       roleId: workerId,
       roleName: "AgentOS",
