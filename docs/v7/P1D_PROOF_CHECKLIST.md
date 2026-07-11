@@ -152,3 +152,23 @@ silent-fallback test:  broken target -> <loud error PASS | silent success FAIL>
 **Guiding line:** this checklist should make your proofs *faster*, never replace them. A
 receipt on your hardware is the only thing that turns "the docs say so" into "the Dock
 works."
+
+---
+
+## Eve Path A U4 — single proof tile
+
+This is the first Eve-on-AgentOS dock proof after the Path A pivot. It must not promote
+Eve into the real spawn rail yet.
+
+- [ ] **U4.1** Create the isolated proof-only recipe `proof-eve-agentos` with
+      `runtimeTarget="agentos"` and `agentosSoftware="eve"`.
+- [ ] **U4.2** Spawn one tile from that recipe and confirm the tile attached to an
+      AgentOS session with `software="eve"`.
+- [ ] **U4.3** Prompt the tile with `Reply with exactly: eve-proof-ok`.
+- [ ] **U4.4** Capture the reply text and screenshot evidence.
+- [ ] **U4.5** Confirm `DOCK_SPAWN_ACTOR_IDS` is still empty; U7 promotion is still
+      operator-owned.
+
+**Receipt:** `bun qa/run.ts agentos-eve` logs `AGENTOS-EVE-PROOF` steps, reply text
+containing `eve-proof-ok`, and `V7-00-agentos-eve-live.png`.
+**PASS =** proof recipe spawn, Eve session attach, and live prompt round-trip all pass.

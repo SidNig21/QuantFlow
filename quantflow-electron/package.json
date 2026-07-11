@@ -52,6 +52,7 @@
 		"proof:legend-agentos": "bun scripts/proof-legend-agentos.ts",
 		"proof:actors-on-agentos": "bun scripts/proof-actors-on-agentos.ts",
 		"proof:agentos-stick": "bun scripts/proof-agentos-stick.ts",
+		"proof:agentos-eve": "bun scripts/proof-agentos-eve.ts",
 		"proof:agentos-a2a": "bun scripts/proof-agentos-a2a.ts",
 		"proof:a2a-cable": "bun scripts/proof-a2a-cable.ts",
 		"proof:orchestrator": "bun scripts/proof-orchestrator.ts",

@@ -270,7 +270,12 @@ export async function startAgentOsHost(
   }
 
   const spawnEnv = buildSpawnEnv(port);
-  const script = `cd ${JSON.stringify(wslHostPath)} && node host.js`;
+  const script = [
+    '. "$HOME/.profile" >/dev/null 2>&1 || true',
+    '. "$HOME/.nvm/nvm.sh" >/dev/null 2>&1 || true',
+    'if command -v nvm >/dev/null 2>&1; then nvm use 24 >/dev/null 2>&1 || true; fi',
+    `cd ${JSON.stringify(wslHostPath)} && node host.js`,
+  ].join('; ');
   const child = spawnImpl('wsl.exe', ['-e', 'bash', '-lc', script], { env: spawnEnv });
 
   const reachableHost = await (async () => {

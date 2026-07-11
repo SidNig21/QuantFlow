@@ -41,7 +41,7 @@ function parseCreateInput(raw: unknown): LegendRecipeCreateInput {
       ? input.harnessKind
       : undefined,
     agentosSoftware: input.agentosSoftware === "pi" || input.agentosSoftware === "opencode"
-      || input.agentosSoftware === "claude-code"
+      || input.agentosSoftware === "claude-code" || input.agentosSoftware === "eve"
       ? input.agentosSoftware
       : undefined,
     agentosInstruction: typeof input.agentosInstruction === "string"

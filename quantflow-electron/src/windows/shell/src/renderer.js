@@ -371,6 +371,7 @@ async function init() {
 		);
 		legendDock?.refresh?.();
 	}
+	window.__quantflowRefreshLegendRegistry = refreshLegendRegistry;
 	const legendSpawnGhost = document.createElement("div");
 	legendSpawnGhost.className = "lv1-spawn-ghost";
 	legendSpawnGhost.hidden = true;

@@ -292,6 +292,15 @@ const checks: Check[] = [
     },
   },
   {
+    name: "agentos-eve",
+    description:
+      "U4: proof Eve dock recipe to AgentOS session to terminal tile to live prompt round-trip",
+    async run() {
+      const { runAgentOsEveCheck } = await import("./lib/agentos-eve");
+      return runAgentOsEveCheck();
+    },
+  },
+  {
     name: "agentos-a2a",
     description:
       "A2A: two pi-stick AgentOS sessions, cable relay, sim ack + scripted canvas proof",

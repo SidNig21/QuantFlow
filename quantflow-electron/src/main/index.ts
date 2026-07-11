@@ -71,6 +71,7 @@ import { runAgentOsTerminalProof } from "./agentos-terminal-proof";
 import { runLegendAgentosProof } from "./agentos-legend-proof";
 import { runActorsOnAgentosProof } from "./agentos-actors-proof";
 import { runA2aCableProof } from "./agentos-a2a-proof";
+import { runAgentosEveProof } from "./agentos-eve-proof";
 import { runAgentosStickProof } from "./agentos-stick-proof";
 import { runEveA2aProof } from "./agentos-eve-a2a-proof";
 import { runOrchestratorProof } from "./agentos-orchestrator-proof";
@@ -1035,6 +1036,9 @@ app.whenReady().then(async () => {
   }
   if (process.env.QF_AGENTOS_STICK_PROOF === "1") {
     void runAgentosStickProof(mainWindow!);
+  }
+  if (process.env.QF_AGENTOS_EVE_PROOF === "1") {
+    void runAgentosEveProof(mainWindow!);
   }
   if (process.env.QF_A2A_CABLE_PROOF === "1" || process.env.QF_AGENTOS_A2A_PROOF === "1") {
     void runA2aCableProof(mainWindow!);

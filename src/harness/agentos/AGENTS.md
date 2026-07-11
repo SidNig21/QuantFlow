@@ -73,7 +73,10 @@ bun qa/run.ts kill-switch
 
 WSL sidecar: `tools/agentos-host/host.js` — see `tools/agentos-host/AGENTS.md`.
 Electron main ↔ host over localhost (same pattern as herdr). Lifecycle:
-`startAgentOsHost()` spawns `wsl -e bash -lc "cd …/tools/agentos-host && node host.js"`.
+`startAgentOsHost()` spawns WSL through `bash -lc`, sources `~/.profile` and
+`~/.nvm/nvm.sh` when present, prefers `nvm use 24`, then runs
+`tools/agentos-host/host.js`. Keep this profile/NVM step: live Eve/AgentOS
+proofs depend on the same WSL credential and Node setup used by manual probes.
 
 ## Live wiring (Electron main, P6)
 

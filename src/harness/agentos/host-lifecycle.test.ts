@@ -51,6 +51,8 @@ describe('agentos-host-lifecycle', () => {
     expect(spawnCalls[0]?.command).toBe('wsl.exe');
     expect(spawnCalls[0]?.args[0]).toBe('-e');
     expect(spawnCalls[0]?.args.join(' ')).toContain('agentos-host');
+    expect(spawnCalls[0]?.args.join(' ')).toContain('. "$HOME/.profile"');
+    expect(spawnCalls[0]?.args.join(' ')).toContain('nvm use 24');
 
     await stopAgentOsHost(handle);
     expect(killed).toBe(true);

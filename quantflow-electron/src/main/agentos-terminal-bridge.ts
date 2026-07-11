@@ -276,11 +276,14 @@ export function getAgentOsTileAttach(tileId: string): Readonly<TileAttach> | nul
   return tileAttaches.get(tileId) ?? null;
 }
 
-export async function promptAgentOsTile(tileId: string, text: string): Promise<void> {
+export async function promptAgentOsTile(
+  tileId: string,
+  text: string,
+): Promise<{ text: string; response?: unknown }> {
   const attach = tileAttaches.get(tileId.trim());
   if (!attach) throw new Error(formatAgentOsUnavailable(`no AgentOS attach for tile ${tileId}`));
   const transport = await transportOrThrow();
-  await transport.prompt(attach.sessionId, text);
+  return transport.prompt(attach.sessionId, text);
 }
 
 export async function writeAgentOsTileTerminal(tileId: string, text: string): Promise<void> {
