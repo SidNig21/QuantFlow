@@ -41,7 +41,7 @@ function withEnv(values, fn) {
   }
 }
 
-test("resolves Eve software with OPENCODE_GO_API_KEY only in session env", () => {
+test("resolves Eve software with OPENCODE_GO_API_KEY in session env", () => {
   withEnv({ OPENCODE_GO_API_KEY: "test-eve-key" }, () => {
     assert.deepEqual(resolveSessionConfig("eve"), {
       software: "eve",
@@ -50,14 +50,37 @@ test("resolves Eve software with OPENCODE_GO_API_KEY only in session env", () =>
   });
 });
 
-test("rejects Eve software when OPENCODE_GO_API_KEY is missing", () => {
-  withEnv({ OPENCODE_GO_API_KEY: undefined }, () => {
-    assert.throws(
-      () => resolveSessionConfig("eve"),
-      (error) => error instanceof SessionConfigError
-        && /OPENCODE_GO_API_KEY/.test(error.message),
-    );
-  });
+test("resolves Eve software when only OPENCODE_API_KEY is set (WSL profile alias)", () => {
+  withEnv(
+    {
+      OPENCODE_API_KEY: "profile-alias-key",
+      OPENCODE_GO_API_KEY: undefined,
+      OPENCODE_ZEN_API_KEY: undefined,
+    },
+    () => {
+      assert.deepEqual(resolveSessionConfig("eve"), {
+        software: "eve",
+        env: { OPENCODE_GO_API_KEY: "profile-alias-key" },
+      });
+    },
+  );
+});
+
+test("rejects Eve software when all OpenCode aliases are missing", () => {
+  withEnv(
+    {
+      OPENCODE_API_KEY: undefined,
+      OPENCODE_GO_API_KEY: undefined,
+      OPENCODE_ZEN_API_KEY: undefined,
+    },
+    () => {
+      assert.throws(
+        () => resolveSessionConfig("eve"),
+        (error) => error instanceof SessionConfigError
+          && /OPENCODE_API_KEY/.test(error.message),
+      );
+    },
+  );
 });
 
 test("keeps unknown software rejection explicit", () => {

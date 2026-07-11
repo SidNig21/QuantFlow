@@ -218,12 +218,16 @@ function resolveSessionConfig(requested) {
     return resolveSoftwareAndEnv();
   }
   if (software === "eve") {
-    const opencodeGoKey = (process.env.OPENCODE_GO_API_KEY ?? "").trim();
-    if (opencodeGoKey) {
-      return { software: "eve", env: { OPENCODE_GO_API_KEY: opencodeGoKey } };
+    // Same alias family as the pi route (WSL profiles commonly export
+    // OPENCODE_API_KEY); forwarded under the exact name quantflow-eve's
+    // agent.ts reads inside the VM. U3.5 finding 2026-07-11.
+    const opencodeKey = resolveOpencodeKey();
+    if (opencodeKey) {
+      return { software: "eve", env: { OPENCODE_GO_API_KEY: opencodeKey } };
     }
     throw new SessionConfigError(
-      "no Eve credential: set OPENCODE_GO_API_KEY in the AgentOS host environment",
+      "no Eve credential: set OPENCODE_API_KEY / OPENCODE_GO_API_KEY / OPENCODE_ZEN_API_KEY " +
+        "in the AgentOS host environment",
     );
   }
   if (software === "claude" || software === "claude-code") {

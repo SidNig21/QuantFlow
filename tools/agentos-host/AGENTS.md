@@ -100,10 +100,12 @@ ACP permission requests block until `POST .../permission` arrives.
 
 ## Credential order
 
-1. `OPENCODE_GO_API_KEY` → Eve custom ACP software (`software: "eve"`).
-   The value is forwarded in the AgentOS session env only; it is never written
-   to VM files or returned over HTTP. Use `QUANTFLOW_EVE_AGENTOS_PKG` to
-   override the package path; default is the sibling
+1. `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` / `OPENCODE_ZEN_API_KEY` → Eve
+   custom ACP software (`software: "eve"`); whichever alias is present is
+   forwarded into the VM session env as `OPENCODE_GO_API_KEY` (the name
+   `quantflow-eve/agent/agent.ts` reads). Value is never written to VM files
+   or returned over HTTP. Use `QUANTFLOW_EVE_AGENTOS_PKG` to override the
+   package path; default is the sibling
    `../../../quantflow-eve/agentos/dist/package.aospkg`.
 2. `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` / `OPENCODE_ZEN_API_KEY` → Pi
    with custom provider files under both supported VM homes. Default is
