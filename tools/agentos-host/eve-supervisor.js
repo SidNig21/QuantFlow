@@ -47,6 +47,15 @@ function portForKey(keyId, attempt = 0, {
   return base + ((stableHash(keyId) + attempt) % range);
 }
 
+function getKeyIdForPort(port) {
+  const requested = Number(port);
+  if (!Number.isFinite(requested)) return null;
+  for (const [keyId, record] of running) {
+    if (record?.entry?.port === requested) return keyId;
+  }
+  return null;
+}
+
 function makeBaseUrl(port) {
   return `http://127.0.0.1:${port}`;
 }
@@ -81,6 +90,7 @@ function spawnEve({ eveRoot, port, env, spawnImpl = defaultSpawn } = {}) {
         ...env,
         PORT: String(port),
         EVE_PORT: String(port),
+        QF_HOST_URL: `http://127.0.0.1:${process.env.AGENTOS_HOST_PORT ?? process.env.QF_AGENTOS_PORT ?? 7430}`,
         WORKFLOW_LOCAL_DATA_DIR: `/tmp/eve-workflow-data-${port}`,
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -268,6 +278,7 @@ export {
   _resetEveSupervisorForTests,
   actorKeyId,
   ensureEveForActorKey,
+  getKeyIdForPort,
   portForKey,
   prewarmEve,
   resolveQuantflowEveRoot,

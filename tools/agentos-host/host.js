@@ -13,7 +13,8 @@ import pi from "@agentos-software/pi";
 import opencode from "@agentos-software/opencode";
 import claudeCode from "@agentos-software/claude-code";
 import { z } from "zod";
-import { ensureEveForActorKey, prewarmEve, stopAllEve, stopEveForActorKey } from "./eve-supervisor.js";
+import { ensureEveForActorKey, getKeyIdForPort, prewarmEve, stopAllEve, stopEveForActorKey } from "./eve-supervisor.js";
+import { buildQuantflowTileInstructions } from "./quantflow-instructions.js";
 
 const HOST = process.env.AGENTOS_HOST_BIND ?? "0.0.0.0";
 const PORT = Number.parseInt(process.env.AGENTOS_HOST_PORT ?? "7430", 10);
@@ -174,6 +175,66 @@ function registerHostTileSession(tileId, sessionId) {
   if (!tile || !session) return;
   sessionToTile.set(session, tile);
   tileToSession.set(tile, session);
+}
+
+function shortTileSuffix(tileId) {
+  const raw = String(tileId ?? "").trim();
+  if (!raw) return "";
+  const parts = raw.split(/[\/:\s]+/).filter(Boolean);
+  const segment = parts.at(-1) ?? raw;
+  return segment.length > 5 ? segment.slice(-5) : segment;
+}
+
+function sessionRecordForTile(tileId) {
+  const sessionId = tileToSession.get(String(tileId ?? "").trim());
+  return sessionId ? sessions.get(sessionId) ?? null : null;
+}
+
+function labelForTile(tileId) {
+  const tile = String(tileId ?? "").trim();
+  const record = sessionRecordForTile(tile);
+  if (!record?.software) return tile;
+  const suffix = shortTileSuffix(tile);
+  return suffix ? `${record.software}-${suffix}` : record.software;
+}
+
+function tileIdForKeyId(keyId) {
+  const key = String(keyId ?? "").trim();
+  if (!key) return null;
+  for (const session of sessions.values()) {
+    if (session.keyId === key) return session.tileId;
+  }
+  try {
+    const actorKey = JSON.parse(key);
+    if (Array.isArray(actorKey) && typeof actorKey[1] === "string" && actorKey[1].trim()) {
+      return actorKey[1];
+    }
+  } catch {
+    // Key ids are normally JSON actor keys; malformed values are unresolved.
+  }
+  return null;
+}
+
+function tileIdForPort(port) {
+  const keyId = getKeyIdForPort(port);
+  return keyId ? tileIdForKeyId(keyId) : null;
+}
+
+function cablePeersForTile(tileId) {
+  const tile = String(tileId ?? "").trim();
+  const peers = [];
+  if (!tile) return peers;
+  for (const [connectionId, conn] of hostConnectionGraph) {
+    if (conn.tileAId !== tile && conn.tileBId !== tile) continue;
+    const peerTileId = conn.tileAId === tile ? conn.tileBId : conn.tileAId;
+    peers.push({
+      connectionId,
+      peerTileId,
+      peerLabel: labelForTile(peerTileId),
+      peerSoftware: sessionRecordForTile(peerTileId)?.software ?? null,
+    });
+  }
+  return peers;
 }
 
 function syncHostConnectionGraph(connections) {
@@ -678,7 +739,8 @@ async function executeCableSend({ connectionId, fromTileId, text, fromSessionId 
     throw new Error(`target tile has no AgentOS session: ${targetTileId}`);
   }
 
-  const delegated = `[a2a ${from}→${targetTileId}] ${msg}`;
+  const fromLabel = labelForTile(from);
+  const delegated = `Message from cabled agent @${fromLabel} (canvas cable ${connId}): ${msg}`;
   let targetResult;
   try {
     targetResult = await promptSession(targetSessionId, delegated);
@@ -694,16 +756,6 @@ async function executeCableSend({ connectionId, fromTileId, text, fromSessionId 
     replyPayload = `ack: ${msg.slice(0, 120)}`;
   } else if (!replyPayload) {
     replyPayload = "(no reply text)";
-  }
-
-  const sourceSessionId = fromSessionId ?? tileToSession.get(from);
-  if (sourceSessionId) {
-    const back = `[a2a ${targetTileId}→${from}] ${replyPayload}`;
-    try {
-      await promptSession(sourceSessionId, back);
-    } catch {
-      // Reply is still returned to the toolkit caller.
-    }
   }
 
   return { ok: true, targetTileId, reply: replyPayload };
@@ -966,12 +1018,38 @@ async function handleRequest(req, res) {
       return;
     }
 
+    if (req.method === "GET" && path === "/cable/peers") {
+      const port = url.searchParams.get("port");
+      let tileId = String(url.searchParams.get("tileId") ?? "").trim();
+      if (port !== null && port.trim()) {
+        tileId = tileIdForPort(port) ?? "";
+        if (!tileId) {
+          sendJson(res, 404, { error: "no actor for port" });
+          return;
+        }
+      }
+      if (!tileId) {
+        sendJson(res, 400, { error: "port or tileId required" });
+        return;
+      }
+      sendJson(res, 200, { tileId, peers: cablePeersForTile(tileId) });
+      return;
+    }
+
     if (req.method === "POST" && path === "/cable/send") {
       const body = await readJsonBody(req);
+      let fromTileId = body?.fromTileId;
+      if (!fromTileId && body?.fromPort !== undefined && body?.fromPort !== null) {
+        fromTileId = tileIdForPort(body.fromPort);
+        if (!fromTileId) {
+          sendJson(res, 404, { ok: false, message: "no actor for port" });
+          return;
+        }
+      }
       try {
         const result = await executeCableSend({
           connectionId: body?.connectionId,
-          fromTileId: body?.fromTileId,
+          fromTileId,
           text: body?.text,
           fromSessionId: null,
         });
@@ -1043,6 +1121,11 @@ async function handleRequest(req, res) {
       }
       const sessionId = await handle.createSession(picked.software, {
         env: picked.env,
+        additionalInstructions: buildQuantflowTileInstructions({
+          tileId: address.tileId,
+          workspaceId: address.workspaceId,
+          software: picked.software,
+        }),
       });
       sessions.set(sessionId, {
         subscribers: new Set(),

@@ -57,6 +57,16 @@ function runBunTest(args: string[], cwd: string): boolean {
 
 const checks: Check[] = [
   {
+    name: "agentos-toolkit-envelope",
+    description: "Tripwire: native AgentOS actor envelope still rejects JS toolKits",
+    async run() {
+      const { runAgentosToolkitEnvelopeCheck } = await import(
+        "./lib/agentos-toolkit-envelope"
+      );
+      return runAgentosToolkitEnvelopeCheck();
+    },
+  },
+  {
     name: "contract-nouns",
     description: "A3 forbidden vocabulary zero-hit checks",
     run() {
