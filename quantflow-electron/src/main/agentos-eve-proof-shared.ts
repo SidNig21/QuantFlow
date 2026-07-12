@@ -150,28 +150,34 @@ export async function assertAgentOsWorkers(
   tileIds: string[],
   logStep: LogStep,
 ): Promise<boolean> {
-  const check = await execJs<{ ok: boolean; detail: string }>(wc, `(async () => {
-    const tileIds = ${JSON.stringify(tileIds)};
-    const workers = await window.kernelApi?.sendQuery?.('kernel.worker.list', {}) ?? [];
-    const list = Array.isArray(workers) ? workers : [];
-    const details = tileIds.map((tileId) => {
-      const worker = list.find((entry) => entry?.tileId === tileId);
-      const runtime = worker?.runtimeTarget ?? worker?.harnessKind ?? null;
-      // kernel worker rows do not carry runtimeTarget; fall back to the
-      // tile webview src, same as the U4 agentos-rail check
-      const tileEl = document.querySelector('[data-tile-id="' + tileId + '"]');
-      const webview = tileEl?.querySelector('webview');
-      const decoded = decodeURIComponent(webview?.getAttribute('src') ?? '');
-      const isAgentOs = runtime === 'agentos'
-        || decoded.includes('target=agentos')
-        || decoded.includes('agentos%3A');
-      return { tileId, runtime, isAgentOs, hasWebview: !!webview };
-    });
-    return {
-      ok: details.every((entry) => entry.isAgentOs && entry.hasWebview),
-      detail: JSON.stringify(details),
-    };
-  })()`);
+  let check: { ok: boolean; detail: string } = { ok: false, detail: "not checked" };
+  const started = Date.now();
+  while (Date.now() - started < 15_000) {
+    check = await execJs<{ ok: boolean; detail: string }>(wc, `(async () => {
+      const tileIds = ${JSON.stringify(tileIds)};
+      const workers = await window.kernelApi?.sendQuery?.('kernel.worker.list', {}) ?? [];
+      const list = Array.isArray(workers) ? workers : [];
+      const details = tileIds.map((tileId) => {
+        const worker = list.find((entry) => entry?.tileId === tileId);
+        const runtime = worker?.runtimeTarget ?? worker?.harnessKind ?? null;
+        // kernel worker rows do not carry runtimeTarget; fall back to the
+        // tile webview src, same as the U4 agentos-rail check
+        const tileEl = document.querySelector('[data-tile-id="' + tileId + '"]');
+        const webview = tileEl?.querySelector('webview');
+        const decoded = decodeURIComponent(webview?.getAttribute('src') ?? '');
+        const isAgentOs = runtime === 'agentos'
+          || decoded.includes('target=agentos')
+          || decoded.includes('agentos%3A');
+        return { tileId, runtime, isAgentOs, hasWebview: !!webview };
+      });
+      return {
+        ok: details.every((entry) => entry.isAgentOs && entry.hasWebview),
+        detail: JSON.stringify(details),
+      };
+    })()`);
+    if (check.ok) break;
+    await proofSleep(500);
+  }
   logStep("worker-runtime", check.ok, check.detail);
   return check.ok;
 }

@@ -319,6 +319,15 @@ const checks: Check[] = [
     },
   },
   {
+    name: "agentos-eve-cable-chat",
+    description:
+      "T-UX-lite: typed /cable in Eve terminal relays over canvas cable; plain Enter stays local",
+    async run() {
+      const { runAgentOsEveCableChatCheck } = await import("./lib/agentos-eve-cable-chat");
+      return runAgentOsEveCableChatCheck();
+    },
+  },
+  {
     name: "agentos-a2a",
     description:
       "A2A: two pi-stick AgentOS sessions, cable relay, sim ack + scripted canvas proof",

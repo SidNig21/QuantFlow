@@ -55,6 +55,7 @@
 		"proof:agentos-eve": "bun scripts/proof-agentos-eve.ts",
 		"proof:agentos-eve-multispawn": "bun scripts/proof-agentos-eve-multispawn.ts",
 		"proof:agentos-eve-a2a": "bun scripts/proof-agentos-eve-a2a.ts",
+		"proof:agentos-eve-cable-chat": "bun scripts/proof-agentos-eve-cable-chat.ts",
 		"proof:agentos-a2a": "bun scripts/proof-agentos-a2a.ts",
 		"proof:a2a-cable": "bun scripts/proof-a2a-cable.ts",
 		"proof:orchestrator": "bun scripts/proof-orchestrator.ts",

@@ -232,6 +232,13 @@ export function getConnectionById(connectionId: string): ConnectionGraphEntry | 
   return connectionGraph.get(connectionId) ?? null;
 }
 
+export function getConnectionsForTile(tileId: string): ConnectionGraphEntry[] {
+  const id = tileId.trim();
+  if (!id) return [];
+  return [...connectionGraph.values()].filter((connection) =>
+    connection.tileAId === id || connection.tileBId === id);
+}
+
 export function removeConnectionFromGraph(connectionId: string): void {
   connectionGraph.delete(connectionId);
 }

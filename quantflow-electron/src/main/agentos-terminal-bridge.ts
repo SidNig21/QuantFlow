@@ -11,11 +11,12 @@ import {
 } from '@qf-harness/agentos/credential-order';
 import { formatAgentOsUnavailable } from '@qf-harness/agentos/error-messages';
 import { getAgentOsTransport } from './agentos-service';
+import { resolveTileChatRoute } from './tile-chat-route';
 import {
   buildAgentOsDisplayTarget,
   parseAgentOsAttachTarget,
 } from './pty-spawn-params';
-import { registerHostTileSession } from './tile-session-registry';
+import { getConnectionsForTile, registerHostTileSession } from './tile-session-registry';
 import {
   bootstrapAcpTerminalText,
   createAcpPromptLineEditor,
@@ -117,6 +118,37 @@ async function transportOrThrow(): Promise<AgentOsTransport> {
   return getAgentOsTransport();
 }
 
+async function submitTileChatLine(
+  tileId: string,
+  sessionId: string,
+  line: string,
+  echo: (text: string) => void,
+): Promise<void> {
+  const route = resolveTileChatRoute(tileId, line, getConnectionsForTile(tileId));
+  if (route.kind === 'local') {
+    const transport = await transportOrThrow();
+    await transport.prompt(sessionId, route.text);
+    return;
+  }
+
+  if (route.kind === 'cable-error') {
+    echo(`\r\n[a2a error] ${route.notice ?? 'relay failed'}\r\n> `);
+    return;
+  }
+
+  if (route.notice) echo(`\r\n[a2a] ${route.notice}\r\n`);
+  echo(`\r\n[a2a ${tileId}→${route.toTileId}] ${route.text}\r\n`);
+  const { sendConnectionRelay } = await import('./agentos-a2a-relay');
+  const relay = await sendConnectionRelay({
+    connectionId: route.connectionId!,
+    fromTileId: tileId,
+    text: route.text,
+  });
+  if (!relay.ok) {
+    echo(`\r\n[a2a error] ${relay.message ?? 'relay failed'}\r\n> `);
+  }
+}
+
 export async function prepareAgentOsTerminalAttach(input: {
   workspaceId?: string;
   tileId: string;
@@ -216,7 +248,7 @@ export async function bindAgentOsPtySession(input: {
   if (isAcpPromptSoftware(attach.software)) {
     bridge.acpEditor = createAcpPromptLineEditor({
       onEcho: echo,
-      onSubmit: (line) => transport.prompt(attach.sessionId, line),
+      onSubmit: (line) => submitTileChatLine(tileId, attach.sessionId, line, echo),
       onSubmitError: () => echo('\r\n[error: prompt failed]\r\n> '),
     });
   }
@@ -229,6 +261,14 @@ export async function bindAgentOsPtySession(input: {
 
 export function isAgentOsPtySession(sessionId: string): boolean {
   return ptyBridges.has(sessionId);
+}
+
+export function getAgentOsPtySessionIdForTile(tileId: string): string | null {
+  const normalized = tileId.trim();
+  for (const [sessionId, bridge] of ptyBridges.entries()) {
+    if (bridge.tileId === normalized) return sessionId;
+  }
+  return null;
 }
 
 export async function writeAgentOsPtySession(sessionId: string, data: string): Promise<void> {

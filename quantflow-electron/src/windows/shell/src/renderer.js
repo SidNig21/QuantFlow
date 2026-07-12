@@ -1574,6 +1574,7 @@ async function init() {
 					projection.getConnectionSemanticTypes().get(id) ?? null,
 			});
 		}
+		syncConnectionGraph();
 	}
 
 	// -- Workflow region layer (Goal 7) --
