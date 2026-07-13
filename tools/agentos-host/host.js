@@ -171,15 +171,19 @@ const pendingPermissions = new Map();
 /** @type {string | null} */
 let activePromptSessionId = null;
 
-// AgentOS prompt delivery is a single host-owned rail.  In particular, an
-// agent tool call must never synchronously wait for a second agent prompt:
-// that re-enters the rail while the source turn is still open and can
-// deadlock two otherwise independent Eve sessions.
-let promptRail = Promise.resolve();
+// Prompt delivery is serialized PER TILE, never canvas-wide: a human turn and
+// a peer turn must not race on one tile, but two tiles working at once is the
+// product (both peers visibly processing).  An agent tool call still must
+// never synchronously wait for a second agent prompt — that re-entrancy is
+// handled by executeCableSend queueing the peer turn instead of awaiting it.
+/** @type {Map<string, Promise<unknown>>} tileId → tail of that tile's prompt queue */
+const tilePromptRails = new Map();
 
-function enqueuePromptRail(operation) {
-  const queued = promptRail.then(operation, operation);
-  promptRail = queued.catch(() => {});
+function enqueueTilePromptRail(tileId, operation) {
+  const key = String(tileId ?? "").trim() || "__untiled__";
+  const previous = tilePromptRails.get(key) ?? Promise.resolve();
+  const queued = previous.then(operation, operation);
+  tilePromptRails.set(key, queued.catch(() => {}));
   return queued;
 }
 
@@ -692,21 +696,32 @@ async function disposeActorConnection(keyId) {
   }
 }
 
+/**
+ * Sessions with a prompt turn currently executing. Turns on different tiles
+ * run concurrently, so mid-turn detection must be a set — the single
+ * activePromptSessionId survives only for the dormant toolkit paths.
+ * @type {Set<string>}
+ */
+const activePromptSessions = new Set();
+
 async function promptSession(sessionId, text) {
   const { handle } = await actorForSession(sessionId);
   const previous = activePromptSessionId;
   activePromptSessionId = sessionId;
   lastAddressedSessionId = sessionId;
+  activePromptSessions.add(sessionId);
   try {
     return await handle.sendPrompt(sessionId, text);
   } finally {
     activePromptSessionId = previous;
+    activePromptSessions.delete(sessionId);
   }
 }
 
 /**
- * The host serializes all prompts headed for an Eve tile before handing them
- * to AgentOS. The ACP adapter remains the only component that writes to Eve.
+ * The host serializes prompts PER TILE before handing them to AgentOS. The
+ * ACP adapter remains the only component that writes to Eve; independent
+ * tiles run their turns concurrently so cabled peers visibly work together.
  */
 async function promptTileSessionNow(sessionId, text) {
   const session = sessions.get(sessionId);
@@ -716,7 +731,9 @@ async function promptTileSessionNow(sessionId, text) {
 }
 
 function promptTileSession(sessionId, text) {
-  return enqueuePromptRail(() => promptTileSessionNow(sessionId, text));
+  const session = sessions.get(sessionId);
+  const tileId = session?.tileId ?? sessionToTile.get(sessionId) ?? sessionId;
+  return enqueueTilePromptRail(tileId, () => promptTileSessionNow(sessionId, text));
 }
 
 async function disposeActorRuntime() {
@@ -806,18 +823,15 @@ async function executeCableSend({ connectionId, fromTileId, text, fromSessionId 
   ].join("\n");
 
   // An agent-originated HTTP tool call is nested inside its own prompt. Queue
-  // the peer turn behind that source prompt instead of awaiting it here.
-  // Once the peer finishes, deliver the reply back to the source as a fresh
-  // host-owned turn. This gives the operator two visible, bounded turns rather
-  // than a re-entrant request chain.
-  const activeSourceTileId = activePromptSessionId
-    ? sessionToTile.get(activePromptSessionId)
-    : null;
-  if (activeSourceTileId === from) {
-    const sourceSessionId = tileToSession.get(from);
-    if (!sourceSessionId) {
-      throw new Error(`source tile has no AgentOS session: ${from}`);
-    }
+  // the peer turn on the TARGET tile's rail instead of awaiting it here — it
+  // starts immediately (both tiles visibly working) while the source finishes
+  // its own turn. Once the peer finishes, deliver the reply back to the source
+  // as a fresh host-owned turn. Mid-turn detection uses the concurrency-safe
+  // set; tiles now run turns in parallel.
+  const sourceSessionForTile = tileToSession.get(from);
+  const sourceMidTurn = !!sourceSessionForTile && activePromptSessions.has(sourceSessionForTile);
+  if (sourceMidTurn) {
+    const sourceSessionId = sourceSessionForTile;
     activeCableRelays.add(connId);
     void (async () => {
       try {
@@ -847,7 +861,9 @@ async function executeCableSend({ connectionId, fromTileId, text, fromSessionId 
     return {
       ok: true,
       targetTileId,
-      reply: "Peer turn queued; its reply will be delivered as a follow-up turn.",
+      reply: "Message delivered to your cabled peer, who is now working on it. "
+        + "Their answer will arrive automatically as your next turn — do not wait, retry, or call cable tools again. "
+        + "End this turn now with a one-line note to the operator that the question is on its way.",
     };
   }
 
