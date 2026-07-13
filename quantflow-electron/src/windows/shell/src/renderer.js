@@ -1545,6 +1545,9 @@ async function init() {
 			tileManager.saveCanvasImmediate();
 		}
 		tileManager.repositionAllTiles();
+		// Tidy is an explicit operator action. Keep the packed layout in view so
+		// the action never strands tiles beyond the current camera bounds.
+		edgeIndicators.panToTiles(tiles);
 		updateCables();
 		toasts.show({
 			message: formatRepackTilesToast(result),
