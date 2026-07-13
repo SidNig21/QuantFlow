@@ -17,7 +17,7 @@ actor registry and preserves the localhost wire protocol consumed by
 
 | File | Role |
 | --- | --- |
-| `host.js` | RivetKit registry/client; HTTP/SSE compatibility server; actor/session routing; credential-order session env; Eve host-PTY display relay |
+| `host.js` | RivetKit registry/client; HTTP/SSE compatibility server; actor/session routing; credential-order session env; per-tile prompt rails; async cable relay |
 | `eve-supervisor.js` | Path A Eve server supervisor: warm `eve start` servers, deterministic ports, and `EVE_BASE_URL` injection |
 | `eve-session-broker.js` | Read-only Eve session stream projection and per-tile AgentOS prompt queue; never owns an Eve continuation cursor |
 | `package.json` | Exact AgentOS/software version pins |
@@ -104,6 +104,26 @@ ACP permission requests block until `POST .../permission` arrives.
    simultaneously and both returned exact model replies. The earlier one-slot
    backoff was stale probe actors holding capacity through the one-hour idle
    window, not a package ceiling. Upper capacity bound is unmeasured.
+
+## Turn concurrency and the cable contract (2026-07-13)
+
+- Prompts are serialized **per tile** (`tilePromptRails` in `host.js`), never
+  canvas-wide: a human turn and a peer turn cannot race on one tile, and two
+  cabled tiles run their turns concurrently (both visibly working).
+- **Agent-initiated `cable_send` is asynchronous by design.** When the sender
+  is mid-turn, the peer turn is queued on the TARGET tile's rail and starts
+  immediately; the sender's tool call returns a directive delivery note and
+  the peer's reply is delivered back to the sender as a **host-owned
+  follow-up turn**. Two visible, bounded turns — never a re-entrant chain.
+  `agentos-eve-native-collab` asserts this exact shape.
+- Operator-initiated sends (`/cable`, `/cable/send` with an idle sender) stay
+  synchronous and return the peer's reply inline.
+- One exchange per cable at a time (`activeCableRelays`); a receiver that
+  tries to `cable_send` during its inbound turn gets an explicit error.
+- The host reaps its actor runtime on SIGTERM/SIGINT/SIGHUP. An **orphaned
+  `rivet-engine` in WSL wedges every later host's session-attach at the 180s
+  timeout** — if attach times out with a healthy `/health`, check
+  `wsl ps aux | grep rivet-engine` before debugging anything else.
 
 ## Credential order
 

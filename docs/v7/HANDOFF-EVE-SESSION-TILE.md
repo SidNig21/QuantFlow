@@ -3,6 +3,8 @@
 **Date:** 2026-07-12 · **Branch:** `quantflow-v7-agentos-anchor` @ `c586e28` (+ uncommitted working tree, see §2) · **Repos:** `QuantFlow` + `quantflow-eve`
 **Driver:** founder, in the Codex app. This document is the single authority for this work.
 
+> **STATUS: COMPLETE (2026-07-13).** E1 `quantflow-eve@a962346+5e8a969` · E2/E3 `02bdc34` · E4 swept in the same wave (zero TUI refs at HEAD) · E5 all five gates green over `a7041f9`, native-collab asserting the async two-turn cable contract · **founder manual exit PASSED live** (A plain-chat ask → cable tools → B rendered inbound + replied → A reported + artifact). Post-handoff fixes folded in: per-tile prompt rails `706e77d`, full-snapshot tile render + engine reaping `935b235`, canvas EPERM retry `4bbc847`. Remaining v7 tail: U8 DOX (partially landed in `tools/agentos-host/AGENTS.md`), U7 promotion (founder-only). Follow-ups parked: relay wedge (Health-down), tile stop button, T-PERF cold boots, proof workspaceId leak.
+
 > **SUPERSEDES:** `docs/v7/HANDOFF-T-UX-REMAINDER.md` **§4 (U1, both fork paths)**. Fork (b) — host-side `eve dev --url` PTY rail — was BUILT (it's the uncommitted tree) and live-tested on 2026-07-12. It renders beautifully and is architecturally wrong: it created the split-session defect below. Do not iterate on it; do not build fork (a) either. Everything else in HANDOFF-T-UX-REMAINDER (§5 native-collab close-out, §6 commit rules, §7 manual exit shape, §9 gotchas, §10 parked queue) **remains valid** and is incorporated by reference. Plan 002 remains valid U2–U6 reference.
 
 ---
