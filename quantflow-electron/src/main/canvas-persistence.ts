@@ -84,8 +84,13 @@ function hasEphemeralCache(): boolean {
 }
 
 async function renameWithWindowsRetry(tmp: string, targetPath: string): Promise<void> {
+  // Windows denies replace-rename while ANY process holds the target open
+  // without FILE_SHARE_DELETE — including short readers like the
+  // canvas.persistence health probe, search indexer, or antivirus. Those
+  // holds can outlast a sub-second window, so back off up to ~3s total
+  // (25+50+100+...+1600) before declaring the save lost.
   let lastError: unknown;
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
       await rename(tmp, targetPath);
       return;
@@ -93,7 +98,7 @@ async function renameWithWindowsRetry(tmp: string, targetPath: string): Promise<
       lastError = error;
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES") throw error;
-      await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+      await new Promise((resolve) => setTimeout(resolve, 25 * 2 ** attempt));
     }
   }
   throw lastError;
