@@ -7,22 +7,24 @@ import {
 
 const REPO_ROOT = join(import.meta.dir, '..', '..');
 
-function assertEveStillUnpromoted(): boolean {
+// U7 landed 2026-07-13: eve is a verified dock spawn actor. The gate now
+// pins the PROMOTED state so an accidental demotion fails loud.
+function assertEvePromoted(): boolean {
   if (!getDockActor('eve')) {
     console.error('agentos-eve-cable-chat: eve actor missing from dock registry');
     return false;
   }
-  if ([...DOCK_SPAWN_ACTOR_IDS].includes('eve')) {
-    console.error('agentos-eve-cable-chat: eve promoted before U7 sign-off');
+  if (![...DOCK_SPAWN_ACTOR_IDS].includes('eve')) {
+    console.error('agentos-eve-cable-chat: eve missing from DOCK_SPAWN_ACTOR_IDS — U7 promotion regressed');
     return false;
   }
-  console.log('agentos-eve-cable-chat: eve remains staged but unpromoted');
+  console.log('agentos-eve-cable-chat: eve is a verified dock spawn actor (U7)');
   return true;
 }
 
 export async function runAgentOsEveCableChatCheck(): Promise<boolean> {
   let ok = true;
-  if (!assertEveStillUnpromoted()) ok = false;
+  if (!assertEvePromoted()) ok = false;
 
   const proof = Bun.spawnSync(['bun', 'run', 'proof:agentos-eve-cable-chat'], {
     cwd: join(REPO_ROOT, 'quantflow-electron'),
