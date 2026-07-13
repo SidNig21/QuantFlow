@@ -51,29 +51,25 @@ export function EveSessionTile({ tileId }: { tileId: string }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const latestRevision = useRef(-1);
-  const eventCount = useRef(0);
 
   useEffect(() => {
     let disposed = false;
     let refreshing = false;
     latestRevision.current = -1;
-    eventCount.current = 0;
+    // Always fetch the full snapshot (startIndex 0) and replace state.
+    // An incremental append protocol lived here briefly and lost events to a
+    // bookkeeping race during cold registration (blank tile B, 2026-07-13);
+    // full replacement is correct by construction at session-scale volumes.
+    // Reintroduce chunking only with T-PERF, as a stateless protocol.
     const refresh = async () => {
       if (refreshing) return;
       refreshing = true;
       try {
-        const result = await window.api.agentosEveSnapshot(tileId, eventCount.current);
+        const result = await window.api.agentosEveSnapshot(tileId);
         if (disposed || !result.ok || !result.snapshot) return;
         if (result.snapshot.revision !== latestRevision.current) {
           latestRevision.current = result.snapshot.revision;
-          setSnapshot((previous) => {
-            const appendEvents = previous?.eveSessionId === result.snapshot?.eveSessionId
-              && result.snapshot?.eventStartIndex === eventCount.current;
-            eventCount.current = result.snapshot?.eventCount ?? 0;
-            return appendEvents && previous
-              ? { ...result.snapshot!, events: [...previous.events, ...result.snapshot!.events] }
-              : result.snapshot!;
-          });
+          setSnapshot(result.snapshot);
         }
       } catch {
         // The next serialized refresh can recover when the local host restarts.

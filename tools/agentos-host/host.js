@@ -1493,6 +1493,32 @@ const server = http.createServer((req, res) => {
   });
 });
 
+// Without handlers, SIGTERM/SIGHUP kill node before actorClient.dispose()
+// runs and the Rivet engine child outlives the host. One orphaned engine
+// wedged every later host's session-attach at the 180s timeout (2026-07-13).
+let hostShuttingDown = false;
+async function shutdownHost(signal) {
+  if (hostShuttingDown) return;
+  hostShuttingDown = true;
+  console.error(`[host] ${signal} — disposing actor runtime before exit`);
+  const failsafe = setTimeout(() => process.exit(0), 8_000);
+  failsafe.unref?.();
+  try {
+    await disposeActorRuntime();
+  } catch {
+    // Exit anyway; a half-disposed runtime still beats an orphaned engine.
+  }
+  try {
+    server.close();
+  } catch {
+    // Already closed.
+  }
+  process.exit(0);
+}
+process.on("SIGTERM", () => void shutdownHost("SIGTERM"));
+process.on("SIGINT", () => void shutdownHost("SIGINT"));
+process.on("SIGHUP", () => void shutdownHost("SIGHUP"));
+
 if (process.env.AGENTOS_HOST_NO_LISTEN !== "1") {
   server.listen(PORT, HOST, () => {
     console.log(`agentos-host listening on http://${HOST}:${PORT}`);
