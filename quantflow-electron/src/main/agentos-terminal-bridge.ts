@@ -11,6 +11,7 @@ import {
 } from '@qf-harness/agentos/credential-order';
 import { formatAgentOsUnavailable } from '@qf-harness/agentos/error-messages';
 import { getAgentOsTransport } from './agentos-service';
+import { resolveAgentOsHostAddress } from '@qf-harness/agentos/host-lifecycle';
 import { resolveTileChatRoute } from './tile-chat-route';
 import {
   buildAgentOsDisplayTarget,
@@ -44,6 +45,19 @@ interface PtyBridge {
   unsub: () => void;
   echo: (text: string) => void;
   acpEditor?: AcpPromptLineEditor;
+}
+
+export interface EveSessionSnapshot {
+  tileId: string;
+  baseUrl: string;
+  eveSessionId: string | null;
+  initialSession: { sessionId: string; streamIndex: number } | null;
+  eventStartIndex: number;
+  eventCount: number;
+  events: unknown[];
+  revision: number;
+  phase: 'idle' | 'working' | 'error';
+  error: string | null;
 }
 
 const tileAttaches = new Map<string, TileAttach>();
@@ -324,6 +338,59 @@ export async function promptAgentOsTile(
   if (!attach) throw new Error(formatAgentOsUnavailable(`no AgentOS attach for tile ${tileId}`));
   const transport = await transportOrThrow();
   return transport.prompt(attach.sessionId, text);
+}
+
+/**
+ * Operator input from an Eve session tile. Routes exactly like terminal-tile
+ * chat: plain text is a local turn on the tile's AgentOS session; the /cable
+ * debug command crosses the canvas cable. The renderer never writes to Eve
+ * directly — local turns ride the AgentOS prompt rail into the ACP adapter.
+ */
+export async function submitEveTileChat(
+  tileId: string,
+  line: string,
+): Promise<{ text: string }> {
+  const normalized = tileId.trim();
+  const attach = tileAttaches.get(normalized);
+  if (!attach) throw new Error(formatAgentOsUnavailable(`no AgentOS attach for tile ${tileId}`));
+  const route = resolveTileChatRoute(normalized, line, getConnectionsForTile(normalized));
+  if (route.kind === 'cable-error') {
+    throw new Error(route.notice ?? 'cable relay failed');
+  }
+  if (route.kind === 'cable') {
+    const { sendConnectionRelay } = await import('./agentos-a2a-relay');
+    const relay = await sendConnectionRelay({
+      connectionId: route.connectionId!,
+      fromTileId: normalized,
+      text: route.text,
+    });
+    if (!relay.ok) throw new Error(relay.message ?? 'cable relay failed');
+    return { text: relay.reply ?? '' };
+  }
+  const transport = await transportOrThrow();
+  const result = await transport.prompt(attach.sessionId, route.text);
+  return { text: typeof result?.text === 'string' ? result.text : '' };
+}
+
+/** Read-only projection from the host broker; the renderer never talks to Eve. */
+export async function getEveSessionSnapshot(tileId: string, startIndex = 0): Promise<EveSessionSnapshot | null> {
+  const normalized = tileId.trim();
+  const attach = tileAttaches.get(normalized);
+  if (!attach || attach.software !== 'eve') return null;
+  const rawPort = process.env.QF_AGENTOS_PORT ?? process.env.AGENTOS_HOST_PORT ?? '7430';
+  const port = Number.parseInt(rawPort, 10);
+  const host = await resolveAgentOsHostAddress({ port });
+  const safeStartIndex = Number.isInteger(startIndex) && startIndex >= 0 ? startIndex : 0;
+  const response = await fetch(
+    `http://${host}:${port}/eve-sessions/${encodeURIComponent(normalized)}?startIndex=${safeStartIndex}`,
+    {
+    signal: AbortSignal.timeout(5_000),
+    },
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Eve session snapshot failed (${response.status})`);
+  const body = await response.json() as { snapshot?: EveSessionSnapshot };
+  return body.snapshot ?? null;
 }
 
 export async function writeAgentOsTileTerminal(tileId: string, text: string): Promise<void> {

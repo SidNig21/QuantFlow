@@ -307,6 +307,7 @@ async function notifySender(
 export async function sendTileDelegate(
   input: TileDelegateInput,
   deps: TileRelayDeps = {},
+  connection?: ConnectionGraphEntry,
 ): Promise<TileDelegateResult> {
   const cableId = input.cableId.trim();
   const fromTileId = input.fromTileId.trim();
@@ -317,8 +318,9 @@ export async function sendTileDelegate(
   if (!toTileId) return { ok: false, message: 'toTileId required' };
   if (!text) return { ok: false, message: 'text required' };
 
-  const conn = getConnectionById(cableId);
+  const conn = connection ?? getConnectionById(cableId);
   if (!conn) return { ok: false, message: `connection not found: ${cableId}` };
+  if (conn.id !== cableId) return { ok: false, message: "connection id mismatch" };
   if (fromTileId !== conn.tileAId && fromTileId !== conn.tileBId) {
     return { ok: false, message: 'fromTileId is not on this connection' };
   }

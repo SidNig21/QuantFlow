@@ -644,6 +644,14 @@ contextBridge.exposeInMainWorld("api", {
       "agent:save-messages", { messages },
     ),
 
+  // Eve session tile: rendered from the host's read-only broker projection.
+  agentosEveTileInfo: (tileId: string) =>
+    ipcRenderer.invoke("agentos:eve:tile-info", { tileId }),
+  agentosEveSnapshot: (tileId: string, startIndex?: number) =>
+    ipcRenderer.invoke("agentos:eve:snapshot", { tileId, startIndex }),
+  agentosEvePrompt: (tileId: string, text: string) =>
+    ipcRenderer.invoke("agentos:eve:prompt", { tileId, text }),
+
   onAgentUpdate: (
     cb: (params: unknown) => void,
   ) => {

@@ -45,3 +45,67 @@ body,
 	line-height: 1.35;
 	overflow-wrap: anywhere;
 }
+
+.eve-session-tile {
+	box-sizing: border-box;
+	display: grid;
+	grid-template-rows: auto 1fr auto;
+	gap: 10px;
+	width: 100%;
+	height: 100%;
+	padding: 12px;
+	color: #d7e1e8;
+	background: #0d131b;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+}
+
+.eve-session-tile header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: 1px solid #223342;
+	padding-bottom: 8px;
+}
+
+.eve-session-title { color: #d8f3ff; font-weight: 700; }
+.eve-session-phase { color: #8ba2b3; font-size: 10px; text-transform: uppercase; }
+.eve-session-phase.phase-working { color: #b5df4a; }
+.eve-session-phase.phase-error { color: #ff8585; }
+
+.eve-session-transcript {
+	overflow-y: auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.eve-session-empty { color: #71879a; margin: auto 0; }
+.eve-message { padding: 7px 8px; border-left: 2px solid #3b5264; background: rgba(255,255,255,.025); }
+.eve-message-user { border-left-color: #7d59d9; }
+.eve-message-role { color: #79b9d4; font-size: 10px; text-transform: uppercase; }
+.eve-message p { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.45; }
+.eve-session-error { color: #ff9696; margin: 0; }
+
+.eve-session-input { display: flex; gap: 7px; }
+.eve-session-input input {
+	min-width: 0;
+	flex: 1;
+	border: 1px solid #2d4657;
+	border-radius: 4px;
+	padding: 8px;
+	color: #e9f7ff;
+	background: #091017;
+	font: inherit;
+}
+.eve-session-input button {
+	border: 1px solid #4d908e;
+	border-radius: 4px;
+	padding: 0 11px;
+	color: #c9f7ed;
+	background: #17322f;
+	font: inherit;
+}
+.eve-session-input button:disabled,
+.eve-session-input input:disabled { opacity: .55; }

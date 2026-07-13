@@ -13,8 +13,15 @@ import pi from "@agentos-software/pi";
 import opencode from "@agentos-software/opencode";
 import claudeCode from "@agentos-software/claude-code";
 import { z } from "zod";
-import { ensureEveForActorKey, getKeyIdForPort, prewarmEve, stopAllEve, stopEveForActorKey } from "./eve-supervisor.js";
+import {
+  ensureEveForActorKey,
+  getKeyIdForPort,
+  prewarmEve,
+  stopAllEve,
+  stopEveForActorKey,
+} from "./eve-supervisor.js";
 import { buildQuantflowTileInstructions } from "./quantflow-instructions.js";
+import { EveSessionBroker } from "./eve-session-broker.js";
 
 const HOST = process.env.AGENTOS_HOST_BIND ?? "0.0.0.0";
 const PORT = Number.parseInt(process.env.AGENTOS_HOST_PORT ?? "7430", 10);
@@ -53,7 +60,12 @@ function eveLoopbackExemptPorts() {
   const range = Number.isFinite(EVE_PORT_RANGE) ? EVE_PORT_RANGE : 900;
   const safeStart = Math.max(0, Math.min(65535, base));
   const safeCount = Math.max(0, Math.min(range, 65536 - safeStart));
-  return Array.from({ length: safeCount }, (_, index) => safeStart + index);
+  // The ACP adapter runs inside the guest. It must reach both Eve's per-tile
+  // server and the local host broker that records the durable Eve session.
+  return [...new Set([
+    ...Array.from({ length: safeCount }, (_, index) => safeStart + index),
+    PORT,
+  ])];
 }
 
 // @rivet-dev/agentos@0.2.7 accepts serializable software + native mounts here.
@@ -159,6 +171,18 @@ const pendingPermissions = new Map();
 /** @type {string | null} */
 let activePromptSessionId = null;
 
+// AgentOS prompt delivery is a single host-owned rail.  In particular, an
+// agent tool call must never synchronously wait for a second agent prompt:
+// that re-enters the rail while the source turn is still open and can
+// deadlock two otherwise independent Eve sessions.
+let promptRail = Promise.resolve();
+
+function enqueuePromptRail(operation) {
+  const queued = promptRail.then(operation, operation);
+  promptRail = queued.catch(() => {});
+  return queued;
+}
+
 /** @type {string | null} */
 let lastAddressedSessionId = null;
 
@@ -168,6 +192,20 @@ const sessionToTile = new Map();
 const tileToSession = new Map();
 /** @type {Map<string, { tileAId: string, tileBId: string }>} synced from Electron Kernel cables */
 const hostConnectionGraph = new Map();
+/**
+ * A cable send is a request/reply exchange, not an open-ended conversation
+ * pump.  Keep one exchange in flight per cable so a receiving agent cannot
+ * recursively send the same request back to its sender while the first turn
+ * is still awaiting its reply.
+ */
+const activeCableRelays = new Set();
+
+const eveSessionBroker = new EveSessionBroker({
+  onUpdate(snapshot) {
+    const sessionId = tileToSession.get(snapshot.tileId);
+    if (sessionId) broadcastSession(sessionId, { kind: "eve-session:update", snapshot });
+  },
+});
 
 function registerHostTileSession(tileId, sessionId) {
   const tile = String(tileId ?? "").trim();
@@ -666,7 +704,23 @@ async function promptSession(sessionId, text) {
   }
 }
 
+/**
+ * The host serializes all prompts headed for an Eve tile before handing them
+ * to AgentOS. The ACP adapter remains the only component that writes to Eve.
+ */
+async function promptTileSessionNow(sessionId, text) {
+  const session = sessions.get(sessionId);
+  if (!session) throw new Error(`session not found: ${sessionId}`);
+  if (session.software !== "eve") return promptSession(sessionId, text);
+  return eveSessionBroker.enqueuePrompt(session.tileId, () => promptSession(sessionId, text));
+}
+
+function promptTileSession(sessionId, text) {
+  return enqueuePromptRail(() => promptTileSessionNow(sessionId, text));
+}
+
 async function disposeActorRuntime() {
+  await eveSessionBroker.dispose();
   await stopAllEve();
 
   for (const [shellId, terminal] of terminals) {
@@ -733,6 +787,11 @@ async function executeCableSend({ connectionId, fromTileId, text, fromSessionId 
   if (from !== conn.tileAId && from !== conn.tileBId) {
     throw new Error("fromTileId is not on this connection");
   }
+  if (activeCableRelays.has(connId)) {
+    throw new Error(
+      "cable already has a peer turn in flight; answer the inbound peer message directly instead of sending it back",
+    );
+  }
   const targetTileId = from === conn.tileAId ? conn.tileBId : conn.tileAId;
   const targetSessionId = tileToSession.get(targetTileId);
   if (!targetSessionId) {
@@ -740,12 +799,66 @@ async function executeCableSend({ connectionId, fromTileId, text, fromSessionId 
   }
 
   const fromLabel = labelForTile(from);
-  const delegated = `Message from cabled agent @${fromLabel} (canvas cable ${connId}): ${msg}`;
+  const delegated = [
+    `Inbound peer message from @${fromLabel} (canvas cable ${connId}): ${msg}`,
+    "Reply directly and concisely to this peer message.",
+    "Do not call cable_list or cable_send while answering this inbound peer turn; your final text is returned to the sender.",
+  ].join("\n");
+
+  // An agent-originated HTTP tool call is nested inside its own prompt. Queue
+  // the peer turn behind that source prompt instead of awaiting it here.
+  // Once the peer finishes, deliver the reply back to the source as a fresh
+  // host-owned turn. This gives the operator two visible, bounded turns rather
+  // than a re-entrant request chain.
+  const activeSourceTileId = activePromptSessionId
+    ? sessionToTile.get(activePromptSessionId)
+    : null;
+  if (activeSourceTileId === from) {
+    const sourceSessionId = tileToSession.get(from);
+    if (!sourceSessionId) {
+      throw new Error(`source tile has no AgentOS session: ${from}`);
+    }
+    activeCableRelays.add(connId);
+    void (async () => {
+      try {
+        const targetResult = await promptTileSession(targetSessionId, delegated);
+        const reply = typeof targetResult?.text === "string" && targetResult.text.trim()
+          ? targetResult.text.trim()
+          : "(no reply text)";
+        await promptTileSession(
+          sourceSessionId,
+          [
+            `Your cabled peer @${labelForTile(targetTileId)} replied: ${reply}`,
+            "Report that reply to the operator directly.",
+            "Do not call cable_list or cable_send for this delivery.",
+          ].join("\n"),
+        );
+      } catch (error) {
+        // The source receives an explicit host-owned failure turn instead of
+        // remaining indefinitely in a disabled working state.
+        await promptTileSession(
+          sourceSessionId,
+          `Your cabled peer turn failed: ${error instanceof Error ? error.message : String(error)}. Report this directly to the operator without using cable tools.`,
+        ).catch(() => {});
+      } finally {
+        activeCableRelays.delete(connId);
+      }
+    })();
+    return {
+      ok: true,
+      targetTileId,
+      reply: "Peer turn queued; its reply will be delivered as a follow-up turn.",
+    };
+  }
+
   let targetResult;
+  activeCableRelays.add(connId);
   try {
-    targetResult = await promptSession(targetSessionId, delegated);
+    targetResult = await promptTileSession(targetSessionId, delegated);
   } catch (err) {
     throw new Error(err instanceof Error ? err.message : String(err));
+  } finally {
+    activeCableRelays.delete(connId);
   }
 
   let replyPayload =
@@ -920,6 +1033,24 @@ function broadcastSession(sessionId, payload) {
   }
 }
 
+function terminalDimension(value, fallback) {
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+async function openTerminalForSession(sessionId, cols, rows) {
+  const session = sessions.get(sessionId);
+  if (!session) throw new Error(`session not found: ${sessionId}`);
+  const dimensions = {
+    cols: terminalDimension(cols, 80),
+    rows: terminalDimension(rows, 24),
+  };
+
+  const { handle } = await actorForSession(sessionId);
+  const { shellId } = await handle.openShell(dimensions);
+  terminals.set(shellId, { sessionId, keyId: session.keyId });
+  return shellId;
+}
+
 function emitPermissionRequest(sessionId, request) {
   broadcastSession(sessionId, {
     kind: "permission-request",
@@ -1092,14 +1223,18 @@ async function handleRequest(req, res) {
         throw err;
       }
       const { handle, actorId } = await ensureActor(address);
+      let eveBaseUrl = null;
       if (picked.software === "eve") {
         try {
           const eve = await ensureEveForActorKey(address, {
             opencodeKey: picked.opencodeKey,
           });
+          eveBaseUrl = eve.baseUrl;
           picked.env = {
             ...picked.env,
             EVE_BASE_URL: eve.baseUrl,
+            QF_EVE_SESSION_BROKER_URL: `http://127.0.0.1:${PORT}/eve-sessions/register`,
+            QF_EVE_TILE_ID: address.tileId,
           };
         } catch (error) {
           sendJson(res, 500, {
@@ -1135,9 +1270,13 @@ async function handleRequest(req, res) {
         actorKey: address.actorKey,
         keyId: address.keyId,
         actorId,
+        eveBaseUrl,
       });
       lastAddressedSessionId = sessionId;
       registerHostTileSession(address.tileId, sessionId);
+      if (picked.software === "eve" && eveBaseUrl) {
+        eveSessionBroker.ensureTile({ tileId: address.tileId, baseUrl: eveBaseUrl });
+      }
       sendJson(res, 200, {
         sessionId,
         software: picked.software,
@@ -1146,6 +1285,47 @@ async function handleRequest(req, res) {
         actorKey: address.actorKey,
         actorId,
       });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/eve-sessions/register") {
+      const body = await readJsonBody(req);
+      const tileId = typeof body.tileId === "string" ? body.tileId.trim() : "";
+      const eveSessionId = typeof body.eveSessionId === "string" ? body.eveSessionId.trim() : "";
+      const agentSessionId = tileToSession.get(tileId);
+      const session = agentSessionId ? sessions.get(agentSessionId) : null;
+      if (!tileId || !eveSessionId || session?.software !== "eve") {
+        sendJson(res, 400, { error: "registered Eve tile and eveSessionId required" });
+        return;
+      }
+      try {
+        sendJson(res, 200, { ok: true, snapshot: eveSessionBroker.registerSession({ tileId, eveSessionId }) });
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
+      return;
+    }
+
+    const eveSnapshotMatch = path.match(/^\/eve-sessions\/([^/]+)$/);
+    if (eveSnapshotMatch && req.method === "GET") {
+      const tileId = decodeURIComponent(eveSnapshotMatch[1]);
+      const requestedStartIndex = Number.parseInt(url.searchParams.get("startIndex") ?? "0", 10);
+      const startIndex = Number.isFinite(requestedStartIndex) && requestedStartIndex >= 0
+        ? requestedStartIndex
+        : 0;
+      try {
+        // Register the read projection as soon as the host knows this is an
+        // Eve tile. The adapter supplies the actual durable session id after
+        // its first turn; this avoids a renderer-facing 404 during that gap.
+        const agentSessionId = tileToSession.get(tileId);
+        const session = agentSessionId ? sessions.get(agentSessionId) : null;
+        if (session?.software === "eve" && session.eveBaseUrl) {
+          eveSessionBroker.ensureTile({ tileId, baseUrl: session.eveBaseUrl });
+        }
+        sendJson(res, 200, { ok: true, snapshot: eveSessionBroker.snapshot(tileId, { startIndex }) });
+      } catch (error) {
+        sendJson(res, 404, { error: error instanceof Error ? error.message : String(error) });
+      }
       return;
     }
 
@@ -1160,6 +1340,11 @@ async function handleRequest(req, res) {
       const action = terminalShellMatch[3];
       if (!sessions.has(sessionId)) {
         sendJson(res, 404, { error: "session not found" });
+        return;
+      }
+      const terminal = terminals.get(shellId);
+      if (!terminal || terminal.sessionId !== sessionId) {
+        sendJson(res, 404, { error: "terminal not found" });
         return;
       }
       const { handle } = await actorForSession(sessionId);
@@ -1195,10 +1380,7 @@ async function handleRequest(req, res) {
       const body = await readJsonBody(req);
       const cols = Number.parseInt(String(body.cols ?? "80"), 10);
       const rows = Number.parseInt(String(body.rows ?? "24"), 10);
-      const session = sessions.get(sessionId);
-      const { handle } = await actorForSession(sessionId);
-      const { shellId } = await handle.openShell({ cols, rows });
-      terminals.set(shellId, { sessionId, keyId: session.keyId });
+      const shellId = await openTerminalForSession(sessionId, cols, rows);
       sendJson(res, 200, { shellId });
       return;
     }
@@ -1216,10 +1398,7 @@ async function handleRequest(req, res) {
         const body = await readJsonBody(req);
         const cols = Number.parseInt(String(body.cols ?? "80"), 10);
         const rows = Number.parseInt(String(body.rows ?? "24"), 10);
-        const session = sessions.get(sessionId);
-        const { handle } = await actorForSession(sessionId);
-        const { shellId } = await handle.openShell({ cols, rows });
-        terminals.set(shellId, { sessionId, keyId: session.keyId });
+        const shellId = await openTerminalForSession(sessionId, cols, rows);
         sendJson(res, 200, { shellId });
         return;
       }
@@ -1261,7 +1440,7 @@ async function handleRequest(req, res) {
       if (action === "prompt" && req.method === "POST") {
         const body = await readJsonBody(req);
         const text = typeof body.text === "string" ? body.text : "";
-        const result = await promptSession(sessionId, text);
+        const result = await promptTileSession(sessionId, text);
         sendJson(res, 200, {
           ok: true,
           text: result?.text ?? "",

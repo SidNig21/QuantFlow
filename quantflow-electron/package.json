@@ -202,6 +202,7 @@
 		"dependency-cruiser": "^17.3.8",
 		"electron-log": "5.4.3",
 		"electron-updater": "6.8.3",
+		"eve": "0.11.8",
 		"front-matter": "4.0.2",
 		"ignore": "7.0.5",
 		"katex": "0.16.33",

@@ -4,10 +4,59 @@ import {
   resolveAgentOsApproval,
 } from "./agentos-approval";
 import { startAgentOsTask } from "./agentos-run";
-import { prepareAgentOsTerminalAttach } from "./agentos-terminal-bridge";
+import {
+  getAgentOsTileAttach,
+  getEveSessionSnapshot,
+  prepareAgentOsTerminalAttach,
+  submitEveTileChat,
+} from "./agentos-terminal-bridge";
 
 export function registerAgentOsHandlers(): void {
   ipcMain.handle("agentos:approvals", () => listPendingAgentOsApprovals());
+
+  ipcMain.handle(
+    "agentos:eve:tile-info",
+    (_event, payload: { tileId?: string } = {}) => {
+      const tileId = typeof payload.tileId === "string" ? payload.tileId.trim() : "";
+      const attach = tileId ? getAgentOsTileAttach(tileId) : null;
+      return {
+        ok: true,
+        isEve: attach?.software === "eve",
+        sessionId: attach?.sessionId ?? null,
+      };
+    },
+  );
+
+  ipcMain.handle(
+    "agentos:eve:snapshot",
+    async (_event, payload: { tileId?: string; startIndex?: number } = {}) => {
+      const tileId = typeof payload.tileId === "string" ? payload.tileId.trim() : "";
+      if (!tileId) return { ok: false, error: "tileId required" };
+      const startIndex = Number.isInteger(payload.startIndex) && (payload.startIndex as number) >= 0
+        ? payload.startIndex as number
+        : 0;
+      try {
+        return { ok: true, snapshot: await getEveSessionSnapshot(tileId, startIndex) };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "agentos:eve:prompt",
+    async (_event, payload: { tileId?: string; text?: string } = {}) => {
+      const tileId = typeof payload.tileId === "string" ? payload.tileId.trim() : "";
+      const text = typeof payload.text === "string" ? payload.text.trim() : "";
+      if (!tileId || !text) return { ok: false, error: "tileId and text required" };
+      try {
+        const result = await submitEveTileChat(tileId, text);
+        return { ok: true, ...result };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
 
   ipcMain.handle(
     "agentos:approve",

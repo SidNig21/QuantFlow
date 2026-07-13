@@ -4,6 +4,7 @@ import {
   parseTerminalTileLaunchParams,
   shouldEndRestoredAgentOsRun,
 } from "./session-start";
+import { EveSessionTile } from "./EveSessionTile";
 
 /** Approximate terminal dimensions from the viewport before xterm mounts. */
 function estimateTermSize(): { cols: number; rows: number } {
@@ -28,8 +29,27 @@ function App() {
   const [sessionMode, setSessionMode] =
     useState<"tmux" | "sidecar" | undefined>(undefined);
   const [startError, setStartError] = useState<string | null>(null);
+  const [eveTileId, setEveTileId] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
+    const { target, tileId } = parseTerminalTileLaunchParams(window.location.search);
+    if (!tileId || !target?.startsWith("agentos:")) {
+      setEveTileId(null);
+      return;
+    }
+    let disposed = false;
+    window.api.agentosEveTileInfo(tileId).then((info) => {
+      if (!disposed) setEveTileId(info.isEve ? tileId : null);
+    }).catch(() => {
+      if (!disposed) setEveTileId(null);
+    });
+    return () => { disposed = true; };
+  }, []);
+
+  useEffect(() => {
+    // The Dock prepares the AgentOS attachment before this webview opens. An
+    // Eve attachment renders its broker-backed React session instead of a PTY.
+    if (eveTileId === undefined || eveTileId) return;
     const {
       existingSessionId,
       isRestored,
@@ -179,7 +199,7 @@ function App() {
     }
 
     createFreshSession(target);
-  }, []);
+  }, [eveTileId]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -206,7 +226,11 @@ function App() {
     );
   }
 
-  if (!sessionId) {
+  if (eveTileId) {
+    return <EveSessionTile tileId={eveTileId} />;
+  }
+
+  if (eveTileId === undefined || !sessionId) {
     return (
       <div className="terminal-tile-pending" aria-label="Terminal pending" />
     );

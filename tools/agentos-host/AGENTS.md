@@ -17,8 +17,9 @@ actor registry and preserves the localhost wire protocol consumed by
 
 | File | Role |
 | --- | --- |
-| `host.js` | RivetKit registry/client; HTTP/SSE compatibility server; actor/session routing; credential-order session env |
-| `eve-supervisor.js` | Path A Eve process supervisor: one WSL Eve server per `[workspaceId, tileId]`, deterministic port, `EVE_BASE_URL` injection |
+| `host.js` | RivetKit registry/client; HTTP/SSE compatibility server; actor/session routing; credential-order session env; Eve host-PTY display relay |
+| `eve-supervisor.js` | Path A Eve server supervisor: warm `eve start` servers, deterministic ports, and `EVE_BASE_URL` injection |
+| `eve-session-broker.js` | Read-only Eve session stream projection and per-tile AgentOS prompt queue; never owns an Eve continuation cursor |
 | `package.json` | Exact AgentOS/software version pins |
 | `host-config.test.mjs` | Fast session-config tests; must not start Rivet or the HTTP listener |
 | `eve-supervisor.test.mjs` | Fast supervisor tests with injected spawn/fetch; must not start real Eve |
@@ -36,6 +37,10 @@ default so Windows can use the WSL IP when localhost mirroring is unavailable.
 | GET | `/session/:id/events` | — | SSE `session-event`, `permission-request`, and terminal payloads |
 | POST | `/session/:id/permission` | `{ requestId, approved }` | `{ ok }` |
 | GET | `/session/:id/runtime` | — | actor key/id, lifecycle, persisted sessions, and persisted events |
+| POST | `/session/:id/terminal` | `{ cols, rows }` | `{ shellId }`; AgentOS guest shell for terminal-native software |
+| POST | `/eve-sessions/register` | `{ tileId, eveSessionId }` | Adapter reports a newly-created Eve session; no continuation token crosses this boundary |
+| GET | `/eve-sessions/:tileId` | â€” | Read-only Eve event projection/revision for the React tile |
+| POST | `/session/:id/terminal/:shellId/(write|resize|close)` | terminal bytes or dimensions | forwards to the selected display rail |
 | GET | `/file` | `?path=&sessionId=` | raw bytes; `sessionId` may be omitted only when one host session exists |
 | POST | `/dispose` | — | closes shells/sessions/connections, returns `{ ok }`, then exits the host |
 
@@ -112,7 +117,10 @@ ACP permission requests block until `POST .../permission` arrives.
    never written to VM files or returned over HTTP. Use `QUANTFLOW_EVE_ROOT`
    to override the sibling checkout and `QUANTFLOW_EVE_AGENTOS_PKG` to
    override the adapter package path; default package is the sibling
-   `../../../quantflow-eve/agentos/dist/package.aospkg`.
+   `../../../quantflow-eve/agentos/dist/package.aospkg`. The ACP adapter is
+   the only Eve writer and owns the continuation cursor. The host broker only
+   queues AgentOS prompts and tails the resulting Eve stream for the React
+   session tile; it never POSTs to Eve.
 2. `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` / `OPENCODE_ZEN_API_KEY` → Pi
    with custom provider files under both supported VM homes. Default is
    OpenCode Go (`https://opencode.ai/zen/go/v1`, model `glm-5.2`); use

@@ -52,6 +52,32 @@ export function spawnRoleViaShell(params: unknown): Promise<unknown> {
   return sendToShell("canvas.roleSpawn", params);
 }
 
+/** Create a cable through the same renderer and Kernel path as an operator drag. */
+export async function createConnectionViaShell(params: {
+  tileAId: string;
+  tileBId: string;
+  label?: string | null;
+  fromSide?: string;
+  toSide?: string;
+  kind?: string;
+}): Promise<Record<string, unknown> | null> {
+  const result = await sendToShell("canvas.connectionCreate", params) as Record<string, unknown> | null;
+  const connId = result?.["id"] as string | undefined;
+  if (!connId) return result;
+
+  const kernelResult = await dispatchKernelCommand("kernel.connection.create", {
+    id: connId,
+    tileAId: params.tileAId,
+    tileBId: params.tileBId,
+    label: params.label ?? null,
+  }, "canvas-rpc");
+  if (!kernelResult.ok) {
+    await sendToShell("canvas.connectionRemove", { id: connId }).catch(() => undefined);
+    throw new Error(`Kernel rejected connection.create: ${kernelResult.error}`);
+  }
+  return result;
+}
+
 export function registerCanvasRpc(win: BrowserWindow): void {
   shellWindow = win;
   subscribeWebContents(win.webContents);
@@ -252,31 +278,15 @@ export function registerCanvasRpc(win: BrowserWindow): void {
     "canvas.connectionCreate",
     async (params) => {
       const p = params as Record<string, unknown>;
-      if (!p['tileAId'] || !p['tileBId']) {
-        return sendToShell('canvas.connectionCreate', params);
-      }
-
-      // Renderer creates connection first so we capture its assigned ID.
-      const result = await sendToShell('canvas.connectionCreate', params) as Record<string, unknown> | null;
-      const connId = result?.['id'] as string | undefined;
-
-      // Kernel write gate.
-      const kernelResult = await dispatchKernelCommand('kernel.connection.create', {
-        id: connId,
-        tileAId: p['tileAId'] as string,
-        tileBId: p['tileBId'] as string,
-        label: (p['label'] as string | null) ?? null,
-      }, 'canvas-rpc');
-
-      if (!kernelResult.ok) {
-        // Roll back provisional connection.
-        if (connId) {
-          await sendToShell('canvas.connectionRemove', { id: connId }).catch(() => undefined);
-        }
-        throw new Error(`Kernel rejected connection.create: ${kernelResult.error}`);
-      }
-
-      return result;
+      if (!p["tileAId"] || !p["tileBId"]) return sendToShell("canvas.connectionCreate", params);
+      return createConnectionViaShell({
+        tileAId: p["tileAId"] as string,
+        tileBId: p["tileBId"] as string,
+        label: (p["label"] as string | null) ?? null,
+        fromSide: p["fromSide"] as string | undefined,
+        toSide: p["toSide"] as string | undefined,
+        kind: p["kind"] as string | undefined,
+      });
     },
     {
       description: "Create a connection between two tiles",

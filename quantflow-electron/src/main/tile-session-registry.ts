@@ -115,7 +115,7 @@ function matchesStatusHints(normalizedLine: string, hints?: string[]): boolean {
   });
 }
 
-export function syncConnectionGraph(connections: ConnectionGraphEntry[]): void {
+export function syncConnectionGraph(connections: ConnectionGraphEntry[]): Promise<void> {
   connectionGraph.clear();
   for (const conn of connections) {
     if (!conn.id || !conn.tileAId || !conn.tileBId) continue;
@@ -127,8 +127,8 @@ export function syncConnectionGraph(connections: ConnectionGraphEntry[]): void {
     if (conn.label != null) entry.label = conn.label;
     connectionGraph.set(conn.id, entry);
   }
-  if (connectionGraph.size === 0) return;
-  void pushConnectionGraphToHost(connections);
+  if (connectionGraph.size === 0) return Promise.resolve();
+  return pushConnectionGraphToHost(connections);
 }
 
 async function hostSidecarBaseUrl(): Promise<string | null> {

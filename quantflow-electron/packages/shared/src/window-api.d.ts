@@ -364,8 +364,38 @@ export interface CollabApi {
   onFocusTab: (cb: (ptySessionId: string) => void) => Unsubscribe;
   onShellBlur: (cb: () => void) => Unsubscribe;
 
+  // Eve tile session projection. Input still travels through AgentOS/ACP;
+  // these methods never grant the renderer a direct Eve write route.
+  agentosEveTileInfo: (tileId: string) => Promise<{
+    ok: boolean;
+    isEve: boolean;
+    sessionId: string | null;
+  }>;
+  agentosEveSnapshot: (tileId: string, startIndex?: number) => Promise<{
+    ok: boolean;
+    snapshot?: EveSessionSnapshot | null;
+    error?: string;
+  }>;
+  agentosEvePrompt: (tileId: string, text: string) => Promise<{
+    ok: boolean;
+    text?: string;
+    error?: string;
+  }>;
+
   // Canvas pinch forwarding
   forwardPinch: (deltaY: number) => void;
+}
+
+interface EveSessionSnapshot {
+  tileId: string;
+  eveSessionId: string | null;
+  initialSession: { sessionId: string; streamIndex: number } | null;
+  eventStartIndex: number;
+  eventCount: number;
+  events: unknown[];
+  revision: number;
+  phase: "idle" | "working" | "error";
+  error: string | null;
 }
 
 declare global {

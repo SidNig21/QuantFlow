@@ -5,6 +5,7 @@ import {
   appendRelayLog,
   getConnectionById,
   removeConnectionFromGraph,
+  type ConnectionGraphEntry,
 } from './tile-session-registry';
 import { sendTileDelegate } from './tile-relay-dispatcher';
 
@@ -12,6 +13,7 @@ export interface ConnectionRelayInput {
   connectionId: string;
   fromTileId: string;
   text: string;
+  connection?: ConnectionGraphEntry;
 }
 
 export interface ConnectionRelayResult {
@@ -69,8 +71,9 @@ export async function sendConnectionRelay(
   if (!fromTileId) return { ok: false, message: 'fromTileId required' };
   if (!text) return { ok: false, message: 'text required' };
 
-  const conn = getConnectionById(connectionId);
+  const conn = input.connection ?? getConnectionById(connectionId);
   if (!conn) return { ok: false, message: `connection not found: ${connectionId}` };
+  if (conn.id !== connectionId) return { ok: false, message: 'connection id mismatch' };
   if (fromTileId !== conn.tileAId && fromTileId !== conn.tileBId) {
     return { ok: false, message: 'fromTileId is not on this connection' };
   }
@@ -82,7 +85,7 @@ export async function sendConnectionRelay(
       toTileId: targetTileId,
       cableId: connectionId,
       text,
-    });
+    }, {}, conn);
     if (!relay.ok) {
       return { ok: false, message: relay.message };
     }
