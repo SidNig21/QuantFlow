@@ -4,6 +4,7 @@
 import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { reserveProofAgentOsPort } from "./proof-agentos-port";
 
 const ELECTRON_DIR = resolve(import.meta.dir, "..");
 const REPO_ROOT = resolve(ELECTRON_DIR, "..");
@@ -27,6 +28,7 @@ function ensureBuilt(): void {
 async function main(): Promise<void> {
   ensureBuilt();
   const dataRoot = mkdtempSync(join(tmpdir(), "qf-agentos-eve-cable-chat-proof-"));
+  const agentOsPort = reserveProofAgentOsPort();
   const proc = Bun.spawn({
     cmd: [process.execPath, resolveElectronCli(), "."],
     cwd: ELECTRON_DIR,
@@ -36,6 +38,11 @@ async function main(): Promise<void> {
       QF_TERMINAL_PROOF_EVIDENCE_DIR: EVIDENCE_DIR,
       QF_QUANTFLOW_DIR: join(dataRoot, "quantflow"),
       QF_USER_DATA_DIR: join(dataRoot, "userData"),
+      QF_AGENTOS_PORT: String(agentOsPort),
+      AGENTOS_HOST_PORT: String(agentOsPort),
+      // Proof-only Eve port range: never collide with the live app's pool (3010-3909).
+      EVE_PORT_BASE: process.env.EVE_PORT_BASE ?? "4200",
+      EVE_PORT_RANGE: process.env.EVE_PORT_RANGE ?? "300",
       QF_RELAY_TCP_PORT: "0",
       QF_AGENTOS_HEALTH_TIMEOUT_MS: process.env.QF_AGENTOS_HEALTH_TIMEOUT_MS ?? "180000",
       QUANTFLOW_DEV_WORKTREE_ROOT: REPO_ROOT,

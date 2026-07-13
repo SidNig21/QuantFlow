@@ -9,7 +9,10 @@ import { proofSleep } from "./proof-tile-spawn";
 
 export const SPAWN_TIMEOUT_MS = 180_000;
 export const ATTACH_TIMEOUT_MS = 180_000;
-export const RECIPE_ID = "proof-eve-agentos";
+// Founder-locked 2026-07-13: proofs seed and click the SAME dock entry the
+// operator uses (~/.quantflow/roles/eve-agentos.json), never a parallel
+// "proof" recipe that can drift from the real one.
+export const RECIPE_ID = "eve-agentos";
 
 export type LogStep = (name: string, ok: boolean, detail: string) => void;
 
@@ -30,12 +33,17 @@ export async function ensureProofRecipe(wc: WebContents, logStep: LogStep): Prom
       if (Array.isArray(entries) && entries.some((entry) => entry?.id === ${JSON.stringify(RECIPE_ID)})) {
         return { ok: true };
       }
+      // Mirror of the operator's live recipe (~/.quantflow/roles/eve-agentos.json).
+      // If the live recipe gains fields, mirror them here.
       await window.shellApi.legendCreate?.({
         id: ${JSON.stringify(RECIPE_ID)},
-        name: 'Proof Eve',
+        name: 'Eve',
+        description: 'Eve on the AgentOS rail',
         color: '#8b5cf6',
         icon: 'agentos',
         runtimeTarget: 'agentos',
+        cwdPolicy: 'workspace',
+        defaultShell: 'auto',
         harnessKind: 'agentos',
         agentosSoftware: 'eve',
         type: 'agent',

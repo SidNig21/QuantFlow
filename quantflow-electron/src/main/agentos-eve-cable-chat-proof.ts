@@ -1,13 +1,13 @@
 /**
- * T-UX-lite scripted proof — typed /cable command in an Eve terminal.
+ * T-UX-lite scripted proof — typed /cable command from an Eve session tile.
+ * Drives submitEveTileChat, the exact seam the tile's Send input calls over
+ * IPC, so the assertion covers the operator's real input route.
  */
 import type { BrowserWindow } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import {
-  getAgentOsPtySessionIdForTile,
-  writeAgentOsPtySession,
-} from "./agentos-terminal-bridge";
+import { submitEveTileChat } from "./agentos-terminal-bridge";
+import { createConnectionViaShell } from "./canvas-rpc";
 import {
   assertAgentOsWorkers,
   ensureProofRecipe,
@@ -17,31 +17,18 @@ import {
 } from "./agentos-eve-proof-shared";
 import { exitProofApp } from "./proof-app-lifecycle";
 import { proofSleep, saveProofScreenshot } from "./proof-tile-spawn";
-import { getStringLog, syncConnectionGraph } from "./tile-session-registry";
+import { getStringLog, pushConnectionGraphToHost } from "./tile-session-registry";
 
 const SETTLE_MS = 2500;
-const PTY_TIMEOUT_MS = 120_000;
 const RELAY_TIMEOUT_MS = 180_000;
 const CABLE_TEXT = "Reply with exactly: cable-chat-ok";
 const CABLE_EXPECT = "cable-chat-ok";
 
 const logStep = makeLogStep("AGENTOS-EVE-CABLE-CHAT-PROOF");
 
-async function waitForPty(tileId: string): Promise<string | null> {
-  const started = Date.now();
-  while (Date.now() - started < PTY_TIMEOUT_MS) {
-    const ptySessionId = getAgentOsPtySessionIdForTile(tileId);
-    if (ptySessionId) return ptySessionId;
-    await proofSleep(500);
-  }
-  return getAgentOsPtySessionIdForTile(tileId);
-}
-
 async function spawnAttachedEvePair(mainWindow: BrowserWindow): Promise<{
   tileA: string;
   tileB: string;
-  ptyA: string;
-  ptyB: string;
 } | null> {
   const wc = mainWindow.webContents;
   await proofSleep(SETTLE_MS);
@@ -69,16 +56,8 @@ async function spawnAttachedEvePair(mainWindow: BrowserWindow): Promise<{
   }
   logStep("session-attach-b", true, `tile=${tileB} session=${attachB.sessionId}`);
 
-  const ptyA = await waitForPty(tileA);
-  const ptyB = await waitForPty(tileB);
-  if (!ptyA || !ptyB) {
-    logStep("pty-bridge", false, `ptyA=${ptyA ?? "null"} ptyB=${ptyB ?? "null"}`);
-    return null;
-  }
-  logStep("pty-bridge", true, `ptyA=${ptyA} ptyB=${ptyB}`);
-
   if (!(await assertAgentOsWorkers(wc, [tileA, tileB], logStep))) return null;
-  return { tileA, tileB, ptyA, ptyB };
+  return { tileA, tileB };
 }
 
 async function waitForRelayLog(connectionId: string, tileA: string, tileB: string): Promise<boolean> {
@@ -117,22 +96,45 @@ export async function runAgentosEveCableChatProof(mainWindow: BrowserWindow): Pr
     return;
   }
 
-  const connectionId = `conn-eve-cable-chat-${Date.now()}`;
-  syncConnectionGraph([{
+  const createdConnection = await createConnectionViaShell({
+    tileAId: pair.tileA,
+    tileBId: pair.tileB,
+    label: "eve-cable-chat",
+  });
+  const connectionId = typeof createdConnection?.id === "string" ? createdConnection.id : "";
+  if (!connectionId) {
+    logStep("canvas-cable", false, "renderer returned no connection id");
+    exitProofApp(1);
+    return;
+  }
+  await pushConnectionGraphToHost([{
     id: connectionId,
     tileAId: pair.tileA,
     tileBId: pair.tileB,
     label: "eve-cable-chat",
   }]);
 
-  await writeAgentOsPtySession(pair.ptyA, `/cable ${CABLE_TEXT}\r`);
+  try {
+    const cableResult = await submitEveTileChat(pair.tileA, `/cable ${CABLE_TEXT}`);
+    logStep("cable-submit", true, `reply=${cableResult.text.slice(0, 120)}`);
+  } catch (error) {
+    logStep("cable-submit", false, error instanceof Error ? error.message : String(error));
+    exitProofApp(1);
+    return;
+  }
   if (!(await waitForRelayLog(connectionId, pair.tileA, pair.tileB))) {
     exitProofApp(1);
     return;
   }
 
   const beforePlain = getStringLog(connectionId, 50).length;
-  await writeAgentOsPtySession(pair.ptyA, "plain local line\r");
+  try {
+    await submitEveTileChat(pair.tileA, "Answer locally in one word: what color is the sky?");
+  } catch (error) {
+    logStep("plain-local-submit", false, error instanceof Error ? error.message : String(error));
+    exitProofApp(1);
+    return;
+  }
   await proofSleep(5000);
   const afterPlain = getStringLog(connectionId, 50).length;
   const plainOk = beforePlain === afterPlain;

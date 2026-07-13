@@ -5,6 +5,7 @@ import type { BrowserWindow } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { sendConnectionRelay } from "./agentos-a2a-relay";
+import { createConnectionViaShell } from "./canvas-rpc";
 import {
   assertAgentOsWorkers,
   ensureProofRecipe,
@@ -14,7 +15,7 @@ import {
 } from "./agentos-eve-proof-shared";
 import { exitProofApp } from "./proof-app-lifecycle";
 import { proofSleep, saveProofScreenshot } from "./proof-tile-spawn";
-import { getStringLog, syncConnectionGraph } from "./tile-session-registry";
+import { getStringLog, pushConnectionGraphToHost } from "./tile-session-registry";
 
 const SETTLE_MS = 2500;
 const RELAY_TEXT = "Reply with exactly: eve-a2a-u6-ok";
@@ -77,13 +78,25 @@ export async function runAgentosEveA2aLiveProof(mainWindow: BrowserWindow): Prom
     return;
   }
 
-  const connectionId = `conn-eve-a2a-${Date.now()}`;
-  syncConnectionGraph([{ id: connectionId, tileAId: tileA, tileBId: tileB, label: "eve-a2a-u6" }]);
+  const createdConnection = await createConnectionViaShell({
+    tileAId: tileA,
+    tileBId: tileB,
+    label: "eve-a2a-u6",
+  });
+  const connectionId = typeof createdConnection?.id === "string" ? createdConnection.id : "";
+  if (!connectionId) {
+    logStep("canvas-cable", false, "renderer returned no connection id");
+    exitProofApp(1);
+    return;
+  }
+  const connection = { id: connectionId, tileAId: tileA, tileBId: tileB, label: "eve-a2a-u6" };
+  await pushConnectionGraphToHost([connection]);
 
   const relay = await sendConnectionRelay({
     connectionId,
     fromTileId: tileA,
     text: RELAY_TEXT,
+    connection,
   });
   const relayOk = relay.ok
     && relay.targetTileId === tileB

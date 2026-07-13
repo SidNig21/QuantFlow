@@ -104,10 +104,12 @@ sign-off. Until then the manual path is the seeded custom card:
    `ensureEveForActorKey` in `tools/agentos-host/eve-supervisor.js`), so attach
    skips the cold boot (~8s session create vs ~32s cold; `EVE_WARM_POOL=0`
    disables the pool).
-3. Tiles run `eve start` (production server, per-instance
-   `WORKFLOW_LOCAL_DATA_DIR`), never `eve dev` — the dev server enforces a
-   single-instance lock per workspace and cannot multi-spawn. A stale
-   `eve dev` (e.g. `.eve/dev-process.pid`) blocks new instances; kill it first.
+3. The execution server runs `eve start` (production server, per-instance
+   `WORKFLOW_LOCAL_DATA_DIR`) and keeps its warm-pool/multi-spawn safety. The
+   ACP adapter remains the only Eve writer; the host queues AgentOS prompts
+   and tails the durable Eve session for the React tile view. A stale local
+   `eve dev` server (e.g. `.eve/dev-process.pid`) is irrelevant to this
+   production display path.
 4. Settings → Add agent → "Eve agent" now defaults to the AgentOS rail;
    pick `windows-pty` there only for a local-dev (`npm run dev`) Eve.
 

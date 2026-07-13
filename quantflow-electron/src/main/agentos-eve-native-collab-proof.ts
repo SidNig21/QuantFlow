@@ -5,6 +5,7 @@ import type { BrowserWindow } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { promptAgentOsTile } from "./agentos-terminal-bridge";
+import { createConnectionViaShell } from "./canvas-rpc";
 import {
   assertAgentOsWorkers,
   ensureProofRecipe,
@@ -14,7 +15,7 @@ import {
 } from "./agentos-eve-proof-shared";
 import { exitProofApp } from "./proof-app-lifecycle";
 import { proofSleep, saveProofScreenshot } from "./proof-tile-spawn";
-import { syncConnectionGraph } from "./tile-session-registry";
+import { pushConnectionGraphToHost } from "./tile-session-registry";
 
 const SETTLE_MS = 2500;
 const COLLAB_EXPECT = "collab-ok";
@@ -77,8 +78,14 @@ export async function runAgentosEveNativeCollabProof(mainWindow: BrowserWindow):
     return;
   }
 
-  const connectionId = `conn-eve-collab-${Date.now()}`;
-  syncConnectionGraph([{ id: connectionId, tileAId: tileA, tileBId: tileB, label: "eve-native-collab" }]);
+  const createdConnection = await createConnectionViaShell({ tileAId: tileA, tileBId: tileB, label: "eve-native-collab" });
+  const connectionId = typeof createdConnection?.id === "string" ? createdConnection.id : "";
+  if (!connectionId) {
+    logStep("canvas-cable", false, "renderer returned no connection id");
+    exitProofApp(1);
+    return;
+  }
+  await pushConnectionGraphToHost([{ id: connectionId, tileAId: tileA, tileBId: tileB, label: "eve-native-collab" }]);
 
   let agentText = "";
   try {

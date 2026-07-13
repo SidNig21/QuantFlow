@@ -14,6 +14,8 @@ const execFileAsync = promisify(execFile);
 export interface SpawnHandle {
   pid?: number;
   kill(signal?: NodeJS.Signals): void;
+  /** Rolling tail of the child's stdout+stderr, for boot-failure diagnostics. */
+  readOutputTail?: () => string;
 }
 
 export type LifecycleSpawn = (
@@ -53,7 +55,16 @@ const CREDENTIAL_ENV_NAMES = [
 ] as const;
 
 /** Host runtime knobs forwarded Win→WSL (override WSL ~/.profile drift). */
-const HOST_RUNTIME_ENV_NAMES = ['AGENTOS_MODEL', 'AGENTOS_PROVIDER'] as const;
+const HOST_RUNTIME_ENV_NAMES = [
+  'AGENTOS_MODEL',
+  'AGENTOS_PROVIDER',
+  // Eve supervisor knobs: isolated proof runs pin these so their Eve pool
+  // cannot collide with the live app's per-actor ports or warm instance.
+  'EVE_PORT_BASE',
+  'EVE_PORT_RANGE',
+  'EVE_WARM_POOL',
+  'QUANTFLOW_EVE_ROOT',
+] as const;
 
 function defaultRepoRoot(): string {
   return join(fileURLToPath(new URL('../../..', import.meta.url)));
@@ -116,6 +127,8 @@ function buildSpawnEnv(port: number): NodeJS.ProcessEnv {
   return env;
 }
 
+const OUTPUT_TAIL_LIMIT = 4_000;
+
 function defaultSpawn(
   command: string,
   args: string[],
@@ -124,15 +137,25 @@ function defaultSpawn(
   const child = nodeSpawn(command, args, {
     env: options.env,
     cwd: options.cwd,
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
     detached: false,
+  });
+  let tail = '';
+  const append = (chunk: Buffer) => {
+    tail = `${tail}${chunk.toString('utf8')}`.slice(-OUTPUT_TAIL_LIMIT);
+  };
+  child.stdout?.on('data', append);
+  child.stderr?.on('data', append);
+  child.on('exit', (code, signal) => {
+    tail = `${tail}\n[host process exited: code=${code} signal=${signal}]`.slice(-OUTPUT_TAIL_LIMIT);
   });
   return {
     pid: child.pid,
     kill(signal = 'SIGTERM') {
       child.kill(signal);
     },
+    readOutputTail: () => tail,
   };
 }
 
@@ -291,8 +314,12 @@ export async function startAgentOsHost(
   })();
 
   if (!reachableHost) {
+    const tail = child.readOutputTail?.().trim();
     child.kill('SIGTERM');
-    throw new Error(`agentos-host did not become healthy within ${healthTimeoutMs}ms`);
+    throw new Error(
+      `agentos-host did not become healthy within ${healthTimeoutMs}ms`
+      + ` (port ${port})${tail ? `; host output tail:\n${tail}` : '; host produced no output'}`,
+    );
   }
 
   return { host: reachableHost, port, wslHostPath, child };

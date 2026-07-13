@@ -35,7 +35,7 @@ export async function runA2aCableProof(mainWindow: BrowserWindow): Promise<void>
   logStep("spawn-pair", true, `tileA=${tileA} tileB=${tileB}`);
 
   const connectionId = `conn-a2a-${Date.now()}`;
-  syncConnectionGraph([{ id: connectionId, tileAId: tileA, tileBId: tileB, label: "a2a-proof" }]);
+  await syncConnectionGraph([{ id: connectionId, tileAId: tileA, tileBId: tileB, label: "a2a-proof" }]);
 
   const relay = await sendConnectionRelay({
     connectionId,
