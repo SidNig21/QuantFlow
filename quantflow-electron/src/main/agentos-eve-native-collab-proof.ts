@@ -19,6 +19,8 @@ import { pushConnectionGraphToHost } from "./tile-session-registry";
 
 const SETTLE_MS = 2500;
 const COLLAB_EXPECT = "collab-ok";
+/** B's peer turn + A's host-owned reply turn, each a real LLM call. */
+const FOLLOW_UP_TIMEOUT_MS = 120_000;
 const COLLAB_INSTRUCTION = "You are cabled to one peer. Call your cable_list tool to get the connectionId, then call cable_send with that connectionId and the text 'Reply with exactly: collab-ok'. Then tell me your peer's reply.";
 
 const logStep = makeLogStep("AGENTOS-EVE-NATIVE-COLLAB-PROOF");
@@ -98,8 +100,38 @@ export async function runAgentosEveNativeCollabProof(mainWindow: BrowserWindow):
     return;
   }
 
-  const collabOk = agentText.includes(COLLAB_EXPECT);
-  logStep("agent-collab", collabOk, agentText || "empty reply");
+  const { resolveAgentOsHostAddress } = await import("@qf-harness/agentos/host-lifecycle");
+  const port = Number.parseInt(process.env.AGENTOS_HOST_PORT ?? process.env.QF_AGENTOS_PORT ?? "7430", 10);
+  const hostAddr = await resolveAgentOsHostAddress({ port });
+  const base = `http://${hostAddr}:${port}`;
+
+  // The cable relay is asynchronous by design: A's first turn ends with a
+  // delivery note and B's reply arrives as a host-owned FOLLOW-UP turn
+  // (per-tile rails, 2026-07-13). Assert the reply at its true arrival
+  // point — A's persisted session events — not inside the first turn.
+  let collabOk = agentText.includes(COLLAB_EXPECT);
+  let collabDetail = agentText || "empty reply";
+  if (!collabOk) {
+    const deadline = Date.now() + FOLLOW_UP_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      try {
+        const runtimeA = await fetch(`${base}/session/${encodeURIComponent(attachA.sessionId)}/runtime`);
+        if (runtimeA.ok) {
+          const bodyA = await runtimeA.json() as { persistedEvents?: unknown[] };
+          if (JSON.stringify(bodyA.persistedEvents ?? []).includes(COLLAB_EXPECT)) {
+            collabOk = true;
+            collabDetail = `first turn: ${agentText.slice(0, 100)} | follow-up turn delivered ${COLLAB_EXPECT}`;
+            break;
+          }
+        }
+      } catch {
+        // Poll again until the deadline.
+      }
+      await proofSleep(2000);
+    }
+    if (!collabOk) collabDetail = `no follow-up ${COLLAB_EXPECT} within ${FOLLOW_UP_TIMEOUT_MS}ms; first turn: ${agentText.slice(0, 200)}`;
+  }
+  logStep("agent-collab", collabOk, collabDetail);
   if (!collabOk) {
     exitProofApp(1);
     return;
@@ -108,10 +140,6 @@ export async function runAgentosEveNativeCollabProof(mainWindow: BrowserWindow):
   let persistedEvents: unknown[] = [];
   let framingError: string | null = null;
   try {
-    const { resolveAgentOsHostAddress } = await import("@qf-harness/agentos/host-lifecycle");
-    const port = Number.parseInt(process.env.AGENTOS_HOST_PORT ?? process.env.QF_AGENTOS_PORT ?? "7430", 10);
-    const host = await resolveAgentOsHostAddress({ port });
-    const base = `http://${host}:${port}`;
     const runtimeResponse = await fetch(`${base}/session/${encodeURIComponent(attachB.sessionId)}/runtime`);
     if (runtimeResponse.ok) {
       const body = await runtimeResponse.json() as { persistedEvents?: unknown[] };
