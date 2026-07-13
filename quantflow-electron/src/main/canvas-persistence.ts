@@ -26,6 +26,7 @@ import {
 } from "./canvas-kernel-sync";
 
 let stateDir = QUANTFLOW_DIR;
+const atomicWriteQueues = new Map<string, Promise<void>>();
 
 function getStateFile(): string {
   return join(stateDir, "canvas-state.json");
@@ -82,11 +83,50 @@ function hasEphemeralCache(): boolean {
   return existsSync(getEphemeralCacheFile());
 }
 
-async function atomicWriteJson(targetPath: string, payload: unknown): Promise<void> {
+async function renameWithWindowsRetry(tmp: string, targetPath: string): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await rename(tmp, targetPath);
+      return;
+    } catch (error) {
+      lastError = error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
+async function writeJsonOnce(targetPath: string, payload: unknown): Promise<void> {
   const tmp = join(tmpdir(), `canvas-write-${crypto.randomUUID()}.json`);
   const json = JSON.stringify(payload, null, 2);
-  await writeFile(tmp, json, "utf-8");
-  await rename(tmp, targetPath);
+  try {
+    await writeFile(tmp, json, "utf-8");
+    await renameWithWindowsRetry(tmp, targetPath);
+  } finally {
+    await rm(tmp, { force: true }).catch(() => {});
+  }
+}
+
+/**
+ * The renderer can emit several save requests during one drag/cable gesture.
+ * Windows does not reliably permit overlapping replace-renames of the same
+ * file, so retain the latest request order while giving each replacement a
+ * single writer and a short lock retry.
+ */
+async function atomicWriteJson(targetPath: string, payload: unknown): Promise<void> {
+  const previous = atomicWriteQueues.get(targetPath) ?? Promise.resolve();
+  const next = previous.catch(() => {}).then(() => writeJsonOnce(targetPath, payload));
+  atomicWriteQueues.set(targetPath, next);
+  try {
+    await next;
+  } finally {
+    if (atomicWriteQueues.get(targetPath) === next) {
+      atomicWriteQueues.delete(targetPath);
+    }
+  }
 }
 
 async function writeEphemeralCache(tiles: TileState[]): Promise<void> {
