@@ -73,6 +73,7 @@ import { runActorsOnAgentosProof } from "./agentos-actors-proof";
 import { runA2aCableProof } from "./agentos-a2a-proof";
 import { runAgentosEveA2aLiveProof } from "./agentos-eve-a2a-live-proof";
 import { runAgentosEveCableChatProof } from "./agentos-eve-cable-chat-proof";
+import { runAgentosEveNativeCollabProof } from "./agentos-eve-native-collab-proof";
 import { runAgentosEveMultispawnProof } from "./agentos-eve-multispawn-proof";
 import { runAgentosEveProof } from "./agentos-eve-proof";
 import { runAgentosStickProof } from "./agentos-stick-proof";
@@ -1048,6 +1049,9 @@ app.whenReady().then(async () => {
   }
   if (process.env.QF_AGENTOS_EVE_A2A_PROOF === "1") {
     void runAgentosEveA2aLiveProof(mainWindow!);
+  }
+  if (process.env.QF_AGENTOS_EVE_NATIVE_COLLAB_PROOF === "1") {
+    void runAgentosEveNativeCollabProof(mainWindow!);
   }
   if (process.env.QF_AGENTOS_EVE_CABLE_CHAT_PROOF === "1") {
     void runAgentosEveCableChatProof(mainWindow!);

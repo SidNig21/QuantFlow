@@ -338,6 +338,15 @@ const checks: Check[] = [
     },
   },
   {
+    name: "agentos-eve-native-collab",
+    description:
+      "U6: Eve discovers cabled peer through native cable tools and returns peer reply",
+    async run() {
+      const { runAgentOsEveNativeCollabCheck } = await import("./lib/agentos-eve-native-collab");
+      return runAgentOsEveNativeCollabCheck();
+    },
+  },
+  {
     name: "agentos-a2a",
     description:
       "A2A: two pi-stick AgentOS sessions, cable relay, sim ack + scripted canvas proof",
