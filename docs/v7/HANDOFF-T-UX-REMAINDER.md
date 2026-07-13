@@ -1,5 +1,7 @@
 # HANDOFF — T-UX remainder: Eve native TUI first, then cable-collab close-out
 
+> **STATUS: CLOSED (2026-07-13).** §4 (U1 native TUI, both forks) was superseded and completed differently by `HANDOFF-EVE-SESSION-TILE.md` (Eve session tiles — see its STATUS block for all receipts). §5 native-collab is GREEN (async two-turn contract, `a7041f9`). U8 landed in `tools/agentos-host/AGENTS.md`; **U7 done 2026-07-13** (`eve` promoted to `DOCK_SPAWN_ACTOR_IDS`, assertions flipped, founder-authorized). §§6/9 commit rules and gotchas remain live reference. Next phase: `docs/v7/PREMIER_PHASE_PLAN.md` (PARKED until founder go).
+
 **Date:** 2026-07-12 · **Branch:** `quantflow-v7-agentos-anchor` @ `c586e28` (pushed) · **Repos:** `QuantFlow` + `quantflow-eve`
 **Driver:** founder, in the Codex app. This document is the single authority for the remaining work.
 
