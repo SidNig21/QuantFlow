@@ -4,7 +4,23 @@ export const LEGEND_PREF_KEYS = {
 };
 
 /** Built-in seed — runtime list comes from main via getRecipes(); keep spawn ids in sync with DOCK_SPAWN_ACTOR_IDS. */
-export const LEGEND_RECIPES = [];
+export const LEGEND_RECIPES = [
+	{
+		id: "eve",
+		roleId: "eve",
+		group: "spawn",
+		type: "eve",
+		name: "Eve",
+		description: "agentos · eve",
+		runtime: "agentos",
+		color: "var(--rail-agent, #6366f1)",
+		icon: "eve",
+		runtimeTarget: "agentos",
+		harnessKind: "agentos",
+		agentosSoftware: "eve",
+		modelHint: "deepseek-v4-pro",
+	},
+];
 
 export { mapHealthLevelToBadge, resolveRecipeCapabilityId, resolveReadinessBadge } from "./legend-readiness.js";
 

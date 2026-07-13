@@ -29,9 +29,10 @@ describe("dock-actors", () => {
     expect(DOCK_ACTORS).toHaveLength(7);
   });
 
-  test("dock spawn rail starts empty until canvas proof promotes actors", () => {
-    expect([...DOCK_SPAWN_ACTOR_IDS]).toEqual([]);
-    expect(buildDockLegendRecipes()).toHaveLength(0);
+  test("dock spawn rail holds only canvas-proven actors (U7: eve, 2026-07-13)", () => {
+    expect([...DOCK_SPAWN_ACTOR_IDS]).toEqual(["eve"]);
+    expect(buildDockLegendRecipes()).toHaveLength(1);
+    expect(buildDockLegendRecipes()[0]?.id).toBe("eve");
   });
 
   test("maps each actor to role + legend recipe with matching ids", () => {
@@ -127,7 +128,7 @@ describe("dock-actors", () => {
 
   test("build helpers match registry vs verified dock spawn rail", () => {
     expect(buildDockRoles()).toHaveLength(7);
-    expect(buildDockLegendRecipes()).toHaveLength(0);
+    expect(buildDockLegendRecipes()).toHaveLength(1);
   });
 
   test("claude-worker alias resolves to claude", () => {

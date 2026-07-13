@@ -15,8 +15,12 @@ export type DockActorId = (typeof DOCK_ACTOR_IDS)[number];
  * Verified-only Dock spawn rail. Empty until an actor passes live canvas proof
  * (dock click → tile → AgentOS session → Kernel receipt). Promote one id at a
  * time after `docs/v7/V7_FIRST_PROOF.md` / P1d evidence — never pre-ship hope.
+ *
+ * eve — U7 promotion, founder-authorized 2026-07-13: five-gate stack green
+ * over `a7041f9` + founder manual canvas exit passed live
+ * (docs/v7/HANDOFF-EVE-SESSION-TILE.md STATUS block holds the receipts).
  */
-export const DOCK_SPAWN_ACTOR_IDS = [] as const satisfies readonly DockActorId[];
+export const DOCK_SPAWN_ACTOR_IDS = ["eve"] as const satisfies readonly DockActorId[];
 
 export type DockActorKind = "codex" | "worker" | "agent" | "eve";
 
