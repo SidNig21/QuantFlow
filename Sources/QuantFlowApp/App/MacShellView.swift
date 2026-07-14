@@ -271,6 +271,16 @@ private struct DockCatalogueSidebar: View {
             HStack(alignment: .top, spacing: 7) {
                 Circle().fill(session.runtimePromptable ? QuantFlowTheme.lime : Color.orange).frame(width: 5, height: 5).padding(.top, 4)
                 Text(session.runtimeNotice ?? "Starting native runtime…").font(.caption2).foregroundStyle(.secondary).lineLimit(3)
+                Spacer(minLength: 4)
+                Button {
+                    Swift.Task { await session.startRuntime() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(QuantFlowTheme.cyan)
+                }
+                .buttonStyle(.plain)
+                .help("Refresh native runtime")
             }
             .padding(12)
         }
