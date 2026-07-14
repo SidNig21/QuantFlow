@@ -17,14 +17,20 @@ let package = Package(
             path: "Sources/QuantFlowCore",
             exclude: ["AGENTS.md"]
         ),
+        .target(
+            name: "QuantFlowCanvas",
+            dependencies: ["QuantFlowCore"],
+            path: "Sources/QuantFlowCanvas",
+            exclude: ["AGENTS.md"]
+        ),
         .executableTarget(
             name: "QuantFlowApp",
-            dependencies: ["QuantFlowCore"],
+            dependencies: ["QuantFlowCore", "QuantFlowCanvas"],
             path: "Sources/QuantFlowApp"
         ),
         .executableTarget(
             name: "QuantFlowKernelProof",
-            dependencies: ["QuantFlowCore"],
+            dependencies: ["QuantFlowCore", "QuantFlowCanvas"],
             path: "Sources/QuantFlowKernelProof"
         )
     ]

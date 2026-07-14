@@ -30,7 +30,9 @@ Swift Kernel (SQLite) → SwiftUI Canvas → Conductor / Inspector
 The active build ladder is [the Mac-native rebuild plan](docs/plans/2026-07-13-002-arch-quantflow-mac-native-rebuild-plan.md).
 M0 provides the native app shell and archived Windows execution material. M1 is
 complete: `QuantFlowCore` provides one SQLite Kernel with command audit rows,
-query snapshots, append-only receipts/events, and the enforced task gate.
+query snapshots, append-only receipts/events, and the enforced task gate. M2
+adds the native pan/zoom SwiftUI canvas: drag operations refresh through the
+event-driven `QuantFlowCanvas` projection rather than local tile state.
 
 ## Development
 

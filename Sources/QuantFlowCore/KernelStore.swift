@@ -1,5 +1,8 @@
+import Foundation
+
 public final class KernelStore {
     private let database: SQLiteDatabase
+    private var eventSubscribers: [UUID: (KernelEvent) -> Void] = [:]
 
     public init(path: String) throws {
         database = try SQLiteDatabase(path: path)
@@ -14,6 +17,7 @@ public final class KernelStore {
         do {
             let result = try database.transaction { try apply(command, commandID: commandID) }
             try database.execute("UPDATE commands SET status = 'accepted', result_json = ?, completed_at = ? WHERE id = ?", [.text("{\"subject_id\":\"\(result.subjectID)\"}"), .integer(KernelIDs.timestamp()), .text(commandID)])
+            eventSubscribers.values.forEach { $0(result.event) }
             return result
         } catch {
             try? database.execute("UPDATE commands SET status = 'rejected', rejection_reason = ?, completed_at = ? WHERE id = ?", [.text(error.localizedDescription), .integer(KernelIDs.timestamp()), .text(commandID)])
@@ -31,6 +35,21 @@ public final class KernelStore {
             KernelEvent(id: database.text(row, 0)!, workflowID: database.text(row, 1)!, taskID: database.text(row, 2), tileID: database.text(row, 3), kind: database.text(row, 4)!, createdAt: database.integer(row, 5))
         }
     }
+
+    public func workflows() throws -> [Workflow] {
+        try database.query("SELECT id, name, objective, status FROM workflows ORDER BY created_at") {
+            Workflow(id: database.text($0, 0)!, name: database.text($0, 1)!, objective: database.text($0, 2)!, status: WorkflowStatus(rawValue: database.text($0, 3)!)!)
+        }
+    }
+
+    @discardableResult
+    public func subscribe(_ handler: @escaping (KernelEvent) -> Void) -> UUID {
+        let id = UUID()
+        eventSubscribers[id] = handler
+        return id
+    }
+
+    public func unsubscribe(_ id: UUID) { eventSubscribers[id] = nil }
 
     private func apply(_ command: KernelCommand, commandID: KernelID) throws -> KernelCommandResult {
         let now = KernelIDs.timestamp()

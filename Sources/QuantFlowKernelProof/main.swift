@@ -1,6 +1,7 @@
 import Foundation
 import Darwin
 import QuantFlowCore
+import QuantFlowCanvas
 
 @main
 struct KernelProofMain {
@@ -10,7 +11,9 @@ struct KernelProofMain {
             let workflow = try kernel.dispatch(.createWorkflow(name: "M1 proof", objective: "Prove the native Kernel"))
             let eve = try kernel.dispatch(.createTile(workflowID: workflow.subjectID, displayName: "Eve", kind: .worker, x: 20, y: 40))
             _ = try kernel.dispatch(.createWorker(tileID: eve.subjectID, role: "agent", harness: "agentos", model: "eve"))
-            _ = try kernel.dispatch(.moveTile(tileID: eve.subjectID, x: 360, y: 240))
+            let projection = try CanvasProjection(kernel: kernel, workflowID: workflow.subjectID)
+            projection.activate()
+            projection.move(try kernel.snapshot(workflowID: workflow.subjectID).tiles[0], to: CGPoint(x: 360, y: 240))
             let task = try kernel.dispatch(.createTask(workflowID: workflow.subjectID, title: "Verify the Kernel", objective: "Pass every task gate"))
             for status in [TaskStatus.claimed, .working, .submitted, .verifying] {
                 _ = try kernel.dispatch(.transitionTask(taskID: task.subjectID, to: status))
@@ -25,14 +28,14 @@ struct KernelProofMain {
             _ = try kernel.dispatch(.transitionTask(taskID: task.subjectID, to: .complete))
             _ = try kernel.dispatch(.createConnection(workflowID: workflow.subjectID, fromTileID: eve.subjectID, toTileID: eve.subjectID, semantic: .verification, label: "self-check"))
 
-            let snapshot = try kernel.snapshot(workflowID: workflow.subjectID)
+            let snapshot = projection.snapshot
             try require(snapshot.tiles.first?.x == 360 && snapshot.tiles.first?.y == 240, "tile move did not persist")
             try require(snapshot.workers.count == 1, "worker was not stored")
             try require(snapshot.tasks.first?.status == .complete, "task did not reach complete through verification")
             try require(snapshot.receipts.count == 7, "receipt chain is incomplete")
             try require(snapshot.connections.count == 1, "typed connection was not stored")
             try require((try kernel.events(workflowID: workflow.subjectID)).count == 12, "event chain is incomplete")
-            print("M1 KERNEL PROOF PASSED · SQLite commands, snapshots, receipts, events, and task gates are live.")
+            print("M2 CANVAS PROOF PASSED · SQLite commands, event-driven projection refresh, receipts, and task gates are live.")
         } catch {
             fputs("M1 KERNEL PROOF FAILED: \(error.localizedDescription)\n", stderr)
             exit(1)

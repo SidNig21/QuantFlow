@@ -37,8 +37,11 @@ Kernel owns truth → Canvas projects → Conductor plans → Harness adapts →
 ```text
 Sources/QuantFlowCore/
   KernelModels.swift, KernelStore.swift, SQLiteDatabase.swift
+Sources/QuantFlowCanvas/
+  CanvasProjection.swift  event-driven, non-authoritative read model
 Sources/QuantFlowApp/
-  App/          SwiftUI application composition and future Canvas projection
+  Canvas/       SwiftUI infinite canvas and tile gesture projection
+  App/          SwiftUI application composition
 Sources/QuantFlowKernelProof/
   standalone M1 command/query acceptance proof
 tools/agentos-host-mac/
