@@ -38,7 +38,9 @@ M3 is complete: it adds a clean localhost-only native runtime boundary in
 separates a live Eve/AgentOS runtime from a genuinely promptable one, which
 also requires an OpenCode credential; the [M3 proof](docs/proofs/2026-07-13-m3-native-runtime.md)
 records a 52.1 ms warm session acceptance and successful AgentOS actor
-attachment. The dock/prompt surface remains M4.
+attachment. M4 now provides the native Eve-only dock, Kernel runtime binding,
+and a Swift session sheet; its [live-model acceptance](docs/proofs/2026-07-13-m4-eve-dock.md)
+is intentionally pending an operator-provided OpenCode credential.
 
 ## Development
 

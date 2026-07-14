@@ -38,14 +38,6 @@ public final class CanvasProjection {
         catch { lastError = error.localizedDescription }
     }
 
-    public func addEve() {
-        do {
-            let position = CGPoint(x: 350 + Double(snapshot.tiles.count * 40), y: 520)
-            let tile = try kernel.dispatch(.createTile(workflowID: workflowID, displayName: "Eve", kind: .worker, x: position.x, y: position.y))
-            _ = try kernel.dispatch(.createWorker(tileID: tile.subjectID, role: "agent", harness: "runtime-pending", model: "eve"))
-        } catch { lastError = error.localizedDescription }
-    }
-
     deinit {
         if let subscriptionID { kernel.unsubscribe(subscriptionID) }
     }

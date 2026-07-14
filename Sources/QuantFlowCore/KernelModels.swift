@@ -26,7 +26,7 @@ public struct Tile: Identifiable, Equatable, Sendable {
     public let x: Double; public let y: Double; public let width: Double; public let height: Double; public let status: TileStatus
 }
 public struct WorkerInstance: Identifiable, Equatable, Sendable {
-    public let id: KernelID; public let tileID: KernelID; public let workflowID: KernelID; public let role: String; public let harness: String; public let model: String; public let status: WorkerStatus
+    public let id: KernelID; public let tileID: KernelID; public let workflowID: KernelID; public let role: String; public let harness: String; public let model: String; public let status: WorkerStatus; public let runtimeActorID: String?; public let runtimeSessionID: String?
 }
 public struct Task: Identifiable, Equatable, Sendable {
     public let id: KernelID; public let workflowID: KernelID; public let correlationID: String; public let title: String; public let objective: String; public let status: TaskStatus
@@ -49,6 +49,7 @@ public enum KernelCommand: Sendable {
     case createTile(workflowID: KernelID, displayName: String, kind: TileKind, x: Double, y: Double)
     case moveTile(tileID: KernelID, x: Double, y: Double)
     case createWorker(tileID: KernelID, role: String, harness: String, model: String)
+    case bindWorkerRuntime(workerID: KernelID, actorID: String, sessionID: String, promptable: Bool)
     case createTask(workflowID: KernelID, title: String, objective: String)
     case transitionTask(taskID: KernelID, to: TaskStatus)
     case postReceipt(workflowID: KernelID, taskID: KernelID?, type: ReceiptType, summary: String)
@@ -60,6 +61,7 @@ public enum KernelCommand: Sendable {
         case .createTile: "kernel.tile.create"
         case .moveTile: "kernel.tile.move"
         case .createWorker: "kernel.worker.create"
+        case .bindWorkerRuntime: "kernel.worker.runtime.bind"
         case .createTask: "kernel.task.create"
         case .transitionTask: "kernel.task.transition"
         case .postReceipt: "kernel.receipt.post"

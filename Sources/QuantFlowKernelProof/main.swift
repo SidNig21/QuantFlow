@@ -10,7 +10,10 @@ struct KernelProofMain {
             let kernel = try KernelStore.inMemory()
             let workflow = try kernel.dispatch(.createWorkflow(name: "M1 proof", objective: "Prove the native Kernel"))
             let eve = try kernel.dispatch(.createTile(workflowID: workflow.subjectID, displayName: "Eve", kind: .worker, x: 20, y: 40))
-            _ = try kernel.dispatch(.createWorker(tileID: eve.subjectID, role: "agent", harness: "agentos", model: "eve"))
+            let worker = try kernel.dispatch(.createWorker(tileID: eve.subjectID, role: "agent", harness: "agentos", model: "eve"))
+            _ = try kernel.dispatch(.bindWorkerRuntime(workerID: worker.subjectID, actorID: "actor-proof", sessionID: "session-proof", promptable: false))
+            let attached = try kernel.snapshot(workflowID: workflow.subjectID).workers.first { $0.id == worker.subjectID }
+            guard attached?.runtimeActorID == "actor-proof", attached?.runtimeSessionID == "session-proof" else { throw KernelError.database("runtime binding was not queryable") }
             let projection = try CanvasProjection(kernel: kernel, workflowID: workflow.subjectID)
             projection.activate()
             projection.move(try kernel.snapshot(workflowID: workflow.subjectID).tiles[0], to: CGPoint(x: 360, y: 240))
@@ -34,8 +37,8 @@ struct KernelProofMain {
             try require(snapshot.tasks.first?.status == .complete, "task did not reach complete through verification")
             try require(snapshot.receipts.count == 7, "receipt chain is incomplete")
             try require(snapshot.connections.count == 1, "typed connection was not stored")
-            try require((try kernel.events(workflowID: workflow.subjectID)).count == 12, "event chain is incomplete")
-            print("M2 CANVAS PROOF PASSED · SQLite commands, event-driven projection refresh, receipts, and task gates are live.")
+            try require((try kernel.events(workflowID: workflow.subjectID)).count == 13, "event chain is incomplete")
+            print("M4 KERNEL PROOF PASSED · SQLite commands, runtime binding, projection refresh, receipts, and task gates are live.")
         } catch {
             fputs("M1 KERNEL PROOF FAILED: \(error.localizedDescription)\n", stderr)
             exit(1)

@@ -142,6 +142,15 @@ class AgentOSRuntime {
     });
     return { actorID, sessionID };
   }
+
+  async promptEveActorSession({ workspaceID, tileID, sessionID, text }) {
+    if (this.state !== "ready") throw new Error(this.error ?? "AgentOS runtime is not ready");
+    if (!credentialConfigured()) throw new Error("OPENCODE_GO_API_KEY is required before Eve can accept a prompt");
+    const handle = await this.client.agentos.getOrCreate([workspaceID, tileID]);
+    const result = await handle.sendPrompt(sessionID, text);
+    const textResult = typeof result?.text === "string" ? result.text : JSON.stringify(result);
+    return { text: textResult, result };
+  }
 }
 
 async function waitForEnvoy(enginePort, timeoutMs = 90_000) {
@@ -200,6 +209,18 @@ export function makeServer(runtime) {
         if (!workspaceID || !tileID) return sendJSON(response, 400, { error: "workspaceID and tileID are required" });
         const session = await runtime.agentos.createEveActorSession({ workspaceID, tileID });
         return sendJSON(response, 201, { ...session, workspaceID, tileID, promptable: credentialConfigured() });
+      }
+      const promptMatch = url.pathname.match(/^\/v1\/agentos\/eve-session\/([^/]+)\/prompt$/);
+      if (request.method === "POST" && promptMatch) {
+        if (!credentialConfigured()) return sendJSON(response, 409, { error: "OPENCODE_GO_API_KEY is required before Eve can accept a prompt" });
+        const body = await readJSON(request);
+        const workspaceID = String(body.workspaceID ?? "").trim();
+        const tileID = String(body.tileID ?? "").trim();
+        const text = String(body.text ?? "").trim();
+        if (!workspaceID || !tileID || !text) return sendJSON(response, 400, { error: "workspaceID, tileID, and text are required" });
+        const sessionID = decodeURIComponent(promptMatch[1]);
+        const responseBody = await runtime.agentos.promptEveActorSession({ workspaceID, tileID, sessionID, text });
+        return sendJSON(response, 200, { ok: true, ...responseBody });
       }
       return sendJSON(response, 404, { error: "not found" });
     } catch (error) {

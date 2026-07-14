@@ -27,6 +27,8 @@ public actor RuntimeClient {
         public let promptable: Bool
     }
 
+    public struct EvePrompt: Codable, Equatable, Sendable { public let ok: Bool; public let text: String }
+
     private let baseURL: URL
     private let session: URLSession
 
@@ -49,6 +51,10 @@ public actor RuntimeClient {
         try await request(path: "/v1/agentos/eve-session", method: "POST", body: ActorRequest(workspaceID: workflowID, tileID: tileID))
     }
 
+    public func promptEve(workflowID: String, tileID: String, sessionID: String, text: String) async throws -> EvePrompt {
+        try await request(path: "/v1/agentos/eve-session/\(sessionID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? sessionID)/prompt", method: "POST", body: PromptRequest(workspaceID: workflowID, tileID: tileID, text: text))
+    }
+
     private func request<Response: Decodable, Body: Encodable>(path: String, method: String, body: Body?) async throws -> Response {
         var request = URLRequest(url: baseURL.appending(path: path))
         request.httpMethod = method
@@ -68,6 +74,7 @@ public actor RuntimeClient {
 
     private struct ProbeRequest: Encodable { let message: String }
     private struct ActorRequest: Encodable { let workspaceID: String; let tileID: String }
+    private struct PromptRequest: Encodable { let workspaceID: String; let tileID: String; let text: String }
     private struct RuntimeFailure: Decodable { let error: String }
 }
 
