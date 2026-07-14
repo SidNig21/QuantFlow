@@ -11,6 +11,7 @@ Screenshots/
 .worktrees
 quantflow-electron/logs/
 /.build/
+.swiftpm/
 DerivedData/
 *.xcuserstate
 *.xcworkspace/xcuserdata/

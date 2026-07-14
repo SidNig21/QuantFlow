@@ -8,9 +8,11 @@
 import http from "node:http";
 import { access } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { agentOS, defineSoftware, setup } from "@rivet-dev/agentos";
 import { createClient } from "@rivet-dev/agentos/client";
+import pty from "node-pty";
 
 const moduleDirectory = fileURLToPath(new URL(".", import.meta.url));
 
@@ -98,7 +100,16 @@ class EveServer {
 }
 
 class AgentOSRuntime {
-  constructor(config) { this.config = config; this.state = "stopped"; this.error = null; this.registry = null; this.client = null; this.tilePromptRails = new Map(); }
+  constructor(config) {
+    this.config = config;
+    this.state = "stopped";
+    this.error = null;
+    this.registry = null;
+    this.client = null;
+    this.tilePromptRails = new Map();
+    this.actorConnections = new Map();
+    this.terminalShells = new Map();
+  }
 
   async start() {
     if (this.state === "ready") return;
@@ -107,9 +118,8 @@ class AgentOSRuntime {
       await access(this.config.evePackagePath);
       const eveSoftware = defineSoftware({ packagePath: this.config.evePackagePath });
       const actor = agentOS({
-        // Eve's ACP adapter is the sole software in this actor. Disabling the
-        // default shell bundle avoids resolving unrelated packaged command
-        // software at attach time; M3 has no terminal rail.
+        // Eve is the sole AgentOS agent adapter. Terminal rendering is a
+        // native macOS PTY that sends turns back through this Eve session.
         defaultSoftware: false,
         software: [eveSoftware],
         loopbackExemptPorts: [this.config.evePort],
@@ -133,8 +143,7 @@ class AgentOSRuntime {
 
   async createEveActorSession({ workspaceID, tileID }) {
     if (this.state !== "ready") throw new Error(this.error ?? "AgentOS runtime is not ready");
-    const handle = await this.client.agentos.getOrCreate([workspaceID, tileID]);
-    const actorID = await handle.resolve();
+    const { handle, actorID } = await this.actorFor({ workspaceID, tileID });
     const opencodeKey = String(process.env.OPENCODE_GO_API_KEY ?? process.env.OPENCODE_API_KEY ?? process.env.OPENCODE_ZEN_API_KEY ?? "").trim();
     const sessionID = await handle.createSession("eve", {
       env: { EVE_BASE_URL: this.config.eveBaseURL, ...(opencodeKey ? { OPENCODE_GO_API_KEY: opencodeKey } : {}) },
@@ -147,7 +156,7 @@ class AgentOSRuntime {
     if (this.state !== "ready") throw new Error(this.error ?? "AgentOS runtime is not ready");
     if (!credentialConfigured()) throw new Error("OPENCODE_GO_API_KEY is required before Eve can accept a prompt");
     return this.enqueueTilePrompt(tileID, async () => {
-      const handle = await this.client.agentos.getOrCreate([workspaceID, tileID]);
+      const { handle } = await this.actorFor({ workspaceID, tileID });
       const result = await handle.sendPrompt(sessionID, text);
       const textResult = typeof result?.text === "string" ? result.text : JSON.stringify(result);
       return { text: textResult, result };
@@ -163,6 +172,117 @@ class AgentOSRuntime {
     return queued;
   }
 
+  actorKey({ workspaceID, tileID }) { return JSON.stringify([workspaceID, tileID]); }
+
+  async actorFor({ workspaceID, tileID }) {
+    const key = this.actorKey({ workspaceID, tileID });
+    const handle = await this.client.agentos.getOrCreate([workspaceID, tileID]);
+    const actorID = await handle.resolve();
+    let pending = this.actorConnections.get(key);
+    if (!pending) {
+      pending = (async () => {
+        const connection = handle.connect();
+        const unsubs = [];
+        unsubs.push(connection.on("shellData", (payload) => {
+          const shellID = String(payload?.shellId ?? "");
+          const terminal = this.terminalShells.get(shellID);
+          if (!terminal || payload?.data == null) return;
+          terminal.append(Buffer.from(payload.data).toString("utf8"));
+        }));
+        try {
+          await connection.ready;
+          return { handle, actorID, connection, unsubs };
+        } catch (error) {
+          for (const unsubscribe of unsubs) unsubscribe?.();
+          await connection.dispose().catch(() => {});
+          throw error;
+        }
+      })();
+      this.actorConnections.set(key, pending);
+      pending.catch(() => { if (this.actorConnections.get(key) === pending) this.actorConnections.delete(key); });
+    }
+    return pending;
+  }
+
+  terminalFor({ workspaceID, tileID, sessionID, shellID }) {
+    const terminal = this.terminalShells.get(shellID);
+    if (!terminal || terminal.workspaceID !== workspaceID || terminal.tileID !== tileID || terminal.sessionID !== sessionID) {
+      throw new Error("terminal is not bound to this Eve tile session");
+    }
+    return terminal;
+  }
+
+  async openTerminal({ workspaceID, tileID, sessionID, cols = 80, rows = 24 }) {
+    const { handle } = await this.actorFor({ workspaceID, tileID });
+    const sessions = await handle.listPersistedSessions();
+    if (!sessions.some((entry) => entry.sessionId === sessionID)) {
+      throw new Error("Eve terminal requires a session bound to this tile's AgentOS actor");
+    }
+    const shellID = `pty-${randomUUID()}`;
+    const terminal = {
+      workspaceID,
+      tileID,
+      sessionID,
+      shellID,
+      buffer: "",
+      start: 0,
+      closed: false,
+      append(data) {
+        this.buffer += data;
+        const maximum = 128 * 1024;
+        if (this.buffer.length > maximum) {
+          const drop = this.buffer.length - maximum;
+          this.buffer = this.buffer.slice(drop);
+          this.start += drop;
+        }
+      },
+    };
+    const bridge = fileURLToPath(new URL("./eve-terminal-bridge.mjs", import.meta.url));
+    const terminalProcess = pty.spawn(process.execPath, [bridge], {
+      name: "xterm-256color",
+      cols: terminalDimension(cols, 80),
+      rows: terminalDimension(rows, 24),
+      cwd: this.config.eveRoot,
+      env: {
+        ...process.env,
+        TERM: "xterm-256color",
+        QUANTFLOW_RUNTIME_URL: `http://${this.config.bind}:${this.config.port}`,
+        QUANTFLOW_TERMINAL_WORKSPACE_ID: workspaceID,
+        QUANTFLOW_TERMINAL_TILE_ID: tileID,
+        QUANTFLOW_TERMINAL_SESSION_ID: sessionID,
+      },
+    });
+    terminal.pty = terminalProcess;
+    terminalProcess.onData((data) => terminal.append(data));
+    terminalProcess.onExit(() => { terminal.closed = true; });
+    this.terminalShells.set(shellID, terminal);
+    return { shellID, cursor: terminal.start };
+  }
+
+  readTerminal({ workspaceID, tileID, sessionID, shellID, cursor = 0 }) {
+    const terminal = this.terminalFor({ workspaceID, tileID, sessionID, shellID });
+    const requested = Number.isInteger(cursor) ? cursor : terminal.start;
+    const effectiveCursor = Math.max(terminal.start, Math.min(requested, terminal.start + terminal.buffer.length));
+    return {
+      shellID,
+      start: terminal.start,
+      cursor: terminal.start + terminal.buffer.length,
+      data: terminal.buffer.slice(effectiveCursor - terminal.start),
+      reset: requested < terminal.start,
+      closed: terminal.closed,
+    };
+  }
+
+  async writeTerminal({ workspaceID, tileID, sessionID, shellID, data }) {
+    const terminal = this.terminalFor({ workspaceID, tileID, sessionID, shellID });
+    terminal.pty.write(data);
+  }
+
+  async resizeTerminal({ workspaceID, tileID, sessionID, shellID, cols, rows }) {
+    const terminal = this.terminalFor({ workspaceID, tileID, sessionID, shellID });
+    terminal.pty.resize(terminalDimension(cols, 80), terminalDimension(rows, 24));
+  }
+
   async exchangeEveCable({ from, to, text }) {
     if (!from || !to || from.tileID === to.tileID || from.sessionID === to.sessionID) {
       throw new Error("cable endpoints must be two distinct Eve tile sessions");
@@ -175,6 +295,11 @@ class AgentOSRuntime {
     const reply = await this.promptEveActorSession({ ...to, text: relayText });
     return { fromTileID: from.tileID, toTileID: to.tileID, text: reply.text };
   }
+}
+
+function terminalDimension(value, fallback) {
+  const number = Number.parseInt(String(value), 10);
+  return Number.isInteger(number) && number > 0 ? number : fallback;
 }
 
 function cableEndpoint(value) {
@@ -244,6 +369,40 @@ export function makeServer(runtime) {
         return sendJSON(response, 201, { ...session, workspaceID, tileID, promptable: credentialConfigured() });
       }
       const promptMatch = url.pathname.match(/^\/v1\/agentos\/eve-session\/([^/]+)\/prompt$/);
+      const terminalMatch = url.pathname.match(/^\/v1\/agentos\/eve-session\/([^/]+)\/terminal$/);
+      const terminalActionMatch = url.pathname.match(/^\/v1\/agentos\/eve-session\/([^/]+)\/terminal\/([^/]+)\/(read|write|resize)$/);
+      if (terminalActionMatch) {
+        const sessionID = decodeURIComponent(terminalActionMatch[1]);
+        const shellID = decodeURIComponent(terminalActionMatch[2]);
+        const action = terminalActionMatch[3];
+        const body = request.method === "GET" ? Object.fromEntries(url.searchParams) : await readJSON(request);
+        const workspaceID = String(body.workspaceID ?? "").trim();
+        const tileID = String(body.tileID ?? "").trim();
+        if (!workspaceID || !tileID) return sendJSON(response, 400, { error: "workspaceID and tileID are required" });
+        if (action === "read" && request.method === "GET") {
+          const cursor = Number.parseInt(String(body.cursor ?? "0"), 10);
+          return sendJSON(response, 200, runtime.agentos.readTerminal({ workspaceID, tileID, sessionID, shellID, cursor }));
+        }
+        if (action === "write" && request.method === "POST") {
+          const data = String(body.data ?? "");
+          if (!data) return sendJSON(response, 400, { error: "terminal data is required" });
+          await runtime.agentos.writeTerminal({ workspaceID, tileID, sessionID, shellID, data });
+          return sendJSON(response, 200, { ok: true });
+        }
+        if (action === "resize" && request.method === "POST") {
+          await runtime.agentos.resizeTerminal({ workspaceID, tileID, sessionID, shellID, cols: body.cols, rows: body.rows });
+          return sendJSON(response, 200, { ok: true });
+        }
+      }
+      if (terminalMatch && request.method === "POST") {
+        const sessionID = decodeURIComponent(terminalMatch[1]);
+        const body = await readJSON(request);
+        const workspaceID = String(body.workspaceID ?? "").trim();
+        const tileID = String(body.tileID ?? "").trim();
+        if (!workspaceID || !tileID) return sendJSON(response, 400, { error: "workspaceID and tileID are required" });
+        const terminal = await runtime.agentos.openTerminal({ workspaceID, tileID, sessionID, cols: body.cols, rows: body.rows });
+        return sendJSON(response, 201, terminal);
+      }
       if (request.method === "POST" && promptMatch) {
         if (!credentialConfigured()) return sendJSON(response, 409, { error: "OPENCODE_GO_API_KEY is required before Eve can accept a prompt" });
         const body = await readJSON(request);

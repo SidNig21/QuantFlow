@@ -38,15 +38,19 @@ M3 is complete: it adds a clean localhost-only native runtime boundary in
 separates a live Eve/AgentOS runtime from a genuinely promptable one, which
 also requires an OpenCode credential; the [M3 proof](docs/proofs/2026-07-13-m3-native-runtime.md)
 records a 52.1 ms warm session acceptance and successful AgentOS actor
-attachment. M4 now provides the native Eve-only dock, Kernel runtime binding,
-and a Swift session sheet. Its [live-model acceptance](docs/proofs/2026-07-13-m4-eve-dock.md)
-passed with a 834.5 ms warm attach and a real Eve reply.
+attachment. M4 provides the native Eve-only dock and Kernel runtime binding.
+Its [live-model acceptance](docs/proofs/2026-07-13-m4-eve-dock.md) passed with
+a 834.5 ms warm attach and a real Eve reply.
 M5 adds [session-scoped two-Eve cables](docs/proofs/2026-07-13-m5-session-cables.md)
 without ports or a second runtime store.
 M6 adds a [read-only Conductor and Inspector](docs/proofs/2026-07-13-m6-conductor-inspector.md)
 that observe the same Kernel projection as the canvas.
 M7 adds the [Swift Harness fence](docs/proofs/2026-07-13-m7-harness-boundary.md),
 which adapts Eve/AgentOS without receiving Kernel mutation authority.
+M9 replaces the former session-sheet experiment with the intended Mode-1
+[terminal tile](docs/proofs/2026-07-13-m9-native-terminal-tile.md): Dock →
+Kernel tile → AgentOS Eve session → native macOS PTY, with raw bytes retained
+only by that visible tile.
 
 ## Development
 

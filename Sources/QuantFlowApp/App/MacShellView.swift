@@ -68,7 +68,7 @@ final class AppSession {
             return
         }
         isSpawningEve = true
-        runtimeNotice = "Creating Eve tile…"
+        runtimeNotice = "Summoning Eve terminal…"
         do {
             let position = CGPoint(x: 350 + Double(projection.snapshot.tiles.count * 40), y: 520)
             let tile = try kernel.dispatch(.createTile(workflowID: projection.workflowID, displayName: "Eve", kind: .worker, x: position.x, y: position.y))
@@ -78,10 +78,10 @@ final class AppSession {
                     let attached = try await harness.attach(workflowID: projection.workflowID, tileID: tile.subjectID)
                     _ = try kernel.dispatch(.bindWorkerRuntime(workerID: worker.subjectID, actorID: attached.actorID, sessionID: attached.sessionID, promptable: attached.promptable))
                     runtimeNotice = attached.promptable
-                        ? "Eve is attached and promptable."
+                        ? "Eve terminal is attached and promptable."
                         : "Eve is attached. Set OPENCODE_GO_API_KEY, then restart the local runtime to prompt it."
                 } catch {
-                    runtimeNotice = "Eve tile exists, but runtime attachment failed: \(error.localizedDescription)"
+                    runtimeNotice = "Eve terminal exists, but runtime attachment failed: \(error.localizedDescription)"
                 }
                 isSpawningEve = false
             }
@@ -108,13 +108,31 @@ final class AppSession {
         }
     }
 
-    func latestEveWorker() -> WorkerInstance? {
-        projection.snapshot.workers.last { $0.model == "eve" && $0.runtimeSessionID != nil }
+    func openTerminal(for worker: WorkerInstance, columns: Int = 80, rows: Int = 24) async throws -> HarnessTerminal {
+        guard let sessionID = worker.runtimeSessionID else { throw RuntimeError.rejected("This Eve tile is still attaching its runtime session.") }
+        return try await harness.openTerminal(
+            endpoint: .init(workflowID: worker.workflowID, tileID: worker.tileID, sessionID: sessionID),
+            columns: columns,
+            rows: rows
+        )
     }
 
-    func promptEve(_ worker: WorkerInstance, text: String) async throws -> String {
+    func readTerminal(for worker: WorkerInstance, terminal: HarnessTerminal, cursor: Int) async throws -> HarnessTerminalRead {
         guard let sessionID = worker.runtimeSessionID else { throw RuntimeError.rejected("This Eve tile has no runtime session.") }
-        return try await harness.prompt(endpoint: .init(workflowID: worker.workflowID, tileID: worker.tileID, sessionID: sessionID), text: text)
+        return try await harness.readTerminal(
+            endpoint: .init(workflowID: worker.workflowID, tileID: worker.tileID, sessionID: sessionID),
+            terminal: terminal,
+            cursor: cursor
+        )
+    }
+
+    func writeTerminal(for worker: WorkerInstance, terminal: HarnessTerminal, data: String) async throws {
+        guard let sessionID = worker.runtimeSessionID else { throw RuntimeError.rejected("This Eve tile has no runtime session.") }
+        try await harness.writeTerminal(
+            endpoint: .init(workflowID: worker.workflowID, tileID: worker.tileID, sessionID: sessionID),
+            terminal: terminal,
+            data: data
+        )
     }
 
     /// A Canvas connection is the operator's explicit permission for a peer
@@ -145,14 +163,13 @@ final class AppSession {
 
 struct MacShellView: View {
     @Bindable var session: AppSession
-    @State private var showingEveSession = false
 
     var body: some View {
         NavigationSplitView {
             DockCatalogueSidebar(session: session)
         } detail: {
             HStack(spacing: 0) {
-                WorkflowCanvas(projection: session.projection)
+                WorkflowCanvas(session: session)
                 Divider()
                 ConductorInspectorView(conductor: session.conductor)
             }
@@ -164,14 +181,7 @@ struct MacShellView: View {
                 }
                 .disabled(!session.canSpawnEve)
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button { showingEveSession = true } label: {
-                    Label("Eve Session", systemImage: "text.bubble")
-                }
-                .disabled(session.latestEveWorker() == nil)
-            }
         }
-        .sheet(isPresented: $showingEveSession) { EveSessionPanel(session: session) }
         .task { await session.startRuntime() }
         .preferredColorScheme(.dark)
     }
@@ -275,54 +285,5 @@ private struct DockCatalogueSidebar: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(8)
         .background(QuantFlowTheme.canvas.opacity(0.45), in: RoundedRectangle(cornerRadius: 6))
-    }
-}
-
-private struct EveSessionPanel: View {
-    @Bindable var session: AppSession
-    @Environment(\.dismiss) private var dismiss
-    @State private var prompt = ""
-    @State private var transcript: [String] = []
-    @State private var isSending = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Eve session").font(.title3.weight(.semibold))
-                    Text("Display-only runtime transcript; Kernel owns workflow truth.").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("Done") { dismiss() }
-            }
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                    if transcript.isEmpty { Text("Ready for a prompt.").foregroundStyle(.secondary) }
-                    ForEach(Array(transcript.enumerated()), id: \.offset) { _, entry in
-                        Text(entry).textSelection(.enabled).padding(9).frame(maxWidth: .infinity, alignment: .leading).background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-            }
-            HStack(alignment: .bottom) {
-                TextField("Message Eve", text: $prompt, axis: .vertical).textFieldStyle(.roundedBorder).lineLimit(1...4)
-                Button("Send") { send() }.disabled(isSending || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding(20)
-        .frame(minWidth: 540, minHeight: 380)
-        .background(QuantFlowTheme.canvas)
-        .preferredColorScheme(.dark)
-    }
-
-    private func send() {
-        guard let worker = session.latestEveWorker() else { return }
-        let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        prompt = ""; isSending = true; transcript.append("Operator\n\(text)")
-        Swift.Task {
-            do { transcript.append("Eve\n\(try await session.promptEve(worker, text: text))") }
-            catch { transcript.append("Runtime error\n\(error.localizedDescription)") }
-            isSending = false
-        }
     }
 }
