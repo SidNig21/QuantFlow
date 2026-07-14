@@ -101,7 +101,7 @@ final class AppSession {
             runtimeNotice = promptable ? "Native runtime started and is promptable." : "Native runtime started; add OPENCODE_GO_API_KEY to make Eve promptable."
         case .configurationRequired:
             runtimePromptable = false
-            runtimeNotice = "Set QUANTFLOW_RUNTIME_ROOT to tools/agentos-host-mac, or start the local runtime separately."
+            runtimeNotice = "Start tools/agentos-host-mac with OPENCODE_GO_API_KEY, then refresh this Dock."
         case let .unavailable(message):
             runtimePromptable = false
             runtimeNotice = "Native runtime unavailable: \(message)"

@@ -20,6 +20,10 @@ public actor RuntimeSupervisor {
         if let health = try? await client.health(), health.ok {
             return .alreadyRunning(promptable: health.promptable)
         }
+        // Do not create a credentialless standby process on behalf of the
+        // operator. A manually launched sidecar may carry its credential in a
+        // separate Terminal environment; this app can attach to it on refresh.
+        guard Self.hasOpenCodeCredential else { return .configurationRequired }
         guard let root = ProcessInfo.processInfo.environment["QUANTFLOW_RUNTIME_ROOT"], !root.isEmpty else {
             return .configurationRequired
         }
@@ -52,5 +56,11 @@ public actor RuntimeSupervisor {
         guard let process else { return }
         if process.isRunning { process.terminate() }
         self.process = nil
+    }
+
+    private static var hasOpenCodeCredential: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return ["OPENCODE_GO_API_KEY", "OPENCODE_API_KEY", "OPENCODE_ZEN_API_KEY"]
+            .contains { !(environment[$0] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }
