@@ -2,6 +2,7 @@ import Foundation
 import Darwin
 import QuantFlowCore
 import QuantFlowCanvas
+import QuantFlowConductor
 
 @main
 struct KernelProofMain {
@@ -18,7 +19,9 @@ struct KernelProofMain {
             let attached = try kernel.snapshot(workflowID: workflow.subjectID).workers.first { $0.id == worker.subjectID }
             guard attached?.runtimeActorID == "actor-proof", attached?.runtimeSessionID == "session-proof" else { throw KernelError.database("runtime binding was not queryable") }
             let projection = try CanvasProjection(kernel: kernel, workflowID: workflow.subjectID)
+            let conductor = try ConductorProjection(kernel: kernel, workflowID: workflow.subjectID)
             projection.activate()
+            conductor.activate()
             projection.move(try kernel.snapshot(workflowID: workflow.subjectID).tiles[0], to: CGPoint(x: 360, y: 240))
             let task = try kernel.dispatch(.createTask(workflowID: workflow.subjectID, title: "Verify the Kernel", objective: "Pass every task gate"))
             for status in [TaskStatus.claimed, .working, .submitted, .verifying] {
@@ -41,7 +44,8 @@ struct KernelProofMain {
             try require(snapshot.receipts.count == 7, "receipt chain is incomplete")
             try require(snapshot.connections.first?.semantic == .contextFlow, "session-scoped cable connection was not stored")
             try require((try kernel.events(workflowID: workflow.subjectID)).count == 16, "event chain is incomplete")
-            print("M5 KERNEL PROOF PASSED · SQLite commands, runtime bindings, typed cable, projection refresh, receipts, and task gates are live.")
+            try require(conductor.snapshot.tasks.first?.status == .complete, "read-only Conductor did not observe Kernel truth")
+            print("M6 KERNEL PROOF PASSED · SQLite commands, runtime bindings, typed cable, projections, receipts, and task gates are live.")
         } catch {
             fputs("M1 KERNEL PROOF FAILED: \(error.localizedDescription)\n", stderr)
             exit(1)

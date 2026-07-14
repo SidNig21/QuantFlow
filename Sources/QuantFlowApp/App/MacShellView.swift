@@ -3,12 +3,14 @@ import SwiftUI
 import QuantFlowCore
 import QuantFlowCanvas
 import QuantFlowRuntime
+import QuantFlowConductor
 
 @MainActor
 @Observable
 final class AppSession {
     let kernel: KernelStore
     let projection: CanvasProjection
+    let conductor: ConductorProjection
     private let runtime = RuntimeClient()
     private let runtimeSupervisor = RuntimeSupervisor()
     var runtimeNotice: String?
@@ -34,7 +36,9 @@ final class AppSession {
             }
             self.kernel = kernel
             self.projection = try CanvasProjection(kernel: kernel, workflowID: workflowID)
+            self.conductor = try ConductorProjection(kernel: kernel, workflowID: workflowID)
             projection.activate()
+            conductor.activate()
         } catch {
             fatalError("QuantFlow could not open its Kernel: \(error.localizedDescription)")
         }
@@ -166,7 +170,11 @@ struct MacShellView: View {
             .listStyle(.sidebar)
             .navigationTitle("QuantFlow")
         } detail: {
-            WorkflowCanvas(projection: session.projection)
+            HStack(spacing: 0) {
+                WorkflowCanvas(projection: session.projection)
+                Divider()
+                ConductorInspectorView(conductor: session.conductor)
+            }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

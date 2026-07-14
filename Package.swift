@@ -9,7 +9,8 @@ let package = Package(
         .executable(name: "QuantFlowKernelProof", targets: ["QuantFlowKernelProof"]),
         .executable(name: "QuantFlowRuntimeProof", targets: ["QuantFlowRuntimeProof"]),
         .library(name: "QuantFlowCore", targets: ["QuantFlowCore"]),
-        .library(name: "QuantFlowRuntime", targets: ["QuantFlowRuntime"])
+        .library(name: "QuantFlowRuntime", targets: ["QuantFlowRuntime"]),
+        .library(name: "QuantFlowConductor", targets: ["QuantFlowConductor"])
     ],
     targets: [
         .systemLibrary(name: "CSQLite", path: "Sources/CSQLite"),
@@ -26,14 +27,15 @@ let package = Package(
             exclude: ["AGENTS.md"]
         ),
         .target(name: "QuantFlowRuntime", path: "Sources/QuantFlowRuntime", exclude: ["AGENTS.md"]),
+        .target(name: "QuantFlowConductor", dependencies: ["QuantFlowCore"], path: "Sources/QuantFlowConductor", exclude: ["AGENTS.md"]),
         .executableTarget(
             name: "QuantFlowApp",
-            dependencies: ["QuantFlowCore", "QuantFlowCanvas", "QuantFlowRuntime"],
+            dependencies: ["QuantFlowCore", "QuantFlowCanvas", "QuantFlowRuntime", "QuantFlowConductor"],
             path: "Sources/QuantFlowApp"
         ),
         .executableTarget(
             name: "QuantFlowKernelProof",
-            dependencies: ["QuantFlowCore", "QuantFlowCanvas"],
+            dependencies: ["QuantFlowCore", "QuantFlowCanvas", "QuantFlowConductor"],
             path: "Sources/QuantFlowKernelProof"
         ),
         .executableTarget(

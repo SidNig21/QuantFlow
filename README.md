@@ -43,6 +43,8 @@ and a Swift session sheet. Its [live-model acceptance](docs/proofs/2026-07-13-m4
 passed with a 834.5 ms warm attach and a real Eve reply.
 M5 adds [session-scoped two-Eve cables](docs/proofs/2026-07-13-m5-session-cables.md)
 without ports or a second runtime store.
+M6 adds a [read-only Conductor and Inspector](docs/proofs/2026-07-13-m6-conductor-inspector.md)
+that observe the same Kernel projection as the canvas.
 
 ## Development
 
