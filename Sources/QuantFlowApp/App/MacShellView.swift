@@ -149,36 +149,7 @@ struct MacShellView: View {
 
     var body: some View {
         NavigationSplitView {
-            List {
-                Section("QUANTFLOW") {
-                    HStack(spacing: 8) {
-                        Image(systemName: "point.3.connected.trianglepath.dotted").foregroundStyle(QuantFlowTheme.lime)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("QUANTFLOW").font(.caption.weight(.bold)).tracking(1.8)
-                            Text("OPERATOR CONSOLE").font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                Section("KERNEL") {
-                    Label("SQLite truth", systemImage: "cylinder.split.1x2")
-                    Label("\(session.projection.snapshot.tiles.count) tiles", systemImage: "square.grid.2x2")
-                    Label("\(session.projection.snapshot.receipts.count) receipts", systemImage: "checkmark.seal")
-                }
-                Section("DOCK") {
-                    Button(action: session.spawnEve) {
-                        Label("Eve", systemImage: "sparkles")
-                    }
-                    .disabled(!session.canSpawnEve)
-                }
-                if let notice = session.runtimeNotice {
-                    Section("RUNTIME") { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                }
-            }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .background(QuantFlowTheme.panel)
-            .foregroundStyle(.primary)
-            .navigationTitle("QuantFlow")
+            DockCatalogueSidebar(session: session)
         } detail: {
             HStack(spacing: 0) {
                 WorkflowCanvas(projection: session.projection)
@@ -203,6 +174,107 @@ struct MacShellView: View {
         .sheet(isPresented: $showingEveSession) { EveSessionPanel(session: session) }
         .task { await session.startRuntime() }
         .preferredColorScheme(.dark)
+    }
+}
+
+private struct DockCatalogueSidebar: View {
+    @Bindable var session: AppSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4).fill(QuantFlowTheme.lime.opacity(0.16))
+                    Image(systemName: "point.3.connected.trianglepath.dotted").font(.caption).foregroundStyle(QuantFlowTheme.lime)
+                }
+                .frame(width: 24, height: 24)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("QUANTFLOW").font(.caption.weight(.bold)).tracking(1.8)
+                    Text("LOCAL OPERATOR BUILD").font(.system(size: 8, weight: .medium)).tracking(0.8).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("V8").font(.caption2.monospaced()).foregroundStyle(QuantFlowTheme.cyan)
+            }
+            .padding(14)
+
+            Divider().overlay(QuantFlowTheme.line)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    sidebarHeading("DOCK CATALOGUE", detail: "01 PROMOTED SPECIES")
+                    Button(action: session.spawnEve) {
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle().fill(QuantFlowTheme.lime.opacity(0.14))
+                                Image(systemName: "sparkles").foregroundStyle(QuantFlowTheme.lime)
+                            }
+                            .frame(width: 32, height: 32)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Eve").font(.subheadline.weight(.semibold))
+                                Text(session.canSpawnEve ? "AGENTOS · READY" : "AGENTOS · STANDBY")
+                                    .font(.system(size: 8, weight: .bold)).tracking(0.8)
+                                    .foregroundStyle(session.canSpawnEve ? QuantFlowTheme.lime : .secondary)
+                            }
+                            Spacer()
+                            Circle().fill(session.canSpawnEve ? QuantFlowTheme.lime : Color.secondary.opacity(0.5)).frame(width: 5, height: 5)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(QuantFlowTheme.panelRaised, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay { RoundedRectangle(cornerRadius: 8).stroke(QuantFlowTheme.line, lineWidth: 1) }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!session.canSpawnEve)
+
+                    sidebarHeading("TEMPLATES", detail: "FUTURE WORKFLOW RECIPES")
+                    VStack(alignment: .leading, spacing: 7) {
+                        Label("No saved templates yet", systemImage: "rectangle.stack.badge.plus")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("Field-tested workflows will appear here after they earn a place in the catalogue.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary.opacity(0.8))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(10)
+                    .background(QuantFlowTheme.canvas.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+
+                    sidebarHeading("KERNEL", detail: "LIVE TRUTH")
+                    HStack(spacing: 8) {
+                        kernelMetric("TILES", "\(session.projection.snapshot.tiles.count)")
+                        kernelMetric("RECEIPTS", "\(session.projection.snapshot.receipts.count)")
+                    }
+                }
+                .padding(14)
+            }
+
+            Spacer(minLength: 0)
+            Divider().overlay(QuantFlowTheme.line)
+            HStack(alignment: .top, spacing: 7) {
+                Circle().fill(session.runtimePromptable ? QuantFlowTheme.lime : Color.orange).frame(width: 5, height: 5).padding(.top, 4)
+                Text(session.runtimeNotice ?? "Starting native runtime…").font(.caption2).foregroundStyle(.secondary).lineLimit(3)
+            }
+            .padding(12)
+        }
+        .frame(minWidth: 236, idealWidth: 252, maxWidth: 280, maxHeight: .infinity, alignment: .topLeading)
+        .background(QuantFlowTheme.panel)
+    }
+
+    private func sidebarHeading(_ title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.system(size: 9, weight: .bold)).tracking(1.3).foregroundStyle(QuantFlowTheme.cyan)
+            Text(detail).font(.system(size: 8, weight: .medium)).tracking(0.7).foregroundStyle(.secondary)
+        }
+    }
+
+    private func kernelMetric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).font(.system(size: 16, weight: .medium, design: .monospaced)).foregroundStyle(.primary)
+            Text(label).font(.system(size: 8, weight: .bold)).tracking(0.7).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(QuantFlowTheme.canvas.opacity(0.45), in: RoundedRectangle(cornerRadius: 6))
     }
 }
 
