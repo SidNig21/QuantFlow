@@ -28,8 +28,9 @@ Swift Kernel (SQLite) → SwiftUI Canvas → Conductor / Inspector
 ## Status
 
 The active build ladder is [the Mac-native rebuild plan](docs/plans/2026-07-13-002-arch-quantflow-mac-native-rebuild-plan.md).
-M0 provides the native app shell and archived Windows execution material; M1
-adds the SQLite Kernel.
+M0 provides the native app shell and archived Windows execution material. M1 is
+complete: `QuantFlowCore` provides one SQLite Kernel with command audit rows,
+query snapshots, append-only receipts/events, and the enforced task gate.
 
 ## Development
 
@@ -37,7 +38,7 @@ Open `Package.swift` in Xcode 16+ and run the `QuantFlow` executable, or use:
 
 ```bash
 swift run QuantFlow
-swift test
+swift run QuantFlowKernelProof
 ```
 
 The full read order is in [START_HERE_MAC.md](START_HERE_MAC.md).

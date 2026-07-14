@@ -35,12 +35,12 @@ Kernel owns truth → Canvas projects → Conductor plans → Harness adapts →
 ## Active structure
 
 ```text
+Sources/QuantFlowCore/
+  KernelModels.swift, KernelStore.swift, SQLiteDatabase.swift
 Sources/QuantFlowApp/
-  Kernel/       Swift SQLite truth, commands, queries, events
-  Canvas/       SwiftUI canvas projection
-  Conductor/    read-only planning projections
-  Harness/      runtime adapter contracts
-  App/          SwiftUI application composition
+  App/          SwiftUI application composition and future Canvas projection
+Sources/QuantFlowKernelProof/
+  standalone M1 command/query acceptance proof
 tools/agentos-host-mac/
   native macOS Node runtime sidecar (M3)
 ```
