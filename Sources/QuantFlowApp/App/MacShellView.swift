@@ -163,6 +163,7 @@ final class AppSession {
 
 struct MacShellView: View {
     @Bindable var session: AppSession
+    @State private var showingConductor = false
 
     var body: some View {
         NavigationSplitView {
@@ -170,8 +171,10 @@ struct MacShellView: View {
         } detail: {
             HStack(spacing: 0) {
                 WorkflowCanvas(session: session)
-                Divider()
-                ConductorInspectorView(conductor: session.conductor)
+                if showingConductor {
+                    Divider()
+                    ConductorInspectorView(conductor: session.conductor)
+                }
             }
         }
         .toolbar {
@@ -180,6 +183,11 @@ struct MacShellView: View {
                     Label(session.isSpawningEve ? "Attaching Eve" : "Add Eve", systemImage: "plus")
                 }
                 .disabled(!session.canSpawnEve)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button { showingConductor.toggle() } label: {
+                    Label("Conductor", systemImage: "sidebar.right")
+                }
             }
         }
         .task { await session.startRuntime() }

@@ -17,6 +17,11 @@ the exact workspace/tile/session AgentOS Eve prompt endpoint. Raw terminal
 bytes are held only in the native sidecar's bounded in-memory tile buffer;
 they do not write Kernel SQLite or canvas projection state.
 
+The Dock remains the permanent left-side surface. Conductor is an on-demand
+read-only inspector so it cannot obscure active terminal tiles; terminal
+movement is committed from the tile header through the existing Kernel canvas
+move command.
+
 ## Live native acceptance
 
 With no model credential configured, the runtime still proved the terminal

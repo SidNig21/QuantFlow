@@ -35,6 +35,7 @@ struct WorkflowCanvas: View {
                 }
             }
             .contentShape(Rectangle())
+            .clipped()
             .gesture(panGesture)
             .simultaneousGesture(magnifyGesture)
         }
