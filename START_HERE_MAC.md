@@ -1,7 +1,7 @@
 # QuantFlow Mac — start here
 
-**Branch:** `quantflow-mac-native`  
-**Platform:** macOS 14+, SwiftUI native app  
+**Branch:** `v8-MacApp`
+**Platform:** macOS 14+, SwiftUI native app
 **Windows reference (frozen):** `quantflow-v7-agentos-anchor` — do not execute from it.
 
 ---
@@ -59,7 +59,7 @@ MCP stays external. Vault stays mirror, not live state.
 
 | Rung | Goal |
 | --- | --- |
-| **M0** | Branch hygiene, archive Windows plan sprawl, Xcode shell |
+| **M0** | Branch hygiene, archive Windows plan sprawl, SwiftUI/Xcode shell |
 | **M1** | Kernel in Swift + tests |
 | **M2** | Canvas SwiftUI + Kernel events |
 | **M3** | Native Mac AgentOS/Eve sidecar |

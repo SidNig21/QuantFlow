@@ -2,23 +2,6 @@
 *.swp
 *.swo
 *~
-docs/*
-!docs/v3/
-!docs/v3/**
-!docs/v4/
-!docs/v4/**
-!docs/v5/
-!docs/v5/**
-!docs/v6/
-!docs/v6/**
-!docs/v7/
-!docs/v7/**
-!docs/adr/
-!docs/adr/**
-!docs/plans/
-!docs/plans/**
-!docs/solutions/
-!docs/solutions/**
 .compound-engineering/*.local.yaml
 .collaborator
 .superpowers
@@ -27,6 +10,10 @@ notes/
 Screenshots/
 .worktrees
 quantflow-electron/logs/
+/.build/
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
 opencode.json
 
 # --- Local agent tooling & generated scratch (not product source) ---

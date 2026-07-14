@@ -1,51 +1,43 @@
-# QuantFlow
+# QuantFlow for Mac
 
-**Where autonomous work becomes visible, coordinated, and provable.**
+QuantFlow is a native macOS operator console for autonomous work. Its canvas
+makes workflows, workers, connections, decisions, and evidence visible without
+turning the UI into a second source of truth.
 
-QuantFlow is an infinite-canvas desktop workspace for orchestrating real multi-agent work. Spawn Hermes, Codex, Claude, and other workers as live terminal tiles; connect them with cables; run task graphs with verification gates and receipts. The **Kernel** owns truth — the canvas only projects it.
+This branch is the Mac rebuild. The Windows/Electron/WSL implementation is
+preserved under [`reference/windows-superseded/`](reference/windows-superseded/)
+for archaeology only.
 
-![QuantFlow canvas — Legend dock and agent spawn rail](assets/readme/canvas-hero.png)
+## Architecture
 
-## What it does today
-
-- **Canvas-first cockpit** — pan/zoom infinite surface; each tile is a real terminal (WSL via herdr, or Windows PTY).
-- **One-click agents** — Legend dock spawns orchestrators and workers; cables declare how work flows between tiles.
-- **Governed task lifecycle** — create → claim → submit → verify → complete; downstream steps wait on verified upstream work (DAG scheduling).
-- **Single task authority** — Kernel commands first; Envoy mirrors for inbox and vault export.
-- **MCP tool surface** — agents call `qf_task_*`, tile/cable ops, and read-only Kernel queries on `:9811`.
-- **Conductor** — in-process planner with approval-gated steps; operator can advance one action at a time.
-- **Obsidian vault mirror** — durable operator memory, canvas skill, and Envoy evidence under your vault.
-
-Early **v4** development on branch `quantflow-v4` (extends the shipped v3 spine). Windows-first; macOS/Linux paths exist but are less dogfooded.
-
-## Quickstart (dev)
-
-**Prerequisites:** Node.js 22+ (the Eve cloud-worker path requires Node 24+ — see [docs/v4/EVE_SETUP.md](docs/v4/EVE_SETUP.md)), Bun. Windows: PowerShell 7 + WSL2 for herdr-backed tiles. See [WINDOWS_DEV_SETUP.md](WINDOWS_DEV_SETUP.md).
-
-```powershell
-git clone https://github.com/SidNig21/QuantFlow.git
-cd QuantFlow
-git checkout quantflow-v4
-cd quantflow-electron
-bun install
-bun run dev
+```text
+Swift Kernel (SQLite) → SwiftUI Canvas → Conductor / Inspector
+                              ↕
+                    native macOS Node sidecar
+                    (Rivet AgentOS + shared Eve server)
 ```
 
-Pair an Obsidian vault (default: `QuantFlow Vault`) so Run Workflow and canvas skills resolve. Configure in-app or via `%USERPROFILE%\.quantflow\vault-config.json`.
+- **Kernel** — the only durable workflow truth; commands mutate, queries read,
+  receipts and events prove transitions.
+- **Canvas** — a SwiftUI projection of Kernel snapshots. It does not own tiles,
+  tasks, or connections.
+- **Conductor** — read-only planning and operator-triggered actions through the
+  Kernel command boundary.
+- **Harness** — the sole runtime adapter boundary.
 
-## Stack
+## Status
 
-Electron · React · Tailwind · xterm.js · herdr (WSL) · SQLite Kernel · MCP adapter · Obsidian mirror
+The active build ladder is [the Mac-native rebuild plan](docs/plans/2026-07-13-002-arch-quantflow-mac-native-rebuild-plan.md).
+M0 provides the native app shell and archived Windows execution material; M1
+adds the SQLite Kernel.
 
-## Docs
+## Development
 
-| Doc | Purpose |
-| --- | --- |
-| [PRODUCT.md](PRODUCT.md) | Product definition |
-| [BUILD_PLAN_V4.md](BUILD_PLAN_V4.md) | Current v4 rung ladder |
-| [KERNEL_CONSTITUTION.md](KERNEL_CONSTITUTION.md) | Authority rules |
-| [AGENTS.md](AGENTS.md) | Agent entry + DOX chain |
+Open `Package.swift` in Xcode 16+ and run the `QuantFlow` executable, or use:
 
-## License
+```bash
+swift run QuantFlow
+swift test
+```
 
-See repository license file.
+The full read order is in [START_HERE_MAC.md](START_HERE_MAC.md).
