@@ -27,6 +27,10 @@ AgentOS actor-session route is `POST /v1/agentos/eve-session` with
 `npm run proof:m3` uses the default runtime ports and requires that no other
 QuantFlow runtime is running first.
 
+`npm run proof:m4-live` is the credential-required acceptance proof for the
+Eve dock path. It inherits `OPENCODE_GO_API_KEY`; do not place the key in a
+file or commit it.
+
 For the Swift-package development app to launch this sidecar itself, set this
 in the Xcode scheme or shell that starts `QuantFlow`:
 
