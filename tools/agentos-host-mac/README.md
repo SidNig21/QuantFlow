@@ -26,3 +26,10 @@ AgentOS actor-session route is `POST /v1/agentos/eve-session` with
 
 `npm run proof:m3` uses the default runtime ports and requires that no other
 QuantFlow runtime is running first.
+
+For the Swift-package development app to launch this sidecar itself, set this
+in the Xcode scheme or shell that starts `QuantFlow`:
+
+```bash
+export QUANTFLOW_RUNTIME_ROOT="/Users/r/Documents/QuantFlow Mac/tools/agentos-host-mac"
+```

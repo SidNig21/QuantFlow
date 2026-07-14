@@ -10,6 +10,7 @@ final class AppSession {
     let kernel: KernelStore
     let projection: CanvasProjection
     private let runtime = RuntimeClient()
+    private let runtimeSupervisor = RuntimeSupervisor()
     var runtimeNotice: String?
     var isSpawningEve = false
 
@@ -80,6 +81,19 @@ final class AppSession {
         }
     }
 
+    func startRuntime() async {
+        switch await runtimeSupervisor.startIfNeeded() {
+        case let .alreadyRunning(promptable):
+            runtimeNotice = promptable ? "Native runtime is already promptable." : "Native runtime is ready; add OPENCODE_GO_API_KEY to make Eve promptable."
+        case let .started(promptable):
+            runtimeNotice = promptable ? "Native runtime started and is promptable." : "Native runtime started; add OPENCODE_GO_API_KEY to make Eve promptable."
+        case .configurationRequired:
+            runtimeNotice = "Set QUANTFLOW_RUNTIME_ROOT to tools/agentos-host-mac, or start the local runtime separately."
+        case let .unavailable(message):
+            runtimeNotice = "Native runtime unavailable: \(message)"
+        }
+    }
+
     func latestEveWorker() -> WorkerInstance? {
         projection.snapshot.workers.last { $0.model == "eve" && $0.runtimeSessionID != nil }
     }
@@ -136,6 +150,7 @@ struct MacShellView: View {
             }
         }
         .sheet(isPresented: $showingEveSession) { EveSessionPanel(session: session) }
+        .task { await session.startRuntime() }
     }
 }
 

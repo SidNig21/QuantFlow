@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .executable(name: "QuantFlow", targets: ["QuantFlowApp"]),
         .executable(name: "QuantFlowKernelProof", targets: ["QuantFlowKernelProof"]),
+        .executable(name: "QuantFlowRuntimeProof", targets: ["QuantFlowRuntimeProof"]),
         .library(name: "QuantFlowCore", targets: ["QuantFlowCore"]),
         .library(name: "QuantFlowRuntime", targets: ["QuantFlowRuntime"])
     ],
@@ -34,6 +35,11 @@ let package = Package(
             name: "QuantFlowKernelProof",
             dependencies: ["QuantFlowCore", "QuantFlowCanvas"],
             path: "Sources/QuantFlowKernelProof"
+        ),
+        .executableTarget(
+            name: "QuantFlowRuntimeProof",
+            dependencies: ["QuantFlowRuntime"],
+            path: "Sources/QuantFlowRuntimeProof"
         )
     ]
 )
