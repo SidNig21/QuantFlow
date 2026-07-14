@@ -8,9 +8,11 @@ let package = Package(
         .executable(name: "QuantFlow", targets: ["QuantFlowApp"]),
         .executable(name: "QuantFlowKernelProof", targets: ["QuantFlowKernelProof"]),
         .executable(name: "QuantFlowRuntimeProof", targets: ["QuantFlowRuntimeProof"]),
+        .executable(name: "QuantFlowHarnessProof", targets: ["QuantFlowHarnessProof"]),
         .library(name: "QuantFlowCore", targets: ["QuantFlowCore"]),
         .library(name: "QuantFlowRuntime", targets: ["QuantFlowRuntime"]),
-        .library(name: "QuantFlowConductor", targets: ["QuantFlowConductor"])
+        .library(name: "QuantFlowConductor", targets: ["QuantFlowConductor"]),
+        .library(name: "QuantFlowHarness", targets: ["QuantFlowHarness"])
     ],
     targets: [
         .systemLibrary(name: "CSQLite", path: "Sources/CSQLite"),
@@ -28,9 +30,10 @@ let package = Package(
         ),
         .target(name: "QuantFlowRuntime", path: "Sources/QuantFlowRuntime", exclude: ["AGENTS.md"]),
         .target(name: "QuantFlowConductor", dependencies: ["QuantFlowCore"], path: "Sources/QuantFlowConductor", exclude: ["AGENTS.md"]),
+        .target(name: "QuantFlowHarness", dependencies: ["QuantFlowCore", "QuantFlowRuntime"], path: "Sources/QuantFlowHarness", exclude: ["AGENTS.md"]),
         .executableTarget(
             name: "QuantFlowApp",
-            dependencies: ["QuantFlowCore", "QuantFlowCanvas", "QuantFlowRuntime", "QuantFlowConductor"],
+            dependencies: ["QuantFlowCore", "QuantFlowCanvas", "QuantFlowRuntime", "QuantFlowConductor", "QuantFlowHarness"],
             path: "Sources/QuantFlowApp"
         ),
         .executableTarget(
@@ -42,6 +45,11 @@ let package = Package(
             name: "QuantFlowRuntimeProof",
             dependencies: ["QuantFlowRuntime"],
             path: "Sources/QuantFlowRuntimeProof"
+        ),
+        .executableTarget(
+            name: "QuantFlowHarnessProof",
+            dependencies: ["QuantFlowHarness", "QuantFlowRuntime"],
+            path: "Sources/QuantFlowHarnessProof"
         )
     ]
 )

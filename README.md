@@ -45,6 +45,8 @@ M5 adds [session-scoped two-Eve cables](docs/proofs/2026-07-13-m5-session-cables
 without ports or a second runtime store.
 M6 adds a [read-only Conductor and Inspector](docs/proofs/2026-07-13-m6-conductor-inspector.md)
 that observe the same Kernel projection as the canvas.
+M7 adds the [Swift Harness fence](docs/proofs/2026-07-13-m7-harness-boundary.md),
+which adapts Eve/AgentOS without receiving Kernel mutation authority.
 
 ## Development
 

@@ -4,6 +4,7 @@ import QuantFlowCore
 import QuantFlowCanvas
 import QuantFlowRuntime
 import QuantFlowConductor
+import QuantFlowHarness
 
 @MainActor
 @Observable
@@ -11,7 +12,7 @@ final class AppSession {
     let kernel: KernelStore
     let projection: CanvasProjection
     let conductor: ConductorProjection
-    private let runtime = RuntimeClient()
+    private let harness = NativeEveHarness()
     private let runtimeSupervisor = RuntimeSupervisor()
     var runtimeNotice: String?
     var isSpawningEve = false
@@ -74,7 +75,7 @@ final class AppSession {
             let worker = try kernel.dispatch(.createWorker(tileID: tile.subjectID, role: "agent", harness: "agentos", model: "eve"))
             Swift.Task {
                 do {
-                    let attached = try await runtime.createAgentOSEveSession(workflowID: projection.workflowID, tileID: tile.subjectID)
+                    let attached = try await harness.attach(workflowID: projection.workflowID, tileID: tile.subjectID)
                     _ = try kernel.dispatch(.bindWorkerRuntime(workerID: worker.subjectID, actorID: attached.actorID, sessionID: attached.sessionID, promptable: attached.promptable))
                     runtimeNotice = attached.promptable
                         ? "Eve is attached and promptable."
@@ -113,7 +114,7 @@ final class AppSession {
 
     func promptEve(_ worker: WorkerInstance, text: String) async throws -> String {
         guard let sessionID = worker.runtimeSessionID else { throw RuntimeError.rejected("This Eve tile has no runtime session.") }
-        return try await runtime.promptEve(workflowID: worker.workflowID, tileID: worker.tileID, sessionID: sessionID, text: text).text
+        return try await harness.prompt(endpoint: .init(workflowID: worker.workflowID, tileID: worker.tileID, sessionID: sessionID), text: text)
     }
 
     /// A Canvas connection is the operator's explicit permission for a peer
@@ -132,12 +133,13 @@ final class AppSession {
               let targetSessionID = target.runtimeSessionID else {
             throw RuntimeError.rejected("The target cable endpoint has no bound Eve session.")
         }
-        let response = try await runtime.exchangeEveCable(
-            from: .init(workspaceID: from.workflowID, tileID: from.tileID, sessionID: fromSessionID),
-            to: .init(workspaceID: target.workflowID, tileID: target.tileID, sessionID: targetSessionID),
+        // Sessions are validated above so the harness is given only Kernel-
+        // authorized runtime endpoints.
+        return try await harness.relay(
+            from: .init(workflowID: from.workflowID, tileID: from.tileID, sessionID: fromSessionID),
+            to: .init(workflowID: target.workflowID, tileID: target.tileID, sessionID: targetSessionID),
             text: text
         )
-        return response.text
     }
 }
 
