@@ -13,6 +13,8 @@ final class AppSession {
     private let runtimeSupervisor = RuntimeSupervisor()
     var runtimeNotice: String?
     var isSpawningEve = false
+    var runtimePromptable = false
+    var canSpawnEve: Bool { runtimePromptable && !isSpawningEve }
 
     init() {
         do {
@@ -56,7 +58,10 @@ final class AppSession {
     }
 
     func spawnEve() {
-        guard !isSpawningEve else { return }
+        guard canSpawnEve else {
+            runtimeNotice = "Eve dock is unavailable until the native runtime is promptable. Set OPENCODE_GO_API_KEY and restart it."
+            return
+        }
         isSpawningEve = true
         runtimeNotice = "Creating Eve tile…"
         do {
@@ -84,12 +89,16 @@ final class AppSession {
     func startRuntime() async {
         switch await runtimeSupervisor.startIfNeeded() {
         case let .alreadyRunning(promptable):
+            runtimePromptable = promptable
             runtimeNotice = promptable ? "Native runtime is already promptable." : "Native runtime is ready; add OPENCODE_GO_API_KEY to make Eve promptable."
         case let .started(promptable):
+            runtimePromptable = promptable
             runtimeNotice = promptable ? "Native runtime started and is promptable." : "Native runtime started; add OPENCODE_GO_API_KEY to make Eve promptable."
         case .configurationRequired:
+            runtimePromptable = false
             runtimeNotice = "Set QUANTFLOW_RUNTIME_ROOT to tools/agentos-host-mac, or start the local runtime separately."
         case let .unavailable(message):
+            runtimePromptable = false
             runtimeNotice = "Native runtime unavailable: \(message)"
         }
     }
@@ -124,7 +133,7 @@ struct MacShellView: View {
                     Button(action: session.spawnEve) {
                         Label("Eve", systemImage: "sparkles")
                     }
-                    .disabled(session.isSpawningEve)
+                    .disabled(!session.canSpawnEve)
                 }
                 if let notice = session.runtimeNotice {
                     Section("RUNTIME") { Text(notice).font(.caption).foregroundStyle(.secondary) }
@@ -140,7 +149,7 @@ struct MacShellView: View {
                 Button(action: session.spawnEve) {
                     Label(session.isSpawningEve ? "Attaching Eve" : "Add Eve", systemImage: "plus")
                 }
-                .disabled(session.isSpawningEve)
+                .disabled(!session.canSpawnEve)
             }
             ToolbarItem(placement: .primaryAction) {
                 Button { showingEveSession = true } label: {
