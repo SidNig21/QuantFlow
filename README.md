@@ -33,6 +33,12 @@ complete: `QuantFlowCore` provides one SQLite Kernel with command audit rows,
 query snapshots, append-only receipts/events, and the enforced task gate. M2
 adds the native pan/zoom SwiftUI canvas: drag operations refresh through the
 event-driven `QuantFlowCanvas` projection rather than local tile state.
+M3 is complete: it adds a clean localhost-only native runtime boundary in
+`tools/agentos-host-mac/` and a typed `QuantFlowRuntime` Swift client. It
+separates a live Eve/AgentOS runtime from a genuinely promptable one, which
+also requires an OpenCode credential; the [M3 proof](docs/proofs/2026-07-13-m3-native-runtime.md)
+records a 52.1 ms warm session acceptance and successful AgentOS actor
+attachment. The dock/prompt surface remains M4.
 
 ## Development
 

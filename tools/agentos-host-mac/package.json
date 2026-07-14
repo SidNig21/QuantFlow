@@ -1,0 +1,19 @@
+{
+  "name": "quantflow-agentos-host-mac",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Native macOS AgentOS and Eve runtime boundary for QuantFlow",
+  "scripts": {
+    "start": "node host.js",
+    "check": "node --check host.js",
+    "test": "node --test *.test.mjs",
+    "proof:m3": "node m3-proof.mjs"
+  },
+  "engines": {
+    "node": ">=24 <26"
+  },
+  "dependencies": {
+    "@rivet-dev/agentos": "0.2.7"
+  }
+}

@@ -7,7 +7,8 @@ let package = Package(
     products: [
         .executable(name: "QuantFlow", targets: ["QuantFlowApp"]),
         .executable(name: "QuantFlowKernelProof", targets: ["QuantFlowKernelProof"]),
-        .library(name: "QuantFlowCore", targets: ["QuantFlowCore"])
+        .library(name: "QuantFlowCore", targets: ["QuantFlowCore"]),
+        .library(name: "QuantFlowRuntime", targets: ["QuantFlowRuntime"])
     ],
     targets: [
         .systemLibrary(name: "CSQLite", path: "Sources/CSQLite"),
@@ -23,9 +24,10 @@ let package = Package(
             path: "Sources/QuantFlowCanvas",
             exclude: ["AGENTS.md"]
         ),
+        .target(name: "QuantFlowRuntime", path: "Sources/QuantFlowRuntime", exclude: ["AGENTS.md"]),
         .executableTarget(
             name: "QuantFlowApp",
-            dependencies: ["QuantFlowCore", "QuantFlowCanvas"],
+            dependencies: ["QuantFlowCore", "QuantFlowCanvas", "QuantFlowRuntime"],
             path: "Sources/QuantFlowApp"
         ),
         .executableTarget(

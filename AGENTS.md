@@ -39,6 +39,8 @@ Sources/QuantFlowCore/
   KernelModels.swift, KernelStore.swift, SQLiteDatabase.swift
 Sources/QuantFlowCanvas/
   CanvasProjection.swift  event-driven, non-authoritative read model
+Sources/QuantFlowRuntime/
+  RuntimeClient.swift     typed localhost runtime boundary (M3)
 Sources/QuantFlowApp/
   Canvas/       SwiftUI infinite canvas and tile gesture projection
   App/          SwiftUI application composition
