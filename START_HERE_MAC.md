@@ -10,10 +10,11 @@
 
 1. **This file** — front door; wins conflicts on Mac branch.
 2. **`docs/plans/2026-07-13-002-arch-quantflow-mac-native-rebuild-plan.md`** — active ladder (M0–M7), scope, acceptance.
-3. **`KERNEL_CONSTITUTION.md`** — Kernel owns truth; mutation/query paths.
-4. **`docs/v3/{GLOSSARY,AUTHORITY_RULES,KERNEL_SCHEMA_V1}.md`** — canonical primitives.
-5. **`docs/v7/HANDOFF-EVE-SESSION-TILE.md`** — Eve display rail (session tile yes; `eve dev` PTY no).
-6. **`tools/agentos-host/AGENTS.md`** — AgentOS sidecar wire protocol (port to native Mac Node, no WSL).
+3. **`docs/audits/2026-07-13-v7-to-v8-native-boundary-audit.md`** — port boundary and unresolved runtime topology; read before M1–M4.
+4. **`KERNEL_CONSTITUTION.md`** — Kernel owns truth; mutation/query paths.
+5. **`docs/v3/{GLOSSARY,AUTHORITY_RULES,KERNEL_SCHEMA_V1}.md`** — canonical primitives.
+6. **`docs/v7/HANDOFF-EVE-SESSION-TILE.md`** — Eve display rail (session tile yes; `eve dev` PTY no).
+7. **`tools/agentos-host/AGENTS.md`** — AgentOS sidecar wire protocol (port to native Mac Node, no WSL).
 7. Nearest **`AGENTS.md`** on the path you are editing.
 
 **Do not execute from:** `REBUILD_QUEUE.md`, `BUILD_PLAN_V4.md`, `docs/v7/PREMIER_PHASE_PLAN.md`, or anything under `reference/windows-superseded/` unless this file points there for archaeology.
@@ -52,6 +53,10 @@ MCP stays external. Vault stays mirror, not live state.
 - Dock click → **promptable in ≤1s** (hard fail >2s) at normal pace.
 - Unlimited Eve tiles over time; no actor-lane pools, no fake-ready input queues.
 - Cables use **session id**, not port.
+
+> **Topology gate:** v7 used a per-actor server plus a warm pool; the shared-server
+> wording above is a V8 hypothesis, not a fact. M3 must measure it according to
+> the boundary audit before choosing an implementation.
 
 ---
 

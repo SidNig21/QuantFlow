@@ -30,7 +30,7 @@ reference_windows_branch: quantflow-v7-agentos-anchor
 
 **Authority:** `KERNEL_CONSTITUTION.md` + `docs/v3/{GLOSSARY,AUTHORITY_RULES,KERNEL_SCHEMA_V1}.md` + Windows v7 learnings (shared Eve server, session-scoped cables, dock actor registry). Windows execution plans (`REBUILD_QUEUE`, premier, v4/v7 ladders) are **archive reference only**.
 
-**Open blockers:** Mac branch scaffold exists locally (per operator) but unbuilt; destination publish name TBD; AgentOS `createSession` serializes on one actor — Mac must not repeat Windows lane/pool hacks.
+**Open blockers:** AgentOS `createSession` serializes on one actor — Mac must not repeat Windows lane/pool hacks. The V8 port boundary audit is binding before M1–M4; it identifies v7's per-actor Eve-server implementation as distinct from the shared-server V8 hypothesis.
 
 ---
 
@@ -166,7 +166,7 @@ M2 — Canvas SwiftUI
 
 M3 — Runtime sidecar (AgentOS + Eve native Mac)
   Copy tools/agentos-host → tools/agentos-host-mac OR same folder with platform branch.
-  Remove WSL assumptions; bind localhost; prewarm shared Eve server + shared Eve actor at boot.
+  Remove WSL assumptions; bind localhost; first measure shared-server/per-session Eve against v7's per-actor server topology. Document the result before selecting a production topology.
   Swift RuntimeClient: HTTP transport matching existing session/prompt/events routes.
   Proof: sidecar health + one Eve session create <100ms on warm server.
 
