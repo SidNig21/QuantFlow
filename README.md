@@ -57,4 +57,13 @@ swift run QuantFlow
 swift run QuantFlowKernelProof
 ```
 
+For a local desktop-app bundle without waiting on release signing:
+
+```bash
+scripts/assemble-development-app.sh
+```
+
+The assembled app is unsigned and uses the native sidecar configured through
+`QUANTFLOW_RUNTIME_ROOT`; it never embeds a model credential.
+
 The full read order is in [START_HERE_MAC.md](START_HERE_MAC.md).
