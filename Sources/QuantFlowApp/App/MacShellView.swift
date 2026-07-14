@@ -151,8 +151,13 @@ struct MacShellView: View {
         NavigationSplitView {
             List {
                 Section("QUANTFLOW") {
-                    Label("Operator Console", systemImage: "point.3.connected.trianglepath.dotted")
-                        .font(.headline)
+                    HStack(spacing: 8) {
+                        Image(systemName: "point.3.connected.trianglepath.dotted").foregroundStyle(QuantFlowTheme.lime)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("QUANTFLOW").font(.caption.weight(.bold)).tracking(1.8)
+                            Text("OPERATOR CONSOLE").font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 Section("KERNEL") {
                     Label("SQLite truth", systemImage: "cylinder.split.1x2")
@@ -170,6 +175,9 @@ struct MacShellView: View {
                 }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .background(QuantFlowTheme.panel)
+            .foregroundStyle(.primary)
             .navigationTitle("QuantFlow")
         } detail: {
             HStack(spacing: 0) {
@@ -194,6 +202,7 @@ struct MacShellView: View {
         }
         .sheet(isPresented: $showingEveSession) { EveSessionPanel(session: session) }
         .task { await session.startRuntime() }
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -229,6 +238,8 @@ private struct EveSessionPanel: View {
         }
         .padding(20)
         .frame(minWidth: 540, minHeight: 380)
+        .background(QuantFlowTheme.canvas)
+        .preferredColorScheme(.dark)
     }
 
     private func send() {

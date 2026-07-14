@@ -6,12 +6,12 @@ struct ConductorInspectorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Conductor", systemImage: "point.3.connected.trianglepath.dotted")
-                .font(.headline)
+            Label("CONDUCTOR", systemImage: "point.3.connected.trianglepath.dotted")
+                .font(.caption.weight(.bold)).tracking(1.4).foregroundStyle(QuantFlowTheme.cyan)
             Text("READ-ONLY KERNEL ASSESSMENT").font(.caption2.weight(.medium)).tracking(0.9).foregroundStyle(.secondary)
-            metric("Open tasks", conductor.openTasks.count, tint: .cyan)
+            metric("Open tasks", conductor.openTasks.count, tint: QuantFlowTheme.cyan)
             metric("Blocked", conductor.blockers.count, tint: .red)
-            metric("Active workers", conductor.activeWorkers.count, tint: .mint)
+            metric("Active workers", conductor.activeWorkers.count, tint: QuantFlowTheme.lime)
             Divider()
             Text("Tasks").font(.subheadline.weight(.semibold))
             ScrollView {
@@ -30,7 +30,8 @@ struct ConductorInspectorView: View {
         }
         .padding(14)
         .frame(width: 240, alignment: .topLeading)
-        .background(.ultraThinMaterial)
+        .background(QuantFlowTheme.panel)
+        .overlay(alignment: .leading) { Rectangle().fill(QuantFlowTheme.line).frame(width: 1) }
     }
 
     private func metric(_ label: String, _ value: Int, tint: Color) -> some View {
