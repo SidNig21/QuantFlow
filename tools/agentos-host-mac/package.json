@@ -9,7 +9,8 @@
     "check": "node --check host.js",
     "test": "node --test *.test.mjs",
     "proof:m3": "node m3-proof.mjs",
-    "proof:m4-live": "node m4-live-proof.mjs"
+    "proof:m4-live": "node m4-live-proof.mjs",
+    "proof:m5-live": "node m5-live-proof.mjs"
   },
   "engines": {
     "node": ">=24 <26"

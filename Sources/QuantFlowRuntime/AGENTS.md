@@ -12,3 +12,7 @@ rungs.
 workflow state. During Swift-package development it needs
 `QUANTFLOW_RUNTIME_ROOT` pointing at `tools/agentos-host-mac`; release
 packaging will replace that development locator with an app-bundled runtime.
+
+M5 cable exchange accepts two session-scoped endpoints only. The App layer
+must authorize their relationship from a Kernel `Connection` before it calls
+this adapter; ports never identify a peer.

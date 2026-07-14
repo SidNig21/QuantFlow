@@ -111,6 +111,30 @@ final class AppSession {
         guard let sessionID = worker.runtimeSessionID else { throw RuntimeError.rejected("This Eve tile has no runtime session.") }
         return try await runtime.promptEve(workflowID: worker.workflowID, tileID: worker.tileID, sessionID: sessionID, text: text).text
     }
+
+    /// A Canvas connection is the operator's explicit permission for a peer
+    /// exchange. The runtime never discovers or persists Kernel connections.
+    func exchangeEveCable(connectionID: KernelID, fromWorkerID: KernelID, text: String) async throws -> String {
+        guard let connection = projection.snapshot.connections.first(where: { $0.id == connectionID }) else {
+            throw KernelError.missing(connectionID)
+        }
+        guard let from = projection.snapshot.workers.first(where: { $0.id == fromWorkerID }),
+              let fromSessionID = from.runtimeSessionID,
+              from.tileID == connection.fromTileID || from.tileID == connection.toTileID else {
+            throw RuntimeError.rejected("The source worker is not a bound endpoint of this cable.")
+        }
+        let targetTileID = from.tileID == connection.fromTileID ? connection.toTileID : connection.fromTileID
+        guard let target = projection.snapshot.workers.first(where: { $0.tileID == targetTileID && $0.model == "eve" }),
+              let targetSessionID = target.runtimeSessionID else {
+            throw RuntimeError.rejected("The target cable endpoint has no bound Eve session.")
+        }
+        let response = try await runtime.exchangeEveCable(
+            from: .init(workspaceID: from.workflowID, tileID: from.tileID, sessionID: fromSessionID),
+            to: .init(workspaceID: target.workflowID, tileID: target.tileID, sessionID: targetSessionID),
+            text: text
+        )
+        return response.text
+    }
 }
 
 struct MacShellView: View {

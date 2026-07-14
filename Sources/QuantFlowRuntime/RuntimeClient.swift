@@ -28,6 +28,13 @@ public actor RuntimeClient {
     }
 
     public struct EvePrompt: Codable, Equatable, Sendable { public let ok: Bool; public let text: String }
+    public struct EveCableEndpoint: Codable, Equatable, Sendable {
+        public let workspaceID: String
+        public let tileID: String
+        public let sessionID: String
+        public init(workspaceID: String, tileID: String, sessionID: String) { self.workspaceID = workspaceID; self.tileID = tileID; self.sessionID = sessionID }
+    }
+    public struct EveCableExchange: Codable, Equatable, Sendable { public let ok: Bool; public let fromTileID: String; public let toTileID: String; public let text: String }
 
     private let baseURL: URL
     private let session: URLSession
@@ -55,6 +62,13 @@ public actor RuntimeClient {
         try await request(path: "/v1/agentos/eve-session/\(sessionID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? sessionID)/prompt", method: "POST", body: PromptRequest(workspaceID: workflowID, tileID: tileID, text: text))
     }
 
+    /// The caller must first authorize the relationship against a Kernel
+    /// `Connection`. This localhost adapter accepts only session-scoped IDs;
+    /// a port is never a cable endpoint.
+    public func exchangeEveCable(from: EveCableEndpoint, to: EveCableEndpoint, text: String) async throws -> EveCableExchange {
+        try await request(path: "/v1/cables/exchange", method: "POST", body: CableRequest(from: from, to: to, text: text))
+    }
+
     private func request<Response: Decodable, Body: Encodable>(path: String, method: String, body: Body?) async throws -> Response {
         var request = URLRequest(url: baseURL.appending(path: path))
         request.httpMethod = method
@@ -75,6 +89,7 @@ public actor RuntimeClient {
     private struct ProbeRequest: Encodable { let message: String }
     private struct ActorRequest: Encodable { let workspaceID: String; let tileID: String }
     private struct PromptRequest: Encodable { let workspaceID: String; let tileID: String; let text: String }
+    private struct CableRequest: Encodable { let from: EveCableEndpoint; let to: EveCableEndpoint; let text: String }
     private struct RuntimeFailure: Decodable { let error: String }
 }
 

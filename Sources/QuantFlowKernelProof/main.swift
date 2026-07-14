@@ -12,6 +12,9 @@ struct KernelProofMain {
             let eve = try kernel.dispatch(.createTile(workflowID: workflow.subjectID, displayName: "Eve", kind: .worker, x: 20, y: 40))
             let worker = try kernel.dispatch(.createWorker(tileID: eve.subjectID, role: "agent", harness: "agentos", model: "eve"))
             _ = try kernel.dispatch(.bindWorkerRuntime(workerID: worker.subjectID, actorID: "actor-proof", sessionID: "session-proof", promptable: false))
+            let evePeer = try kernel.dispatch(.createTile(workflowID: workflow.subjectID, displayName: "Eve peer", kind: .worker, x: 480, y: 40))
+            let peerWorker = try kernel.dispatch(.createWorker(tileID: evePeer.subjectID, role: "agent", harness: "agentos", model: "eve"))
+            _ = try kernel.dispatch(.bindWorkerRuntime(workerID: peerWorker.subjectID, actorID: "actor-peer-proof", sessionID: "session-peer-proof", promptable: false))
             let attached = try kernel.snapshot(workflowID: workflow.subjectID).workers.first { $0.id == worker.subjectID }
             guard attached?.runtimeActorID == "actor-proof", attached?.runtimeSessionID == "session-proof" else { throw KernelError.database("runtime binding was not queryable") }
             let projection = try CanvasProjection(kernel: kernel, workflowID: workflow.subjectID)
@@ -29,16 +32,16 @@ struct KernelProofMain {
             }
             _ = try kernel.dispatch(.postReceipt(workflowID: workflow.subjectID, taskID: task.subjectID, type: .verificationPassed, summary: "Native SQLite proof passed."))
             _ = try kernel.dispatch(.transitionTask(taskID: task.subjectID, to: .complete))
-            _ = try kernel.dispatch(.createConnection(workflowID: workflow.subjectID, fromTileID: eve.subjectID, toTileID: eve.subjectID, semantic: .verification, label: "self-check"))
+            _ = try kernel.dispatch(.createConnection(workflowID: workflow.subjectID, fromTileID: eve.subjectID, toTileID: evePeer.subjectID, semantic: .contextFlow, label: "session cable"))
 
             let snapshot = projection.snapshot
             try require(snapshot.tiles.first?.x == 360 && snapshot.tiles.first?.y == 240, "tile move did not persist")
-            try require(snapshot.workers.count == 1, "worker was not stored")
+            try require(snapshot.workers.count == 2, "two bound Eve workers were not stored")
             try require(snapshot.tasks.first?.status == .complete, "task did not reach complete through verification")
             try require(snapshot.receipts.count == 7, "receipt chain is incomplete")
-            try require(snapshot.connections.count == 1, "typed connection was not stored")
-            try require((try kernel.events(workflowID: workflow.subjectID)).count == 13, "event chain is incomplete")
-            print("M4 KERNEL PROOF PASSED · SQLite commands, runtime binding, projection refresh, receipts, and task gates are live.")
+            try require(snapshot.connections.first?.semantic == .contextFlow, "session-scoped cable connection was not stored")
+            try require((try kernel.events(workflowID: workflow.subjectID)).count == 16, "event chain is incomplete")
+            print("M5 KERNEL PROOF PASSED · SQLite commands, runtime bindings, typed cable, projection refresh, receipts, and task gates are live.")
         } catch {
             fputs("M1 KERNEL PROOF FAILED: \(error.localizedDescription)\n", stderr)
             exit(1)

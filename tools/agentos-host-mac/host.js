@@ -98,7 +98,7 @@ class EveServer {
 }
 
 class AgentOSRuntime {
-  constructor(config) { this.config = config; this.state = "stopped"; this.error = null; this.registry = null; this.client = null; }
+  constructor(config) { this.config = config; this.state = "stopped"; this.error = null; this.registry = null; this.client = null; this.tilePromptRails = new Map(); }
 
   async start() {
     if (this.state === "ready") return;
@@ -146,11 +146,44 @@ class AgentOSRuntime {
   async promptEveActorSession({ workspaceID, tileID, sessionID, text }) {
     if (this.state !== "ready") throw new Error(this.error ?? "AgentOS runtime is not ready");
     if (!credentialConfigured()) throw new Error("OPENCODE_GO_API_KEY is required before Eve can accept a prompt");
-    const handle = await this.client.agentos.getOrCreate([workspaceID, tileID]);
-    const result = await handle.sendPrompt(sessionID, text);
-    const textResult = typeof result?.text === "string" ? result.text : JSON.stringify(result);
-    return { text: textResult, result };
+    return this.enqueueTilePrompt(tileID, async () => {
+      const handle = await this.client.agentos.getOrCreate([workspaceID, tileID]);
+      const result = await handle.sendPrompt(sessionID, text);
+      const textResult = typeof result?.text === "string" ? result.text : JSON.stringify(result);
+      return { text: textResult, result };
+    });
   }
+
+  enqueueTilePrompt(tileID, operation) {
+    const key = String(tileID ?? "").trim();
+    if (!key) throw new Error("tileID is required for the prompt rail");
+    const previous = this.tilePromptRails.get(key) ?? Promise.resolve();
+    const queued = previous.then(operation, operation);
+    this.tilePromptRails.set(key, queued.catch(() => {}));
+    return queued;
+  }
+
+  async exchangeEveCable({ from, to, text }) {
+    if (!from || !to || from.tileID === to.tileID || from.sessionID === to.sessionID) {
+      throw new Error("cable endpoints must be two distinct Eve tile sessions");
+    }
+    const relayText = [
+      `Inbound session-scoped cable message from tile ${from.tileID}:`,
+      text,
+      "Reply directly and concisely to this peer message.",
+    ].join("\n");
+    const reply = await this.promptEveActorSession({ ...to, text: relayText });
+    return { fromTileID: from.tileID, toTileID: to.tileID, text: reply.text };
+  }
+}
+
+function cableEndpoint(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const workspaceID = String(source.workspaceID ?? "").trim();
+  const tileID = String(source.tileID ?? "").trim();
+  const sessionID = String(source.sessionID ?? "").trim();
+  if (!workspaceID || !tileID || !sessionID) throw new Error("cable endpoint requires workspaceID, tileID, and sessionID");
+  return { workspaceID, tileID, sessionID };
 }
 
 async function waitForEnvoy(enginePort, timeoutMs = 90_000) {
@@ -221,6 +254,13 @@ export function makeServer(runtime) {
         const sessionID = decodeURIComponent(promptMatch[1]);
         const responseBody = await runtime.agentos.promptEveActorSession({ workspaceID, tileID, sessionID, text });
         return sendJSON(response, 200, { ok: true, ...responseBody });
+      }
+      if (request.method === "POST" && url.pathname === "/v1/cables/exchange") {
+        const body = await readJSON(request);
+        const text = String(body.text ?? "").trim();
+        if (!text) return sendJSON(response, 400, { error: "text is required" });
+        const result = await runtime.agentos.exchangeEveCable({ from: cableEndpoint(body.from), to: cableEndpoint(body.to), text });
+        return sendJSON(response, 200, { ok: true, ...result });
       }
       return sendJSON(response, 404, { error: "not found" });
     } catch (error) {
