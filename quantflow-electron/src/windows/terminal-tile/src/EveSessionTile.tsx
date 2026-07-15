@@ -14,6 +14,13 @@ type Snapshot = {
   error: string | null;
 };
 
+// Snapshot poll cadence. A streaming turn needs a tight loop; an idle or
+// hidden tile does not — dozens of idle Eve tiles each refetching the full
+// (and growing) snapshot at the active rate is pure overhead, so back off.
+const ACTIVE_POLL_MS = 500;
+const IDLE_POLL_MS = 2_000;
+const HIDDEN_POLL_MS = 10_000;
+
 function projectEvents(events: unknown[]): EveMessageData {
   const reducer = defaultMessageReducer();
   return events.reduce(
@@ -51,11 +58,15 @@ export function EveSessionTile({ tileId }: { tileId: string }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const latestRevision = useRef(-1);
+  const latestPhase = useRef<Snapshot["phase"]>("idle");
+  const wakeRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let disposed = false;
     let refreshing = false;
+    let timer: number | undefined;
     latestRevision.current = -1;
+    latestPhase.current = "idle";
     // Always fetch the full snapshot (startIndex 0) and replace state.
     // An incremental append protocol lived here briefly and lost events to a
     // bookkeeping race during cold registration (blank tile B, 2026-07-13);
@@ -67,6 +78,7 @@ export function EveSessionTile({ tileId }: { tileId: string }) {
       try {
         const result = await window.api.agentosEveSnapshot(tileId);
         if (disposed || !result.ok || !result.snapshot) return;
+        latestPhase.current = result.snapshot.phase;
         if (result.snapshot.revision !== latestRevision.current) {
           latestRevision.current = result.snapshot.revision;
           setSnapshot(result.snapshot);
@@ -77,11 +89,37 @@ export function EveSessionTile({ tileId }: { tileId: string }) {
         refreshing = false;
       }
     };
+
+    const nextDelayMs = () => {
+      if (document.hidden) return HIDDEN_POLL_MS;
+      return latestPhase.current === "working" ? ACTIVE_POLL_MS : IDLE_POLL_MS;
+    };
+    const scheduleNext = () => {
+      if (disposed) return;
+      timer = window.setTimeout(() => { void tick(); }, nextDelayMs());
+    };
+    const tick = async () => {
+      await refresh();
+      scheduleNext();
+    };
+    // Let a fresh submit or a return-to-visible pull the next poll forward
+    // instead of waiting out the idle backoff.
+    const wake = () => {
+      if (disposed) return;
+      if (timer) window.clearTimeout(timer);
+      void tick();
+    };
+    wakeRef.current = wake;
+    const onVisible = () => { if (!document.hidden) wake(); };
+    document.addEventListener("visibilitychange", onVisible);
+
     void refresh();
-    const refreshTimer = window.setInterval(() => { void refresh(); }, 500);
+    scheduleNext();
     return () => {
       disposed = true;
-      window.clearInterval(refreshTimer);
+      wakeRef.current = () => {};
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [tileId]);
 
@@ -100,6 +138,10 @@ export function EveSessionTile({ tileId }: { tileId: string }) {
       const result = await window.api.agentosEvePrompt(tileId, text);
       if (!result.ok) throw new Error(result.error ?? "Prompt failed");
       setDraft("");
+      // The turn is now starting; poll at the active rate immediately rather
+      // than waiting out the idle backoff for the reply to appear.
+      latestPhase.current = "working";
+      wakeRef.current();
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : String(error));
     } finally {
