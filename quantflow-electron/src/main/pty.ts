@@ -79,13 +79,16 @@ const dataSockets = new Map<string, net.Socket>();
  */
 const sidecarSessionIds = new Set<string>();
 const agentosSessionIds = new Set<string>();
-const sidecarPowerShellSessionIds = new Set<string>();
 const pendingPtyData = new Map<string, Buffer[]>();
 const pendingPtyDataTimers = new Map<
   string,
   ReturnType<typeof setTimeout>
 >();
-const WINDOWS_POWERSHELL_PTY_BATCH_MS = 16;
+// Coalesce PTY output into ~one frame before crossing IPC. Applied to every
+// Windows sidecar session (PowerShell, WSL, and herdr panes), not just
+// PowerShell: chatty WSL/agent output (e.g. Eve a2a) previously streamed every
+// chunk unbatched and flooded the renderer.
+const SIDECAR_PTY_BATCH_MS = 16;
 const ptyOutputListeners = new Map<string, Set<(data: string) => void>>();
 
 function notifyPtyOutputListeners(sessionId: string, data: Buffer | string): void {
@@ -196,10 +199,10 @@ function sendToSender(
   }
 }
 
-function shouldBatchWindowsPowerShellOutput(sessionId: string): boolean {
+function shouldBatchSidecarOutput(sessionId: string): boolean {
   return (
     process.platform === "win32"
-    && sidecarPowerShellSessionIds.has(sessionId)
+    && sidecarSessionIds.has(sessionId)
   );
 }
 
@@ -241,7 +244,7 @@ function forwardPtyData(
   // No pty:status-changed, canvas save, or Kernel work per chunk.
   ingestPtyStreamBytes(sessionId, data);
   notifyPtyOutputListeners(sessionId, data);
-  if (!shouldBatchWindowsPowerShellOutput(sessionId)) {
+  if (!shouldBatchSidecarOutput(sessionId)) {
     sendToSender(senderWebContentsId, "pty:data", {
       sessionId,
       data,
@@ -258,7 +261,7 @@ function forwardPtyData(
       sessionId,
       setTimeout(
         () => flushPendingPtyData(sessionId, senderWebContentsId),
-        WINDOWS_POWERSHELL_PTY_BATCH_MS,
+        SIDECAR_PTY_BATCH_MS,
       ),
     );
   }
@@ -344,7 +347,6 @@ async function doEnsureSidecar(): Promise<void> {
         clearPendingPtyData(sessionId);
         dataSockets.get(sessionId)?.destroy();
         dataSockets.delete(sessionId);
-        sidecarPowerShellSessionIds.delete(sessionId);
         deleteSessionMeta(sessionId);
         if (!shuttingDown) {
           endPtySession(sessionId, exitCode);
@@ -372,6 +374,15 @@ function fixSpawnHelperPerms(): void {
 async function spawnSidecar(): Promise<void> {
   fixSpawnHelperPerms();
   cleanupEndpoint(SIDECAR_SOCKET_PATH);
+  // We only reach here when the recorded sidecar was unreachable. If a stale
+  // process is still holding the old PID (e.g. after a crash), kill it so we
+  // don't stack multiple detached sidecars — each keeps its own PTY subtree.
+  try {
+    const stalePid = parseInt(fs.readFileSync(SIDECAR_PID_PATH, "utf-8").trim(), 10);
+    if (Number.isInteger(stalePid) && stalePid > 0) {
+      try { process.kill(stalePid); } catch {}
+    }
+  } catch {}
   try { fs.unlinkSync(SIDECAR_PID_PATH); } catch {}
 
   const token = crypto.randomBytes(16).toString("hex");
@@ -865,9 +876,6 @@ async function createSessionInner(
   );
 
   sidecarSessionIds.add(sessionId);
-  if (resolvedTarget.target === "powershell") {
-    sidecarPowerShellSessionIds.add(sessionId);
-  }
 
   if (!zshIntegrated) {
     injectOsc7Hook(sessionId, resolvedTarget.command);
@@ -991,9 +999,6 @@ export async function reconnectSession(
     const shell = meta?.command || meta?.shell || process.env.SHELL || "/bin/zsh";
     const displayName = meta?.displayName || displayBasename(shell) || "shell";
     sidecarSessionIds.add(sessionId);
-    if (meta?.target === "powershell") {
-      sidecarPowerShellSessionIds.add(sessionId);
-    }
 
     return withOptionalFields({
       sessionId,
@@ -1155,7 +1160,6 @@ export async function killSession(
       // Session may already be dead
     }
     sidecarSessionIds.delete(sessionId);
-    sidecarPowerShellSessionIds.delete(sessionId);
     clearPendingPtyData(sessionId);
     deleteSessionMeta(sessionId);
     endPtySession(sessionId);
@@ -1177,7 +1181,6 @@ export async function killSession(
   }
 
   clearPendingPtyData(sessionId);
-  sidecarPowerShellSessionIds.delete(sessionId);
   deleteSessionMeta(sessionId);
   endPtySession(sessionId);
 }
@@ -1186,14 +1189,37 @@ export function listSessions(): string[] {
   return [...new Set([...sessions.keys(), ...sidecarSessionIds])];
 }
 
+// Kill every sidecar-backed session on the sidecar itself. `killAll`/
+// `killAllAndWait` historically only cleared the local id sets, which left the
+// detached sidecar's PTYs (and their WSL/agent process trees) alive across app
+// quit. Each run then orphaned another sidecar subtree until the machine ran
+// out of memory. Sending `session.kill` for every tracked id lets the sidecar
+// reap those PTYs so the subsequent idle check can shut the sidecar down.
+async function killAllSidecarSessions(): Promise<void> {
+  const ids = [...sidecarSessionIds];
+  sidecarSessionIds.clear();
+  if (!sidecarClient || ids.length === 0) return;
+  await Promise.all(
+    ids.map(async (id) => {
+      dataSockets.get(id)?.destroy();
+      dataSockets.delete(id);
+      try {
+        await sidecarClient!.killSession(id);
+      } catch {
+        // Session may already be dead.
+      }
+    }),
+  );
+}
+
 export function killAll(): void {
   shuttingDown = true;
   for (const [, sock] of dataSockets) {
     sock.destroy();
   }
   dataSockets.clear();
-  sidecarSessionIds.clear();
-  sidecarPowerShellSessionIds.clear();
+  // Best-effort reap of sidecar PTYs; do not block the sync path.
+  void killAllSidecarSessions();
   for (const sessionId of pendingPtyDataTimers.keys()) {
     clearPendingPtyData(sessionId);
   }
@@ -1206,9 +1232,8 @@ export function killAll(): void {
 
 const KILL_ALL_TIMEOUT_MS = 2000;
 
-export function killAllAndWait(): Promise<void> {
+export async function killAllAndWait(): Promise<void> {
   shuttingDown = true;
-  if (sessions.size === 0) return Promise.resolve();
 
   const pending: Promise<void>[] = [];
   for (const [id, session] of sessions) {
@@ -1226,10 +1251,15 @@ export function killAllAndWait(): Promise<void> {
     setTimeout(resolve, KILL_ALL_TIMEOUT_MS),
   );
 
-  return Promise.race([
+  await Promise.race([
     Promise.all(pending).then(() => {}),
     timeout,
   ]);
+
+  // Reap detached sidecar PTYs so `shutdownSidecarIfIdle` finds the sidecar
+  // idle and can actually terminate it instead of leaving it (and its WSL
+  // children) running after quit.
+  await killAllSidecarSessions();
 }
 
 export function destroyAll(): void {

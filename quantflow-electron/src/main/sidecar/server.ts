@@ -25,6 +25,11 @@ import {
 
 const require = createRequire(import.meta.url);
 
+// Grace window before a controller-less sidecar reaps its sessions and exits.
+// Long enough to survive a normal reconnect (app restart / client refresh),
+// short enough that a crashed controller does not leave orphans lingering.
+const ORPHAN_SHUTDOWN_MS = 15_000;
+
 interface ServerOptions {
   controlSocketPath: string;
   sessionSocketDir: string;
@@ -60,6 +65,7 @@ export class SidecarServer {
   private controlClients = new Set<net.Socket>();
   private sessions = new Map<string, Session>();
   private startTime = Date.now();
+  private orphanTimer: NodeJS.Timeout | null = null;
   private readonly opts: Required<ServerOptions>;
 
   constructor(opts: ServerOptions) {
@@ -239,6 +245,11 @@ export class SidecarServer {
 
   private handleControlClient(sock: net.Socket): void {
     this.controlClients.add(sock);
+    // A live controller cancels any pending orphan self-shutdown.
+    if (this.orphanTimer) {
+      clearTimeout(this.orphanTimer);
+      this.orphanTimer = null;
+    }
     let buf = "";
 
     sock.on("data", (chunk) => {
@@ -253,11 +264,29 @@ export class SidecarServer {
 
     sock.on("close", () => {
       this.controlClients.delete(sock);
+      this.scheduleOrphanShutdown();
     });
 
     sock.on("error", () => {
       this.controlClients.delete(sock);
+      this.scheduleOrphanShutdown();
     });
+  }
+
+  // If the controlling Electron process goes away without a graceful
+  // `sidecar.shutdown` (e.g. it crashed or was force-quit mid a2a test), this
+  // detached sidecar would otherwise keep its PTYs — and their WSL/agent
+  // process trees — alive forever, leaking memory on every run. When no
+  // controller remains, reap all sessions and exit after a short grace window
+  // that a normal reconnect cancels.
+  private scheduleOrphanShutdown(): void {
+    if (this.controlClients.size > 0 || this.orphanTimer) return;
+    this.orphanTimer = setTimeout(() => {
+      this.orphanTimer = null;
+      if (this.controlClients.size > 0) return;
+      void this.shutdown().then(() => process.exit(0));
+    }, ORPHAN_SHUTDOWN_MS);
+    this.orphanTimer.unref?.();
   }
 
   private handleRpcMessage(sock: net.Socket, line: string): void {
